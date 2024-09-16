@@ -1,0 +1,159 @@
+{% load static %}
+<nav id="sidebar" class="sidebar js-sidebar">
+    <div class="sidebar-content js-simplebar">
+        <a class="sidebar-brand d-flex align-items-center" href="{% url 'home' %}">
+            <img src="{% static 'img/logo/logo.png' %}" alt="Карта водно-зеленой инфраструктуры" class="img-fluid">
+            <span class="ms-1 display-6 font-weight-bold text-uppercase text-white fs-7">ВГП №3</span>
+        </a>
+
+        <ul class="sidebar-nav">
+            {% block sidebar_nav %}
+                <!-- Здесь рендерится содержимое основного меню -->
+            {% endblock %}
+        </ul>
+
+
+        <div class="sidebar-cta">
+            <div class="sidebar-cta-content text-center">
+                <img src="{% static 'img/logo/img.png' %}" alt="Lanit Logo" class="img-fluid">
+                <strong class="d-inline-block mb-2">МозаикаМед</strong>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.category-filter').forEach(function (link) {
+            link.addEventListener('click', function () {
+                document.querySelectorAll('.category-filter').forEach(function (otherLink) {
+                    if (otherLink !== link) {
+                        otherLink.classList.remove('active');
+                        var sublist = otherLink.nextElementSibling;
+                        if (sublist) {
+                            sublist.style.display = 'none';
+                        }
+                    }
+                });
+                var sublist = link.nextElementSibling;
+                if (sublist) {
+                    if (sublist.style.display === 'none' || sublist.style.display === '') {
+                        sublist.style.display = 'block';
+                    } else {
+                        sublist.style.display = 'none';
+                    }
+                }
+                link.classList.toggle('active');
+                updateMap();
+            });
+        });
+
+        document.querySelectorAll('.type-filter').forEach(function (link) {
+            link.addEventListener('click', function () {
+                document.querySelectorAll('.type-filter').forEach(function (otherLink) {
+                    otherLink.classList.remove('active');
+                });
+                link.classList.add('active');
+                updateMap();
+            });
+        });
+
+        document.getElementById('reset-filters').addEventListener('click', function () {
+            document.querySelectorAll('.category-filter, .type-filter').forEach(function (link) {
+                link.classList.remove('active');
+                var sublist = link.nextElementSibling;
+                if (sublist) {
+                    sublist.style.display = 'none';
+                }
+            });
+            updateMap();
+        });
+
+        function updateMap() {
+            var selectedCategories = Array.from(document.querySelectorAll('.category-filter.active')).map(function (link) {
+                return link.dataset.categoryId;
+            });
+
+            var selectedTypes = Array.from(document.querySelectorAll('.type-filter.active')).map(function (link) {
+                return link.dataset.typeId;
+            });
+
+            fetch(`/update_map/?categories=${selectedCategories.join(',')}&types=${selectedTypes.join(',')}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (typeof window.updateMarkers === 'function') {
+                        window.updateMarkers(data);
+                    }
+                });
+        }
+    });
+</script>
+
+
+<style>
+    .navbar-brand {
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .navbar-brand-full {
+        display: inline;
+    }
+
+    .navbar-brand-short {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        .navbar-brand-full {
+            display: none;
+        }
+
+        .navbar-brand-short {
+            display: inline;
+        }
+    }
+
+    .btn-link {
+        text-decoration: none;
+    }
+
+    .btn-link:hover {
+        text-decoration: none;
+    }
+
+    .category-filter.active, .type-filter.active {
+        background-color: rgba(0, 123, 255, 0.1); /* светло-синий фон для активного состояния */
+        border-left: 3px solid #007bff; /* синяя линия слева для активного состояния */
+    }
+
+    .sidebar-nav .sidebar-item .type-filter {
+        padding-left: 40px; /*  для смещения типов*/
+
+    }
+
+    .sidebar-cta {
+        padding: 10%;
+        margin: 10%;
+    }
+
+    .sidebar-cta-content {
+        padding: 5%;
+        margin: 5%;
+    }
+
+    .sidebar-dropdown {
+        max-height: 300px; /* Ограничение высоты для прокрутки */
+        overflow-y: auto; /* Вертикальная прокрутка, если элементов много */
+    }
+
+    .sidebar-dropdown::-webkit-scrollbar {
+        width: 8px; /* Ширина полосы прокрутки */
+    }
+
+    .sidebar-dropdown::-webkit-scrollbar-thumb {
+        background-color: #007bff; /* Цвет полосы прокрутки */
+        border-radius: 4px; /* Радиус для скругления */
+    }
+
+</style>
