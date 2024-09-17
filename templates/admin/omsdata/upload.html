@@ -1,0 +1,22 @@
+{% extends 'admin/base_site.html' %}
+
+{% block content %}
+    <h1>Загрузить файл CSV</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="file" required>
+        <button type="submit" class="btn btn-primary">Загрузить</button>
+    </form>
+
+    {% if missing_fields %}
+        <div class="error">
+            <p>Отсутствуют поля модели: {{ missing_fields }}</p>
+        </div>
+    {% endif %}
+
+    {% if extra_fields_warning %}
+        <div class="warning">
+            <p>В файле содержатся дополнительные поля: {{ extra_fields_warning }}</p>
+        </div>
+    {% endif %}
+{% endblock %}
