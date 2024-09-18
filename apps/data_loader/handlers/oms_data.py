@@ -5,7 +5,8 @@ from apps.data_loader.models.oms_data import OMSData
 
 
 def handle_oms_data(file, request):
-    df = pd.read_csv(file, sep=';', low_memory=False, na_values="-", dtype='str')
+    df = pd.read_csv(file, sep=';', low_memory=False, dtype='str')
+    df.fillna('-', inplace=True)
 
     required_fields = ['Талон']  # Обязательно
     model_fields = ['Талон', 'Источник', 'ID источника', 'Номер счёта', 'Дата выгрузки', 'Причина аннулирования',
@@ -43,26 +44,26 @@ def handle_oms_data(file, request):
     # Загружаем данные в базу данных
     for _, row in df.iterrows():
         data, created = OMSData.objects.update_or_create(
-            talon=row.get('Талон', ''),
+            talon=row.get('Талон', '-'),
             defaults={
                 'source': row.get('Источник', ''),
                 'source_id': row.get('ID источника', ''),
                 'account_number': row.get('Номер счёта', ''),
-                'upload_date': pd.to_datetime(row.get('Дата выгрузки', ''), errors='coerce'),
+                'upload_date': row.get('Дата выгрузки', ''),
                 'cancellation_reason': row.get('Причина аннулирования', ''),
                 'status': row.get('Статус', ''),
                 'talon_type': row.get('Тип талона', ''),
                 'goal': row.get('Цель', ''),
                 'federal_goal': row.get('Фед. цель', ''),
                 'patient': row.get('Пациент', ''),
-                'birth_date': pd.to_datetime(row.get('Дата рождения', ''), errors='coerce'),
+                'birth_date': row.get('Дата рождения', ''),
                 'gender': row.get('Пол', ''),
                 'policy': row.get('Полис', ''),
                 'smo_code': row.get('Код СМО', ''),
                 'insurance': row.get('Страховая', ''),
                 'enp': row.get('ЕНП', ''),
-                'treatment_start': pd.to_datetime(row.get('Начало лечения', ''), errors='coerce'),
-                'treatment_end': pd.to_datetime(row.get('Окончание лечения', ''), errors='coerce'),
+                'treatment_start': row.get('Начало лечения', ''),
+                'treatment_end': row.get('Окончание лечения', ''),
                 'doctor': row.get('Врач', ''),
                 'doctor_profile': row.get('Врач (Профиль МП)', ''),
                 'staff_position': row.get('Должность мед.персонала (V021)', ''),
@@ -71,9 +72,9 @@ def handle_oms_data(file, request):
                 'medical_assistance_type': row.get('Вид мед. помощи', ''),
                 'disease_type': row.get('Тип заболевания', ''),
                 'main_disease_character': row.get('Характер основного заболевания', ''),
-                'visits': pd.to_numeric(row.get('Посещения', ''), errors='coerce'),
-                'mo_visits': pd.to_numeric(row.get('Посещения в МО', ''), errors='coerce'),
-                'home_visits': pd.to_numeric(row.get('Посещения на Дому', ''), errors='coerce'),
+                'visits': row.get('Посещения', ''),
+                'mo_visits': row.get('Посещения в МО', ''),
+                'home_visits': row.get('Посещения на Дому', ''),
                 'case': row.get('Случай', ''),
                 'main_diagnosis': row.get('Диагноз основной (DS1)', ''),
                 'additional_diagnosis': row.get('Сопутствующий диагноз (DS2)', ''),
@@ -84,17 +85,17 @@ def handle_oms_data(file, request):
                 'outcome': row.get('Исход', ''),
                 'result': row.get('Результат', ''),
                 'operator': row.get('Оператор', ''),
-                'initial_input_date': pd.to_datetime(row.get('Первоначальная дата ввода', ''), errors='coerce'),
-                'last_change_date': pd.to_datetime(row.get('Дата последнего изменения', ''), errors='coerce'),
-                'tariff': pd.to_numeric(row.get('Тариф', ''), errors='coerce'),
-                'amount': pd.to_numeric(row.get('Сумма', ''), errors='coerce'),
-                'paid': pd.to_numeric(row.get('Оплачено', ''), errors='coerce'),
+                'initial_input_date': row.get('Первоначальная дата ввода', ''),
+                'last_change_date': row.get('Дата последнего изменения', ''),
+                'tariff': row.get('Тариф', ''),
+                'amount': row.get('Сумма', ''),
+                'paid': row.get('Оплачено', ''),
                 'payment_type': row.get('Тип оплаты', ''),
                 'sanctions': row.get('Санкции', ''),
                 'ksg': row.get('КСГ', ''),
                 'kz': row.get('КЗ', ''),
                 'therapy_schema_code': row.get('Код схемы лекарственной терапии', ''),
-                'uet': pd.to_numeric(row.get('УЕТ', ''), errors='coerce'),
+                'uet': row.get('УЕТ', ''),
                 'classification_criterion': row.get('Классификационный критерий', ''),
                 'shrm': row.get('ШРМ', ''),
                 'directing_mo': row.get('МО, направившая', ''),

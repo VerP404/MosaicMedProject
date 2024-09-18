@@ -2,7 +2,7 @@
 
 {% block content %}
     <h1>Импорт данных</h1>
-    <a href="{% url 'admin:data_loader_omsdata_upload' %}" class="btn btn-primary">Загрузить CSV файл</a>
+    <a href="{% url 'data_loader:data_loader_omsdata_upload' %}" class="btn btn-primary">Загрузить CSV файл</a>
     <div>
         {% if opts.verbose_name %}
             <h2>{{ opts.verbose_name_plural }}</h2>
