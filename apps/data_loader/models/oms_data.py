@@ -58,7 +58,7 @@ class OMSData(models.Model):
     shrm = models.CharField(max_length=255, null=True, blank=True)  # "ШРМ"
     directing_mo = models.CharField(max_length=255, null=True, blank=True)  # "МО, направившая"
     payment_method_code = models.CharField(max_length=255, null=True, blank=True)  # "Код способа оплаты"
-    newborn = models.BooleanField(default=False)  # "Новорожденный"
+    newborn = models.CharField(max_length=255, null=True, blank=True)  # "Новорожденный"
     representative = models.CharField(max_length=255, null=True, blank=True)  # "Представитель"
     additional_status_info = models.CharField(max_length=255, null=True, blank=True)  # "Доп. инф. о статусе талона"
     kslp = models.CharField(max_length=255, null=True, blank=True)  # "КСЛП"

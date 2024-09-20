@@ -5,7 +5,7 @@ from django.conf import settings
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('apps.home.urls')),
-    path('data_loader/', include('apps.data_loader.urls', namespace='data_loader')),
+    path('', include('apps.data_loader.urls', namespace='data_loader')),
 ]
 if settings.DEBUG:
     import debug_toolbar
