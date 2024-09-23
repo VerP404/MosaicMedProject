@@ -58,7 +58,7 @@ class OMSData(models.Model):
     shrm = models.CharField(max_length=255, null=True, blank=True)  # "ШРМ"
     directing_mo = models.CharField(max_length=255, null=True, blank=True)  # "МО, направившая"
     payment_method_code = models.CharField(max_length=255, null=True, blank=True)  # "Код способа оплаты"
-    newborn = models.BooleanField(default=False)  # "Новорожденный"
+    newborn = models.CharField(max_length=255, null=True, blank=True)  # "Новорожденный"
     representative = models.CharField(max_length=255, null=True, blank=True)  # "Представитель"
     additional_status_info = models.CharField(max_length=255, null=True, blank=True)  # "Доп. инф. о статусе талона"
     kslp = models.CharField(max_length=255, null=True, blank=True)  # "КСЛП"
@@ -67,3 +67,11 @@ class OMSData(models.Model):
 
     def __str__(self):
         return f"{self.talon} - {self.patient}"
+
+
+class OMSDataImport(models.Model):
+    csv_file = models.FileField(upload_to='uploads/')
+    date_added = models.DateTimeField(auto_now_add=True)
+    added_count = models.IntegerField(default=0)  # Количество добавленных записей
+    updated_count = models.IntegerField(default=0)  # Количество обновленных записей
+    error_count = models.IntegerField(default=0)  # Количество ошибок

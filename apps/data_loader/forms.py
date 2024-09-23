@@ -1,6 +1,9 @@
-# forms.py
-from django import forms
+from django.forms import ModelForm
+
+from apps.data_loader.models.oms_data import *
 
 
-class FileUploadForm(forms.Form):
-    file = forms.FileField()
+class OMSDataImportForm(ModelForm):
+    class Meta:
+        model = OMSDataImport
+        fields = ('csv_file',)

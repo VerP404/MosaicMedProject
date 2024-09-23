@@ -1,0 +1,21 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+    <h1>Upload CSV</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" id="submit-button">Загрузка CSV</button>
+    </form>
+
+    <div id="loading-indicator" style="display:none;">
+        Загрузка данных, пожалуйста, подождите...
+    </div>
+
+    <script type="text/javascript">
+        document.querySelector("form").onsubmit = function() {
+            document.getElementById("submit-button").style.display = "none";
+            document.getElementById("loading-indicator").style.display = "block";
+        };
+    </script>
+{% endblock %}
