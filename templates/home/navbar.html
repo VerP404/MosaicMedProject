@@ -31,15 +31,15 @@
                         <span class="text-dark">{{ user.last_name }} {{ user.first_name }}</span>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end">
-                        <a class="dropdown-item" href="{% url 'profile' %}"><i class="align-middle me-1"
-                                                                               data-feather="user"></i> Мой профиль</a>
+{#                        <a class="dropdown-item" href="{% url 'profile' %}"><i class="align-middle me-1"#}
+{#                                                                               data-feather="user"></i> Мой профиль</a>#}
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{% url 'logout' %}"
-                           onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i
-                                class="align-middle" data-feather="log-out"></i> Выйти</a>
-                        <form id="logout-form" action="{% url 'logout' %}" method="POST" style="display: none;">
-                            {% csrf_token %}
-                        </form>
+{#                        <a class="dropdown-item" href="{% url 'logout' %}"#}
+{#                           onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i#}
+{#                                class="align-middle" data-feather="log-out"></i> Выйти</a>#}
+{#                        <form id="logout-form" action="{% url 'logout' %}" method="POST" style="display: none;">#}
+{#                            {% csrf_token %}#}
+{#                        </form>#}
                     </div>
                 {% else %}
                     <a class="nav-link d-none d-sm-inline-block" href="{% url 'home' %}">
