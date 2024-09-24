@@ -12,6 +12,11 @@ from apps.data_loader.forms import *
 from apps.data_loader.selenium_script import logger
 from apps.data_loader.models.oms_data import *
 
+# Изменение заголовка и подписи панели администратора
+admin.site.site_header = "Административная панель МозаикаМед"
+admin.site.site_title = "МозаикаМед"
+admin.site.index_title = "Админпанели"
+
 
 @admin.register(OMSSettings)
 class OMSSettingsAdmin(admin.ModelAdmin):
@@ -21,31 +26,278 @@ class OMSSettingsAdmin(admin.ModelAdmin):
 # модель для просмотра импортируемых файлов
 @admin.register(OMSDataImport)
 class OMSDataImportAdmin(admin.ModelAdmin):
-    list_display = ('date_added', 'added_count', 'updated_count', 'error_count')
+    list_display = ('date_added', 'type', 'added_count', 'updated_count', 'error_count')
+    list_filter = ('type', 'date_added')
 
     def has_add_permission(self, request):
-        return False  # Запрещаем добавление вручную
+        return False  # Запрещаем добавление записей
 
     change_list_template = "admin/omsdata_change_list.html"
 
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('csv-upload/', self.upload_csv, name='omsdataimport_csv-upload'),
-            path('wo-download/', self.download_from_wo, name='omsdataimport_wo-download'),
+            path('csv-upload/oms/', self.upload_csv_talons, name='oms_talon_csv_upload'),
+            path('csv-upload/doctors/', self.upload_csv_doctors, name='oms_doctor_csv_upload'),
+            path('csv-upload/detailed/', self.upload_csv_detailed, name='oms_detailed_csv_upload'),
+
+            path('wo-download/', self.download_wo_talon, name='oms_talon_wo_download'),
         ]
         return custom_urls + urls
 
-    def upload_csv(self, request):
-        # Ваш код для обработки ручного импорта CSV
-        pass
+    def upload_csv_doctors(self, request):
+        if request.method == 'POST':
+            form = OMSDataImportForm(request.POST, request.FILES)
+            if form.is_valid():
+                form_object = form.save()
+                form_object.type = 'DOCTORS'  # Указываем тип данных "Врачи"
 
-    def download_from_wo(self, request):
-        # Вызываем тот же метод, что и в OMSDataAdmin
-        return OMSDataAdmin(self.model, self.admin_site).download_from_wo(request)
+                # Инициализируем счетчики
+                added_count = 0
+                error_count = 0
+
+                try:
+                    # Чтение CSV файла
+                    with form_object.csv_file.open('rb') as csv_file:
+                        decoded_file = csv_file.read().decode('utf-8-sig').splitlines()
+                        reader = csv.DictReader(decoded_file, delimiter=';')
+
+                        # Проверка корректности полей
+                        required_fields = set(DOCTOR_DATA_CSV_TO_MODEL_MAPPING.keys())
+                        file_fields = set(reader.fieldnames)
+
+                        if not required_fields.issubset(file_fields):
+                            messages.error(request, "Файл не содержит всех необходимых столбцов!")
+                            return HttpResponseRedirect(reverse('admin:data_loader_omsdataimport_changelist'))
+
+                        # Удаление всех существующих данных перед загрузкой
+                        DoctorData.objects.all().delete()
+
+                        # Загрузка новых данных
+                        for row in reader:
+                            data = {}
+                            for csv_field, model_field in DOCTOR_DATA_CSV_TO_MODEL_MAPPING.items():
+                                data[model_field] = row.get(csv_field, '')
+
+                            # Создаем новый объект и сохраняем
+                            doctor = DoctorData(
+                                snils=row['СНИЛС:'],
+                                doctor_code=row['Код врача:'],
+                                last_name=row['Фамилия:'],
+                                first_name=row['Имя:'],
+                                middle_name=row['Отчество:'],
+                                birth_date=row['Дата рождения:'],
+                                gender=row['Пол'],
+                                start_date=row['Дата начала работы:'],
+                                end_date=row['Дата окончания работы:'],
+                                department=row['Структурное подразделение:'],
+                                medical_profile_code=row['Код профиля медпомощи:'],
+                                specialty_code=row['Код специальности:'],
+                                department_code=row['Код отделения:'],
+                                comment=row['Комментарий:']
+                            )
+                            doctor.save()
+                            added_count += 1
+
+                except Exception as e:
+                    error_count += 1
+                    print(f"Ошибка при обработке файла: {e}")
+
+                form_object.added_count = added_count
+                form_object.error_count = error_count
+                form_object.save()
+
+                messages.success(request,
+                                 f'Данные успешно загружены. Добавлено: {added_count}, Ошибок: {error_count}.')
+                return HttpResponseRedirect(reverse('admin:data_loader_omsdataimport_changelist'))
+
+        form = OMSDataImportForm()
+        return render(request, 'admin/csv_import_page.html', {'form': form})
+
+    def upload_csv_talons(self, request):
+        if request.method == 'POST':
+            form = OMSDataImportForm(request.POST, request.FILES)
+            if form.is_valid():
+                form_object = form.save()
+                form_object.type = 'OMS'
+
+                # Инициализируем счетчики
+                added_count = 0
+                updated_count = 0
+                error_count = 0
+
+                with form_object.csv_file.open('rb') as csv_file:
+                    decoded_file = csv_file.read().decode('utf-8-sig').splitlines()
+                    reader = csv.DictReader(decoded_file, delimiter=';')
+                    for row in reader:
+                        data = {}
+                        for csv_field, model_field in OMS_DATA_CSV_TO_MODEL_MAPPING.items():
+                            data[model_field] = row.get(csv_field, '')
+
+                        try:
+                            # Используем update_or_create для добавления или обновления записи
+                            obj, created = OMSData.objects.update_or_create(
+                                talon=data['talon'],  # Поле для поиска существующей записи
+                                defaults=data  # Поля для обновления или создания новой записи
+                            )
+                            if created:
+                                added_count += 1
+                            else:
+                                updated_count += 1
+                        except Exception as e:
+                            # Если произошла ошибка, увеличиваем счетчик ошибок
+                            print(f"Ошибка при обработке строки: {row}")
+                            print(f"Ошибка: {e}")
+                            error_count += 1
+
+                # Обновляем статистику в модели OMSDataImport
+                form_object.added_count = added_count
+                form_object.updated_count = updated_count
+                form_object.error_count = error_count
+                form_object.save()
+
+                # Сообщение для пользователя
+                messages.success(request,
+                                 f'Данные успешно импортированы. Добавлено: {added_count}, Обновлено: {updated_count}, Ошибки: {error_count}.')
+                return HttpResponseRedirect(reverse('admin:index'))
+
+        form = OMSDataImportForm()
+        return render(request, 'admin/csv_import_page.html', {'form': form})
+
+    def upload_csv_detailed(self, request):
+        if request.method == 'POST':
+            form = OMSDataImportForm(request.POST, request.FILES)
+            if form.is_valid():
+                form_object = form.save()
+                form_object.type = 'DETAILED'
+
+                # Инициализируем счетчики
+                added_count = 0
+                updated_count = 0
+                error_count = 0
+
+                with form_object.csv_file.open('rb') as csv_file:
+                    decoded_file = csv_file.read().decode('utf-8-sig').splitlines()
+                    reader = csv.DictReader(decoded_file, delimiter=';')
+
+                    csv_data = list(reader)
+                    unique_talons = set(row["Номер талона"] for row in csv_data)
+
+                    for talon_number in unique_talons:
+                        try:
+                            # Проверяем, существуют ли записи для данного талона
+                            existing_records = DetailedData.objects.filter(talon_number=talon_number)
+
+                            if existing_records.exists():
+                                # Если записи существуют, удаляем их и считаем как обновление
+                                updated_count += 1
+                                existing_records.delete()
+                            else:
+                                # Если записи не существовали, считаем как добавление
+                                added_count += 1
+
+                            # Добавляем новые записи для данного талона
+                            for row in [r for r in csv_data if r["Номер талона"] == talon_number]:
+                                data = {}
+                                for csv_field, model_field in DETAILED_DATA_CSV_TO_MODEL_MAPPING.items():
+                                    data[model_field] = row.get(csv_field, '')
+
+                                # Создаем новую запись
+                                DetailedData.objects.create(**data)
+
+                        except Exception as e:
+                            # Логируем ошибки и увеличиваем счетчик ошибок
+                            print(f"Ошибка при обработке талона {talon_number}: {e}")
+                            error_count += 1
+
+                # Обновляем статистику в модели OMSDataImport
+                form_object.added_count = added_count
+                form_object.updated_count = updated_count
+                form_object.error_count = error_count
+                form_object.save()
+
+                # Сообщение для пользователя
+                messages.success(request,
+                                 f'Данные успешно импортированы. Добавлено: {added_count}, Обновлено: {updated_count}, Ошибки: {error_count}.')
+                return HttpResponseRedirect(reverse('admin:index'))
+
+        form = OMSDataImportForm()
+        return render(request, 'admin/csv_import_page.html', {'form': form})
+
+    def download_wo_talon(self, request):
+        # Получаем настройки из базы данных
+        try:
+            oms_settings = OMSSettings.objects.latest('id')
+        except OMSSettings.DoesNotExist:
+            messages.error(request,
+                           'Настройки OMS не найдены в базе данных. Пожалуйста, добавьте настройки через админку.')
+            return redirect('..')  # Перенаправляем обратно на страницу списка
+
+        if request.method == 'POST':
+            form = WODataDownloadForm(request.POST)
+            if form.is_valid():
+                logger.info("Начинаем выполнение run_selenium_script")
+                start_date = form.cleaned_data['start_date'].strftime('%d-%m-%y')
+                end_date = form.cleaned_data['end_date'].strftime('%d-%m-%y')
+                start_date_treatment = form.cleaned_data['start_date_treatment'].strftime('%d-%m-%y')
+
+                # Запускаем скрипт Selenium с указанными параметрами
+                from .selenium_script import run_selenium_script
+
+                success, added_count, updated_count, error_count = run_selenium_script(
+                    username=oms_settings.username,
+                    password=oms_settings.password,
+                    start_date=start_date,
+                    end_date=end_date,
+                    start_date_treatment=start_date_treatment
+                )
+                # Сохраняем информацию в OMSDataImport
+                oms_data_import = OMSDataImport.objects.create(
+                    csv_file=None,  # Если файл не сохраняется, оставьте None
+                    date_added=timezone.now(),
+                    added_count=added_count,
+                    updated_count=updated_count,
+                    error_count=error_count
+                )
+
+                logger.info("Выполнение run_selenium_script завершено")
+
+                if success:
+                    messages.success(request, 'Данные успешно загружены и обработаны.')
+                else:
+                    messages.error(request, 'Произошла ошибка при загрузке данных.')
+                logger.info("Завершаем метод download_from_wo")
+                return redirect('..')  # Перенаправляем обратно на страницу списка
+        else:
+            form = WODataDownloadForm(initial={
+                'username': oms_settings.username,
+                'password': oms_settings.password,
+            })
+
+        context = {
+            'form': form,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/wo_data_download.html', context)
 
 
-OMSDATA_CSV_TO_MODEL_MAPPING = {
+DOCTOR_DATA_CSV_TO_MODEL_MAPPING = {
+    "СНИЛС:": "snils",
+    "Код врача:": "doctor_code",
+    "Фамилия:": "last_name",
+    "Имя:": "first_name",
+    "Отчество:": "middle_name",
+    "Дата рождения:": "birth_date",
+    "Пол": "gender",
+    "Дата начала работы:": "start_date",
+    "Дата окончания работы:": "end_date",
+    "Структурное подразделение:": "department",
+    "Код профиля медпомощи:": "medical_profile_code",
+    "Код специальности:": "specialty_code",
+    "Код отделения:": "department_code",
+    "Комментарий:": "comment",
+}
+OMS_DATA_CSV_TO_MODEL_MAPPING = {
     "Талон": "talon",
     "Источник": "source",
     "ID источника": "source_id",
@@ -109,128 +361,61 @@ OMSDATA_CSV_TO_MODEL_MAPPING = {
     "Источник оплаты": "payment_source",
     "Отчетный период выгрузки": "report_period",
 }
+DETAILED_DATA_CSV_TO_MODEL_MAPPING = {
+    "Номер талона": "talon_number",
+    "Счет": "account_number",
+    "Дата выгрузки": "upload_date",
+    "Статус": "status",
+    "МО": "mo",
+    "Дата начала": "start_date",
+    "Дата окончания": "end_date",
+    "Серия полиса": "policy_series",
+    "Номер полиса": "policy_number",
+    "ЕНП": "enp",
+    "Фамилия": "last_name",
+    "Имя": "first_name",
+    "Отчество": "middle_name",
+    "Страховая организация": "insurance_org",
+    "Пол": "gender",
+    "Дата рождения": "birth_date",
+    "Тип талона": "talon_type",
+    "Основной диагноз": "main_diagnosis",
+    "Сопутствующий диагноз": "additional_diagnosis",
+    "Группа здоровья": "health_group",
+    "Доктор (Код)": "doctor_code",
+    "Доктор (ФИО)": "doctor_name",
+    "Стоимость": "cost",
+    "Название услуги": "service_name",
+    "Номенклатурный код услуги": "service_code",
+    "Доктор-Услуги (Код)": "service_doctor_code",
+    "Доктор-Услуги (ФИО)": "service_doctor_name",
+    "Дата-Услуги": "service_date",
+    "Статус-Услуги": "service_status",
+    "Маршрут": "route",
+    "Подразделение врача-Услуги": "service_department",
+    "Код МО (при оказ.услуги в другой МО)": "external_mo_code",
+}
 
 
 @admin.register(OMSData)
 class OMSDataAdmin(admin.ModelAdmin):
     list_display = ('talon', 'patient', 'upload_date', 'status')
-    change_list_template = "admin/omsdata_change_list.html"  # Подключаем кастомный шаблон
 
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path('csv-upload/', self.upload_csv, name='learn_omsdata_csv-upload'),
-            path('wo-download/', self.download_from_wo, name='learn_omsdata_wo-download'),
+    def has_add_permission(self, request):
+        return False  # Запрещаем добавление записей
 
-        ]
-        return custom_urls + urls
 
-    def upload_csv(self, request):
-        if request.method == 'POST':
-            form = OMSDataImportForm(request.POST, request.FILES)
-            if form.is_valid():
-                # Сохраняем информацию о загрузке файла
-                form_object = form.save()
+@admin.register(DoctorData)
+class DoctorDataAdmin(admin.ModelAdmin):
+    list_display = ('doctor_code', 'last_name', 'start_date', 'department')
 
-                # Инициализируем счетчики
-                added_count = 0
-                updated_count = 0
-                error_count = 0
+    def has_add_permission(self, request):
+        return False  # Запрещаем добавление записей
 
-                # Чтение файла как байты
-                with form_object.csv_file.open('rb') as csv_file:
-                    # Декодируем вручную используя нужную кодировку
-                    decoded_file = csv_file.read().decode('utf-8-sig').splitlines()
 
-                    # Теперь используем DictReader для обработки CSV данных
-                    reader = csv.DictReader(decoded_file, delimiter=';')
-                    for row in reader:
-                        oms_data = {}
-                        for csv_field, model_field in OMSDATA_CSV_TO_MODEL_MAPPING.items():
-                            oms_data[model_field] = row.get(csv_field, '')
+@admin.register(DetailedData)
+class DetailedAdmin(admin.ModelAdmin):
+    list_display = ('talon_number', 'talon_type', 'last_name', 'first_name', 'doctor_code', 'service_name', 'route')
 
-                        try:
-                            # Используем update_or_create для добавления или обновления записи
-                            obj, created = OMSData.objects.update_or_create(
-                                talon=oms_data['talon'],  # Поле для поиска существующей записи
-                                defaults=oms_data  # Поля для обновления или создания новой записи
-                            )
-                            if created:
-                                added_count += 1
-                            else:
-                                updated_count += 1
-                        except Exception as e:
-                            # Если произошла ошибка, увеличиваем счетчик ошибок
-                            print(f"Ошибка при обработке строки: {row}")
-                            print(f"Ошибка: {e}")
-                            error_count += 1
-
-                # Обновляем статистику в модели OMSDataImport
-                form_object.added_count = added_count
-                form_object.updated_count = updated_count
-                form_object.error_count = error_count
-                form_object.save()
-
-                # Сообщение для пользователя
-                messages.success(request,
-                                 f'Данные успешно импортированы. Добавлено: {added_count}, Обновлено: {updated_count}, Ошибки: {error_count}.')
-                return HttpResponseRedirect(reverse('admin:index'))
-
-        form = OMSDataImportForm()
-        return render(request, 'admin/csv_import_page.html', {'form': form})
-
-    def download_from_wo(self, request):
-        # Получаем настройки из базы данных
-        try:
-            oms_settings = OMSSettings.objects.latest('id')
-        except OMSSettings.DoesNotExist:
-            messages.error(request,
-                           'Настройки OMS не найдены в базе данных. Пожалуйста, добавьте настройки через админку.')
-            return redirect('..')  # Перенаправляем обратно на страницу списка
-
-        if request.method == 'POST':
-            form = WODataDownloadForm(request.POST)
-            if form.is_valid():
-                logger.info("Начинаем выполнение run_selenium_script")
-                start_date = form.cleaned_data['start_date'].strftime('%d-%m-%y')
-                end_date = form.cleaned_data['end_date'].strftime('%d-%m-%y')
-                start_date_treatment = form.cleaned_data['start_date_treatment'].strftime('%d-%m-%y')
-
-                # Запускаем скрипт Selenium с указанными параметрами
-                from .selenium_script import run_selenium_script
-
-                success, added_count, updated_count, error_count = run_selenium_script(
-                    username=oms_settings.username,
-                    password=oms_settings.password,
-                    start_date=start_date,
-                    end_date=end_date,
-                    start_date_treatment=start_date_treatment
-                )
-                # Сохраняем информацию в OMSDataImport
-                oms_data_import = OMSDataImport.objects.create(
-                    csv_file=None,  # Если файл не сохраняется, оставьте None
-                    date_added=timezone.now(),
-                    added_count=added_count,
-                    updated_count=updated_count,
-                    error_count=error_count
-                )
-
-                logger.info("Выполнение run_selenium_script завершено")
-
-                if success:
-                    messages.success(request, 'Данные успешно загружены и обработаны.')
-                else:
-                    messages.error(request, 'Произошла ошибка при загрузке данных.')
-                logger.info("Завершаем метод download_from_wo")
-                return redirect('..')  # Перенаправляем обратно на страницу списка
-        else:
-            form = WODataDownloadForm(initial={
-                'username': oms_settings.username,
-                'password': oms_settings.password,
-            })
-
-        context = {
-            'form': form,
-            'opts': self.model._meta,
-        }
-        return render(request, 'admin/wo_data_download.html', context)
+    def has_add_permission(self, request):
+        return False  # Запрещаем добавление записей

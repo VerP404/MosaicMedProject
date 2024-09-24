@@ -5,7 +5,7 @@ from apps.data_loader.selenium_script import logger
 def process_csv_file(file_path):
     import csv
     from .models.oms_data import OMSData
-    from .admin import OMSDATA_CSV_TO_MODEL_MAPPING
+    from .admin import OMS_DATA_CSV_TO_MODEL_MAPPING
 
     added_count = 0
     updated_count = 0
@@ -15,7 +15,7 @@ def process_csv_file(file_path):
         reader = csv.DictReader(csv_file, delimiter=';')
         for row in reader:
             oms_data = {}
-            for csv_field, model_field in OMSDATA_CSV_TO_MODEL_MAPPING.items():
+            for csv_field, model_field in OMS_DATA_CSV_TO_MODEL_MAPPING.items():
                 oms_data[model_field] = row.get(csv_field, '')
 
             try:

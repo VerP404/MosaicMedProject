@@ -17,6 +17,7 @@ class WODataDownloadForm(forms.Form):
     username = forms.CharField(label='Логин', max_length=255, required=False, disabled=True)
     password = forms.CharField(label='Пароль', max_length=255, required=False, disabled=True,
                                widget=forms.PasswordInput)
+    type = forms.CharField(label='Тип', max_length=255, required=False, disabled=True)
     start_date = forms.DateField(
         label='Дата начала',
         initial=(datetime.now() - timedelta(days=1)).strftime('%d-%m-%y'),
