@@ -11,6 +11,7 @@ from django.utils import timezone
 from apps.data_loader.forms import *
 from apps.data_loader.selenium_script import logger
 from apps.data_loader.models.oms_data import *
+from apps.data_loader.models.kvazar_data import *
 
 # Изменение заголовка и подписи панели администратора
 admin.site.site_header = "Административная панель МозаикаМед"
@@ -22,12 +23,26 @@ admin.site.index_title = "Админпанели"
 class OMSSettingsAdmin(admin.ModelAdmin):
     list_display = ('username', 'password')
 
+    # Ограничение на создание только одной записи
+    def has_add_permission(self, request):
+        # Проверяем, есть ли уже записи в модели
+        count = OMSSettings.objects.all().count()
+        if count >= 1:
+            return False  # Если запись уже существует, запрещаем создание новой
+        return True  # Если записей нет, разрешаем создание
+
 
 # модель для просмотра импортируемых файлов
-@admin.register(OMSDataImport)
-class OMSDataImportAdmin(admin.ModelAdmin):
-    list_display = ('date_added', 'type', 'added_count', 'updated_count', 'error_count')
-    list_filter = ('type', 'date_added')
+@admin.register(DataImport)
+class DataImportAdmin(admin.ModelAdmin):
+    list_display = ('date_added', 'category', 'type', 'added_count', 'updated_count', 'error_count')
+    list_filter = ('category', 'date_added', 'type')
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        form.base_fields['category'].widget.attrs['readonly'] = True
+        form.base_fields['type'].widget.attrs['readonly'] = True
+        return form
 
     def has_add_permission(self, request):
         return False  # Запрещаем добавление записей
@@ -47,11 +62,11 @@ class OMSDataImportAdmin(admin.ModelAdmin):
 
     def upload_csv_doctors(self, request):
         if request.method == 'POST':
-            form = OMSDataImportForm(request.POST, request.FILES)
+            form = DataImportForm(request.POST, request.FILES)
             if form.is_valid():
                 form_object = form.save()
                 form_object.type = 'DOCTORS'  # Указываем тип данных "Врачи"
-
+                form_object.category = 'Web-ОМС'
                 # Инициализируем счетчики
                 added_count = 0
                 error_count = 0
@@ -111,16 +126,16 @@ class OMSDataImportAdmin(admin.ModelAdmin):
                                  f'Данные успешно загружены. Добавлено: {added_count}, Ошибок: {error_count}.')
                 return HttpResponseRedirect(reverse('admin:data_loader_omsdataimport_changelist'))
 
-        form = OMSDataImportForm()
+        form = DataImportForm()
         return render(request, 'admin/csv_import_page.html', {'form': form})
 
     def upload_csv_talons(self, request):
         if request.method == 'POST':
-            form = OMSDataImportForm(request.POST, request.FILES)
+            form = DataImportForm(request.POST, request.FILES)
             if form.is_valid():
                 form_object = form.save()
                 form_object.type = 'OMS'
-
+                form_object.category = 'Web-ОМС'
                 # Инициализируем счетчики
                 added_count = 0
                 updated_count = 0
@@ -161,16 +176,16 @@ class OMSDataImportAdmin(admin.ModelAdmin):
                                  f'Данные успешно импортированы. Добавлено: {added_count}, Обновлено: {updated_count}, Ошибки: {error_count}.')
                 return HttpResponseRedirect(reverse('admin:index'))
 
-        form = OMSDataImportForm()
+        form = DataImportForm()
         return render(request, 'admin/csv_import_page.html', {'form': form})
 
     def upload_csv_detailed(self, request):
         if request.method == 'POST':
-            form = OMSDataImportForm(request.POST, request.FILES)
+            form = DataImportForm(request.POST, request.FILES)
             if form.is_valid():
                 form_object = form.save()
                 form_object.type = 'DETAILED'
-
+                form_object.category = 'Web-ОМС'
                 # Инициализируем счетчики
                 added_count = 0
                 updated_count = 0
@@ -221,7 +236,7 @@ class OMSDataImportAdmin(admin.ModelAdmin):
                                  f'Данные успешно импортированы. Добавлено: {added_count}, Обновлено: {updated_count}, Ошибки: {error_count}.')
                 return HttpResponseRedirect(reverse('admin:index'))
 
-        form = OMSDataImportForm()
+        form = DataImportForm()
         return render(request, 'admin/csv_import_page.html', {'form': form})
 
     def download_wo_talon(self, request):
@@ -252,7 +267,7 @@ class OMSDataImportAdmin(admin.ModelAdmin):
                     start_date_treatment=start_date_treatment
                 )
                 # Сохраняем информацию в OMSDataImport
-                oms_data_import = OMSDataImport.objects.create(
+                oms_data_import = DataImport.objects.create(
                     csv_file=None,  # Если файл не сохраняется, оставьте None
                     date_added=timezone.now(),
                     added_count=added_count,
@@ -419,3 +434,16 @@ class DetailedAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False  # Запрещаем добавление записей
+
+
+@admin.register(KvazarSettings)
+class OMSSettingsAdmin(admin.ModelAdmin):
+    list_display = ('username', 'password')
+
+    # Ограничение на создание только одной записи
+    def has_add_permission(self, request):
+        # Проверяем, есть ли уже записи в модели
+        count = KvazarSettings.objects.all().count()
+        if count >= 1:
+            return False  # Если запись уже существует, запрещаем создание новой
+        return True  # Если записей нет, разрешаем создание

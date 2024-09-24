@@ -7,16 +7,17 @@ from datetime import datetime, timedelta
 from apps.data_loader.models.oms_data import *
 
 
-class OMSDataImportForm(ModelForm):
+class DataImportForm(ModelForm):
     class Meta:
-        model = OMSDataImport
-        fields = ('csv_file',)
+        model = DataImport
+        fields = ['csv_file', ]
 
 
 class WODataDownloadForm(forms.Form):
     username = forms.CharField(label='Логин', max_length=255, required=False, disabled=True)
     password = forms.CharField(label='Пароль', max_length=255, required=False, disabled=True,
                                widget=forms.PasswordInput)
+    category = forms.CharField(label='Категория', max_length=255, required=False, disabled=True)
     type = forms.CharField(label='Тип', max_length=255, required=False, disabled=True)
     start_date = forms.DateField(
         label='Дата начала',

@@ -151,23 +151,51 @@ class DetailedData(models.Model):
         verbose_name_plural = "ОМС: Детализация"
 
 
-class OMSDataImport(models.Model):
-    TYPE_CHOICES = [
-        ('OMS', 'ОМС'),
-        ('DOCTORS', 'Врачи'),
-        ('DETAILED', 'Детализация'),
-    ]
+CATEGORY_CHOICES = (
+    ('Web-ОМС', 'Web-ОМС'),
+    ('Квазар', 'Квазар'),
+    ('ИСЗЛ', 'ИСЗЛ'),
+    ('КАУЗ', 'КАУЗ'),
+)
 
+WEB_OMS_TYPES = (
+    ('OMS', 'ОМС'),
+    ('DOCTORS', 'Врачи'),
+    ('DETAILED', 'Детализация'),
+)
+
+KVAZAR_TYPES = (
+    ('EMD', 'ЭМД'),
+    ('EPMZ', 'ЭПМЗ'),
+)
+
+ISZL_TYPES = (
+    ('POPULATION', 'Население'),
+    ('DISPANSER', 'Диспансерные'),
+)
+
+KAUZ_TYPES = (
+    ('TALONS', 'Талоны'),
+)
+
+
+class DataImport(models.Model):
     csv_file = models.FileField(upload_to='oms_data_imports/', verbose_name="CSV файл", blank=True, null=True)
     date_added = models.DateTimeField(auto_now_add=True, verbose_name="Дата добавления")
     added_count = models.IntegerField(default=0, verbose_name="Количество добавленных записей")
     updated_count = models.IntegerField(default=0, verbose_name="Количество обновленных записей")
     error_count = models.IntegerField(default=0, verbose_name="Количество ошибок")
-    type = models.CharField(max_length=20, choices=TYPE_CHOICES, verbose_name="Тип данных")
+    type = models.CharField(max_length=20, verbose_name="Тип данных")
+    category = models.CharField(max_length=255, choices=CATEGORY_CHOICES, default='Web-ОМС', verbose_name="Категория")
+
+    def save(self, *args, **kwargs):
+        if self.category == 'Web-ОМС':
+            self.type = self.type or 'OMS'  # Тип по умолчанию для Web-ОМС
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Импорт {self.type} от {self.date_added}"
 
     class Meta:
-        verbose_name = "Импорт данных ОМС"
-        verbose_name_plural = "Импорт данных ОМС"
+        verbose_name = "Импорт данных"
+        verbose_name_plural = "Импорт данных"
