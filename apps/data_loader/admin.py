@@ -38,11 +38,9 @@ class DataImportAdmin(admin.ModelAdmin):
     list_display = ('date_added', 'category', 'type', 'added_count', 'updated_count', 'error_count')
     list_filter = ('category', 'date_added', 'type')
 
-    def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, **kwargs)
-        form.base_fields['category'].widget.attrs['readonly'] = True
-        form.base_fields['type'].widget.attrs['readonly'] = True
-        return form
+    def get_readonly_fields(self, request, obj=None):
+        # Делаем поля только для чтения, кроме csv_file
+        return ['added_count', 'updated_count', 'error_count', 'type', 'category']
 
     def has_add_permission(self, request):
         return False  # Запрещаем добавление записей

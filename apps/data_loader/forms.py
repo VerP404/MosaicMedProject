@@ -12,6 +12,10 @@ class DataImportForm(ModelForm):
         model = DataImport
         fields = ['csv_file', ]
 
+    def __init__(self, *args, **kwargs):
+        super(DataImportForm, self).__init__(*args, **kwargs)
+        self.fields['csv_file'].label = "CSV файл"
+
 
 class WODataDownloadForm(forms.Form):
     username = forms.CharField(label='Логин', max_length=255, required=False, disabled=True)
