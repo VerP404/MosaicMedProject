@@ -3,18 +3,46 @@ from django.contrib import admin
 import csv
 from django.urls import path
 from django.http import HttpResponseRedirect
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.contrib import messages
+from django.utils import timezone
 
 from apps.data_loader.forms import *
+from apps.data_loader.selenium_script import logger
 from apps.data_loader.models.oms_data import *
+
+
+@admin.register(OMSSettings)
+class OMSSettingsAdmin(admin.ModelAdmin):
+    list_display = ('username', 'password')
 
 
 # модель для просмотра импортируемых файлов
 @admin.register(OMSDataImport)
 class OMSDataImportAdmin(admin.ModelAdmin):
-    list_display = ('csv_file', 'date_added', 'added_count', 'updated_count', 'error_count')
+    list_display = ('date_added', 'added_count', 'updated_count', 'error_count')
+
+    def has_add_permission(self, request):
+        return False  # Запрещаем добавление вручную
+
+    change_list_template = "admin/omsdata_change_list.html"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('csv-upload/', self.upload_csv, name='omsdataimport_csv-upload'),
+            path('wo-download/', self.download_from_wo, name='omsdataimport_wo-download'),
+        ]
+        return custom_urls + urls
+
+    def upload_csv(self, request):
+        # Ваш код для обработки ручного импорта CSV
+        pass
+
+    def download_from_wo(self, request):
+        # Вызываем тот же метод, что и в OMSDataAdmin
+        return OMSDataAdmin(self.model, self.admin_site).download_from_wo(request)
 
 
 OMSDATA_CSV_TO_MODEL_MAPPING = {
@@ -91,7 +119,9 @@ class OMSDataAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('csv-upload/', self.upload_csv, name='learn_omsdata_csv-upload'),  # Указываем имя для URL
+            path('csv-upload/', self.upload_csv, name='learn_omsdata_csv-upload'),
+            path('wo-download/', self.download_from_wo, name='learn_omsdata_wo-download'),
+
         ]
         return custom_urls + urls
 
@@ -149,6 +179,58 @@ class OMSDataAdmin(admin.ModelAdmin):
         form = OMSDataImportForm()
         return render(request, 'admin/csv_import_page.html', {'form': form})
 
+    def download_from_wo(self, request):
+        # Получаем настройки из базы данных
+        try:
+            oms_settings = OMSSettings.objects.latest('id')
+        except OMSSettings.DoesNotExist:
+            messages.error(request,
+                           'Настройки OMS не найдены в базе данных. Пожалуйста, добавьте настройки через админку.')
+            return redirect('..')  # Перенаправляем обратно на страницу списка
 
+        if request.method == 'POST':
+            form = WODataDownloadForm(request.POST)
+            if form.is_valid():
+                logger.info("Начинаем выполнение run_selenium_script")
+                start_date = form.cleaned_data['start_date'].strftime('%d-%m-%y')
+                end_date = form.cleaned_data['end_date'].strftime('%d-%m-%y')
+                start_date_treatment = form.cleaned_data['start_date_treatment'].strftime('%d-%m-%y')
 
+                # Запускаем скрипт Selenium с указанными параметрами
+                from .selenium_script import run_selenium_script
 
+                success, added_count, updated_count, error_count = run_selenium_script(
+                    username=oms_settings.username,
+                    password=oms_settings.password,
+                    start_date=start_date,
+                    end_date=end_date,
+                    start_date_treatment=start_date_treatment
+                )
+                # Сохраняем информацию в OMSDataImport
+                oms_data_import = OMSDataImport.objects.create(
+                    csv_file=None,  # Если файл не сохраняется, оставьте None
+                    date_added=timezone.now(),
+                    added_count=added_count,
+                    updated_count=updated_count,
+                    error_count=error_count
+                )
+
+                logger.info("Выполнение run_selenium_script завершено")
+
+                if success:
+                    messages.success(request, 'Данные успешно загружены и обработаны.')
+                else:
+                    messages.error(request, 'Произошла ошибка при загрузке данных.')
+                logger.info("Завершаем метод download_from_wo")
+                return redirect('..')  # Перенаправляем обратно на страницу списка
+        else:
+            form = WODataDownloadForm(initial={
+                'username': oms_settings.username,
+                'password': oms_settings.password,
+            })
+
+        context = {
+            'form': form,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/wo_data_download.html', context)

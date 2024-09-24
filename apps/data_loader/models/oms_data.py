@@ -1,6 +1,14 @@
 from django.db import models
 
 
+class OMSSettings(models.Model):
+    username = models.CharField(max_length=255)
+    password = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.username
+
+
 class OMSData(models.Model):
     talon = models.CharField(max_length=255, unique=True)  # "Талон"
     source = models.CharField(max_length=255)  # "Источник"
@@ -20,8 +28,8 @@ class OMSData(models.Model):
     smo_code = models.CharField(max_length=255)  # "Код СМО"
     insurance = models.CharField(max_length=255)  # "Страховая"
     enp = models.CharField(max_length=255)  # "ЕНП"
-    treatment_start = models.CharField(max_length=255) # "Начало лечения"
-    treatment_end = models.CharField(max_length=255) # "Окончание лечения"
+    treatment_start = models.CharField(max_length=255)  # "Начало лечения"
+    treatment_end = models.CharField(max_length=255)  # "Окончание лечения"
     doctor = models.CharField(max_length=255)  # "Врач"
     doctor_profile = models.CharField(max_length=255)  # "Врач (Профиль МП)"
     staff_position = models.CharField(max_length=255)  # "Должность мед.персонала (V021)"
@@ -31,7 +39,7 @@ class OMSData(models.Model):
     disease_type = models.CharField(max_length=255)  # "Тип заболевания"
     main_disease_character = models.CharField(max_length=255)  # "Характер основного заболевания"
     visits = models.CharField(max_length=255)  # "Посещения"
-    mo_visits = models.CharField(max_length=255) # "Посещения в МО"
+    mo_visits = models.CharField(max_length=255)  # "Посещения в МО"
     home_visits = models.CharField(max_length=255)  # "Посещения на Дому"
     case = models.CharField(max_length=255)  # "Случай"
     main_diagnosis = models.CharField(max_length=255)  # "Диагноз основной (DS1)"
@@ -53,7 +61,7 @@ class OMSData(models.Model):
     ksg = models.CharField(max_length=255, null=True, blank=True)  # "КСГ"
     kz = models.CharField(max_length=255, null=True, blank=True)  # "КЗ"
     therapy_schema_code = models.CharField(max_length=255, null=True, blank=True)  # "Код схемы лекарственной терапии"
-    uet = models.CharField(max_length=255,null=True, blank=True)  # "УЕТ"
+    uet = models.CharField(max_length=255, null=True, blank=True)  # "УЕТ"
     classification_criterion = models.CharField(max_length=255, null=True, blank=True)  # "Классификационный критерий"
     shrm = models.CharField(max_length=255, null=True, blank=True)  # "ШРМ"
     directing_mo = models.CharField(max_length=255, null=True, blank=True)  # "МО, направившая"

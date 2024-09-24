@@ -1,3 +1,5 @@
+<!-- admin/omsdata_change_list.html -->
+
 {% extends "admin/change_list.html" %}
 
 {% block object-tools %}
@@ -5,6 +7,9 @@
         <ul class="grp-object-tools">
             <li>
                 <a href="{% url 'admin:learn_omsdata_csv-upload' %}">Импорт CSV</a>  <!-- Добавляем кнопку импорта -->
+            </li>
+            <li>
+                <a href="{% url 'admin:learn_omsdata_wo-download' %}">Загрузить данные из WO</a>
             </li>
         </ul>
     </div>
