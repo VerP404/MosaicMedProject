@@ -10,8 +10,8 @@ DATABASES = {
 }
 INSTALLED_APPS += [
     'debug_toolbar',
-    'apps.data_loader',
     'import_export',
+    'apps.dash_app',
 ]
 MIDDLEWARE += [
     'debug_toolbar.middleware.DebugToolbarMiddleware',
