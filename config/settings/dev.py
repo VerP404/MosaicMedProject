@@ -12,6 +12,7 @@ INSTALLED_APPS += [
     'debug_toolbar',
     'import_export',
     'apps.dash_app',
+    'django_plotly_dash.apps.DjangoPlotlyDashConfig',
 ]
 MIDDLEWARE += [
     'debug_toolbar.middleware.DebugToolbarMiddleware',
@@ -25,6 +26,13 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+
+X_FRAME_OPTIONS = 'SAMEORIGIN' # Использовать X-Frame-Options в браузере для Django-dash
+PLOTLY_DASH = {
+    "ws_route": "ws/channel",  # Если планируете использовать WebSockets
+    "http_route": "dash/app",  # Путь для Dash-приложения
+}
 
 LOGGING = {
     'version': 1,
@@ -59,4 +67,3 @@ LOGGING = {
         },
     },
 }
-

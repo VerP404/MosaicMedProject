@@ -2,23 +2,17 @@
 <nav id="sidebar" class="sidebar js-sidebar">
     <div class="sidebar-content js-simplebar">
         <a class="sidebar-brand d-flex align-items-center" href="{% url 'home' %}">
-            <img src="{% static 'img/logo/logo.png' %}" alt="Карта водно-зеленой инфраструктуры" class="img-fluid">
-            <span class="ms-1 display-6 font-weight-bold text-uppercase text-white fs-7">ВГП №3</span>
+            <img src="{% static 'img/logo/logo.png' %}" alt="МозаикаМед" class="img-fluid">
+            <span class="ms-1 display-8 font-weight-bold text-uppercase text-white fs-7">МозаикаМед</span>
         </a>
 
         <ul class="sidebar-nav">
             {% block sidebar_nav %}
-                <!-- Здесь рендерится содержимое основного меню -->
+            <!-- Здесь рендерится навигация для текущего модуля -->
             {% endblock %}
         </ul>
 
 
-        <div class="sidebar-cta">
-            <div class="sidebar-cta-content text-center">
-                <img src="{% static 'img/logo/img.png' %}" alt="Lanit Logo" class="img-fluid">
-                <strong class="d-inline-block mb-2">МозаикаМед</strong>
-            </div>
-        </div>
     </div>
 </nav>
 
