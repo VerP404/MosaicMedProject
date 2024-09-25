@@ -23,8 +23,10 @@ app.layout = html.Div(children=[
                 {'x': [1, 2, 3], 'y': [2, 4, 5], 'type': 'bar', 'name': 'Montreal'},
             ],
             'layout': {
-                'title': 'Dash Data Visualization'
+                'title': 'Dash Data Visualization',
+                'height': '1000px',  # Задаем высоту графика
+                'width': '1000px',  # Задаем ширину графика
             }
         }
     )
-])
+], style={'width': '100px', 'height': '100px'})

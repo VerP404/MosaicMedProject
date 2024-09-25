@@ -8,13 +8,44 @@
 
         <ul class="sidebar-nav">
             {% block sidebar_nav %}
-            <!-- Здесь рендерится навигация для текущего модуля -->
+            
+            <!-- Общие ссылки для всех модулей -->
+            <li class="sidebar-item">
+                <a href="/" class="sidebar-link">Главная</a>
+            </li>
+
+            <!-- Условие для отображения "Экономист" -->
+            {% if current_module == 'economic' %}
+            <li class="sidebar-item">
+                <a href="/" class="sidebar-link">Панель экономиста</a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/" class="sidebar-link">Отчеты экономиста</a>
+            </li>
+            {% endif %}
+
+            <!-- Условие для отображения "Статистик" -->
+            {% if current_module == 'statistics' %}
+            <li class="sidebar-item">
+                <a href="{% url '' %}" class="sidebar-link">Панель статистика</a>
+            </li>
+            <li class="sidebar-item">
+                <a href="{% url '' %}" class="sidebar-link">Отчеты статистика</a>
+            </li>
+            {% endif %}
+
+            <!-- Условие для других модулей -->
+            {% if current_module == 'doctor' %}
+            <li class="sidebar-item">
+                <a href="{% url '' %}" class="sidebar-link">Рабочее место врача</a>
+            </li>
+            {% endif %}
+
             {% endblock %}
         </ul>
-
-
     </div>
 </nav>
+
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
