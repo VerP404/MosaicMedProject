@@ -5,3 +5,8 @@ db.sqlite3
 *.csv
 *.xlsx
 *.xls
+
+# Игнорировать все миграции
+*/migrations/*.py
+# Но не игнорировать файл __init__.py
+!*/migrations/__init__.py

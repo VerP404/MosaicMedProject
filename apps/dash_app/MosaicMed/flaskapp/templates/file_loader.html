@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сохранение файлов для работы МозаикаМед</title>
+    <link rel="stylesheet" href="/assets/css/bootstrap.min.css">
+    <style>
+        body {
+            padding: 20px;
+        }
+        .container-fluid {
+            padding: 0;
+        }
+        table {
+            width: 100%;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .date-today {
+            background-color: green;
+            color: white;
+        }
+        .date-not-today {
+            background-color: red;
+            color: white;
+        }
+        .flash-message {
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .flash-message.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .flash-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .upload-form {
+            display: flex;
+            flex-wrap: nowrap;
+        }
+        .upload-form input[type="file"] {
+            flex: 2;
+        }
+        .upload-form input[type="text"] {
+            flex: 2;
+            margin-left: 10px;
+        }
+        .upload-form button {
+            flex: 1;
+            margin-left: 10px;
+        }
+    </style>
+    <script>
+        function updateFileName(input, fileType, ext) {
+            const file = input.files[0];
+            if (file) {
+                const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '').replace(/:/g, '_');
+                const newFileName = `Выгрузка ${fileType} на ${timestamp}.${ext}`;
+                input.nextElementSibling.value = newFileName;
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="container-fluid">
+        <h1 class="mb-4">Сохранение файлов для работы МозаикаМед</h1>
+        <a href="/" class="btn btn-primary mb-4">На главную</a>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Категория</th>
+                    <th>Отчет</th>
+                    <th>Последний файл</th>
+                    <th>Дата последнего файла</th>
+                    <th>Загрузка</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for main_dir, sub_dir, last_file, creation_time, ext, file_type in data %}
+                {% set date_class = 'date-not-today' %}
+                {% if creation_time.split()[0] == current_date %}
+                    {% set date_class = 'date-today' %}
+                {% endif %}
+                <tr>
+                    <td>{{ main_dir }}</td>
+                    <td>{{ sub_dir }}</td>
+                    <td>{{ last_file }}</td>
+                    <td class="{{ date_class }}">{{ creation_time }}</td>
+                    <td>
+                        <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+                            <input type="hidden" name="main_dir" value="{{ main_dir }}">
+                            <input type="hidden" name="sub_dir" value="{{ sub_dir }}">
+                            <input type="file" name="file" accept=".{{ ext }}" onchange="updateFileName(this, '{{ file_type }}', '{{ ext }}')" required>
+                            <input type="text" name="new_file_name" readonly class="form-control mt-2">
+                            <button type="submit" class="btn btn-success mt-2">Сохранить</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

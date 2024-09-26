@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>МозаикаМед - Вход</title>
+    <link rel="icon" href="assets/img/favicon.ico" type="image/vnd.microsoft.icon">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+            background: #f1f1f1;
+        }
+
+        .login-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 400px;
+            padding: 40px;
+            transform: translate(-50%, -50%);
+            background: #ffffff;
+            box-sizing: border-box;
+            box-shadow: 0 15px 25px rgba(0,0,0,.5);
+            border-radius: 10px;
+        }
+
+        .login-box h2 {
+            margin: 0 0 30px;
+            padding: 0;
+            color: #00a6e3;
+            text-align: center;
+        }
+
+        .login-box .logo {
+            display: block;
+            margin: 0 auto 30px;
+            width: 80px;
+            height: 80px;
+        }
+
+        .login-box .user-box {
+            position: relative;
+            margin-bottom: 30px;
+        }
+
+        .login-box .user-box input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            color: #00a6e3;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            outline: none;
+            background: #fff;
+        }
+
+        .login-box .user-box label {
+            position: absolute;
+            top: -20px;
+            left: 10px;
+            color: #00a6e3;
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        .login-box form button {
+            display: inline-block;
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            color: #fff;
+            background: #00a6e3;
+            text-align: center;
+            text-decoration: none;
+            border: none;
+            border-radius: 5px;
+            transition: background 0.5s;
+            cursor: pointer;
+        }
+
+        .login-box form button:hover {
+            background: #43c941;
+        }
+
+        .error-message {
+            color: red;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <img src="/assets/img/plotly-logomark.png" alt="МозаикаМед" class="logo">
+        <h2>МозаикаМед</h2>
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="/login">
+            <div class="user-box">
+                <input type="text" name="username" required="">
+                <label>Логин</label>
+            </div>
+            <div class="user-box">
+                <input type="password" name="password" required="">
+                <label>Пароль</label>
+            </div>
+            <button type="submit">
+                Войти
+            </button>
+        </form>
+    </div>
+</body>
+</html>
