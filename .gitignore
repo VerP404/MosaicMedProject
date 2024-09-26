@@ -10,3 +10,6 @@ db.sqlite3
 */migrations/*.py
 # Но не игнорировать файл __init__.py
 !*/migrations/__init__.py
+
+celery_debug.log
+*.log
