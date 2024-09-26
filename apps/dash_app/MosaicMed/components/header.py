@@ -1,10 +1,6 @@
 import dash_bootstrap_components as dbc
 from dash import Input, Output, dcc, html
 
-from database.db_conn import engine
-from services.MosaicMed.app import app
-from services.MosaicMed.utils import last_record_sql
-
 PLOTLY_LOGO = r"\assets\img\plotly-logomark.png"
 
 header = dbc.Navbar(
@@ -56,11 +52,3 @@ header = dbc.Navbar(
 
 )
 
-
-# Выводим информацию о последнем подгруженном файле из web ОМС
-@app.callback(
-    Output('file-info', 'children'),
-    Input('date-interval', 'n_intervals')
-)
-def file_info(n_intervals):
-    return last_record_sql(engine)[3]

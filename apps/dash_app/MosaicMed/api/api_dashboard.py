@@ -1,5 +1,5 @@
 # api_dashboard.py
-from services.MosaicMed.flaskapp.flask_app import flask_app
+from apps.dash_app.MosaicMed.flaskapp.flask_app import flask_app
 from flask import jsonify
 
 

@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
-from services.MosaicMed.callback.callback import get_current_reporting_month
-from services.MosaicMed.generate_pages.constants import current_year, months_labels, status_groups
+from apps.dash_app.MosaicMed.callback.callback import get_current_reporting_month
+from apps.dash_app.MosaicMed.generate_pages.constants import current_year, months_labels, status_groups
 
 
 def filter_years(type_page):

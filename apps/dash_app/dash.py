@@ -6,15 +6,14 @@ import dash_bootstrap_components as dbc
 from django_plotly_dash import DjangoDash
 
 # Создаем Dash-приложение, интегрированное с Django
-app = DjangoDash('DashApp')
+app2 = DjangoDash('DashApp3')
 
-app.layout = html.Div(children=[
+app2.layout = html.Div(children=[
     html.H1(children='Hello Dash'),
 
     html.Div(children='''
         Dash: A web application framework for Python.
     '''),
-
     dcc.Graph(
         id='example-graph',
         figure={

@@ -4,8 +4,8 @@ import pandas as pd
 import datetime
 from sqlalchemy import text
 
-from database.db_conn import engine
-from services.MosaicMed.utils import get_extracted_names_list_doctors, get_extracted_names_list_specialist
+# from database.db_conn import engine
+from apps.dash_app.MosaicMed.utils import get_extracted_names_list_doctors, get_extracted_names_list_specialist
 
 months_dict = {
     1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель', 5: 'Май', 6: 'Июнь',
