@@ -20,7 +20,7 @@ header = dbc.Navbar(
                     align="center",
                     className="g-0",
                 ),
-                href="/",
+                href="/home/",
                 style={"textDecoration": "none"},
             ),
             dbc.NavLink(),

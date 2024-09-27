@@ -7,17 +7,17 @@ import os
 
 # Определение путей к статическим файлам
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_URL = '/static/dash_app/'
+STATIC_URL = '/static/'
 
 external_stylesheets = [
-    STATIC_URL + 'assets/css/bootstrap.min.css',
-    STATIC_URL + 'assets/css/styles.css',
-    STATIC_URL + 'assets/css/fontawesome/all.css'
+    STATIC_URL + 'css/bootstrap.min.css',
+    STATIC_URL + 'css/styles.css',
+    STATIC_URL + 'css/fontawesome/all.css'
 ]
 
 external_scripts = [
-    STATIC_URL + 'assets/js/bootstrap.bundle.js',
-    STATIC_URL + 'assets/js/datetime.js'
+    STATIC_URL + 'js/bootstrap.bundle.js',
+    STATIC_URL + 'js/datetime.js'
 ]
 
 # Инициализация приложения Dash с использованием DjangoDash
