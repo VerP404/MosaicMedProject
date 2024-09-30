@@ -1,10 +1,10 @@
 from dash import html, dcc, Output, Input, dash_table, State, callback_context
 from database.db_conn import engine
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.callback.callback import TableUpdater
-from services.MosaicMed.pages.iszl.people.query import sql_query_people_iszl, sql_query_people_iszl_all, sql_query_people_iszl_all_168n, \
+from apps.MosaicMed.app import app
+from apps.MosaicMed.callback.callback import TableUpdater
+from apps.MosaicMed.pages.iszl.people.query import sql_query_people_iszl, sql_query_people_iszl_all, sql_query_people_iszl_all_168n, \
     sql_query_people_iszl_168n
 
 type_page = "people-iszl-168n"

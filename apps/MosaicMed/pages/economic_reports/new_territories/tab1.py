@@ -3,12 +3,12 @@ from dash import html, Output, Input
 import dash_bootstrap_components as dbc
 
 from database.db_conn import engine
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 
-from services.MosaicMed.callback.callback import get_selected_dates, TableUpdater
-from services.MosaicMed.generate_pages.elements import card_table
-from services.MosaicMed.generate_pages.filters import date_start, date_end
-from services.MosaicMed.pages.economic_reports.new_territories.query import sqlquery_new_territory
+from apps.MosaicMed.callback.callback import get_selected_dates, TableUpdater
+from apps.MosaicMed.generate_pages.elements import card_table
+from apps.MosaicMed.generate_pages.filters import date_start, date_end
+from apps.MosaicMed.pages.economic_reports.new_territories.query import sqlquery_new_territory
 
 type_page = "new-territories-tab1"
 

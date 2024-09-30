@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 from dash import html, dcc, Output, Input, dash_table
 from database.db_conn import engine
-from services.MosaicMed.app import app
-from services.MosaicMed.callback.callback import TableUpdater, get_selected_dates
-from services.MosaicMed.pages.WO_coupons.status_talon.query import sql_query_status_korpus_date_fin
+from apps.MosaicMed.app import app
+from apps.MosaicMed.callback.callback import TableUpdater, get_selected_dates
+from apps.MosaicMed.pages.WO_coupons.status_talon.query import sql_query_status_korpus_date_fin
 
 type_page = "date-fin-medic"
 

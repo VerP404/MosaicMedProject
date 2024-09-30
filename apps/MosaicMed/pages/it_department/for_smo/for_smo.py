@@ -1,10 +1,10 @@
 from dash import html, Input, Output, dash_table, State
 from database.db_conn import engine
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 import dash_bootstrap_components as dbc
 
-from services.MosaicMed.callback.callback import TableUpdater
-from services.MosaicMed.pages.it_department.for_smo.query import sql_query_for_smo
+from apps.MosaicMed.callback.callback import TableUpdater
+from apps.MosaicMed.pages.it_department.for_smo.query import sql_query_for_smo
 
 type_page = "for-smo"
 

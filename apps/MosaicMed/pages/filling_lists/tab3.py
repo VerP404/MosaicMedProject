@@ -5,7 +5,7 @@ import pandas as pd
 from dash import dcc, html, Input, Output, State, dash_table
 from sqlalchemy import create_engine
 from database.db_conn import engine
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 import dash_bootstrap_components as dbc
 
 type_page = "tab-layout-smo"

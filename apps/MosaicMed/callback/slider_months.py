@@ -1,5 +1,5 @@
-from services.MosaicMed.callback.callback import get_current_reporting_month
-from services.MosaicMed.generate_pages.constants import months_sql_labels
+from apps.MosaicMed.callback.callback import get_current_reporting_month
+from apps.MosaicMed.generate_pages.constants import months_sql_labels
 
 
 def get_selected_period(selected_months_range, selected_year, current_month_name):

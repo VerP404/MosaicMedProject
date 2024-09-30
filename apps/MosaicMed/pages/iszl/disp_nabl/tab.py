@@ -1,10 +1,10 @@
 from dash import html, dcc, Output, Input
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.iszl.disp_nabl.tab1 import tab1_layout_iszl_disp_nab_svod
-from services.MosaicMed.pages.iszl.disp_nabl.tab2 import tab2_layout_iszl_disp_nab_list
-from services.MosaicMed.pages.iszl.disp_nabl.tab3 import tab3_layout_disp_nab_fgs
-from services.MosaicMed.pages.iszl.disp_nabl.tab4 import tab4_layout_disp_nab_cel_3
-from services.MosaicMed.pages.iszl.disp_nabl.tab5 import tab4_layout_disp_nab_pr
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.iszl.disp_nabl.tab1 import tab1_layout_iszl_disp_nab_svod
+from apps.MosaicMed.pages.iszl.disp_nabl.tab2 import tab2_layout_iszl_disp_nab_list
+from apps.MosaicMed.pages.iszl.disp_nabl.tab3 import tab3_layout_disp_nab_fgs
+from apps.MosaicMed.pages.iszl.disp_nabl.tab4 import tab4_layout_disp_nab_cel_3
+from apps.MosaicMed.pages.iszl.disp_nabl.tab5 import tab4_layout_disp_nab_pr
 
 type_page = "iszl-disp-nab"
 # вкладки

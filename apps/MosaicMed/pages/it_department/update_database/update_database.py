@@ -4,8 +4,8 @@ from dash import html, dcc, Input, Output, State
 import subprocess
 import dash_bootstrap_components as dbc
 from sqlalchemy.exc import ProgrammingError
-from services.MosaicMed.app import app
-from services.MosaicMed.callback.callback import query_last_record_sql, last_file_csv_in_directory
+from apps.MosaicMed.app import app
+from apps.MosaicMed.callback.callback import query_last_record_sql, last_file_csv_in_directory
 
 # Определяем базовый путь к скриптам и папкам
 script_dir = os.path.dirname(os.path.abspath(__file__))

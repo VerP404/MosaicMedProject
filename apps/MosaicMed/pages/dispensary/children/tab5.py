@@ -1,10 +1,10 @@
 import dash_bootstrap_components as dbc
 from dash import html, dcc, Output, Input, dash_table
 from database.db_conn import engine
-from services.MosaicMed.app import app
-from services.MosaicMed.callback.callback import TableUpdater
-from services.MosaicMed.generate_pages.elements import card_table
-from services.MosaicMed.pages.dispensary.children.query import query_download_children_list_not_pn1
+from apps.MosaicMed.app import app
+from apps.MosaicMed.callback.callback import TableUpdater
+from apps.MosaicMed.generate_pages.elements import card_table
+from apps.MosaicMed.pages.dispensary.children.query import query_download_children_list_not_pn1
 
 type_page = "children_list_not_pn"
 

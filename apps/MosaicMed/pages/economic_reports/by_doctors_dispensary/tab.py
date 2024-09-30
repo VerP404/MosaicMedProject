@@ -1,8 +1,8 @@
 from dash import html, dcc, Output, Input
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.economic_reports.by_doctors_dispensary.tab1 import tab1_layout_by_doctor_dispensary
-from services.MosaicMed.pages.economic_reports.by_doctors_dispensary.tab2 import tab2_layout_by_doctor_dispensary
-from services.MosaicMed.pages.economic_reports.by_doctors_dispensary.tab3 import tab3_layout_by_doctor_dispensary
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.economic_reports.by_doctors_dispensary.tab1 import tab1_layout_by_doctor_dispensary
+from apps.MosaicMed.pages.economic_reports.by_doctors_dispensary.tab2 import tab2_layout_by_doctor_dispensary
+from apps.MosaicMed.pages.economic_reports.by_doctors_dispensary.tab3 import tab3_layout_by_doctor_dispensary
 
 type_page = "by-doctor-dispensary"
 # вкладки

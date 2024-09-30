@@ -7,7 +7,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from dash import dcc, html, Input, Output, State, dash_table
 from database.db_conn import engine
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 from sqlalchemy import create_engine
 
 

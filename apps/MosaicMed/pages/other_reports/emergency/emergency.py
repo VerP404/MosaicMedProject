@@ -3,8 +3,8 @@ import io
 import pandas as pd
 from dash import html, dcc, Output, Input, dash_table, State
 
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.other_reports.emergency.app_neot import neotlojka_data, neotlojka_pacient_last_file
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.other_reports.emergency.app_neot import neotlojka_data, neotlojka_pacient_last_file
 
 type_page = "emergency"
 

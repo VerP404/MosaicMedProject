@@ -1,7 +1,7 @@
 from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.economic_reports.new_territories.tab1 import new_territories_tab1
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.economic_reports.new_territories.tab1 import new_territories_tab1
 
 type_page = "new-territories"
 # вкладки

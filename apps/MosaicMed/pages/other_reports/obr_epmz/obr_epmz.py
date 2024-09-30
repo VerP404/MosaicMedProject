@@ -7,7 +7,7 @@ from dash import html, dcc, Output, Input, dash_table, State
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 
 type_page = "obr_epmz"
 

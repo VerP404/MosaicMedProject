@@ -4,8 +4,8 @@ import pandas as pd
 from sqlalchemy import text
 from dash import html, dcc, Output, Input, dash_table, State, callback_context
 from database.db_conn import engine
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.filling_lists.query import sql_query_df_from_sql
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.filling_lists.query import sql_query_df_from_sql
 import dash_bootstrap_components as dbc
 
 type_page = "add-contact-info"

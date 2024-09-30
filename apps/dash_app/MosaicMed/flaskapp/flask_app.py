@@ -1,6 +1,5 @@
 # flask_app.py
 from flask import Flask, render_template, request, redirect, url_for
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
 from apps.dash_app.MosaicMed.flaskapp.file_loader import file_loader_bp
 from apps.dash_app.MosaicMed.flaskapp.models import User  # Корректный путь к модели User

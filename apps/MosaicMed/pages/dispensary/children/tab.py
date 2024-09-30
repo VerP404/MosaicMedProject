@@ -1,11 +1,11 @@
 from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.dispensary.children.tab1 import tab1_layout_dc
-from services.MosaicMed.pages.dispensary.children.tab2 import tab2_layout_dc
-from services.MosaicMed.pages.dispensary.children.tab3 import tab3_layout_other_children_age_dispensary
-from services.MosaicMed.pages.dispensary.children.tab4 import tab4_layout_other_children_list
-from services.MosaicMed.pages.dispensary.children.tab5 import tab5_layout_children_list_not_pn
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.dispensary.children.tab1 import tab1_layout_dc
+from apps.MosaicMed.pages.dispensary.children.tab2 import tab2_layout_dc
+from apps.MosaicMed.pages.dispensary.children.tab3 import tab3_layout_other_children_age_dispensary
+from apps.MosaicMed.pages.dispensary.children.tab4 import tab4_layout_other_children_list
+from apps.MosaicMed.pages.dispensary.children.tab5 import tab5_layout_children_list_not_pn
 
 # вкладки
 app_tabs_dc = html.Div(

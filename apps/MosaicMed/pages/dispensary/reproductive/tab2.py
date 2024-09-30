@@ -3,13 +3,13 @@ from datetime import datetime
 from dash import html, dcc, Output, Input, dash_table, exceptions, State
 import dash_bootstrap_components as dbc
 from database.db_conn import engine
-from services.MosaicMed.app import app
-from services.MosaicMed.callback.callback import TableUpdater, get_current_reporting_month
-from services.MosaicMed.callback.slider_months import get_selected_period
-from services.MosaicMed.generate_pages.elements import card_table
-from services.MosaicMed.generate_pages.filters import filter_years, filter_months
-from services.MosaicMed.pages.dispensary.adults.query import sql_query_do_korpus_dd
-from services.MosaicMed.pages.dispensary.reproductive.query import sqlquery_people_reproductive_tab2
+from apps.MosaicMed.app import app
+from apps.MosaicMed.callback.callback import TableUpdater, get_current_reporting_month
+from apps.MosaicMed.callback.slider_months import get_selected_period
+from apps.MosaicMed.generate_pages.elements import card_table
+from apps.MosaicMed.generate_pages.filters import filter_years, filter_months
+from apps.MosaicMed.pages.dispensary.adults.query import sql_query_do_korpus_dd
+from apps.MosaicMed.pages.dispensary.reproductive.query import sqlquery_people_reproductive_tab2
 
 type_page = "tab2-reproductive"
 

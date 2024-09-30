@@ -1,9 +1,9 @@
 from dash import html, dcc, Output, Input, dash_table, exceptions, callback_context
 from database.db_conn import engine
-from services.MosaicMed.app import app
-from services.MosaicMed.callback.callback import TableUpdater
+from apps.MosaicMed.app import app
+from apps.MosaicMed.callback.callback import TableUpdater
 
-from services.MosaicMed.pages.dispensary.adults.query import sql_query_flu_list, sql_query_flu_list2, sql_query_flu_list3, \
+from apps.MosaicMed.pages.dispensary.adults.query import sql_query_flu_list, sql_query_flu_list2, sql_query_flu_list3, \
     sql_query_flu_report
 
 type_page = "tab6-da"

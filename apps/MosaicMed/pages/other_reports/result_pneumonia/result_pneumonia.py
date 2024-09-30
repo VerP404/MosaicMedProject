@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 from dash import html, dcc, Output, Input, dash_table
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 from database.db_conn import engine
-from services.MosaicMed.callback.callback import TableUpdater, get_selected_dates
-from services.MosaicMed.pages.other_reports.result_pneumonia.query import sql_query_pneumonia_in_talon, \
+from apps.MosaicMed.callback.callback import TableUpdater, get_selected_dates
+from apps.MosaicMed.pages.other_reports.result_pneumonia.query import sql_query_pneumonia_in_talon, \
     sql_query_pneumonia_in_talon_korpus_second, sql_query_pneumonia_in_talon_korpus_first
 
 type_page = "rp"

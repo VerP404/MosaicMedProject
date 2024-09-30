@@ -1,13 +1,13 @@
 from dash import html, dcc, Output, Input, dash_table, exceptions, State
 import dash_bootstrap_components as dbc
 from database.db_conn import engine
-from services.MosaicMed.app import app
-from services.MosaicMed.callback.callback import TableUpdater, get_current_reporting_month
-from services.MosaicMed.callback.slider_months import get_selected_period
-from services.MosaicMed.generate_pages.elements import card_table
-from services.MosaicMed.generate_pages.filters import filter_years, filter_months, filter_status
-from services.MosaicMed.generate_pages.constants import status_groups, months_labels, months_sql_labels
-from services.MosaicMed.pages.economic_reports.by_doctors_dispensary.query import (
+from apps.MosaicMed.app import app
+from apps.MosaicMed.callback.callback import TableUpdater, get_current_reporting_month
+from apps.MosaicMed.callback.slider_months import get_selected_period
+from apps.MosaicMed.generate_pages.elements import card_table
+from apps.MosaicMed.generate_pages.filters import filter_years, filter_months, filter_status
+from apps.MosaicMed.generate_pages.constants import status_groups, months_labels, months_sql_labels
+from apps.MosaicMed.pages.economic_reports.by_doctors_dispensary.query import (
     sql_query_by_doctor_dispensary_adult_f1,
     sql_query_by_doctor_dispensary_adult_f2,
     sql_query_by_doctor_dispensary_adult_f3

@@ -3,12 +3,12 @@ from datetime import datetime
 from dash import html, Output, Input
 import dash_bootstrap_components as dbc
 from database.db_conn import engine
-from services.MosaicMed.app import app
-from services.MosaicMed.callback.callback import TableUpdater
-from services.MosaicMed.callback.date_reports import get_selected_year
-from services.MosaicMed.generate_pages.elements import card_table
-from services.MosaicMed.generate_pages.filters import filter_years, filter_months
-from services.MosaicMed.pages.dispensary.children.query import sql_query_pn_talon, sql_query_pn_uniq
+from apps.MosaicMed.app import app
+from apps.MosaicMed.callback.callback import TableUpdater
+from apps.MosaicMed.callback.date_reports import get_selected_year
+from apps.MosaicMed.generate_pages.elements import card_table
+from apps.MosaicMed.generate_pages.filters import filter_years, filter_months
+from apps.MosaicMed.pages.dispensary.children.query import sql_query_pn_talon, sql_query_pn_uniq
 
 type_page = "tab2-dc"
 

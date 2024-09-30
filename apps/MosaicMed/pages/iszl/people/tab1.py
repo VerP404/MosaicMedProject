@@ -1,10 +1,10 @@
 from dash import html, dcc, Output, Input, dash_table, State, callback_context
 from database.db_conn import engine
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 import dash_bootstrap_components as dbc
 
-from services.MosaicMed.callback.callback import TableUpdater
-from services.MosaicMed.pages.iszl.people.query import sql_query_people_iszl, sql_query_people_iszl_all
+from apps.MosaicMed.callback.callback import TableUpdater
+from apps.MosaicMed.pages.iszl.people.query import sql_query_people_iszl, sql_query_people_iszl_all
 
 type_page = "people-iszl"
 alert_text = """Половозрастная структура прикрепленного населения по корпусам из ИСЗЛ

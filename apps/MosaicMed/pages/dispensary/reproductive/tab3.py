@@ -1,11 +1,11 @@
 from dash import html, Input, Output, dash_table, dcc
 from database.db_conn import engine
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 import dash_bootstrap_components as dbc
 
-from services.MosaicMed.callback.callback import TableUpdater
-from services.MosaicMed.generate_pages.elements import card_table
-from services.MosaicMed.pages.dispensary.reproductive.query import sqlquery_people_reproductive_tab3
+from apps.MosaicMed.callback.callback import TableUpdater
+from apps.MosaicMed.generate_pages.elements import card_table
+from apps.MosaicMed.pages.dispensary.reproductive.query import sqlquery_people_reproductive_tab3
 
 type_page = "tab3-reproductive"
 

@@ -2,9 +2,7 @@
 from dash import State, html, Output, Input, dcc, dash
 from datetime import datetime
 import dash_bootstrap_components as dbc
-from flask_login import current_user, logout_user
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.admin.settings import get_setting
+from apps.MosaicMed.app import app
 
 year = datetime.now().year
 
@@ -25,8 +23,6 @@ footer_main = html.Div([
     html.Footer(children=[
         html.P(id='user-info', style={'margin-left': '8%', 'cursor': 'pointer'}),
         html.P(id='open-developer-modal', children=f"© Разработка приложения Родионов Д.Н., 2023—{year}"),
-        html.P(id='footer-mo-name', children=html.A(get_setting("name_mo"), href=get_setting("site_mo"),
-                                                    style={'text-decoration': 'none', 'color': 'white'}), style={'margin-right': '8%'}),
     ], style=footer_style),
 ])
 
@@ -79,49 +75,3 @@ def toggle_developer_modal(open_clicks, close_clicks, is_open):
         return not is_open
     return is_open
 
-@app.callback(
-    Output('user-info', 'children'),
-    Input('url', 'pathname')
-)
-def update_user_info(pathname):
-    if current_user.is_authenticated:
-        return f"{current_user.last_name} {current_user.first_name[0]}. {current_user.middle_name[0]}."
-    return "Гость"
-
-@app.callback(
-    [Output('user-full-name', 'children'),
-     Output('user-position', 'children'),
-     Output('user-role', 'children'),
-     Output('user-category', 'children'),
-     Output('user-birth-date', 'children')],
-    Input('user-modal', 'is_open')
-)
-def update_modal_user_info(is_open):
-    if is_open and current_user.is_authenticated:
-        return (f"ФИО: {current_user.last_name} {current_user.first_name} {current_user.middle_name}",
-                f"Должность: {current_user.position}",
-                f"Роль: {current_user.role}",
-                f"Категория: {current_user.category}",
-                f"Дата рождения: {current_user.birth_date}")
-    return ("", "", "", "", "")
-
-@app.callback(
-    Output('url', 'pathname'),
-    Input('logout-button', 'n_clicks')
-)
-def logout(n_clicks):
-    if n_clicks:
-        logout_user()
-        return '/login'
-    return dash.no_update
-
-@app.callback(
-    Output('footer-mo-name', 'children'),
-    [Input('save-settings-button', 'n_clicks')],
-    [State('name_mo', 'value'), State('site_mo', 'value')]
-)
-def update_footer_mo_name(n_clicks, name_mo, site_mo):
-    if n_clicks:
-        return html.A(name_mo, href=site_mo, style={'text-decoration': 'none', 'color': 'white'})
-    return html.A(get_setting("name_mo"), href=get_setting("site_mo"),
-                  style={'text-decoration': 'none', 'color': 'white'})

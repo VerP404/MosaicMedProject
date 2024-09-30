@@ -1,7 +1,7 @@
 from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.it_department.cel_3.tab1 import tab1_layout_cel_3
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.it_department.cel_3.tab1 import tab1_layout_cel_3
 
 # вкладки
 app_tabs_cel3 = html.Div(

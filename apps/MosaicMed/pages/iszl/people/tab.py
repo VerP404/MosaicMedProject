@@ -1,11 +1,11 @@
 from dash import html, dcc, Output, Input
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 
-from services.MosaicMed.pages.iszl.people.tab1 import tab1_layout_people_iszl
-from services.MosaicMed.pages.iszl.people.tab2 import tab2_layout_people_iszl
-from services.MosaicMed.pages.iszl.people.tab3 import tab3_layout_people_iszl
-from services.MosaicMed.pages.iszl.people.tab4 import tab4_layout_people_iszl
-from services.MosaicMed.pages.iszl.people.tab5 import tab5_layout_people_iszl
+from apps.MosaicMed.pages.iszl.people.tab1 import tab1_layout_people_iszl
+from apps.MosaicMed.pages.iszl.people.tab2 import tab2_layout_people_iszl
+from apps.MosaicMed.pages.iszl.people.tab3 import tab3_layout_people_iszl
+from apps.MosaicMed.pages.iszl.people.tab4 import tab4_layout_people_iszl
+from apps.MosaicMed.pages.iszl.people.tab5 import tab5_layout_people_iszl
 
 type_page = "iszl"
 # вкладки

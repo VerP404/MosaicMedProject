@@ -1,7 +1,7 @@
 import pandas as pd
 from sqlalchemy import text
 from database.db_conn import engine
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 import dash_bootstrap_components as dbc
 from dash import html, dash_table, dcc, Output, Input, exceptions, callback_context
 

@@ -1,10 +1,10 @@
 from dash import html, Input, Output, dash_table, dcc, State
 from database.db_conn import engine
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 import dash_bootstrap_components as dbc
 
-from services.MosaicMed.callback.callback import TableUpdater
-from services.MosaicMed.pages.iszl.disp_nabl.query import sql_query_disp_nabl_list, sql_query_disp_nabl_list_svod
+from apps.MosaicMed.callback.callback import TableUpdater
+from apps.MosaicMed.pages.iszl.disp_nabl.query import sql_query_disp_nabl_list, sql_query_disp_nabl_list_svod
 
 # Отчет для сборки талонов
 type_page = "iszl-disp-nab-list"

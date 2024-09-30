@@ -1,8 +1,8 @@
 from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.eln.tab1 import tab1_eln
-from services.MosaicMed.pages.eln.tab2 import tab2_eln
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.eln.tab1 import tab1_eln
+from apps.MosaicMed.pages.eln.tab2 import tab2_eln
 
 type_page = "eln"
 # вкладки

@@ -1,14 +1,14 @@
 from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.other_reports.cardiology_report.cardiology_report import tab_layout_other_cardiology
-from services.MosaicMed.pages.other_reports.dispensary_visits.dispensary_visits import app_other_dd_visits
-from services.MosaicMed.pages.other_reports.emergency.emergency import tab_layout_other_emergency
-from services.MosaicMed.pages.other_reports.obr_epmz.obr_epmz import tab_layout_other_obr_epmz
-from services.MosaicMed.pages.other_reports.result_pneumonia.result_pneumonia import tab_layout_other_rp
-from services.MosaicMed.pages.other_reports.sharapova.sharapova import tab_layout_other_sharapova
-from services.MosaicMed.pages.other_reports.visits.visits import tab_layout_other_visits
-from services.MosaicMed.pages.other_reports.vop.vop import tab_layout_other_vop
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.other_reports.cardiology_report.cardiology_report import tab_layout_other_cardiology
+from apps.MosaicMed.pages.other_reports.dispensary_visits.dispensary_visits import app_other_dd_visits
+from apps.MosaicMed.pages.other_reports.emergency.emergency import tab_layout_other_emergency
+from apps.MosaicMed.pages.other_reports.obr_epmz.obr_epmz import tab_layout_other_obr_epmz
+from apps.MosaicMed.pages.other_reports.result_pneumonia.result_pneumonia import tab_layout_other_rp
+from apps.MosaicMed.pages.other_reports.sharapova.sharapova import tab_layout_other_sharapova
+from apps.MosaicMed.pages.other_reports.visits.visits import tab_layout_other_visits
+from apps.MosaicMed.pages.other_reports.vop.vop import tab_layout_other_vop
 
 # вкладки
 app_tabs_other_reports = html.Div(

@@ -1,9 +1,9 @@
 from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.dispensary.reproductive.tab1 import tab1_reproductive
-from services.MosaicMed.pages.dispensary.reproductive.tab2 import tab2_reproductive
-from services.MosaicMed.pages.dispensary.reproductive.tab3 import tab3_reproductive
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.dispensary.reproductive.tab1 import tab1_reproductive
+from apps.MosaicMed.pages.dispensary.reproductive.tab2 import tab2_reproductive
+from apps.MosaicMed.pages.dispensary.reproductive.tab3 import tab3_reproductive
 
 # вкладки
 app_tabs_reproductive = html.Div(

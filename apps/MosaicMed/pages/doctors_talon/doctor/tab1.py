@@ -1,13 +1,13 @@
 from dash import dcc, html, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.flaskapp.flask_app import flask_app
-from services.MosaicMed.app import app
+from apps.MosaicMed.flaskapp.flask_app import flask_app
+from apps.MosaicMed.app import app
 from database.db_conn import engine
-from services.MosaicMed.callback.callback import get_selected_doctors, get_current_reporting_month, TableUpdater
-from services.MosaicMed.generate_pages.elements import card_table
-from services.MosaicMed.generate_pages.filters import filter_doctors, filter_years, filter_months
-from services.MosaicMed.callback.slider_months import get_selected_period
-from services.MosaicMed.pages.doctors_talon.doctor.query import sql_query_amb_def, sql_query_dd_def, sql_query_stac_def
+from apps.MosaicMed.callback.callback import get_selected_doctors, get_current_reporting_month, TableUpdater
+from apps.MosaicMed.generate_pages.elements import card_table
+from apps.MosaicMed.generate_pages.filters import filter_doctors, filter_years, filter_months
+from apps.MosaicMed.callback.slider_months import get_selected_period
+from apps.MosaicMed.pages.doctors_talon.doctor.query import sql_query_amb_def, sql_query_dd_def, sql_query_stac_def
 
 type_page = "tab1-doctor-talon"
 

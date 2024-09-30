@@ -4,7 +4,7 @@ import pandas as pd
 import re
 import base64
 import io
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 from database.db_conn import engine
 
 

@@ -2,11 +2,11 @@ from datetime import datetime
 from dash import html, Output, Input
 import dash_bootstrap_components as dbc
 from database.db_conn import engine
-from services.MosaicMed.app import app
-from services.MosaicMed.callback.callback import  TableUpdater, get_selected_dates
-from services.MosaicMed.generate_pages.elements import card_table
-from services.MosaicMed.generate_pages.filters import date_start, date_end
-from services.MosaicMed.pages.dispensary.adults.query import sql_query_dispensary
+from apps.MosaicMed.app import app
+from apps.MosaicMed.callback.callback import  TableUpdater, get_selected_dates
+from apps.MosaicMed.generate_pages.elements import card_table
+from apps.MosaicMed.generate_pages.filters import date_start, date_end
+from apps.MosaicMed.pages.dispensary.adults.query import sql_query_dispensary
 
 
 type_page = "tab1-da"

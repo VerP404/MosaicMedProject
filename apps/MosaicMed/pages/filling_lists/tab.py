@@ -1,9 +1,9 @@
 from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.filling_lists.tab1 import tab_layout_add_contact_info
-from services.MosaicMed.pages.filling_lists.tab2 import tab_layout_vokod
-from services.MosaicMed.pages.filling_lists.tab3 import tab_layout_smo
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.filling_lists.tab1 import tab_layout_add_contact_info
+from apps.MosaicMed.pages.filling_lists.tab2 import tab_layout_vokod
+from apps.MosaicMed.pages.filling_lists.tab3 import tab_layout_smo
 
 type_tab = 'fil-list'
 # вкладки

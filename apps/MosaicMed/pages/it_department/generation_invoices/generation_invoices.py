@@ -1,10 +1,10 @@
 from dash import html, Input, Output, dash_table, dcc, State
 from database.db_conn import engine
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 import dash_bootstrap_components as dbc
 
-from services.MosaicMed.callback.callback import TableUpdater
-from services.MosaicMed.pages.it_department.generation_invoices.query import sql_gen_invoices, sql_gen_invoices_povt, sql_gen_name_check
+from apps.MosaicMed.callback.callback import TableUpdater
+from apps.MosaicMed.pages.it_department.generation_invoices.query import sql_gen_invoices, sql_gen_invoices_povt, sql_gen_name_check
 
 # Отчет для сборки талонов
 type_page = "gen_invoice"

@@ -1,4 +1,4 @@
-from services.MosaicMed.pages.admin.settings import get_setting
+from apps.MosaicMed.pages.admin.settings import get_setting
 from dash import dcc, html
 
 dashboard_chef_url = get_setting("dashboard_chef")

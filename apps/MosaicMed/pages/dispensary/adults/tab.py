@@ -1,14 +1,14 @@
 from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.dispensary.adults.tab1 import tab1_layout_da
-from services.MosaicMed.pages.dispensary.adults.tab2 import tab2_layout_da
-from services.MosaicMed.pages.dispensary.adults.tab3 import tab3_layout_da
-from services.MosaicMed.pages.dispensary.adults.tab4 import tab4_layout_da
-from services.MosaicMed.pages.dispensary.adults.tab5 import tab5_layout_da
-from services.MosaicMed.pages.dispensary.adults.tab6 import tab6_layout_da
-from services.MosaicMed.pages.dispensary.adults.tab7 import tab7_layout_da
-from services.MosaicMed.pages.dispensary.adults.tab8 import tab8_layout_da
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.dispensary.adults.tab1 import tab1_layout_da
+from apps.MosaicMed.pages.dispensary.adults.tab2 import tab2_layout_da
+from apps.MosaicMed.pages.dispensary.adults.tab3 import tab3_layout_da
+from apps.MosaicMed.pages.dispensary.adults.tab4 import tab4_layout_da
+from apps.MosaicMed.pages.dispensary.adults.tab5 import tab5_layout_da
+from apps.MosaicMed.pages.dispensary.adults.tab6 import tab6_layout_da
+from apps.MosaicMed.pages.dispensary.adults.tab7 import tab7_layout_da
+from apps.MosaicMed.pages.dispensary.adults.tab8 import tab8_layout_da
 
 # вкладки
 app_tabs_da = html.Div(

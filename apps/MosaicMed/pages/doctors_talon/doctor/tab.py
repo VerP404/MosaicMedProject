@@ -1,9 +1,9 @@
 from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.doctors_talon.doctor.tab1 import tab1_doctor_talon_layout
-from services.MosaicMed.pages.doctors_talon.doctor.tab2 import tab2_doctor_talon_layout
-from services.MosaicMed.pages.doctors_talon.doctor.tab3 import tab3_doctor_talon_layout
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.doctors_talon.doctor.tab1 import tab1_doctor_talon_layout
+from apps.MosaicMed.pages.doctors_talon.doctor.tab2 import tab2_doctor_talon_layout
+from apps.MosaicMed.pages.doctors_talon.doctor.tab3 import tab3_doctor_talon_layout
 
 type_page = 'doctors-talon'
 

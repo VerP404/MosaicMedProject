@@ -1,5 +1,4 @@
-# app_api.py
-from services.MosaicMed.flaskapp.flask_app import flask_app
+# apps.MosaicMed.app.py.py
 import dash
 import dash_bootstrap_components as dbc
 
@@ -15,7 +14,6 @@ external_scripts = [
 ]
 
 app = dash.Dash(__name__,
-                server=flask_app,
                 url_base_pathname='/',
                 external_stylesheets=external_stylesheets,
                 external_scripts=external_scripts,

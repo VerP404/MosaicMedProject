@@ -1,9 +1,9 @@
 from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
-from services.MosaicMed.app import app
-from services.MosaicMed.pages.economic_reports.by_doctors_cel.tab1 import tab1_layout_by_doctor_cel_mest
-from services.MosaicMed.pages.economic_reports.by_doctors_cel.tab2 import tab1_layout_by_doctor_cel_inog
-from services.MosaicMed.pages.economic_reports.by_doctors_cel.tab3 import tab1_layout_by_doctor_cel_stac
+from apps.MosaicMed.app import app
+from apps.MosaicMed.pages.economic_reports.by_doctors_cel.tab1 import tab1_layout_by_doctor_cel_mest
+from apps.MosaicMed.pages.economic_reports.by_doctors_cel.tab2 import tab1_layout_by_doctor_cel_inog
+from apps.MosaicMed.pages.economic_reports.by_doctors_cel.tab3 import tab1_layout_by_doctor_cel_stac
 
 type_page = "by-doctor-cel"
 # вкладки

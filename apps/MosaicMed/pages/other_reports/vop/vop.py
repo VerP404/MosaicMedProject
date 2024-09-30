@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 from dash import html, dcc, Output, Input, dash_table, State
-from services.MosaicMed.app import app
+from apps.MosaicMed.app import app
 from database.db_conn import engine
-from services.MosaicMed.callback.callback import TableUpdater, get_selected_dates
-from services.MosaicMed.pages.other_reports.vop.query import sql_query_vop
+from apps.MosaicMed.callback.callback import TableUpdater, get_selected_dates
+from apps.MosaicMed.pages.other_reports.vop.query import sql_query_vop
 import dash_bootstrap_components as dbc
 
 type_page = "vop"

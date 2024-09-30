@@ -4,7 +4,7 @@ import dash_bootstrap_components as dbc
 from database.db_conn import engine
 from dash import html, dash_table
 
-from services.MosaicMed.pages.economic_reports.volumes_indicators.query import sql_query_pgg_amb, sql_query_pgg_dd, sql_query_pgg_ds
+from apps.MosaicMed.pages.economic_reports.volumes_indicators.query import sql_query_pgg_amb, sql_query_pgg_dd, sql_query_pgg_ds
 
 
 def pgg_amb(eng, sql_query):

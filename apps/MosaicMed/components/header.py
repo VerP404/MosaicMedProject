@@ -1,9 +1,9 @@
 import dash_bootstrap_components as dbc
 from dash import Input, Output, dcc, html
 
-from database.db_conn import engine
-from services.MosaicMed.app import app
-from services.MosaicMed.utils import last_record_sql
+# from database.db_conn import engine
+from apps.MosaicMed.app import app
+from apps.MosaicMed.utils import last_record_sql
 
 PLOTLY_LOGO = r"\assets\img\plotly-logomark.png"
 
