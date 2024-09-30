@@ -1,7 +1,13 @@
 import dash_bootstrap_components as dbc
 from dash import Input, Output, dcc, html
 
-PLOTLY_LOGO = r"\assets\img\plotly-logomark.png"
+from apps.home.models import MainSettings
+
+# Получите настройки
+main_settings = MainSettings.objects.first()
+main_app_url = f"http://{main_settings.main_app_ip}:{main_settings.main_app_port}"
+
+PLOTLY_LOGO = r"\static\img\plotly-logomark.png"
 
 header = dbc.Navbar(
     dbc.Container(
@@ -20,7 +26,7 @@ header = dbc.Navbar(
                     align="center",
                     className="g-0",
                 ),
-                href="/home/",
+                href=main_app_url,
                 style={"textDecoration": "none"},
             ),
             dbc.NavLink(),
