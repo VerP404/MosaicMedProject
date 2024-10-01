@@ -13,6 +13,13 @@ INSTALLED_APPS += [
     'import_export',
     'apps.dash_app',
     'django_plotly_dash.apps.DjangoPlotlyDashConfig',
+
+    'apps.personnel',
+    'apps.organization',
+
+    'dal',
+    'dal_select2',
+
 ]
 MIDDLEWARE += [
     'debug_toolbar.middleware.DebugToolbarMiddleware',
