@@ -1,0 +1,56 @@
+/* assets/css/styles.css */
+
+/* Стили для сайдбара */
+.sidebar {
+    transition: all 0.3s ease;
+}
+
+.sidebar.collapsed {
+    width: 5rem !important;
+}
+
+.sidebar .nav-link {
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.sidebar .nav-link.active {
+    background-color: #007bff;
+    color: #fff;
+}
+
+.sidebar .bi {
+    font-size: 1.5rem;
+    margin-right: 1rem;
+}
+
+.sidebar.collapsed .bi {
+    margin: 0;
+}
+
+.sidebar.collapsed .nav-link {
+    text-align: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.navbar {
+    background-color: #007bff;
+}
+
+#current-date-output {
+    color: white;
+    font-size: 1rem;
+}
+
+#current-date-output {
+    color: white;
+    font-size: 1rem;
+    margin-right: 20px; /* Отступ справа */
+}
+
+.navbar-brand {
+    font-size: 1.25rem;
+    margin-left: 10px; /* Отступ от логотипа */
+}

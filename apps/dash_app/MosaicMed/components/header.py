@@ -6,7 +6,6 @@ from apps.home.models import MainSettings
 # Получите настройки
 main_settings = MainSettings.objects.first()
 main_app_url = f"http://{main_settings.main_app_ip}:{main_settings.main_app_port}"
-
 PLOTLY_LOGO = r"\static\img\plotly-logomark.png"
 
 header = dbc.Navbar(
