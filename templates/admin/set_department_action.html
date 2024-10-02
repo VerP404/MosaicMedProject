@@ -1,0 +1,26 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h2>Проставить отделение для выбранных записей</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" name="apply" class="button">Применить</button>
+    <a href="{% url 'admin:personnel_doctorrecord_changelist' %}" class="button">Отмена</a>
+</form>
+
+<!-- Отображение сообщений и отладочной информации -->
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+      <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% if debug_info %}
+  <h3>Отладочная информация</h3>
+  <pre>{{ debug_info }}</pre>
+{% endif %}
+
+{% endblock %}

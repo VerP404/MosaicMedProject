@@ -1,6 +1,7 @@
 from dal import autocomplete
 from django import forms
 from .models import *
+from ..organization.models import Department
 
 
 class RG014Form(forms.ModelForm):
@@ -34,3 +35,8 @@ class DigitalSignatureForm(forms.ModelForm):
     class Meta:
         model = DigitalSignature
         fields = ('valid_from', 'valid_to', 'issued_date', 'revoked_date')
+
+
+class DepartmentActionForm(forms.Form):
+    department = forms.ModelChoiceField(queryset=Department.objects.all(), label="Выберите отделение")
+
