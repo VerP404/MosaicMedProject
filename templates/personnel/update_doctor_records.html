@@ -1,0 +1,20 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Обновление записей врачей</h1>
+
+<p>Обновлено записей: {{ updated_count }}</p>
+
+{% if missing_snils %}
+    <h3>СНИЛС, которые отсутствуют в Person:</h3>
+    <ul>
+        {% for snils in missing_snils %}
+        <li>{{ snils }}</li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>Все СНИЛС найдены в Person.</p>
+{% endif %}
+
+<a href="{% url 'admin:personnel_doctorrecord_changelist' %}">Назад к журналу врачей</a>
+{% endblock %}

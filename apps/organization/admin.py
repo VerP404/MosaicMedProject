@@ -21,6 +21,8 @@ class BuildingAdmin(admin.ModelAdmin):
     list_display = ('name', 'additional_name', 'organization', 'address')
     list_filter = ('organization',)
     search_fields = ('name', 'additional_name', 'address')
+    list_editable = ('additional_name',)
+
 
 
 @admin.register(Department)

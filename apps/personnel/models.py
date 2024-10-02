@@ -62,7 +62,7 @@ class DoctorRecord(models.Model):
         verbose_name="Физическое лицо"
     )
     doctor_code = models.CharField("Код врача", max_length=20)
-    start_date = models.DateField("Дата начала работы")
+    start_date = models.DateField("Дата начала работы", blank=True, null=True)
     end_date = models.DateField("Дата окончания работы", blank=True, null=True)
     structural_unit = models.CharField("Структурное подразделение", max_length=255, default='-')
     profile = models.ForeignKey(
@@ -137,3 +137,18 @@ class RG014(models.Model):
 
     def __str__(self):
         return f"{self.person} - {self.spec_name} - {self.post_name}"
+
+
+class DigitalSignature(models.Model):
+    person = models.ForeignKey('Person', on_delete=models.CASCADE, related_name='digital_signatures')
+    valid_from = models.DateField("Действует с")
+    valid_to = models.DateField("Действует по")
+    issued_date = models.DateField("Дата передачи врачу", blank=True, null=True)
+    revoked_date = models.DateField("Дата аннулирования", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "ЭЦП"
+        verbose_name_plural = "ЭЦП"
+
+    def __str__(self):
+        return f"ЭЦП для {self.person} (Действует с {self.valid_from} по {self.valid_to})"

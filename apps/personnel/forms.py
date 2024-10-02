@@ -26,5 +26,11 @@ class DoctorRecordForm(forms.ModelForm):
         model = DoctorRecord
         fields = ('doctor_code', 'start_date', 'end_date', 'structural_unit', 'profile', 'specialty', 'department')
         widgets = {
-            'department': autocomplete.ModelSelect2(url='department-autocomplete'),  # Автозаполнение для отделения
+            'department': autocomplete.ModelSelect2(url='department-autocomplete'),
         }
+
+
+class DigitalSignatureForm(forms.ModelForm):
+    class Meta:
+        model = DigitalSignature
+        fields = ('valid_from', 'valid_to', 'issued_date', 'revoked_date')
