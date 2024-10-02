@@ -16,6 +16,7 @@ INSTALLED_APPS += [
 
     'apps.personnel',
     'apps.organization',
+    'apps.oms_reference',
 
     'dal',
     'dal_select2',

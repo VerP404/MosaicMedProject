@@ -35,7 +35,7 @@ class Building(models.Model):
         verbose_name_plural = "Корпусы"
 
     def __str__(self):
-        return f"{self.name} ({self.organization.name})"
+        return f"{self.name} - {self.additional_name}"
 
 
 class Department(models.Model):

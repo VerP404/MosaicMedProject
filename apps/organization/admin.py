@@ -24,7 +24,6 @@ class BuildingAdmin(admin.ModelAdmin):
     list_editable = ('additional_name',)
 
 
-
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'additional_name', 'building')
