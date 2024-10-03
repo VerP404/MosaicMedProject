@@ -2,16 +2,27 @@ from .base import *
 
 DEBUG = True
 LOGGING['root']['level'] = 'DEBUG'
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'mosaicmed',
+        'USER': 'postgres',
+        'PASSWORD': 'password!24',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
+
 INSTALLED_APPS += [
     'debug_toolbar',
     'import_export',
-    'apps.dash_app',
     'django_plotly_dash.apps.DjangoPlotlyDashConfig',
 
     'apps.personnel',
