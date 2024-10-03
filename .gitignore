@@ -30,3 +30,4 @@ static
 /apps/data_loader/migrations/0010_dataimport_delete_omsdataimport.py
 /apps/data_loader/migrations/0011_alter_dataimport_type.py
 /apps/data_loader/migrations/0012_alter_dataimport_category.py
+/apps/organization/migrations/0002_medicalorganization_code_mo.py

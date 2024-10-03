@@ -13,6 +13,7 @@ urlpatterns = [
     path('dash_app/', include('apps.dash_app.urls')),
     path('organization/', include('apps.organization.urls')),
     path('personnel/', include('apps.personnel.urls')),
+    path('sql_manager/', include('apps.sql_manager.urls')),
 ]
 if settings.DEBUG:
     import debug_toolbar

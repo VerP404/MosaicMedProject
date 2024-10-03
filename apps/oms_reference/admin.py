@@ -47,10 +47,12 @@ class MedicalOrganizationOMSTargetForm(forms.ModelForm):
 @admin.register(MedicalOrganizationOMSTarget)
 class MedicalOrganizationOMSTargetAdmin(admin.ModelAdmin):
     form = MedicalOrganizationOMSTargetForm
-    list_display = ('organization', 'general_target', 'is_active', 'start_date', 'end_date')
-    list_filter = ('organization', 'is_active', 'start_date', 'end_date')
-    search_fields = ('organization__name', 'general_target__name')
+    list_display = ('general_target', 'is_active', 'start_date', 'end_date')
+    list_filter = ('is_active', 'start_date', 'end_date')
+    search_fields = ('general_target__name',)
     autocomplete_fields = ['organization', 'general_target']
+    list_editable = ('is_active', 'start_date', 'end_date')
+    ordering = ('general_target',)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)

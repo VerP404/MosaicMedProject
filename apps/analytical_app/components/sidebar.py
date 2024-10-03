@@ -21,10 +21,18 @@ def create_sidebar():
                         id="main-link"
                     ),
                     dbc.NavLink(
-                        [html.I(className="bi bi-info-circle"), html.Span(" О нас", className="ms-2", id="about-label")],
+                        [html.I(className="bi bi-info-circle"),
+                         html.Span(" О нас", className="ms-2", id="about-label")],
                         href="/about",
                         active="exact",
                         id="about-link"
+                    ),
+                    dbc.NavLink(
+                        [html.I(className="bi bi-info-circle"),
+                         html.Span(" Запросы", className="ms-2", id="query-label")],
+                        href="/query",
+                        active="exact",
+                        id="query-link"
                     ),
                 ],
                 vertical=True,

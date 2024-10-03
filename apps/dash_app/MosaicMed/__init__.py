@@ -1,5 +1,0 @@
-# site_mo = 'https://gp3.zdrav36.ru/'
-# name_mo = 'ВГКП3"'
-# short_name_mo = 'ВГКП3'
-# dashboard_chef = 'http://10.136.29.166:5010/'
-# dashboard_patient = 'http://10.136.29.72:8001/'

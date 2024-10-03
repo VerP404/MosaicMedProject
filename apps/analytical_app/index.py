@@ -4,6 +4,8 @@ import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from dash.dependencies import Output, Input, State
 import datetime
+
+from apps.analytical_app.pages.tab1 import *
 from components.sidebar import create_sidebar
 from components.navbar import create_navbar
 from components.footer import create_footer
@@ -62,6 +64,8 @@ def toggle_sidebar(n_clicks, sidebar_style, page_content_style):
 def display_page(pathname):
     if pathname == '/about':
         return html.H1('О нас')
+    if pathname == '/query':
+        return tab1_doctor_talon_list
     else:
         return html.Div([
             html.H1("Добро пожаловать в МозаикаМед", style={"textAlign": "center"}),
@@ -70,7 +74,7 @@ def display_page(pathname):
 
 
 if __name__ == "__main__":
-    app.run_server(debug=False, host='0.0.0.0', port='5000')
+    app.run_server(debug=True, host='0.0.0.0', port='5000')
 
 # MosaicMedProject/
 # └──apps/

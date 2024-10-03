@@ -39,3 +39,18 @@ class MedicalOrganizationOMSTarget(models.Model):
 
     def __str__(self):
         return f"{self.organization.name} - {self.general_target.name}"
+
+
+class SQLQueryParameters(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название параметра")
+    query = models.TextField(verbose_name="SQL-запрос")
+    parameters = models.JSONField(verbose_name="Параметры запроса", blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        verbose_name = "SQL Параметр"
+        verbose_name_plural = "SQL Параметры"
+
+    def __str__(self):
+        return self.name

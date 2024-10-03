@@ -17,10 +17,10 @@ INSTALLED_APPS += [
     'apps.personnel',
     'apps.organization',
     'apps.oms_reference',
+    'apps.sql_manager',
 
     'dal',
     'dal_select2',
-
 ]
 MIDDLEWARE += [
     'debug_toolbar.middleware.DebugToolbarMiddleware',
@@ -35,8 +35,7 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 
-
-X_FRAME_OPTIONS = 'SAMEORIGIN' # Использовать X-Frame-Options в браузере для Django-dash
+X_FRAME_OPTIONS = 'SAMEORIGIN'  # Использовать X-Frame-Options в браузере для Django-dash
 PLOTLY_DASH = {
     "ws_route": "ws/channel",  # Если планируете использовать WebSockets
     "http_route": "dash/app",  # Путь для Dash-приложения
