@@ -1,8 +1,19 @@
 from django.db import models
 
 
+class OMSTargetCategory(models.Model):
+    name = models.CharField(max_length=255, unique=True, verbose_name="Название категории")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Категория целей"
+        verbose_name_plural = "Категории целей"
+
+
 class GeneralOMSTarget(models.Model):
-    code = models.CharField("Код цели", max_length=10)
+    code = models.CharField("Код цели", max_length=255)
     name = models.CharField("Наименование цели", max_length=255)
     start_date = models.DateField("Дата начала действия", blank=True, null=True)
     end_date = models.DateField("Дата окончания действия", blank=True, null=True)
@@ -16,29 +27,36 @@ class GeneralOMSTarget(models.Model):
 
 
 class MedicalOrganizationOMSTarget(models.Model):
-    organization = models.ForeignKey(
-        'organization.MedicalOrganization',
-        on_delete=models.CASCADE,
-        related_name='oms_targets',
-        verbose_name="Медицинская организация"
-    )
     general_target = models.ForeignKey(
         GeneralOMSTarget,
         on_delete=models.CASCADE,
-        related_name='organization_targets',
-        verbose_name="Общая цель ОМС"
+        verbose_name="Базовая цель"
     )
-    is_active = models.BooleanField("Цель активна", default=True)
-    start_date = models.DateField("Дата начала действия", blank=True, null=True)
-    end_date = models.DateField("Дата окончания действия", blank=True, null=True)
+    organization = models.ForeignKey(
+        "organization.MedicalOrganization",
+        on_delete=models.CASCADE,
+        verbose_name="Медицинская организация"
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Активная цель")
+    start_date = models.DateField(null=True, blank=True, verbose_name="Дата начала")
+    end_date = models.DateField(null=True, blank=True, verbose_name="Дата окончания")
 
-    class Meta:
-        verbose_name = "Цель ОМС медицинской организации"
-        verbose_name_plural = "Цели ОМС медицинской организации"
-        unique_together = ('organization', 'general_target')
+    # Новое поле для связи с категориями
+    categories = models.ManyToManyField(
+        OMSTargetCategory,
+        related_name="medical_targets",
+        blank=True,
+        verbose_name="Категории"
+    )
 
     def __str__(self):
-        return f"{self.organization.name} - {self.general_target.name}"
+        return f"{self.organization} - {self.general_target}"
+
+    class Meta:
+        verbose_name = "Цель ОМС Медицинской организации"
+        verbose_name_plural = "Цели ОМС Медицинских организаций"
+        unique_together = ('organization', 'general_target')
+
 
 
 class SQLQueryParameters(models.Model):

@@ -41,15 +41,18 @@ def get_current_reporting_month():
 
 
 def filter_years(type_page):
-    return (
-        dbc.Col(
-            dcc.Dropdown(options=[
-                {'label': '2023', 'value': 2023},
-                {'label': '2024', 'value': 2024},
-                {'label': '2025', 'value': 2025}
-            ], id=f'dropdown-year-{type_page}', placeholder='Выберите год...',
-                value=current_year)
-        ))
+    # Генерируем список годов от 2023 до текущего года
+    year_options = [{'label': str(year), 'value': year} for year in range(2023, current_year + 1)]
+
+    return dbc.Col(
+        dcc.Dropdown(
+            options=year_options,
+            id=f'dropdown-year-{type_page}',
+            placeholder='Выберите год...',
+            value=current_year,  # Текущий год выбран по умолчанию
+            clearable=False  # Можно выбрать только один год
+        )
+    )
 
 
 def filter_doctors(type_page):
@@ -124,3 +127,20 @@ def filter_status(type_page):
             labelStyle={'display': 'block'}
         )
     )
+
+
+def filter_goals_and_categories():
+    return dbc.Col(
+        [
+            dbc.RadioItems(
+                id='filter-goals-categories',
+                options=[
+                    {'label': 'По целям', 'value': 'goals'},
+                    {'label': 'По категориям', 'value': 'categories'}
+                ],
+                value='goals',  # По умолчанию фильтр по целям
+                inline=True
+            )
+        ]
+    )
+

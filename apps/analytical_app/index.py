@@ -5,7 +5,7 @@ from apps.analytical_app.app import app
 from dash.dependencies import Output, Input, State
 import datetime
 
-from apps.analytical_app.pages.tab1 import *
+from apps.analytical_app.pages.tab1 import tab1_doctor_talon_list
 from components.sidebar import create_sidebar
 from components.navbar import create_navbar
 from components.footer import create_footer

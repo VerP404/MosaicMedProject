@@ -47,7 +47,7 @@ class OMSData(models.Model):
     home_visits = models.CharField(max_length=255)  # "Посещения на Дому"
     case = models.CharField(max_length=255)  # "Случай"
     main_diagnosis = models.CharField(max_length=255)  # "Диагноз основной (DS1)"
-    additional_diagnosis = models.CharField(max_length=255, null=True, blank=True)  # "Сопутствующий диагноз (DS2)"
+    additional_diagnosis = models.CharField(max_length=500, null=True, blank=True)  # "Сопутствующий диагноз (DS2)"
     mp_profile = models.CharField(max_length=255)  # "Профиль МП"
     bed_profile = models.CharField(max_length=255)  # "Профиль койки"
     dispensary_monitoring = models.CharField(max_length=255)  # "Диспансерное наблюдение"
