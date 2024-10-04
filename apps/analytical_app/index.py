@@ -41,7 +41,16 @@ def update_time(n):
     [Output("sidebar", "style"),
      Output("page-content", "style"),
      Output("main-label", "style"),
-     Output("about-label", "style")],
+     Output("doctor-label", "style"),
+     Output("head-label", "style"),
+     Output("chief-label", "style"),
+     Output("statistic-label", "style"),
+     Output("economist-label", "style"),
+     Output("admin-label", "style"),
+     Output("help-label", "style"),
+     Output("query-label", "style"),
+
+     ],  # Добавляем сюда идентификатор для "Запросы"
     [Input("btn_sidebar", "n_clicks")],
     [State("sidebar", "style"), State("page-content", "style")]
 )
@@ -50,12 +59,20 @@ def toggle_sidebar(n_clicks, sidebar_style, page_content_style):
         # Свернутый вид (только иконки)
         sidebar_style["width"] = "5rem"
         page_content_style["margin-left"] = "5rem"
-        return sidebar_style, page_content_style, {"display": "none"}, {"display": "none"}
+        return (sidebar_style, page_content_style,
+                {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
+                {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
+                {"display": "none"}
+                )
     else:
         # Развернутый вид (иконки и текст)
         sidebar_style["width"] = "18rem"
         page_content_style["margin-left"] = "18rem"
-        return sidebar_style, page_content_style, {"display": "inline"}, {"display": "inline"}
+        return (sidebar_style, page_content_style,
+                {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
+                {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
+                {"display": "inline"}
+                )
 
 
 # Callback для отображения страницы в зависимости от URL

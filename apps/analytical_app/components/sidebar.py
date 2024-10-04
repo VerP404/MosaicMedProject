@@ -8,7 +8,7 @@ def create_sidebar():
         [
             # Кнопка сворачивания рядом с пунктами навигации
             html.Div(
-                dbc.Button(html.I(className="bi bi-chevron-left"), color="secondary", id="btn_sidebar", n_clicks=0),
+                dbc.Button(html.I(className="bi bi-sliders"), color="secondary", id="btn_sidebar", n_clicks=0),
                 style={"width": "100%", "text-align": "left", "margin-bottom": "1rem"}
             ),
             # Навигация
@@ -21,11 +21,54 @@ def create_sidebar():
                         id="main-link"
                     ),
                     dbc.NavLink(
-                        [html.I(className="bi bi-info-circle"),
-                         html.Span(" О нас", className="ms-2", id="about-label")],
-                        href="/about",
+                        [html.I(className="bi bi-person"),
+                         html.Span(" Врач", className="ms-2", id="doctor-label")],
+                        href="/doctor",
                         active="exact",
-                        id="about-link"
+                        id="doctor-link"
+                    ),
+                    dbc.NavLink(
+                        [html.I(className="bi bi-person-plus"),
+                         html.Span(" Заведующий", className="ms-2", id="head-label")],
+                        href="/head",
+                        active="exact",
+                        id="head-link"
+                    ),
+
+                    dbc.NavLink(
+                        [html.I(className="bi bi-person-check"),
+                         html.Span(" Главный врач", className="ms-2", id="chief-label")],
+                        href="/chief",
+                        active="exact",
+                        id="chief-link"
+                    ),
+                    dbc.NavLink(
+                        [html.I(className="bi bi-bar-chart"),
+                         html.Span(" Статистик", className="ms-2", id="statistic-label")],
+                        href="/statistic",
+                        active="exact",
+                        id="statistic-link"
+                    ),
+                    dbc.NavLink(
+                        [html.I(className="bi bi-currency-dollar"),
+                         html.Span(" Экономист", className="ms-2", id="economist-label")],
+                        href="/economist",
+                        active="exact",
+                        id="economist-link"
+                    ),
+                    dbc.NavLink(
+                        [html.I(className="bi bi-person-circle"),
+                         html.Span(" Администратор", className="ms-2", id="admin-label")],
+                        href="/admin",
+                        active="exact",
+                        id="admin-link"
+                    ),
+                    dbc.NavLink(
+                        [html.I(className="bi bi-info-circle"),
+                         html.Span(" Помощь", className="ms-2", id="help-label")],
+                        href="/help",
+                        active="exact",
+                        id="help-link"
                     ),
                     dbc.NavLink(
                         [html.I(className="bi bi-info-circle"),
@@ -34,6 +77,7 @@ def create_sidebar():
                         active="exact",
                         id="query-link"
                     ),
+
                 ],
                 vertical=True,
                 pills=True,
@@ -46,7 +90,7 @@ def create_sidebar():
             "top": "56px",  # высота навбара
             "left": 0,
             "bottom": 0,
-            "width": "18rem",
+            "width": "5rem",
             "padding": "1rem",
             "background-color": "#f8f8fa",
             "transition": "all 0.3s ease",
