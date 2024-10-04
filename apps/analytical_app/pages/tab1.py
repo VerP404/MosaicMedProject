@@ -100,12 +100,20 @@ tab1_doctor_talon_list = html.Div(
             style={"margin": "0 auto", "padding": "0rem"}
         ),
         card_table(f'result-table-{type_page}', "Талоны по врачам", 15),
-        dbc.Modal(
-            [
-                dbc.ModalBody("Данные не найдены. Измените фильтры."),
-            ],
-            id="no-data-modal",
-            is_open=False,  # По умолчанию модальное окно закрыто
+
+        # Обновленный Placeholder без аргумента type
+        dbc.Placeholder(id=f'placeholder-{type_page}', style={"height": "300px", "marginTop": "20px"}),
+
+        # Toast для уведомления, если данные не найдены
+        dbc.Toast(
+            "Данные не найдены. Измените фильтры.",
+            id="no-data-toast",
+            header="Внимание",
+            icon="danger",
+            duration=4000,  # 4 секунды
+            is_open=False,
+            dismissable=True,  # Позволяет пользователю закрыть
+            style={"position": "fixed", "top": 60, "right": 50, "width": 350},
         )
     ],
     style={"padding": "0rem"}
@@ -149,11 +157,13 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
     return get_selected_period(selected_months_range, selected_year, current_month_name)
 
 
+# Коллбэк для получения данных и управления Placeholder и Toast
 @app.callback(
     [Output(f'result-table-{type_page}', 'columns'),
      Output(f'result-table-{type_page}', 'data'),
      Output(f'loading-output-{type_page}', 'children'),
-     Output('no-data-modal', 'is_open')],
+     Output(f'placeholder-{type_page}', 'style'),  # Управляем отображением Placeholder
+     Output('no-data-toast', 'is_open')],  # Управляем отображением Toast
     [Input(f'get-data-button-{type_page}', 'n_clicks')],
     [State(f'selected-period-{type_page}', 'children'),
      State(f'status-group-radio-{type_page}', 'value'),
@@ -163,7 +173,10 @@ def update_table(n_clicks, selected_period, selected_status, selected_year):
     if n_clicks is None or not selected_period or not selected_status or not selected_year:
         raise exceptions.PreventUpdate
 
+    # Показываем Placeholder во время загрузки данных
+    placeholder_style = {"height": "300px", "marginTop": "20px"}
     loading_output = html.Div([dcc.Loading(type="default")])
+
     selected_status_values = status_groups[selected_status]
     selected_status_tuple = tuple(selected_status_values)
 
@@ -176,8 +189,11 @@ def update_table(n_clicks, selected_period, selected_status, selected_year):
         'status_list': selected_status_tuple
     }
     columns, data = TableUpdater.query_to_df(engine, sql_query, bind_params)
-    # Проверяем, есть ли данные
+
+    # Если данные не найдены, открываем Toast и сохраняем Placeholder
     if len(data) == 0:
-        return columns, data, loading_output, True  # Открываем модальное окно
-    else:
-        return columns, data, loading_output, False  # Модальное окно закрыто
+        return columns, data, loading_output, placeholder_style, True
+
+    # Если данные найдены, скрываем Placeholder и Toast
+    placeholder_style = {"display": "none"}
+    return columns, data, loading_output, placeholder_style, False

@@ -5,6 +5,7 @@ from apps.analytical_app.app import app
 from dash.dependencies import Output, Input, State
 import datetime
 
+from apps.analytical_app.pages.economist.main import economist_main
 from apps.analytical_app.pages.tab1 import tab1_doctor_talon_list
 from components.sidebar import create_sidebar
 from components.navbar import create_navbar
@@ -83,6 +84,8 @@ def display_page(pathname):
         return html.H1('О нас')
     if pathname == '/query':
         return tab1_doctor_talon_list
+    if pathname == '/economist':
+        return economist_main
     else:
         return html.Div([
             html.H1("Добро пожаловать в МозаикаМед", style={"textAlign": "center"}),
