@@ -2,7 +2,7 @@
 import datetime
 from email.utils import format_datetime
 
-from dash import html, dcc, Output, Input
+from dash import html, Output, Input
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 

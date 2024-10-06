@@ -1,8 +1,6 @@
-import os
-
 from sqlalchemy import create_engine, text
 
-from config.settings import BASE_DIR, DATABASES
+from config.settings import DATABASES
 
 postgres_settings = DATABASES['default']
 engine = create_engine(

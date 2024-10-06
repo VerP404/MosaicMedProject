@@ -1,7 +1,8 @@
 from dash import Output, Input, html
+
+from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
 from apps.analytical_app.pages.economist.main import economist_main
-from apps.analytical_app.pages.economist.svpod.repotr import economist_sv_pod
-from apps.analytical_app.pages.tab1 import tab1_doctor_talon_list
+from apps.analytical_app.pages.economist.svpod.page import economist_sv_pod
 import dash_bootstrap_components as dbc
 
 # Все маршруты для страниц
@@ -15,7 +16,20 @@ routes = {
         ]),
         economist_sv_pod
     ]),
-    "/query": tab1_doctor_talon_list,
+    "/economist/doctors": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "По врачам", "active": True},
+        ]),
+        economist_doctors_talon_list
+    ]),
+    "/economist/disp_by_ages": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "Диспансеризация по возрастам", "active": True},
+        ]),
+        economist_doctors_talon_list
+    ]),
     "/about": html.H1('О нас')
 }
 

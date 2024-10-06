@@ -151,17 +151,57 @@ class DetailedData(models.Model):
         verbose_name_plural = "ОМС: Детализация"
 
 
+class Category(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Категория")
+    description = models.CharField(max_length=255, verbose_name="Описание категории", blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Категория данных"
+        verbose_name_plural = "Категории данных"
+
+
+# Модель для типов данных, связанных с категорией
+class DataType(models.Model):
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="types", verbose_name="Категория")
+    name = models.CharField(max_length=255, verbose_name="Тип данных")
+    description = models.CharField(max_length=255, verbose_name="Описание типа данных", blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.category.name})"
+
+    class Meta:
+        verbose_name = "Тип данных"
+        verbose_name_plural = "Типы данных"
+
+
+# Модель для хранения соответствий столбцов CSV и полей модели
+class DataTypeFieldMapping(models.Model):
+    data_type = models.ForeignKey(DataType, on_delete=models.CASCADE, related_name="field_mappings",
+                                  verbose_name="Тип данных")
+    csv_column_name = models.CharField(max_length=255, verbose_name="Название столбца в CSV")
+    model_field_name = models.CharField(max_length=255, verbose_name="Название поля в модели")
+
+    def __str__(self):
+        return f"Mapping for {self.data_type.name}: {self.csv_column_name} -> {self.model_field_name}"
+
+    class Meta:
+        verbose_name = "Соответствие полей"
+        verbose_name_plural = "Соответствия полей"
+
+
 class DataImport(models.Model):
     csv_file = models.FileField(upload_to='oms_data_imports/', verbose_name="CSV файл", blank=True, null=True)
     date_added = models.DateTimeField(auto_now_add=True, verbose_name="Дата добавления")
     added_count = models.IntegerField(default=0, verbose_name="Количество добавленных записей")
     updated_count = models.IntegerField(default=0, verbose_name="Количество обновленных записей")
     error_count = models.IntegerField(default=0, verbose_name="Количество ошибок")
-    type = models.CharField(max_length=20, verbose_name="Тип данных")
-    category = models.CharField(max_length=255, verbose_name="Категория")
+    data_type = models.ForeignKey(DataType, on_delete=models.CASCADE, verbose_name="Тип данных")
 
     def __str__(self):
-        return f"Импорт {self.type} от {self.date_added}"
+        return f"Импорт {self.data_type.description} от {self.date_added}"
 
     class Meta:
         verbose_name = "Импорт данных"

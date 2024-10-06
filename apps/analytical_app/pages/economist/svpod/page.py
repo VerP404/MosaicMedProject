@@ -1,4 +1,4 @@
-from dash import html, dcc, Output, Input, dash_table, exceptions, State
+from dash import html, dcc, Output, Input, exceptions, State
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
@@ -10,7 +10,7 @@ from apps.analytical_app.elements import card_table, get_selected_period
 from apps.analytical_app.pages.economist.svpod.query import sql_qery_sv_pod
 from apps.analytical_app.query_executor import engine
 
-type_page = "sv-pod"
+type_page = "econ-sv-pod"
 
 economist_sv_pod = html.Div(
     [

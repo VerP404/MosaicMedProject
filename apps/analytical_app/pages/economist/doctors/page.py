@@ -1,4 +1,4 @@
-from dash import html, dcc, Output, Input, dash_table, exceptions, State
+from dash import html, dcc, Output, Input, exceptions, State
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
@@ -8,7 +8,7 @@ from apps.analytical_app.components.filters import filter_status, filter_years, 
 from apps.analytical_app.elements import card_table, get_selected_period
 from apps.analytical_app.query_executor import engine, get_active_targets
 
-type_page = "tab1-doctor-talon-list"
+type_page = "econ-doctors-talon-list"
 
 
 def sql_query_by_doc(sql_cond, selected_year):
@@ -63,7 +63,7 @@ def sql_query_by_doc(sql_cond, selected_year):
     return query
 
 
-tab1_doctor_talon_list = html.Div(
+economist_doctors_talon_list = html.Div(
     [
         dbc.Row(
             dbc.Col(

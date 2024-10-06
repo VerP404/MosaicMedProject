@@ -72,14 +72,6 @@ def create_sidebar():
                         active="exact",
                         id="help-link"
                     ),
-                    dbc.NavLink(
-                        [html.I(className="bi bi-info-circle"),
-                         html.Span(" Запросы", className="ms-2", id="query-label")],
-                        href="/query",
-                        active="exact",
-                        id="query-link"
-                    ),
-
                 ],
                 vertical=True,
                 pills=True,
@@ -108,8 +100,7 @@ def create_sidebar():
          Output("statistic-label", "style"),
          Output("economist-label", "style"),
          Output("admin-label", "style"),
-         Output("help-label", "style"),
-         Output("query-label", "style")],
+         Output("help-label", "style"),],
         [Input("btn_sidebar", "n_clicks")],
         [State("sidebar-state", "data"),
          State("sidebar", "style"),
@@ -124,7 +115,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
-                    {"display": "none"})
+                    )
         else:
             # Развернутый вид
             sidebar_style["width"] = "14rem"
@@ -132,7 +123,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
-                    {"display": "inline"})
+                    )
 
     @app.callback(
         [Output("main-link", "active"),
@@ -143,7 +134,7 @@ def create_sidebar():
          Output("economist-link", "active"),
          Output("admin-link", "active"),
          Output("help-link", "active"),
-         Output("query-link", "active")],
+         ],
         [Input("url", "pathname")]
     )
     def update_active_links(pathname):
@@ -156,7 +147,6 @@ def create_sidebar():
             pathname.startswith("/economist"),  # Для Экономиста, включая вложенные страницы
             pathname.startswith("/admin"),  # Для Администратора
             pathname.startswith("/help"),  # Для Помощи
-            pathname.startswith("/query"),  # Для Запросов
         ]
 
     return sidebar

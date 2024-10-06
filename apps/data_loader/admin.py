@@ -35,12 +35,20 @@ class OMSSettingsAdmin(admin.ModelAdmin):
 # модель для просмотра импортируемых файлов
 @admin.register(DataImport)
 class DataImportAdmin(admin.ModelAdmin):
-    list_display = ('date_added', 'category', 'type', 'added_count', 'updated_count', 'error_count')
-    list_filter = ('category', 'date_added', 'type')
+    list_display = ('date_added', 'get_category', 'get_data_type', 'added_count', 'updated_count', 'error_count')
+    list_filter = ('data_type__category', 'data_type__name', 'date_added')
+
+    def get_category(self, obj):
+        return obj.data_type.category.name
+    get_category.short_description = 'Категория'
+
+    def get_data_type(self, obj):
+        return obj.data_type.name
+    get_data_type.short_description = 'Тип данных'
 
     def get_readonly_fields(self, request, obj=None):
         # Делаем поля только для чтения, кроме csv_file
-        return ['added_count', 'updated_count', 'error_count', 'type', 'category']
+        return ['added_count', 'updated_count', 'error_count', 'get_category', 'get_data_type']
 
     def has_add_permission(self, request):
         return False  # Запрещаем добавление записей
@@ -445,3 +453,29 @@ class OMSSettingsAdmin(admin.ModelAdmin):
         if count >= 1:
             return False  # Если запись уже существует, запрещаем создание новой
         return True  # Если записей нет, разрешаем создание
+
+
+# Создаем инлайн для DataType
+class DataTypeInline(admin.TabularInline):
+    model = DataType
+    extra = 1  # Количество пустых строк для добавления новых типов данных
+    fields = ('name', 'description')  # Поля для редактирования
+
+
+# Настраиваем админку для Category
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')  # Отображение полей в списке категорий
+    inlines = [DataTypeInline]  # Добавляем инлайн для типов данных
+
+# Создаем инлайн для DataTypeFieldMapping
+class DataTypeFieldMappingInline(admin.TabularInline):
+    model = DataTypeFieldMapping
+    extra = 1  # Количество пустых строк для добавления новых полей
+    fields = ('csv_column_name', 'model_field_name')  # Поля для редактирования
+
+# Настраиваем админку для DataType
+@admin.register(DataType)
+class DataTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'category', 'description')  # Отображение полей в списке типов данных
+    inlines = [DataTypeFieldMappingInline]  # Добавляем инлайн для соответствий столбцов
