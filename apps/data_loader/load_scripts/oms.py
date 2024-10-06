@@ -141,6 +141,10 @@ class DataLoader:
         self.file_format = file_format
         self.sep = sep
         self.dtype = dtype
+        # Инициализируем переменные для статистики
+        self.added_count = 0
+        self.updated_count = 0
+        self.error_count = 0
 
     def load_data(self, file_path):
         """
@@ -173,6 +177,9 @@ class DataLoader:
 
         # Шаг 5: Загрузка данных в базу
         self._load_data_to_db(df)
+
+        # Шаг 6: Создаем запись в DataImport
+        self._create_data_import_record()
 
         # Финальное время
         total_end_time = datetime.now()
@@ -262,7 +269,6 @@ class DataLoader:
 
             # Получаем записи из базы данных, которые соответствуют указанным столбцам
             with self.engine.connect() as connection:
-                # Объединяем столбцы в запросе SQL, чтобы создать такой же "ключ"
                 query = f"SELECT {', '.join(self.columns_for_update)} FROM {self.table_name}"
                 rows_in_db = connection.execute(text(query)).fetchall()
 
@@ -278,17 +284,18 @@ class DataLoader:
             if keys_to_delete:
                 # Удаляем строки с совпадающими ключами
                 with self.engine.begin() as connection:
-                    # Используем IN для пакетного удаления строк
-                    delete_query = text(
-                        f"DELETE FROM {self.table_name} WHERE ('{', '.join(self.columns_for_update)}') IN :keys")
-                    connection.execute(delete_query, {'keys': list(keys_to_delete)})
+                    for key in keys_to_delete:
+                        key_values = key.split('_')
+                        conditions = ' AND '.join([f"{col} = :{col}" for col in self.columns_for_update])
+                        delete_query = text(f"DELETE FROM {self.table_name} WHERE {conditions}")
+                        params = dict(zip(self.columns_for_update, key_values))
+                        connection.execute(delete_query, params)
 
                 print(f"Удалены строки с {len(keys_to_delete)} совпадающими значениями.")
 
             else:
                 print("Совпадающие строки отсутствуют. Удаление не требуется.")
-            # Удаляем временный столбец combined_key
-            df.drop(columns=['combined_key'], inplace=True)
+
         except Exception as e:
             print(f"Ошибка при удалении существующих строк: {e}")
 
@@ -296,6 +303,10 @@ class DataLoader:
         """
         Загружает данные в базу данных с отслеживанием прогресса.
         """
+        # Удаляем столбец combined_key, который используется только для внутренней обработки
+        if 'combined_key' in df.columns:
+            df.drop(columns=['combined_key'], inplace=True)
+
         total_rows = df.shape[0]
         loaded_rows = 0
         try:
@@ -309,9 +320,39 @@ class DataLoader:
                     method='multi'
                 )
                 loaded_rows += chunk.shape[0]
+                self.added_count += chunk.shape[0]
                 print(f"Загружено {loaded_rows} строк из {total_rows}.")
         except Exception as e:
+            self.error_count += 1
             print(f"Ошибка при загрузке данных: {e}")
+
+    def _create_data_import_record(self):
+        """
+        Создает запись в таблице DataImport с информацией о загрузке через SQL-запрос.
+        """
+        sql_query = """
+        INSERT INTO data_loader_dataimport (csv_file, date_added, added_count, updated_count, error_count, data_type_id)
+        VALUES (:csv_file, NOW(), :added_count, :updated_count, :error_count, 1)
+        """
+
+        # Выполняем подзапрос отдельно для проверки
+        with self.engine.connect() as connection:
+            data_type_query = "SELECT id FROM data_loader_datatype WHERE name = :data_type_name"
+            print(self.data_type_name)
+            data_type_id = connection.execute(text(data_type_query), {'data_type_name': self.data_type_name}).fetchone()
+
+            if data_type_id:
+                print(f"Тип данных найден, ID: {data_type_id[0]}")
+                # Выполняем основной запрос, если подзапрос вернул результат
+                connection.execute(text(sql_query), {
+                    'csv_file': '-',  # Укажите путь к файлу или значение
+                    'added_count': self.added_count,
+                    'updated_count': self.updated_count,
+                    'error_count': self.error_count,
+                    'data_type_name': self.data_type_name
+                })
+            else:
+                print(f"Ошибка: Тип данных с именем {self.data_type_name} не найден.")
 
 
 if __name__ == "__main__":
