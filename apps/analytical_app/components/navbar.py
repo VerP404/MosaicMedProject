@@ -1,6 +1,10 @@
 # components/navbar.py
-from dash import html, dcc
+import datetime
+from email.utils import format_datetime
+
+from dash import html, dcc, Output, Input
 import dash_bootstrap_components as dbc
+from apps.analytical_app.app import app
 
 
 def create_navbar():
@@ -70,4 +74,15 @@ def create_navbar():
         dark=True,
         fixed="top",
     )
+
+    # Callback для обновления времени в навбаре
+    @app.callback(
+        Output('current-time', 'children'),
+        Input('interval-component', 'n_intervals')
+    )
+    def update_time(n):
+        now = datetime.datetime.now()
+        formatted_time = format_datetime(now, "EEE d MMMM y H:mm:ss", locale='ru')
+        return formatted_time
+
     return navbar

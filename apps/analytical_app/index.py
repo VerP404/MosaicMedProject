@@ -1,97 +1,27 @@
 # apps/analytical_app/index.py
 from dash import dcc, html
-import dash_bootstrap_components as dbc
-from apps.analytical_app.app import app
-from dash.dependencies import Output, Input, State
-import datetime
 
-from apps.analytical_app.pages.economist.main import economist_main
-from apps.analytical_app.pages.tab1 import tab1_doctor_talon_list
+from apps.analytical_app.app import app
+from apps.analytical_app.routes import register_routes
 from components.sidebar import create_sidebar
 from components.navbar import create_navbar
 from components.footer import create_footer
-from babel.dates import format_datetime
 
 app.layout = html.Div(
     [
         dcc.Store(id='current-month-number', data=None),
         dcc.Store(id='current-month-name', data=None),
+        dcc.Store(id='sidebar-state', data="collapsed"),  # Хранилище для состояния сайдбара
         dcc.Interval(id='date-interval-main', interval=600000, n_intervals=0),  # 10 минут
         dcc.Location(id="url"),
         create_navbar(),
         create_sidebar(),
-        html.Div(id='page-content', style={'margin-left': '18rem', 'margin-top': '56px', 'padding': '2rem 1rem'}),
+        html.Div(id='page-content', style={'margin-left': '5rem', 'margin-top': '56px', 'padding': '2rem 1rem'}),
         create_footer(),
     ]
 )
 
-
-# Callback для обновления времени в навбаре
-@app.callback(
-    Output('current-time', 'children'),
-    Input('interval-component', 'n_intervals')
-)
-def update_time(n):
-    now = datetime.datetime.now()
-    formatted_time = format_datetime(now, "EEE d MMMM y H:mm:ss", locale='ru')
-    return formatted_time
-
-
-# Callback для сворачивания/разворачивания сайдбара
-@app.callback(
-    [Output("sidebar", "style"),
-     Output("page-content", "style"),
-     Output("main-label", "style"),
-     Output("doctor-label", "style"),
-     Output("head-label", "style"),
-     Output("chief-label", "style"),
-     Output("statistic-label", "style"),
-     Output("economist-label", "style"),
-     Output("admin-label", "style"),
-     Output("help-label", "style"),
-     Output("query-label", "style"),
-
-     ],  # Добавляем сюда идентификатор для "Запросы"
-    [Input("btn_sidebar", "n_clicks")],
-    [State("sidebar", "style"), State("page-content", "style")]
-)
-def toggle_sidebar(n_clicks, sidebar_style, page_content_style):
-    if n_clicks and n_clicks % 2 == 1:
-        # Свернутый вид (только иконки)
-        sidebar_style["width"] = "5rem"
-        page_content_style["margin-left"] = "5rem"
-        return (sidebar_style, page_content_style,
-                {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
-                {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
-                {"display": "none"}
-                )
-    else:
-        # Развернутый вид (иконки и текст)
-        sidebar_style["width"] = "18rem"
-        page_content_style["margin-left"] = "18rem"
-        return (sidebar_style, page_content_style,
-                {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
-                {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
-                {"display": "inline"}
-                )
-
-
-# Callback для отображения страницы в зависимости от URL
-@app.callback(Output('page-content', 'children'),
-              Input('url', 'pathname'))
-def display_page(pathname):
-    if pathname == '/about':
-        return html.H1('О нас')
-    if pathname == '/query':
-        return tab1_doctor_talon_list
-    if pathname == '/economist':
-        return economist_main
-    else:
-        return html.Div([
-            html.H1("Добро пожаловать в МозаикаМед", style={"textAlign": "center"}),
-            html.P("Это информационно-справочная система для анализа данных.", style={"textAlign": "center"}),
-        ])
-
+register_routes(app)
 
 if __name__ == "__main__":
     app.run_server(debug=True, host='0.0.0.0', port='5000')

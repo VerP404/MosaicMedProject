@@ -1,6 +1,7 @@
 # components/footer.py
 from dash import html
 
+
 def create_footer():
     footer = html.Footer(
         '© 2024 МозаикаМед',

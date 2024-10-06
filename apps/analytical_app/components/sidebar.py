@@ -1,6 +1,8 @@
 # components/sidebar.py
-from dash import html
+from dash import html, Input, Output, State
 import dash_bootstrap_components as dbc
+
+from apps.analytical_app.app import app
 
 
 def create_sidebar():
@@ -87,13 +89,74 @@ def create_sidebar():
         id="sidebar",
         style={
             "position": "fixed",
-            "top": "56px",  # высота навбара
+            "top": "56px",
             "left": 0,
             "bottom": 0,
-            "width": "5rem",
             "padding": "1rem",
             "background-color": "#f8f8fa",
             "transition": "all 0.3s ease",
         },
     )
+
+    @app.callback(
+        [Output("sidebar", "style"),
+         Output("page-content", "style"),
+         Output("main-label", "style"),
+         Output("doctor-label", "style"),
+         Output("head-label", "style"),
+         Output("chief-label", "style"),
+         Output("statistic-label", "style"),
+         Output("economist-label", "style"),
+         Output("admin-label", "style"),
+         Output("help-label", "style"),
+         Output("query-label", "style")],
+        [Input("btn_sidebar", "n_clicks")],
+        [State("sidebar-state", "data"),
+         State("sidebar", "style"),
+         State("page-content", "style")]
+    )
+    def toggle_sidebar(n_clicks, sidebar_state, sidebar_style, page_content_style):
+        if n_clicks and n_clicks % 2 == 1:
+            # Меняем состояние на противоположное
+            if sidebar_state == "collapsed":
+                sidebar_style["width"] = "5rem"
+                page_content_style["margin-left"] = "5rem"
+            return (sidebar_style, page_content_style,
+                    {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
+                    {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
+                    {"display": "none"})
+        else:
+            # Развернутый вид
+            sidebar_style["width"] = "14rem"
+            page_content_style["margin-left"] = "14rem"
+            return (sidebar_style, page_content_style,
+                    {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
+                    {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
+                    {"display": "inline"})
+
+    @app.callback(
+        [Output("main-link", "active"),
+         Output("doctor-link", "active"),
+         Output("head-link", "active"),
+         Output("chief-link", "active"),
+         Output("statistic-link", "active"),
+         Output("economist-link", "active"),
+         Output("admin-link", "active"),
+         Output("help-link", "active"),
+         Output("query-link", "active")],
+        [Input("url", "pathname")]
+    )
+    def update_active_links(pathname):
+        return [
+            pathname == "/",  # Для главной страницы
+            pathname.startswith("/doctor"),  # Для Врача
+            pathname.startswith("/head"),  # Для Заведующего
+            pathname.startswith("/chief"),  # Для Главного врача
+            pathname.startswith("/statistic"),  # Для Статистика
+            pathname.startswith("/economist"),  # Для Экономиста, включая вложенные страницы
+            pathname.startswith("/admin"),  # Для Администратора
+            pathname.startswith("/help"),  # Для Помощи
+            pathname.startswith("/query"),  # Для Запросов
+        ]
+
     return sidebar
