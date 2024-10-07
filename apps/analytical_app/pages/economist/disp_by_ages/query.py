@@ -34,7 +34,7 @@ def sql_query_disp_dv4(sql_cond, selected_year, selected_buildings):
     query = f"""
     WITH data AS (
         SELECT
-            2024 - CAST(SUBSTRING(dlo.birth_date FROM LENGTH(dlo.birth_date) - 3) AS integer) AS Возраст,
+            {int(selected_year)} - CAST(SUBSTRING(dlo.birth_date FROM LENGTH(dlo.birth_date) - 3) AS integer) AS Возраст,
             COUNT(*) AS "Всего",
             ROUND(SUM(CAST(dlo.amount AS numeric(15, 2))):: numeric, 2) AS "Сумма",
             SUM(CASE WHEN dlo.gender = 'М' THEN 1 ELSE 0 END) AS "М",
