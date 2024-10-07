@@ -87,5 +87,4 @@ def sql_query_stac(sql_cond, selected_year, selected_buildings):
         {dynamic_column_sums_sql} 
     FROM data
     """
-    print(query)
     return query

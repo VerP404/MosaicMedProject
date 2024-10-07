@@ -7,6 +7,7 @@ from apps.analytical_app.pages.economist.stationary.page import economist_statio
 from apps.analytical_app.pages.economist.svpod.page import economist_sv_pod
 import dash_bootstrap_components as dbc
 
+from apps.analytical_app.pages.head.main import head_main
 from apps.analytical_app.pages.main.page import main_layout
 
 # Все маршруты для страниц
@@ -41,13 +42,16 @@ routes = {
         ]),
         economist_stationary
     ]),
+    "/head": head_main,
     "/about": html.H1('О нас')
 }
 
 
 # Callback для отображения страницы в зависимости от URL
 def register_routes(app):
-    @app.callback(Output('page-content', 'children'), [Input('url', 'pathname')])
+    @app.callback(
+        Output('page-content', 'children'),
+        [Input('url', 'pathname')])
     def display_page(pathname):
         return routes.get(pathname, html.Div([
             html.H1("Страница не найдена", style={"textAlign": "center"}),
