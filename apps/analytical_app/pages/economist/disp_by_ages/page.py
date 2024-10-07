@@ -1,18 +1,17 @@
 from dash import html, dcc, Output, Input, exceptions, State
-import dash_bootstrap_components as dbc
+from sqlalchemy import text
 
-from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
-from apps.analytical_app.components.filters import filter_status, filter_years, filter_months, \
-    get_current_reporting_month, months_labels, status_groups
+from apps.analytical_app.components.filters import *
 from apps.analytical_app.components.toast import toast
 from apps.analytical_app.elements import card_table, get_selected_period
-from apps.analytical_app.pages.economist.svpod.query import sql_qery_sv_pod
+from apps.analytical_app.app import app
+from apps.analytical_app.pages.economist.disp_by_ages.query import sql_query_disp_dv4
 from apps.analytical_app.query_executor import engine
 
-type_page = "econ-sv-pod"
+type_page = "dispensary-price"
 
-economist_sv_pod = html.Div(
+economist_dispensary_age = html.Div(
     [
         dbc.Row(
             dbc.Col(
@@ -20,6 +19,7 @@ economist_sv_pod = html.Div(
                     dbc.CardBody(
                         [
                             dbc.CardHeader("Фильтры"),
+                            html.Button(id=f'page-load-{type_page}', style={'display': 'none'}),
                             dbc.Row(
                                 [
                                     filter_status(type_page),  # фильтр по статусам
@@ -31,8 +31,36 @@ economist_sv_pod = html.Div(
                                     filter_months(type_page)  # фильтр по месяцам
                                 ]
                             ),
-                            html.Div(id=f'selected-doctor-{type_page}', className='filters-label',
-                                     style={'display': 'none'}),
+                            html.Div(
+                                [
+                                    dbc.Label("Выберите корпус:"),
+                                    dbc.Checklist(
+                                        id=f"building-checklist-{type_page}",
+                                        inline=True,
+                                    ),
+                                ]
+                            ),
+                            html.Div(
+                                [
+                                    dbc.Label("Выберите тип диспансеризации:"),
+                                    dbc.Checklist(
+                                        options=[
+                                            {"label": "ДВ4", "value": 'ДВ4'},
+                                            {"label": "ДВ2", "value": 'ДВ2'},
+                                            {"label": "ОПВ", "value": 'ОПВ'},
+                                            {"label": "УД1", "value": 'УД1'},
+                                            {"label": "УД2", "value": 'УД2'},
+                                            {"label": "ДР1", "value": 'ДР1'},
+                                            {"label": "ДР2", "value": 'ДР2'},
+                                            {"label": "ПН1", "value": 'ПН1'},
+                                            {"label": "ДС2", "value": 'ДС2'},
+                                        ],
+                                        value=['ДВ4'],
+                                        id=f"checklist-input-{type_page}",
+                                        inline=True,
+                                    ),
+                                ]
+                            ),
                             html.Div(id=f'selected-period-{type_page}', className='filters-label',
                                      style={'display': 'none'}),
                             html.Div(id=f'current-month-name-{type_page}', className='filters-label'),
@@ -48,11 +76,31 @@ economist_sv_pod = html.Div(
             ),
             style={"margin": "0 auto", "padding": "0rem"}
         ),
-        card_table(f'result-table-{type_page}', "Отчет по счетам ОМС сверх подушевого финансирования"),
+        card_table(f'result-table-{type_page}', "Отчет по возрастам и суммам диспансеризации и профосмотров", 15),
         toast(type_page)  # уведомление, если данные не найдены
+
     ],
     style={"padding": "0rem"}
+
 )
+
+
+@app.callback(
+    [
+        Output(f'building-checklist-{type_page}', 'options'),
+        Output(f'building-checklist-{type_page}', 'value')
+    ],
+    [Input(f'page-load-{type_page}', 'n_clicks')]
+)
+def update_building_options_and_values(n_clicks):
+    with engine.connect() as connection:
+        building_query = connection.execute(text("SELECT DISTINCT name_kvazar FROM organization_building"))
+        building_names = [row[0] for row in building_query.fetchall()]
+
+    building_options = [{"label": building, "value": building} for building in building_names]
+
+    # Возвращаем все корпуса в value по умолчанию
+    return building_options, [building['value'] for building in building_options]
 
 
 # Определяем отчетный месяц и выводим его на страницу и в переменную dcc Store
@@ -99,23 +147,30 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
      Output(f'no-data-toast-{type_page}', 'is_open')],
     [Input(f'get-data-button-{type_page}', 'n_clicks')],
     [State(f'selected-period-{type_page}', 'children'),
-     State(f'status-group-radio-{type_page}', 'value')]
+     State(f'status-group-radio-{type_page}', 'value'),
+     State(f'checklist-input-{type_page}', 'value'),
+     State(f'dropdown-year-{type_page}', 'value'),
+     State(f'building-checklist-{type_page}', 'value')]  # Добавляем состояние для выбранных корпусов
 )
-def update_table(n_clicks, selected_period, selected_status):
-    if n_clicks is None or not selected_period or not selected_status:
+def update_table(n_clicks, selected_period, selected_status, selected_type_dv, selected_year, selected_buildings):
+    if n_clicks is None or not selected_period or not selected_status or not selected_type_dv:
         raise exceptions.PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
-
     selected_status_values = status_groups[selected_status]
     selected_status_tuple = tuple(selected_status_values)
+    selected_type_dv_tuple = tuple(selected_type_dv)
 
+    # Передаем также selected_buildings в функцию sql_query_disp_dv4
     sql_cond = ', '.join([f"'{period}'" for period in selected_period])
-    sql_query = sql_qery_sv_pod(sql_cond)
+    sql_query = sql_query_disp_dv4(sql_cond, selected_year, selected_buildings)
 
     bind_params = {
-        'status_list': selected_status_tuple
+        'status_list': selected_status_tuple,
+        'dv': selected_type_dv_tuple,
+        'building_list': tuple(selected_buildings)
     }
+
     columns, data = TableUpdater.query_to_df(engine, sql_query, bind_params)
     if len(data) == 0:
         return columns, data, loading_output, True

@@ -18,10 +18,10 @@ class MedicalOrganizationAdmin(admin.ModelAdmin):
 
 @admin.register(Building)
 class BuildingAdmin(admin.ModelAdmin):
-    list_display = ('name', 'additional_name', 'organization', 'address')
+    list_display = ('name', 'additional_name', 'organization', 'address', 'name_kvazar', 'name_miskauz')
     list_filter = ('organization',)
     search_fields = ('name', 'additional_name', 'address')
-    list_editable = ('additional_name',)
+    list_editable = ('additional_name','name_kvazar', 'name_miskauz')
 
 
 @admin.register(Department)

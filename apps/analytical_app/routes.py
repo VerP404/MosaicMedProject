@@ -1,13 +1,16 @@
 from dash import Output, Input, html
 
+from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
 from apps.analytical_app.pages.economist.main import economist_main
 from apps.analytical_app.pages.economist.svpod.page import economist_sv_pod
 import dash_bootstrap_components as dbc
 
+from apps.analytical_app.pages.main.page import main_layout
+
 # Все маршруты для страниц
 routes = {
-    "/": html.Div([html.H1("Добро пожаловать в МозаикаМед"), html.P("Это информационно-справочная система.")]),
+    "/": main_layout,
     "/economist": economist_main,
     "/economist/svpod": html.Div([
         dbc.Breadcrumb(items=[
@@ -28,7 +31,7 @@ routes = {
             {"label": "Экономист", "href": "/economist"},
             {"label": "Диспансеризация по возрастам", "active": True},
         ]),
-        economist_doctors_talon_list
+        economist_dispensary_age
     ]),
     "/about": html.H1('О нас')
 }

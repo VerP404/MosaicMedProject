@@ -27,6 +27,8 @@ class Building(models.Model):
     )
     name = models.CharField("Название корпуса", max_length=255)
     additional_name = models.CharField("Дополнительное название корпуса", max_length=255, blank=True, null=True)
+    name_kvazar = models.CharField("Название корпуса в Квазар", max_length=255)
+    name_miskauz = models.CharField("Название корпуса в КАУЗ", max_length=255)
     address = models.TextField("Адрес", blank=True, null=True)
     description = models.TextField("Описание", blank=True, null=True)
 
