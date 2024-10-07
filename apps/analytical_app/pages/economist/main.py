@@ -57,9 +57,9 @@ cards_2 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Финансовый отчет", className="card-title"),
+                    html.H5("Стационары", className="card-title"),
                     html.P(
-                        "Отчет по выполнению финансовых целей с указанием сумм и метрик.",
+                        "Отчет по КСГ в разбивке по корпусам.",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -142,10 +142,10 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
     elif button_id == 'open-report-3' and open_report_3:
         breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
         return '/economist/disp_by_ages', breadcrumb_items
-
     elif button_id == 'open-report-4' and open_report_4:
-        breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
-        return '/economist/disp_by_ages', breadcrumb_items
+        breadcrumb_items.append({"label": "Стационары", "active": True})
+        return '/economist/stationary', breadcrumb_items
+
     elif button_id == 'open-report-5' and open_report_5:
         breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
         return '/economist/disp_by_ages', breadcrumb_items

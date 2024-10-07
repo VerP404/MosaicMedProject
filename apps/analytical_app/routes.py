@@ -3,6 +3,7 @@ from dash import Output, Input, html
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
 from apps.analytical_app.pages.economist.main import economist_main
+from apps.analytical_app.pages.economist.stationary.page import economist_stationary
 from apps.analytical_app.pages.economist.svpod.page import economist_sv_pod
 import dash_bootstrap_components as dbc
 
@@ -32,6 +33,13 @@ routes = {
             {"label": "Диспансеризация по возрастам", "active": True},
         ]),
         economist_dispensary_age
+    ]),
+    "/economist/stationary": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "Стационары", "active": True},
+        ]),
+        economist_stationary
     ]),
     "/about": html.H1('О нас')
 }
