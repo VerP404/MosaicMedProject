@@ -159,8 +159,8 @@ class Category(models.Model):
         return self.name
 
     class Meta:
-        verbose_name = "Категория данных"
-        verbose_name_plural = "Категории данных"
+        verbose_name = "Справочник: Категория данных"
+        verbose_name_plural = "Справочник: Категории данных"
 
 
 # Модель для типов данных, связанных с категорией
@@ -173,8 +173,8 @@ class DataType(models.Model):
         return f"{self.name} ({self.category.name})"
 
     class Meta:
-        verbose_name = "Тип данных"
-        verbose_name_plural = "Типы данных"
+        verbose_name = "Справочник: Тип данных"
+        verbose_name_plural = "Справочник: Типы данных"
 
 
 # Модель для хранения соответствий столбцов CSV и полей модели
@@ -188,8 +188,8 @@ class DataTypeFieldMapping(models.Model):
         return f"Mapping for {self.data_type.name}: {self.csv_column_name} -> {self.model_field_name}"
 
     class Meta:
-        verbose_name = "Соответствие полей"
-        verbose_name_plural = "Соответствия полей"
+        verbose_name = "Справочник: Соответствие полей"
+        verbose_name_plural = "Справочник: Соответствия полей"
 
 
 class DataImport(models.Model):

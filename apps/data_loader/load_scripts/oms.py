@@ -118,7 +118,10 @@ class DataLoader:
                  column_check,
                  columns_for_update,
                  file_format='csv',
-                 sep=';', dtype='str'):
+                 sep=';',
+                 dtype='str',
+                 encoding='utf-8'
+                 ):
         """
         Инициализация загрузчика данных.
 
@@ -131,6 +134,7 @@ class DataLoader:
         :param file_format: Формат файла (по умолчанию CSV)
         :param sep: Разделитель для CSV файлов (по умолчанию ; )
         :param dtype: Тип данных для чтения (по умолчанию строки)
+        :param encoding: Кодировка для чтения (по умолчанию cp1251)
         """
         self.engine = engine
         self.table_name = table_name
@@ -141,6 +145,7 @@ class DataLoader:
         self.file_format = file_format
         self.sep = sep
         self.dtype = dtype
+        self.encoding = encoding
         # Инициализируем переменные для статистики
         self.added_count = 0
         self.updated_count = 0
@@ -209,7 +214,8 @@ class DataLoader:
     def _load_file_to_df(self, file_path):
         """Загрузка файла в DataFrame."""
         if self.file_format == 'csv':
-            df = pd.read_csv(file_path, sep=self.sep, low_memory=False, dtype=self.dtype)
+            df = pd.read_csv(file_path, sep=self.sep, low_memory=False, na_values="-", dtype=self.dtype,
+                             encoding=self.encoding)
         elif self.file_format == 'excel':
             df = pd.read_excel(file_path)
         else:
@@ -244,14 +250,26 @@ class DataLoader:
         """
         Обрабатывает DataFrame: удаляет NaN и преобразует данные в строки.
         """
-        # Удаляем строки, содержащие NaN на основании столбца column_check
-        df.dropna(subset=[self.column_check], inplace=True)
+        try:
+            # Удаляем строки, содержащие NaN на основании столбца column_check
+            df.dropna(subset=[self.column_check], inplace=True)
+        except KeyError as e:
+            print(f"Ошибка: столбец '{self.column_check}' не найден в данных. Проверьте наличие столбца в базе.")
+            print(f"Доступные столбцы: {list(df.columns)}")
+            raise e  # Повторное возбуждение исключения для остановки выполнения, если необходимо
+
         # Заменяем NaN на '-' в датафрейме
         df.fillna('-', inplace=True)
+
+        # Убираем ` из датафрейма при наличии
+        df = df.replace('`', '', regex=True)
+
         # Удаляем неразрывные пробелы (NBSP) и заменяем их на обычные пробелы
         df.replace('\u00A0', ' ', regex=True, inplace=True)
+
         # Проверяем что тип данных у всех столбцов "текстовый"
         df = df.astype(str)
+
         print("Данные обработаны.")
         return df
 
@@ -270,6 +288,7 @@ class DataLoader:
             # Получаем записи из базы данных, которые соответствуют указанным столбцам
             with self.engine.connect() as connection:
                 query = f"SELECT {', '.join(self.columns_for_update)} FROM {self.table_name}"
+
                 rows_in_db = connection.execute(text(query)).fetchall()
 
             # Преобразуем результат из базы данных в множество с объединенными значениями столбцов
@@ -359,12 +378,30 @@ if __name__ == "__main__":
     # file_path = fr"C:\DjangoProject\MosaicMedProject\journal_20240917(1).csv"
     # file_path = fr"C:\Users\frdro\Downloads\Telegram Desktop\journal_20241004(2).csv"
     # file_path = fr"C:\Users\frdro\Downloads\Telegram Desktop\journal_Detailed_Medical_Examination_20241006.csv"
-    file_path = fr"C:\Users\frdro\Downloads\Telegram Desktop\journal_Doctors_20241006.csv"
+    # file_path = fr"C:\Users\frdro\Downloads\Telegram Desktop\journal_Doctors_20241006.csv"
+    file_path = fr"C:\Users\RDN\Downloads\Att_MO_36002520241008.csv"
 
     loader = DataLoader(engine=engine,
-                        table_name="data_loader_doctordata",
-                        data_type_name='DOCTORS',
-                        column_check="snils",
-                        columns_for_update=['snils', 'doctor_code'],
+                        table_name="data_loader_iszlpeople",
+                        data_type_name='people',
+                        column_check="enp",
+                        columns_for_update=['enp'],
                         )
     loader.load_data(file_path)
+
+#                         table_name="data_loader_iszldisnabjob",
+#                         data_type_name='disnabjob',
+#                         column_check="id_iszl",
+#                         columns_for_update=['id_iszl', 'enp', 'ds' ],
+#                         encoding='cp1251'
+
+#                         table_name="data_loader_iszldisnab",
+#                         data_type_name='disnab',
+#                         column_check="pdwid",
+#                         columns_for_update=['pdwid'],
+#                         encoding='cp1251'
+
+#                         table_name = "data_loader_iszlpeople",
+#                         data_type_name = 'people',
+#                         column_check = "enp",
+#                         columns_for_update = ['enp'],

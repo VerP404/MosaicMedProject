@@ -12,6 +12,7 @@ from apps.data_loader.forms import *
 from apps.data_loader.selenium_script import logger
 from apps.data_loader.models.oms_data import *
 from apps.data_loader.models.kvazar_data import *
+from apps.data_loader.models.iszl import *
 
 # Изменение заголовка и подписи панели администратора
 admin.site.site_header = "Административная панель МозаикаМед"
@@ -40,10 +41,12 @@ class DataImportAdmin(admin.ModelAdmin):
 
     def get_category(self, obj):
         return obj.data_type.category.name
+
     get_category.short_description = 'Категория'
 
     def get_data_type(self, obj):
         return obj.data_type.name
+
     get_data_type.short_description = 'Тип данных'
 
     def get_readonly_fields(self, request, obj=None):
@@ -468,14 +471,63 @@ class CategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'description')  # Отображение полей в списке категорий
     inlines = [DataTypeInline]  # Добавляем инлайн для типов данных
 
+
 # Создаем инлайн для DataTypeFieldMapping
 class DataTypeFieldMappingInline(admin.TabularInline):
     model = DataTypeFieldMapping
     extra = 1  # Количество пустых строк для добавления новых полей
     fields = ('csv_column_name', 'model_field_name')  # Поля для редактирования
 
+
 # Настраиваем админку для DataType
 @admin.register(DataType)
 class DataTypeAdmin(admin.ModelAdmin):
     list_display = ('name', 'category', 'description')  # Отображение полей в списке типов данных
     inlines = [DataTypeFieldMappingInline]  # Добавляем инлайн для соответствий столбцов
+
+
+@admin.register(ISZLSettings)
+class ISZLSettingsAdmin(admin.ModelAdmin):
+    list_display = ('username',)
+    search_fields = ('username',)
+
+    # Можно добавить возможность скрывать пароль, если это необходимо
+
+    def has_add_permission(self, request):
+        # Проверяем, есть ли уже записи в модели
+        count = ISZLSettings.objects.all().count()
+        if count >= 1:
+            return False  # Если запись уже существует, запрещаем создание новой
+        return True  # Если записей нет, разрешаем создание
+
+
+@admin.register(ISZLPeople)
+class ISZLPeopleAdmin(admin.ModelAdmin):
+    list_display = ('fio', 'dr', 'enp')
+    search_fields = ('fio', 'enp', 'pid')
+    list_filter = ('lpu', 'smo')
+    # Это позволит быстро находить записи по ключевым полям
+
+
+@admin.register(ISZLDisNab)
+class ISZLDisNabAdmin(admin.ModelAdmin):
+    list_display = ('fio', 'dr', 'enp', 'datebegin', 'dateend', 'enp')
+    search_fields = ('fio', 'enp', 'ds')
+    list_filter = ('ds', 'datebegin', 'dateend')
+    # Фильтры помогут быстро отфильтровать данные по диагнозам и датам
+
+
+@admin.register(ISZLDisNabJob)
+class ISZLDisNabJobAdmin(admin.ModelAdmin):
+    list_display = ('fio', 'birth_date', 'enp', 'ds', 'date', 'time', 'smo')
+    search_fields = ('fio', 'enp', 'ds')
+    list_filter = ('date', 'smo', 'fact')
+    # Настройки для отображения и поиска в админке
+
+
+@admin.register(DS168n)
+class DS168nAdmin(admin.ModelAdmin):
+    list_display = ('ds', 'profile', 'speciality', 'joint_speciality')
+    search_fields = ('ds', 'profile', 'speciality')
+    list_filter = ('profile', 'speciality', 'joint_speciality')
+    # Здесь также фильтры и поиск по диагнозам и профилям
