@@ -30,3 +30,5 @@ class TableUpdater:
             columns = [{'name': col, 'id': col} for col in df.columns]
             data = df.to_dict('records')
             return columns, data
+
+

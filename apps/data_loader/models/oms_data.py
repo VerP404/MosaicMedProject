@@ -206,3 +206,23 @@ class DataImport(models.Model):
     class Meta:
         verbose_name = "Импорт данных"
         verbose_name_plural = "Импорт данных"
+
+
+class DataLoaderConfig(models.Model):
+    data_type = models.OneToOneField(DataType, on_delete=models.CASCADE, verbose_name="Тип данных")
+    table_name = models.CharField(max_length=255, verbose_name="Имя таблицы")
+    column_check = models.CharField(max_length=255, verbose_name="Столбец для проверки (после переименования)")
+    columns_for_update = models.TextField(verbose_name="Столбцы для обновления", help_text="Перечислите через запятую")
+
+    encoding = models.CharField(max_length=50, default='utf-8', verbose_name="Кодировка файла")
+    delimiter = models.CharField(max_length=10, default=';', verbose_name="Разделитель")
+
+    def __str__(self):
+        return f"Настройки для {self.data_type.name}"
+
+    def get_columns_for_update(self):
+        return [col.strip() for col in self.columns_for_update.split(',')]
+
+    class Meta:
+        verbose_name = "Конфигуратор импорта таблиц"
+        verbose_name_plural = "Конфигуратор импорта"

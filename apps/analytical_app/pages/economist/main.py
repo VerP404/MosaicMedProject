@@ -1,7 +1,8 @@
-from dash import html, Output, Input, callback_context
+from dash import html, dcc, Input, Output, no_update, callback_context
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 
+type_page = 'economist'
 # Карточки для отчётов
 cards_1 = dbc.CardGroup(
     [
@@ -15,7 +16,7 @@ cards_1 = dbc.CardGroup(
                         className="card-text",
                     ),
                     dbc.Button(
-                        "Открыть", color="success", className="mt-auto", id="open-report-1"
+                        "Открыть", color="success", className="mt-auto", id=f"open-report-1-economist"
                     ),
                 ]
             )
@@ -29,7 +30,7 @@ cards_1 = dbc.CardGroup(
                         className="card-text",
                     ),
                     dbc.Button(
-                        "Открыть", color="warning", className="mt-auto", id="open-report-2"
+                        "Открыть", color="warning", className="mt-auto", id=f"open-report-2-economist"
                     ),
                 ]
             )
@@ -43,7 +44,7 @@ cards_1 = dbc.CardGroup(
                         className="card-text",
                     ),
                     dbc.Button(
-                        "Открыть", color="danger", className="mt-auto", id="open-report-3"
+                        "Открыть", color="danger", className="mt-auto", id=f"open-report-3-economist"
                     ),
                 ]
             )
@@ -63,7 +64,7 @@ cards_2 = dbc.CardGroup(
                         className="card-text",
                     ),
                     dbc.Button(
-                        "Открыть", color="success", className="mt-auto", id="open-report-4"  # Уникальный id
+                        "Открыть", color="success", className="mt-auto", id=f"open-report-4-economist"
                     ),
                 ]
             )
@@ -77,7 +78,7 @@ cards_2 = dbc.CardGroup(
                         className="card-text",
                     ),
                     dbc.Button(
-                        "Открыть", color="warning", className="mt-auto", id="open-report-5"  # Уникальный id
+                        "Открыть", color="warning", className="mt-auto", id=f"open-report-5-economist"
                     ),
                 ]
             )
@@ -91,7 +92,7 @@ cards_2 = dbc.CardGroup(
                         className="card-text",
                     ),
                     dbc.Button(
-                        "Открыть", color="danger", className="mt-auto", id="open-report-6"  # Уникальный id
+                        "Открыть", color="danger", className="mt-auto", id=f"open-report-6-economist"
                     ),
                 ]
             )
@@ -101,55 +102,56 @@ cards_2 = dbc.CardGroup(
 
 # Макет страницы "Экономист" с хлебными крошками
 economist_main = html.Div([
-    dbc.Breadcrumb(id="economist-breadcrumb", items=[
+    dbc.Breadcrumb(id="breadcrumb-economist", items=[
         {"label": "Экономист", "href": "/economist", "active": True},
     ]),
     html.Hr(),
-    # Добавляем оба набора карточек на страницу
     html.Div(cards_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
     html.Div(cards_2, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
 ])
 
 
-# Callback для навигации и изменения хлебных крошек
 @app.callback(
-    [Output('url', 'pathname'),
-     Output('economist-breadcrumb', 'items')],
-    [Input('open-report-1', 'n_clicks'),
-     Input('open-report-2', 'n_clicks'),
-     Input('open-report-3', 'n_clicks'),
-     Input('open-report-4', 'n_clicks'),
-     Input('open-report-5', 'n_clicks'),
-     Input('open-report-6', 'n_clicks')
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('breadcrumb-economist', 'items'),
+     ],
+    [Input(f'open-report-1-economist', 'n_clicks'),
+     Input(f'open-report-2-economist', 'n_clicks'),
+     Input(f'open-report-3-economist', 'n_clicks'),
+     Input(f'open-report-4-economist', 'n_clicks'),
+     Input(f'open-report-5-economist', 'n_clicks'),
+     Input(f'open-report-6-economist', 'n_clicks'),
      ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_6):
+def navigate_pages(open_report_1_ec, open_report_2_ec, open_report_3_ec, open_report_4_ec, open_report_5_ec,
+                   open_report_6_ec):
     ctx = callback_context
     if not ctx.triggered:
-        return '/economist', [{"label": "Экономист", "href": "/economist", "active": True}]
-    else:
-        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        return no_update, no_update
+
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
     breadcrumb_items = [{"label": "Экономист", "href": "/economist"}]
 
-    if button_id == 'open-report-1' and open_report_1:
-        breadcrumb_items.append({"label": "Сверхподушевое финансирование", "active": True})
-        return '/economist/svpod', breadcrumb_items
-    elif button_id == 'open-report-2' and open_report_2:
-        breadcrumb_items.append({"label": "По врачам", "active": True})
-        return '/economist/doctors', breadcrumb_items
-    elif button_id == 'open-report-3' and open_report_3:
-        breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
-        return '/economist/disp_by_ages', breadcrumb_items
-    elif button_id == 'open-report-4' and open_report_4:
-        breadcrumb_items.append({"label": "Стационары", "active": True})
-        return '/economist/stationary', breadcrumb_items
+    if button_id.startswith("open-report-") and "economist" in button_id:
+        if button_id == f'open-report-1-economist' and open_report_1_ec:
+            breadcrumb_items.append({"label": "Сверхподушевое финансирование", "active": True})
+            return '/economist/svpod', breadcrumb_items
+        elif button_id == f'open-report-2-economist' and open_report_2_ec:
+            breadcrumb_items.append({"label": "По врачам", "active": True})
+            return '/economist/doctors', breadcrumb_items
+        elif button_id == f'open-report-3-economist' and open_report_3_ec:
+            breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
+            return '/economist/disp_by_ages', breadcrumb_items
+        elif button_id == f'open-report-4-economist' and open_report_4_ec:
+            breadcrumb_items.append({"label": "Стационары", "active": True})
+            return '/economist/stationary', breadcrumb_items
+        elif button_id == f'open-report-5-economist' and open_report_5_ec:
+            breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
+            return '/economist/disp_by_ages', breadcrumb_items
+        elif button_id == f'open-report-6-economist' and open_report_6_ec:
+            breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
+            return '/economist/disp_by_ages', breadcrumb_items
 
-    elif button_id == 'open-report-5' and open_report_5:
-        breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
-        return '/economist/disp_by_ages', breadcrumb_items
-    elif button_id == 'open-report-6' and open_report_6:
-        breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
-        return '/economist/disp_by_ages', breadcrumb_items
     return '/economist', breadcrumb_items

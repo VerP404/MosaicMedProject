@@ -7,6 +7,7 @@ from apps.analytical_app.pages.economist.stationary.page import economist_statio
 from apps.analytical_app.pages.economist.svpod.page import economist_sv_pod
 import dash_bootstrap_components as dbc
 
+from apps.analytical_app.pages.head.dn_job.page import head_dn_job
 from apps.analytical_app.pages.head.main import head_main
 from apps.analytical_app.pages.main.page import main_layout
 
@@ -42,7 +43,36 @@ routes = {
         ]),
         economist_stationary
     ]),
+
     "/head": head_main,
+    "/head/svpod": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансеризация взрослых", "active": True},
+        ]),
+        economist_sv_pod
+    ]),
+    "/head/doctors": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансеризация детей", "active": True},
+        ]),
+        economist_doctors_talon_list
+    ]),
+    "/head/disp_by_ages": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансерное наблюдение", "active": True},
+        ]),
+        economist_dispensary_age
+    ]),
+    "/head/dn_job": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансерное наблюдение работающих", "active": True},
+        ]),
+        head_dn_job
+    ]),
     "/about": html.H1('О нас')
 }
 
@@ -51,7 +81,8 @@ routes = {
 def register_routes(app):
     @app.callback(
         Output('page-content', 'children'),
-        [Input('url', 'pathname')])
+        [Input('url', 'pathname')]
+    )
     def display_page(pathname):
         return routes.get(pathname, html.Div([
             html.H1("Страница не найдена", style={"textAlign": "center"}),

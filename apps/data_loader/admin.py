@@ -506,7 +506,6 @@ class ISZLPeopleAdmin(admin.ModelAdmin):
     list_display = ('fio', 'dr', 'enp')
     search_fields = ('fio', 'enp', 'pid')
     list_filter = ('lpu', 'smo')
-    # Это позволит быстро находить записи по ключевым полям
 
 
 @admin.register(ISZLDisNab)
@@ -514,7 +513,6 @@ class ISZLDisNabAdmin(admin.ModelAdmin):
     list_display = ('fio', 'dr', 'enp', 'datebegin', 'dateend', 'enp')
     search_fields = ('fio', 'enp', 'ds')
     list_filter = ('ds', 'datebegin', 'dateend')
-    # Фильтры помогут быстро отфильтровать данные по диагнозам и датам
 
 
 @admin.register(ISZLDisNabJob)
@@ -522,7 +520,6 @@ class ISZLDisNabJobAdmin(admin.ModelAdmin):
     list_display = ('fio', 'birth_date', 'enp', 'ds', 'date', 'time', 'smo')
     search_fields = ('fio', 'enp', 'ds')
     list_filter = ('date', 'smo', 'fact')
-    # Настройки для отображения и поиска в админке
 
 
 @admin.register(DS168n)
@@ -530,4 +527,10 @@ class DS168nAdmin(admin.ModelAdmin):
     list_display = ('ds', 'profile', 'speciality', 'joint_speciality')
     search_fields = ('ds', 'profile', 'speciality')
     list_filter = ('profile', 'speciality', 'joint_speciality')
-    # Здесь также фильтры и поиск по диагнозам и профилям
+
+
+@admin.register(DataLoaderConfig)
+class DataLoaderConfigAdmin(admin.ModelAdmin):
+    list_display = ('data_type', 'table_name', 'column_check', 'columns_for_update', 'encoding', 'delimiter')
+    search_fields = ('data_type', 'table_name')
+    list_filter = ('data_type',)

@@ -10,104 +10,18 @@ engine = create_engine(
     f'postgresql://{postgres_settings["USER"]}:{postgres_settings["PASSWORD"]}@{postgres_settings["HOST"]}:{postgres_settings["PORT"]}/{postgres_settings["NAME"]}'
 )
 
-columns_table_oms = {
-    "Талон": "talon",
-    "Источник": "source",
-    "ID источника": "source_id",
-    "Номер счёта": "account_number",
-    "Дата выгрузки": "upload_date",
-    "Причина аннулирования": "cancellation_reason",
-    "Статус": "status",
-    "Тип талона": "talon_type",
-    "Цель": "goal",
-    "Фед. цель": "federal_goal",
-    "Пациент": "patient",
-    "Дата рождения": "birth_date",
-    "Возраст": "age",
-    "Пол": "gender",
-    "Полис": "policy",
-    "Код СМО": "smo_code",
-    "Страховая": "insurance",
-    "ЕНП": "enp",
-    "Начало лечения": "treatment_start",
-    "Окончание лечения": "treatment_end",
-    "Врач": "doctor",
-    "Врач (Профиль МП)": "doctor_profile",
-    "Должность мед.персонала (V021)": "staff_position",
-    "Подразделение": "department",
-    "Условия оказания помощи": "care_conditions",
-    "Вид мед. помощи": "medical_assistance_type",
-    "Тип заболевания": "disease_type",
-    "Характер основного заболевания": "main_disease_character",
-    "Посещения": "visits",
-    "Посещения в МО": "mo_visits",
-    "Посещения на Дому": "home_visits",
-    "Случай": "case",
-    "Диагноз основной (DS1)": "main_diagnosis",
-    "Сопутствующий диагноз (DS2)": "additional_diagnosis",
-    "Профиль МП": "mp_profile",
-    "Профиль койки": "bed_profile",
-    "Диспансерное наблюдение": "dispensary_monitoring",
-    "Специальность": "specialty",
-    "Исход": "outcome",
-    "Результат": "result",
-    "Оператор": "operator",
-    "Первоначальная дата ввода": "initial_input_date",
-    "Дата последнего изменения": "last_change_date",
-    "Тариф": "tariff",
-    "Сумма": "amount",
-    "Оплачено": "paid",
-    "Тип оплаты": "payment_type",
-    "Санкции": "sanctions",
-    "КСГ": "ksg",
-    "КЗ": "kz",
-    "Код схемы лекарственной терапии": "therapy_schema_code",
-    "УЕТ": "uet",
-    "Классификационный критерий": "classification_criterion",
-    "ШРМ": "shrm",
-    "МО, направившая": "directing_mo",
-    "Код способа оплаты": "payment_method_code",
-    "Новорожденный": "newborn",
-    "Представитель": "representative",
-    "Доп. инф. о статусе талона": "additional_status_info",
-    "КСЛП": "kslp",
-    "Источник оплаты": "payment_source",
-    "Отчетный период выгрузки": "report_period"
-}
-columns_table_detailed = {
-    "Номер талона": "talon_number",
-    "Счет": "account_number",
-    "Дата выгрузки": "upload_date",
-    "Статус": "status",
-    "МО": "mo",
-    "Дата начала": "start_date",
-    "Дата окончания": "end_date",
-    "Серия полиса": "policy_series",
-    "Номер полиса": "policy_number",
-    "ЕНП": "enp",
-    "Фамилия": "last_name",
-    "Имя": "first_name",
-    "Отчество": "middle_name",
-    "Страховая организация": "insurance_org",
-    "Пол": "gender",
-    "Дата рождения": "birth_date",
-    "Тип талона": "talon_type",
-    "Основной диагноз": "main_diagnosis",
-    "Сопутствующий диагноз": "additional_diagnosis",
-    "Группа здоровья": "health_group",
-    "Доктор (Код)": "doctor_code",
-    "Доктор (ФИО)": "doctor_name",
-    "Стоимость": "cost",
-    "Название услуги": "service_name",
-    "Номенклатурный код услуги": "service_code",
-    "Доктор-Услуги (Код)": "service_doctor_code",
-    "Доктор-Услуги (ФИО)": "service_doctor_name",
-    "Дата-Услуги": "service_date",
-    "Статус-Услуги": "service_status",
-    "Маршрут": "route",
-    "Подразделение врача-Услуги": "service_department",
-    "Код МО (при оказ.услуги в другой МО)": "external_mo_code"
-}
+
+def time_it(method):
+    def timed(*args, **kw):
+        start_time = datetime.now()
+        print(f"Начало '{method.__name__}' в {start_time}")
+        result = method(*args, **kw)
+        end_time = datetime.now()
+        elapsed_time = end_time - start_time
+        print(f"Завершение '{method.__name__}' в {end_time}. Время выполнения: {elapsed_time}")
+        return result
+
+    return timed
 
 
 class DataLoader:
@@ -151,25 +65,20 @@ class DataLoader:
         self.updated_count = 0
         self.error_count = 0
 
+    @time_it
     def load_data(self, file_path):
         """
         Основной метод для загрузки данных из файла в таблицу.
         :param file_path: Путь к файлу
         """
         total_start_time = datetime.now()
-        print("Стартовое время:", total_start_time)
 
         # Шаг 1: Загрузка данных
-        stage_start_time = datetime.now()
         df = self._load_file_to_df(file_path)
         print(f"Файл загружен. Количество строк: {df.shape[0]}")
 
         # Проверка столбцов
         self._check_columns(df)
-
-        stage_end_time = datetime.now()
-        elapsed_time = stage_end_time - stage_start_time
-        print(f"Этап 1 завершён. Время выполнения: {elapsed_time}")
 
         # Шаг 2: Переименование столбцов
         self._rename_columns(df)
@@ -191,6 +100,7 @@ class DataLoader:
         elapsed_time = total_end_time - total_start_time
         print(f"Общее время выполнения: {elapsed_time}")
 
+    @time_it
     def _get_columns_mapping(self):
         """
         Загружает соответствия столбцов для типа данных через SQL запрос, основываясь на имени типа данных.
@@ -208,11 +118,13 @@ class DataLoader:
 
         # Преобразуем результат запроса в словарь {csv_column_name: model_field_name}
         columns_mapping = {row[0]: row[1] for row in result}  # Используем индексы вместо строк
-
+        print(f"Сопоставление столбцов загружено: {columns_mapping}")
         return columns_mapping
 
+    @time_it
     def _load_file_to_df(self, file_path):
         """Загрузка файла в DataFrame."""
+        print(f"Начата загрузка файла {file_path}")
         if self.file_format == 'csv':
             df = pd.read_csv(file_path, sep=self.sep, low_memory=False, na_values="-", dtype=self.dtype,
                              encoding=self.encoding)
@@ -220,12 +132,15 @@ class DataLoader:
             df = pd.read_excel(file_path)
         else:
             raise ValueError("Неподдерживаемый формат файла")
+        print(f"Файл {file_path} успешно загружен. Размер данных: {df.shape}")
         return df
 
+    @time_it
     def _check_columns(self, df):
         """
         Проверяет наличие и соответствие столбцов.
         """
+        print("Проверка соответствия столбцов...")
         file_columns = set(df.columns)
         expected_columns = set(self.columns_mapping.keys())
 
@@ -238,18 +153,23 @@ class DataLoader:
             if extra_columns:
                 print(f"Лишние столбцы: {extra_columns}")
             raise ValueError("Структура файла не соответствует ожиданиям.")
+        print("Все необходимые столбцы присутствуют.")
 
+    @time_it
     def _rename_columns(self, df):
         """
         Переименовывает столбцы DataFrame на основе словаря.
         """
+        print("Переименование столбцов...")
         df.rename(columns=self.columns_mapping, inplace=True)
         print("Столбцы переименованы.")
 
+    @time_it
     def _process_dataframe(self, df):
         """
         Обрабатывает DataFrame: удаляет NaN и преобразует данные в строки.
         """
+        print("Обработка данных DataFrame...")
         try:
             # Удаляем строки, содержащие NaN на основании столбца column_check
             df.dropna(subset=[self.column_check], inplace=True)
@@ -270,58 +190,52 @@ class DataLoader:
         # Проверяем что тип данных у всех столбцов "текстовый"
         df = df.astype(str)
 
-        print("Данные обработаны.")
+        print("Обработка данных завершена.")
         return df
 
+    @time_it
     def _delete_existing_rows(self, df):
         """
         Удаляет строки из базы данных, если значения в столбцах из columns_for_update совпадают между DataFrame и базой данных.
         """
+        print("Начат процесс удаления существующих строк из базы данных...")
         try:
             # Приводим значения всех столбцов в DataFrame к строковому типу, если они еще не строки
             for column in self.columns_for_update:
                 df[column] = df[column].astype(str)
 
-            # Создаем новый столбец в DataFrame с объединенными значениями столбцов из columns_for_update
-            df['combined_key'] = df[self.columns_for_update].apply(lambda row: '_'.join(row.values.astype(str)), axis=1)
+            # Создаем список уникальных комбинаций ключей из DataFrame
+            keys_in_df = df[self.columns_for_update].drop_duplicates()
 
-            # Получаем записи из базы данных, которые соответствуют указанным столбцам
-            with self.engine.connect() as connection:
-                query = f"SELECT {', '.join(self.columns_for_update)} FROM {self.table_name}"
+            # Формируем условие для SQL-запроса
+            conditions = ' OR '.join([
+                '(' + ' AND '.join([f"{col} = :{col}_{i}" for col in self.columns_for_update]) + ')'
+                for i in range(len(keys_in_df))
+            ])
 
-                rows_in_db = connection.execute(text(query)).fetchall()
+            # Подготавливаем параметры для запроса
+            params = {}
+            for idx, row in keys_in_df.iterrows():
+                for col in self.columns_for_update:
+                    params[f"{col}_{idx}"] = row[col]
 
-            # Преобразуем результат из базы данных в множество с объединенными значениями столбцов
-            rows_in_db_set = {'_'.join(map(str, row)) for row in rows_in_db}
-
-            # Получаем комбинированные ключи из DataFrame
-            combined_keys_in_df = set(df['combined_key'])
-
-            # Определяем ключи, которые присутствуют и в базе данных, и в DataFrame
-            keys_to_delete = combined_keys_in_df.intersection(rows_in_db_set)
-
-            if keys_to_delete:
-                # Удаляем строки с совпадающими ключами
+            if conditions:
+                delete_query = text(f"DELETE FROM {self.table_name} WHERE {conditions}")
                 with self.engine.begin() as connection:
-                    for key in keys_to_delete:
-                        key_values = key.split('_')
-                        conditions = ' AND '.join([f"{col} = :{col}" for col in self.columns_for_update])
-                        delete_query = text(f"DELETE FROM {self.table_name} WHERE {conditions}")
-                        params = dict(zip(self.columns_for_update, key_values))
-                        connection.execute(delete_query, params)
-
-                print(f"Удалены строки с {len(keys_to_delete)} совпадающими значениями.")
-
+                    connection.execute(delete_query, params)
+                print(f"Удалены существующие строки по ключам: {self.columns_for_update}")
             else:
-                print("Совпадающие строки отсутствуют. Удаление не требуется.")
+                print("Нет существующих строк для удаления.")
 
         except Exception as e:
             print(f"Ошибка при удалении существующих строк: {e}")
 
+    @time_it
     def _load_data_to_db(self, df):
         """
         Загружает данные в базу данных с отслеживанием прогресса.
         """
+        print("Начата загрузка данных в базу данных...")
         # Удаляем столбец combined_key, который используется только для внутренней обработки
         if 'combined_key' in df.columns:
             df.drop(columns=['combined_key'], inplace=True)
@@ -345,33 +259,42 @@ class DataLoader:
             self.error_count += 1
             print(f"Ошибка при загрузке данных: {e}")
 
+    @time_it
     def _create_data_import_record(self):
         """
         Создает запись в таблице DataImport с информацией о загрузке через SQL-запрос.
         """
+        print("Создание записи о загрузке данных в таблице DataImport...")
         sql_query = """
         INSERT INTO data_loader_dataimport (csv_file, date_added, added_count, updated_count, error_count, data_type_id)
-        VALUES (:csv_file, NOW(), :added_count, :updated_count, :error_count, 1)
+        VALUES (:csv_file, NOW(), :added_count, :updated_count, :error_count, :data_type_id)
         """
 
-        # Выполняем подзапрос отдельно для проверки
-        with self.engine.connect() as connection:
+        with self.engine.begin() as connection:
             data_type_query = "SELECT id FROM data_loader_datatype WHERE name = :data_type_name"
-            print(self.data_type_name)
-            data_type_id = connection.execute(text(data_type_query), {'data_type_name': self.data_type_name}).fetchone()
+            print(f"Поиск data_type_id для '{self.data_type_name}'")
+            data_type_id_result = connection.execute(
+                text(data_type_query),
+                {'data_type_name': self.data_type_name}
+            ).fetchone()
 
-            if data_type_id:
-                print(f"Тип данных найден, ID: {data_type_id[0]}")
-                # Выполняем основной запрос, если подзапрос вернул результат
-                connection.execute(text(sql_query), {
-                    'csv_file': '-',  # Укажите путь к файлу или значение
-                    'added_count': self.added_count,
-                    'updated_count': self.updated_count,
-                    'error_count': self.error_count,
-                    'data_type_name': self.data_type_name
-                })
+            if data_type_id_result:
+                data_type_id = data_type_id_result[0]
+                print(f"Тип данных найден, ID: {data_type_id}")
+                try:
+                    # Выполняем основной запрос, используя фактический data_type_id
+                    connection.execute(text(sql_query), {
+                        'csv_file': '-',  # Укажите путь к файлу или значение
+                        'added_count': self.added_count,
+                        'updated_count': self.updated_count,
+                        'error_count': self.error_count,
+                        'data_type_id': data_type_id
+                    })
+                    print("Запись в таблице DataImport успешно создана.")
+                except Exception as e:
+                    print(f"Ошибка при вставке записи в DataImport: {e}")
             else:
-                print(f"Ошибка: Тип данных с именем {self.data_type_name} не найден.")
+                print(f"Ошибка: Тип данных с именем '{self.data_type_name}' не найден.")
 
 
 if __name__ == "__main__":
@@ -379,13 +302,15 @@ if __name__ == "__main__":
     # file_path = fr"C:\Users\frdro\Downloads\Telegram Desktop\journal_20241004(2).csv"
     # file_path = fr"C:\Users\frdro\Downloads\Telegram Desktop\journal_Detailed_Medical_Examination_20241006.csv"
     # file_path = fr"C:\Users\frdro\Downloads\Telegram Desktop\journal_Doctors_20241006.csv"
-    file_path = fr"C:\Users\RDN\Downloads\Att_MO_36002520241008.csv"
+    # file_path = fr"C:\Users\RDN\Downloads\Att_MO_36002520241008.csv"
+    file_path = fr"C:\Users\RDN\Downloads\Report - 2024-10-08T091240.678.csv"
 
     loader = DataLoader(engine=engine,
-                        table_name="data_loader_iszlpeople",
-                        data_type_name='people',
-                        column_check="enp",
-                        columns_for_update=['enp'],
+                        table_name="data_loader_iszldisnabjob",
+                        data_type_name='disnabjob',
+                        column_check="id_iszl",
+                        columns_for_update=['id_iszl', 'enp', 'ds'],
+                        encoding='cp1251'
                         )
     loader.load_data(file_path)
 
@@ -405,3 +330,8 @@ if __name__ == "__main__":
 #                         data_type_name = 'people',
 #                         column_check = "enp",
 #                         columns_for_update = ['enp'],
+
+#                         table_name = "data_loader_omsdata",
+#                         data_type_name = 'OMS',
+#                         column_check = "patient",
+#                         columns_for_update = ['talon'],
