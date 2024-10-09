@@ -58,7 +58,6 @@ class MedicalOrganizationOMSTarget(models.Model):
         unique_together = ('organization', 'general_target')
 
 
-
 class SQLQueryParameters(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название параметра")
     query = models.TextField(verbose_name="SQL-запрос")
@@ -72,3 +71,15 @@ class SQLQueryParameters(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class StatusWebOMS(models.Model):
+    status = models.CharField("Статус", max_length=255)
+    name = models.CharField("Название", max_length=255)
+
+    class Meta:
+        verbose_name = "Статус Web-ОМС"
+        verbose_name_plural = "Статусы Web-ОМС"
+
+    def __str__(self):
+        return f"{self.status} - {self.name}"

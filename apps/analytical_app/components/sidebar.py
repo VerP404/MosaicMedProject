@@ -3,9 +3,21 @@ from dash import html, Input, Output, State
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
+from apps.analytical_app.query_executor import execute_query
+
+
+# Получаем данные для главного меню
+def get_main_app_url():
+    query = "SELECT main_app_ip, main_app_port FROM home_mainsettings LIMIT 1"
+    result = execute_query(query)
+    if result:
+        ip, port = result[0]
+        return f"http://{ip}:{port}"
+    return "#"
 
 
 def create_sidebar():
+    main_app_url = get_main_app_url()
     sidebar = html.Div(
         [
             # Кнопка сворачивания рядом с пунктами навигации
@@ -72,6 +84,13 @@ def create_sidebar():
                         active="exact",
                         id="help-link"
                     ),
+                    dbc.NavLink(
+                        [html.I(className="bi bi-list"),
+                         html.Span(" Главное меню", className="ms-2", id="main-menu-label")],
+                        href=main_app_url,
+                        active="exact",
+                        id="main-menu-link"
+                    ),
                 ],
                 vertical=True,
                 pills=True,
@@ -100,7 +119,8 @@ def create_sidebar():
          Output("statistic-label", "style"),
          Output("economist-label", "style"),
          Output("admin-label", "style"),
-         Output("help-label", "style"),],
+         Output("help-label", "style"),
+         Output("main-menu-label", "style")],
         [Input("btn_sidebar", "n_clicks")],
         [State("sidebar-state", "data"),
          State("sidebar", "style"),
@@ -115,7 +135,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
-                    )
+                    {"display": "none"},)
         else:
             # Развернутый вид
             sidebar_style["width"] = "14rem"
@@ -123,7 +143,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
-                    )
+                    {"display": "inline"},)
 
     @app.callback(
         [Output("main-link", "active"),

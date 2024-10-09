@@ -68,6 +68,7 @@ class MedicalOrganizationOMSTargetAdmin(admin.ModelAdmin):
     # Метод для отображения категорий
     def get_categories(self, obj):
         return ", ".join([category.name for category in obj.categories.all()])
+
     get_categories.short_description = "Категории"
 
     def get_form(self, request, obj=None, **kwargs):
@@ -79,3 +80,10 @@ class MedicalOrganizationOMSTargetAdmin(admin.ModelAdmin):
             form.base_fields['organization'].disabled = True
 
         return form
+
+
+@admin.register(StatusWebOMS)
+class StatusWebOMSAdmin(admin.ModelAdmin):
+    list_display = ('status', 'name',)
+    search_fields = ('status', 'name',)
+    list_editable = ('name',)
