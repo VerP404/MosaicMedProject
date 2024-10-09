@@ -1,17 +1,17 @@
-from dash import html, dcc, Input, Output, no_update, callback_context
+from dash import html, dcc, callback_context, no_update, Output, Input
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 
-type_page = 'economist'
+type_page = "statistic"
+# Карточки для отчётов
 cards_1 = dbc.CardGroup(
     [
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Сверхподушевое финансирование", className="card-title"),
+                    html.H5("Отчет Шараповой по ДН", className="card-title"),
                     html.P(
-                        "Отчет по фактическому выполнению сверхподушевого финансирования с указанием "
-                        "колическтва талонов и стоимости",
+                        "Еженедельный отчет Шараповой по ДН с формированием по дате создания талонов.",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -23,9 +23,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("По врачам", className="card-title"),
+                    html.H5("Диспансеризация детей", className="card-title"),
                     html.P(
-                        "Анализ выставления целей по врачам.",
+                        "Диспансеризация детей.",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -37,9 +37,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансеризация по возрастам", className="card-title"),
+                    html.H5("Диспансерное наблюдение", className="card-title"),
                     html.P(
-                        "Отчет по всем видам диспансеризации по возрастам с разбивкой по полу и возрасту.",
+                        "Диспансерное наблюдение.",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -48,21 +48,17 @@ cards_1 = dbc.CardGroup(
                 ]
             )
         ),
-    ]
-)
-
-cards_2 = dbc.CardGroup(
-    [
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Стационары", className="card-title"),
+                    html.H5("Диспансерное наблюдение работающих", className="card-title"),
                     html.P(
-                        "Отчет по КСГ в разбивке по корпусам.",
+                        "Анализ не прикрепленных пациентов, внесенных в ИСЗЛ как проходивших диспансерное "
+                        "наблюдение на основании договора заключенного с работодателем",
                         className="card-text",
                     ),
                     dbc.Button(
-                        "Открыть", color="success", className="mt-auto", id=f"open-report-4-economist"
+                        "Открыть", color="danger", className="mt-auto", id=f"open-report-4-{type_page}"
                     ),
                 ]
             )
@@ -70,14 +66,12 @@ cards_2 = dbc.CardGroup(
     ]
 )
 
-# Макет страницы "Экономист" с хлебными крошками
-economist_main = html.Div([
+statistic_main = html.Div([
     dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
-        {"label": "Экономист", "href": "/economist", "active": True},
+        {"label": "Статистик", "href": "/statistic", "active": True},
     ]),
     html.Hr(),
     html.Div(cards_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
-    html.Div(cards_2, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
 ])
 
 
@@ -99,20 +93,20 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4):
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    breadcrumb_items = [{"label": "Экономист", "href": "/economist"}]
+    breadcrumb_items = [{"label": "Статистик", "href": "/statistic"}]
 
-    if button_id.startswith("open-report-") and "economist" in button_id:
+    if button_id.startswith("open-report-") and "statistic" in button_id:
         if button_id == f'open-report-1-{type_page}' and open_report_1:
-            breadcrumb_items.append({"label": "Сверхподушевое финансирование", "active": True})
-            return '/economist/svpod', breadcrumb_items
+            breadcrumb_items.append({"label": "Отчет Шараповой по ДН", "active": True})
+            return '/statistic/statistic-sharapova', breadcrumb_items
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
             breadcrumb_items.append({"label": "По врачам", "active": True})
-            return '/economist/doctors', breadcrumb_items
+            return '/statistic/doctors', breadcrumb_items
         elif button_id == f'open-report-3-{type_page}' and open_report_3:
             breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
-            return '/economist/disp_by_ages', breadcrumb_items
+            return '/statistic/disp_by_ages', breadcrumb_items
         elif button_id == f'open-report-4-{type_page}' and open_report_4:
-            breadcrumb_items.append({"label": "Стационары", "active": True})
-            return '/economist/stationary', breadcrumb_items
+            breadcrumb_items.append({"label": "Диспансерное наблюдение работающих", "active": True})
+            return '/statistic/dn_job', breadcrumb_items
 
-    return '/economist', breadcrumb_items
+    return '/statistic', breadcrumb_items

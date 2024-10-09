@@ -1,3 +1,5 @@
+import datetime
+
 from sqlalchemy import text
 import pandas as pd
 
@@ -32,3 +34,12 @@ class TableUpdater:
             return columns, data
 
 
+def get_selected_dates(start_date, end_date):
+    start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+    end_date_obj = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+
+    start_date_formatted = start_date_obj.strftime('%d.%m.%Y')
+    end_date_formatted = end_date_obj.strftime('%d.%m.%Y')
+
+    selected_dates_text = f'Выбранные даты: с {start_date_formatted} по {end_date_formatted}'
+    return selected_dates_text

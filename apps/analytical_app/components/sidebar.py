@@ -79,10 +79,10 @@ def create_sidebar():
                     ),
                     dbc.NavLink(
                         [html.I(className="bi bi-info-circle"),
-                         html.Span(" Помощь", className="ms-2", id="help-label")],
-                        href="/help",
+                         html.Span(" ИСЗЛ", className="ms-2", id="iszl-label")],
+                        href="/iszl",
                         active="exact",
-                        id="help-link"
+                        id="iszl-link"
                     ),
                     dbc.NavLink(
                         [html.I(className="bi bi-list"),
@@ -119,7 +119,7 @@ def create_sidebar():
          Output("statistic-label", "style"),
          Output("economist-label", "style"),
          Output("admin-label", "style"),
-         Output("help-label", "style"),
+         Output("iszl-label", "style"),
          Output("main-menu-label", "style")],
         [Input("btn_sidebar", "n_clicks")],
         [State("sidebar-state", "data"),
@@ -153,7 +153,7 @@ def create_sidebar():
          Output("statistic-link", "active"),
          Output("economist-link", "active"),
          Output("admin-link", "active"),
-         Output("help-link", "active"),
+         Output("iszl-link", "active"),
          ],
         [Input("url", "pathname")]
     )
@@ -166,7 +166,7 @@ def create_sidebar():
             pathname.startswith("/statistic"),  # Для Статистика
             pathname.startswith("/economist"),  # Для Экономиста, включая вложенные страницы
             pathname.startswith("/admin"),  # Для Администратора
-            pathname.startswith("/help"),  # Для Помощи
+            pathname.startswith("/iszl"),  # Для Помощи
         ]
 
     return sidebar

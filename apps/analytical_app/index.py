@@ -4,7 +4,7 @@ from dash import dcc, html
 from apps.analytical_app.app import app
 from apps.analytical_app.routes import register_routes
 from components.sidebar import create_sidebar
-from components.navbar import create_navbar, create_modal, create_modal_status
+from components.navbar import create_navbar, create_modal_168n, create_modal_status, create_modal_goal
 from components.footer import create_footer
 
 app.layout = html.Div(
@@ -15,8 +15,9 @@ app.layout = html.Div(
         dcc.Interval(id='date-interval-main', interval=600000, n_intervals=0),  # 10 минут
         dcc.Location(id="url"),
         create_navbar(),
-        create_modal(),
+        create_modal_168n(),
         create_modal_status(),
+        create_modal_goal(),
         create_sidebar(),
         html.Div(id='page-content', style={'margin-left': '5rem', 'margin-top': '56px', 'padding': '2rem 1rem'}),
         create_footer(),

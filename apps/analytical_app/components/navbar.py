@@ -16,7 +16,7 @@ def get_organization_name():
 
 
 # Создаем модальное окно
-def create_modal():
+def create_modal_168n():
     modal = dbc.Modal(
         [
             dbc.ModalHeader(dbc.ModalTitle("Диагнозы по 168н")),
@@ -48,6 +48,24 @@ def create_modal_status():
         id="modal-status",
         size="lg",  # Размер окна
         is_open=False,  # По умолчанию закрыто
+    )
+    return modal
+
+
+def create_modal_goal():
+    modal = dbc.Modal(
+        [
+            dbc.ModalHeader(dbc.ModalTitle("Цели в системе ОМС")),
+            dbc.ModalBody(
+                card_table(id_table="modal-table-goal", card_header="Цели в системе ОМС", page_size=15)
+            ),
+            dbc.ModalFooter(
+                dbc.Button("Закрыть", id="close-modal-goal", className="ms-auto", n_clicks=0),
+            ),
+        ],
+        id="modal-goal",
+        size="xl",
+        is_open=False,
     )
     return modal
 
@@ -93,7 +111,7 @@ def create_navbar():
                                     dbc.DropdownMenuItem("Справка", header=True),
                                     dbc.DropdownMenuItem("Статусы талонов", id="open-modal-status", n_clicks=0),
                                     dbc.DropdownMenuItem("Диагнозы по 168н", id="open-modal-168", n_clicks=0),
-                                    # Открытие модального окна
+                                    dbc.DropdownMenuItem("Цели в системе ОМС", id="open-modal-goal", n_clicks=0),
                                 ],
                                 nav=True,
                                 in_navbar=True,
@@ -152,6 +170,20 @@ def toggle_modal(open_clicks, close_clicks, is_open):
 
 
 @app.callback(
+    Output("modal-goal", "is_open"),
+    [Input("open-modal-goal", "n_clicks"),
+     Input("close-modal-goal", "n_clicks")],
+    [State("modal-goal", "is_open")]
+)
+def toggle_modal(open_clicks, close_clicks, is_open):
+    if open_clicks and not close_clicks:
+        return True
+    elif close_clicks:
+        return False
+    return is_open
+
+
+@app.callback(
     [Output(f'modal-table-168', 'columns'),
      Output(f'modal-table-168', 'data'),
      ],
@@ -176,5 +208,51 @@ def update_table(n_clicks):
                                                  f"SELECT status::integer as \"Цель\", "
                                                  "name as \"Название\" FROM oms_reference_statusweboms "
                                                  "ORDER BY status::integer")
+        return columns, data
+    return [], []
+
+
+sql_query = """
+SELECT 
+    g.code as "Код",
+    g.name as "Наименование",
+    CASE
+        WHEN m.is_active THEN 'Да'
+        ELSE 'Нет'
+    END AS "Действует",
+    COALESCE(STRING_AGG(c.name, ', '), '-') AS "Группа" 
+FROM
+    oms_reference_generalomstarget g
+JOIN
+    oms_reference_medicalorganizationomstarget m
+ON
+    g.id = m.general_target_id
+LEFT JOIN
+    oms_reference_medicalorganizationomstarget_categories l
+ON
+    m.id = l.medicalorganizationomstarget_id
+LEFT JOIN
+    oms_reference_omstargetcategory c
+ON
+    l.omstargetcategory_id = c.id
+GROUP BY
+    g.code, g.name, m.is_active, m.start_date, m.end_date
+ORDER BY
+    CASE
+        WHEN g.code ~ '^[0-9]+$' THEN lpad(g.code, 10, '0')
+        ELSE g.code
+    END
+"""
+
+
+@app.callback(
+    [Output(f'modal-table-goal', 'columns'),
+     Output(f'modal-table-goal', 'data'),
+     ],
+    [Input(f'open-modal-goal', 'n_clicks')]
+)
+def update_table(n_clicks):
+    if n_clicks > 0:
+        columns, data = TableUpdater.query_to_df(engine, sql_query)
         return columns, data
     return [], []

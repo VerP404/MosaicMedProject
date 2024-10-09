@@ -1,5 +1,8 @@
 from dash import Output, Input, html
 
+from apps.analytical_app.pages.administrator.main import admin_main
+from apps.analytical_app.pages.chief.main import chief_main
+from apps.analytical_app.pages.doctor.main import doctor_main
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
 from apps.analytical_app.pages.economist.main import economist_main
@@ -9,7 +12,10 @@ import dash_bootstrap_components as dbc
 
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
 from apps.analytical_app.pages.head.main import head_main
+from apps.analytical_app.pages.iszl.main import iszl_main
 from apps.analytical_app.pages.main.page import main_layout
+from apps.analytical_app.pages.statistic.main import statistic_main
+from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapova
 
 # Все маршруты для страниц
 routes = {
@@ -73,8 +79,172 @@ routes = {
         ]),
         head_dn_job
     ]),
-    "/about": html.H1('О нас')
+    "/head/statistic-sharapova": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Отчет Шараповой по ДН", "active": True},
+        ]),
+        statistic_sharapova
+    ]),
+
+    "/statistic": statistic_main,
+    "/statistic/statistic-sharapova": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Статистик", "href": "/statistic"},
+            {"label": "Отчет Шараповой по ДН", "active": True},
+        ]),
+        statistic_sharapova
+    ]),
+    "/statistic/doctors": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Статистик", "href": "/statistic"},
+            {"label": "Диспансеризация детей", "active": True},
+        ]),
+        economist_doctors_talon_list
+    ]),
+    "/statistic/disp_by_ages": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Статистик", "href": "/statistic"},
+            {"label": "Диспансерное наблюдение", "active": True},
+        ]),
+        economist_dispensary_age
+    ]),
+    "/statistic/dn_job": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Статистик", "href": "/statistic"},
+            {"label": "Диспансерное наблюдение работающих", "active": True},
+        ]),
+        head_dn_job
+    ]),
+
+    "/doctor": doctor_main,
+    "/doctor/svpod": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Врач", "href": "/doctor"},
+            {"label": "Диспансеризация взрослых", "active": True},
+        ]),
+        economist_sv_pod
+    ]),
+    "/doctor/doctors": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Врач", "href": "/doctor"},
+            {"label": "Диспансеризация детей", "active": True},
+        ]),
+        economist_doctors_talon_list
+    ]),
+    "/doctor/disp_by_ages": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Врач", "href": "/doctor"},
+            {"label": "Диспансерное наблюдение", "active": True},
+        ]),
+        economist_dispensary_age
+    ]),
+    "/doctor/dn_job": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Врач", "href": "/doctor"},
+            {"label": "Диспансерное наблюдение работающих", "active": True},
+        ]),
+        head_dn_job
+    ]),
+
+    "/admin": admin_main,
+    "/admin/svpod": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Администратор", "href": "/admin"},
+            {"label": "Диспансеризация взрослых", "active": True},
+        ]),
+        economist_sv_pod
+    ]),
+    "/admin/doctors": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Администратор", "href": "/admin"},
+            {"label": "Диспансеризация детей", "active": True},
+        ]),
+        economist_doctors_talon_list
+    ]),
+    "/admin/disp_by_ages": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Администратор", "href": "/admin"},
+            {"label": "Диспансерное наблюдение", "active": True},
+        ]),
+        economist_dispensary_age
+    ]),
+    "/admin/dn_job": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Администратор", "href": "/admin"},
+            {"label": "Диспансерное наблюдение работающих", "active": True},
+        ]),
+        head_dn_job
+    ]),
+
+    "/chief": chief_main,
+    "/chief/svpod": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Главный врач", "href": "/chief"},
+            {"label": "Диспансеризация взрослых", "active": True},
+        ]),
+        economist_sv_pod
+    ]),
+    "/chief/doctors": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Главный врач", "href": "/chief"},
+            {"label": "Диспансеризация детей", "active": True},
+        ]),
+        economist_doctors_talon_list
+    ]),
+    "/chief/disp_by_ages": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Главный врач", "href": "/chief"},
+            {"label": "Диспансерное наблюдение", "active": True},
+        ]),
+        economist_dispensary_age
+    ]),
+    "/chief/dn_job": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Главный врач", "href": "/chief"},
+            {"label": "Диспансерное наблюдение работающих", "active": True},
+        ]),
+        head_dn_job
+    ]),
+
+    "/iszl": iszl_main,
+    "/iszl/svpod": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Главный врач", "href": "/iszl"},
+            {"label": "Диспансеризация взрослых", "active": True},
+        ]),
+        economist_sv_pod
+    ]),
+    "/iszl/doctors": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Главный врач", "href": "/iszl"},
+            {"label": "Диспансеризация детей", "active": True},
+        ]),
+        economist_doctors_talon_list
+    ]),
+    "/iszl/disp_by_ages": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Главный врач", "href": "/iszl"},
+            {"label": "Диспансерное наблюдение", "active": True},
+        ]),
+        economist_dispensary_age
+    ]),
+    "/iszl/dn_job": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Главный врач", "href": "/iszl"},
+            {"label": "Диспансерное наблюдение работающих", "active": True},
+        ]),
+        head_dn_job
+    ]),
 }
+
+
+def page_not_found(pathname):
+    return html.Div([
+        html.H1("404: Страница не найдена", style={"textAlign": "center", "color": "red"}),
+        html.P(f"Путь '{pathname}' не существует.", style={"textAlign": "center"}),
+        html.A("Вернуться на главную", href="/", style={"textAlign": "center"})
+    ])
 
 
 # Callback для отображения страницы в зависимости от URL
@@ -84,7 +254,5 @@ def register_routes(app):
         [Input('url', 'pathname')]
     )
     def display_page(pathname):
-        return routes.get(pathname, html.Div([
-            html.H1("Страница не найдена", style={"textAlign": "center"}),
-            html.P(f"Путь {pathname} не существует.", style={"textAlign": "center"})
-        ]))
+        # Если путь существует, вернуть соответствующую страницу, иначе вернуть страницу 404
+        return routes.get(pathname, page_not_found(pathname))
