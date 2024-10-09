@@ -2,8 +2,16 @@
 {% extends 'home/base.html' %}
 
 {% block content %}
-    <div class="container">
+    <div class="container mt-5">
+        <!-- Добавляем заголовок с центровкой -->
         <div class="row">
+            <div class="col text-center">
+                <h2 class="display-6">{{ organization.name }}</h2>
+            </div>
+        </div>
+
+        <!-- Блок карточек -->
+        <div class="row mt-4">
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-body">
