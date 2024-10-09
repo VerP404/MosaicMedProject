@@ -4,7 +4,15 @@ import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.query_executor import engine
+from apps.analytical_app.query_executor import engine, execute_query
+
+
+def get_organization_name():
+    query = "SELECT name FROM organization_medicalorganization LIMIT 1"
+    result = execute_query(query)
+    if result:
+        return result[0][0]
+    return "Организация не указана"
 
 
 # Создаем модальное окно
@@ -45,6 +53,7 @@ def create_modal_status():
 
 
 def create_navbar():
+    organization_name = get_organization_name()
     navbar = dbc.Navbar(
         dbc.Container(
             [
@@ -67,7 +76,7 @@ def create_navbar():
                 html.A(
                     dbc.Row(
                         [
-                            dbc.Col(dbc.NavbarBrand("БУЗ ВО \"ВГП №3\"", className="ms-2")),
+                            dbc.Col(dbc.NavbarBrand(organization_name, className="ms-2")),
                         ],
                         align="center",
                         className="g-0",
