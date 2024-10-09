@@ -1,0 +1,64 @@
+<!-- index.html -->
+{% extends 'peopledash/base.html' %}
+{% load static %}
+
+{% block main %}
+    <div class="main-container">
+        <div class="table-title">
+            <h2>Информация о приеме в корпусах для инфопанелей</h2>
+        </div>
+        <div class="table-data">
+            <table id="patient-table">
+                <thead>
+                <tr>
+                    <th>Подразделение</th>
+                    <th>Ссылка</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for page in pages %}
+                    <tr>
+                        <td>{{ page.title }}</td>
+                        <td><a href="{% url 'dynamic_page' page.path %}">Страница корпуса</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Блок кнопок -->
+            <div class="button-group">
+                <a href="{% url 'upload_data' %}" class="btn btn-primary">Обновление данных</a>
+                <a href="{% url 'home' %}" class="btn btn-secondary">На главную страницу</a>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .button-group {
+            display: flex;
+            justify-content: flex-start;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            text-align: center;
+            border-radius: 5px;
+            text-decoration: none;
+            color: white;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+{% endblock %}

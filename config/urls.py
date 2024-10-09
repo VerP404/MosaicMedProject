@@ -2,7 +2,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from django.views.generic import TemplateView, RedirectView
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -12,6 +12,7 @@ urlpatterns = [
     path('organization/', include('apps.organization.urls')),
     path('personnel/', include('apps.personnel.urls')),
     path('sql_manager/', include('apps.sql_manager.urls')),
+    path('peopledash/', include('apps.peopledash.urls')),
 ]
 if settings.DEBUG:
     import debug_toolbar
@@ -19,3 +20,5 @@ if settings.DEBUG:
     urlpatterns = [
                       path('__debug__/', include(debug_toolbar.urls)),
                   ] + urlpatterns
+
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
