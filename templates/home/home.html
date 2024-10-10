@@ -1,0 +1,53 @@
+<!--home/home.html-->
+{% extends 'home/base.html' %}
+
+{% block content %}
+    <div class="container mt-5">
+        <!-- Добавляем заголовок с центровкой -->
+        <div class="row">
+            <div class="col text-center">
+                <h2 class="display-6">{{ organization.name }}</h2>
+            </div>
+        </div>
+
+        <!-- Блок карточек -->
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Аналитическая система</h5>
+                        <p class="card-text">МозаикаМед-Аналитика</p>
+                        <a href="{{ main_settings.get_dash_url }}" class="btn btn-primary">Открыть</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Панель пациента</h5>
+                        <p class="card-text">Панель для пациентов в холле медицинской организации</p>
+                        <a href="{% url 'peopledash_home' %}" class="btn btn-primary">Открыть</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Панель главного врача</h5>
+                        <p class="card-text">Панель главного врача для информационного табло</p>
+                        <a href="/" class="btn btn-primary">Открыть</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Административный сайт</h5>
+                        <p class="card-text">Переход к административной панели.</p>
+                        <a href="/admin/" class="btn btn-primary">Открыть</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

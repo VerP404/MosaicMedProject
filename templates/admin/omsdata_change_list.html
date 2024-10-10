@@ -1,11 +1,23 @@
+<!-- admin/omsdata_change_list.html -->
+
 {% extends "admin/change_list.html" %}
 
 {% block object-tools %}
     <div class="object-tools">
         <ul class="grp-object-tools">
             <li>
-                <a href="{% url 'admin:learn_omsdata_csv-upload' %}">Импорт CSV</a>  <!-- Добавляем кнопку импорта -->
+                <a href="{% url 'admin:oms_talon_csv_upload' %}">CSV: Талоны</a>
             </li>
+            <li>
+                <a href="{% url 'admin:oms_doctor_csv_upload' %}">CSV: Врачи</a>
+            </li>            
+            <li>
+                <a href="{% url 'admin:oms_detailed_csv_upload' %}">CSV: Детализация</a>
+            </li>
+            <li>
+                <a href="{% url 'admin:oms_talon_wo_download' %}">Selenium: ОМС талоны</a>
+            </li>            
+
         </ul>
     </div>
 {% endblock %}

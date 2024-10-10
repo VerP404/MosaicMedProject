@@ -20,7 +20,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # 'apps.custom_auth',
-    'apps.home'
+    'apps.home',
+    'apps.data_loader',
+    'apps.peopledash',
+
 ]
 
 MIDDLEWARE = [
@@ -79,6 +82,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -96,3 +100,6 @@ LOGGING = {
         'level': 'WARNING',
     },
 }
+
+MEDIA_URL = '/uploads/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'uploads/')

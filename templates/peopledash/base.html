@@ -1,0 +1,215 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'peopledash/css/peopledash.css' %}">
+    <style>
+        body {
+            font-family: 'montserrat', sans-serif;
+            background: {{ organization.background_color }};
+            color: {{ organization.text_color }};
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .main-container {
+            background-color: {{ organization.main_container_color }};
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 30px;
+            margin-left: 2%;
+            margin-right: 2%;
+        }
+
+        .info-container {
+            background-color: {{ organization.info_container_color }};
+            border-radius: 10px;
+            position: fixed;
+            bottom: 50px;
+            left: 2%;
+            right: 2%;
+            padding: 15px;
+            text-align: center;
+        {#color: #02ff35;info_container_texy_color#} color: {{ organization.info_container_texy_color }};
+
+            font-size: 30px;
+        }
+
+        .table-title {
+            color: {{ organization.header_background_color }};
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 40px;
+        }
+
+        .table-data thead tr th {
+            color: {{ organization.table_header_color }};
+        }
+
+        .footer-text {
+            text-align: center;
+            color: {{ organization.text_color }};
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            margin: 0;
+        }
+
+        /* Стили для ссылок внутри таблицы */
+        .table-data td a {
+            color: {{ organization.text_color }};
+            text-decoration: none; /* Убирает подчеркивание */
+        }
+
+        .table-data td a:hover, .table-data td a:focus {
+            color: {{ organization.text_color }};
+            text-decoration: none; /* Убирает подчеркивание при наведении или фокусе */
+        }
+
+        /* Стили для ссылок внутри таблицы и тега h5 */
+        .table-data td a, .table-data h5 a {
+            color: {{ organization.text_color }};
+            text-decoration: none; /* Убирает подчеркивание */
+        }
+
+        .table-data td a:hover, .table-data td a:focus, .table-data h5 a:hover, .table-data h5 a:focus {
+            color: {{ organization.text_color }};
+            text-decoration: none; /* Убирает подчеркивание при наведении или фокусе */
+        }
+
+        /* Медиа-запросы для экранов с шириной до 1280px */
+        @media screen and (max-width: 1280px) {
+            .header-grid {
+                font-size: 20px;
+            }
+
+            .logo img {
+                width: 60px;
+                height: 60px;
+            }
+
+            .update-info {
+                flex: 1;
+                text-align: center;
+                font-size: 16px;
+            }
+
+            .system-info .row, .update-info .row {
+                margin-bottom: 7px;
+            }
+
+            .main-container {
+                padding: 7px;
+                margin-top: 15px;
+            }
+
+            .info-container {
+                bottom: 25px;
+                padding: 7px;
+                font-size: 25px;
+            }
+
+            .table-title {
+                margin-bottom: 7px;
+                font-size: 23px;
+            }
+
+            .table-data {
+                font-size: 23px;
+            }
+        }
+
+        /* Медиа-запросы для экранов с шириной до 980px */
+        @media screen and (max-width: 980px) {
+            .header-grid {
+                font-size: 15px;
+            }
+
+            .logo img {
+                width: 40px;
+                height: 40px;
+            }
+
+            .system-info .row, .update-info .row {
+                margin-bottom: 5px;
+            }
+
+            .main-container {
+                padding: 5px;
+                margin-top: 10px;
+            }
+
+            .info-container {
+                bottom: 20px;
+                padding: 5px;
+                font-size: 18px;
+            }
+
+            .table-title {
+                margin-bottom: 5px;
+                font-size: 18px;
+            }
+
+            .table-data {
+                font-size: 18px;
+            }
+        }
+    </style>
+    <script src="{% static 'peopledash/js/jquery-3.6.0.min.js' %}"></script>
+</head>
+
+<body>
+<header>
+    <div class="header-grid">
+        <div class="logo">
+            {% if request.path == '/peopledash/upload_data/' %}
+                <a href="{% url 'peopledash_home' %}" style="text-decoration: none; color: white;">Назад к списку подразделений</a>
+            {% else %}
+                <a href="{% url 'peopledash_home' %}">
+                    <img src="{{ organization.logo.url }}" alt="Logo">
+                </a>
+            {% endif %}
+        </div>
+        <div class="system-info">
+            <div class="row">{{ organization.full_name }}</div>
+            <div class="row">{% block titlesystem %}{% endblock %}</div>
+        </div>
+        <div class="update-info">
+            <div class="row row-report-datetime">Обновлено: {{ report_datetime }}</div>
+            <div class="row">
+                <div id="current-date-output"></div>
+                <script src="{% static 'peopledash/js/datetime.js' %}"></script>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main>
+    {% block main %}
+    {% endblock %}
+</main>
+<script>
+    $(document).ready(function () {
+        function fetchData() {
+            // Получение данных для report_datetime
+            $.ajax({
+                url: '/get_report_datetime/',
+                type: 'GET',
+                success: function (data) {
+                    // Обновление значения report_datetime на странице
+                    $('.row-report-datetime').text('Обновлено: ' + data.report_datetime);
+                }
+            });
+        }
+
+        fetchData();
+        // Запуск обновления данных каждые 60 секунд
+        setInterval(fetchData, 60 * 1000);
+    });
+</script>
+</body>
+</html>

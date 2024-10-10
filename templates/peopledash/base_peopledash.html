@@ -1,0 +1,71 @@
+{% extends 'peopledash/base.html' %}
+{% load static %}
+
+{% block title %}{{ page.title }}{% endblock %}
+{% block titlesystem %}{{ page.subdivision }}{% endblock %}
+
+{% block main %}
+<div class="main-container">
+    <div class="table-title">
+        <h2>Доступность записи на первичный прием</h2>
+    </div>
+    <div class="table-data">
+        <table id="patient-table">
+            <thead>
+            <tr>
+                <th>Специальность</th>
+                <th>Слоты сегодня</th>
+                <th>Свободные сегодня</th>
+                <th>Свободные на 14 дней</th>
+            </tr>
+            </thead>
+            <tbody id="data-body">
+            {% for row in data_from_db %}
+                <tr>
+                    <td>{{ row.speciality }}</td>
+                    <td>{{ row.slots_today }}</td>
+                    <td>{{ row.free_slots_today }}</td>
+                    <td>{{ row.free_slots_14_days }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% block content %}{% endblock %}
+</div>
+<div class="info-container">
+    <div class="text-info">
+    {% block info %}По вопросам записи на прием обратитесь к помощникам{% endblock %}
+    </div>
+</div>
+<p class="footer-text">
+    <img src="{% static 'peopledash/img/plotly-logomark.png' %}" alt="Icon" style="width: 25px; height: 25px; vertical-align: middle;">
+    МозаикаМед. 
+    {% now "Y" as current_year %} <!-- Получаем текущий год -->
+    2023-{{ current_year}} <!-- Отображаем текущий год -->
+</p>
+<script>
+    $(document).ready(function () {
+        function fetchData() {
+            $.ajax({
+                url: '{{ url_data }}',
+                type: 'GET',
+                success: function (data) {
+                    $('#data-body').empty();
+                    data.forEach(function (row) {
+                        $('#data-body').append(`<tr>
+                            <td>${row['Наименование должности']}</td>
+                            <td>${row['Всего_1']}</td>
+                            <td>${row['Слоты свободные для записи_1']}</td>
+                            <td>${row['Слоты свободные для записи_14']}</td>
+                        </tr>`);
+                    });
+                }
+            });
+        }
+        fetchData();
+        setInterval(fetchData, 60 * 1000);
+    });
+    
+</script>
+{% endblock %}

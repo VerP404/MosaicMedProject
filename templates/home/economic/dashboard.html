@@ -1,0 +1,9 @@
+{% extends 'home/economic/base_economic.html' %}
+{% load plotly_dash %}
+
+{% block dashboard_content %}
+    <h1>Панель управления экономиста</h1>
+<div id="dash-app" >
+    {% plotly_app name="DashApp3" ratio=0.6%}
+</div>
+{% endblock %}
