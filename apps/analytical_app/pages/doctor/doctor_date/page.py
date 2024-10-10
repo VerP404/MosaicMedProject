@@ -1,17 +1,19 @@
 from datetime import datetime
 
-from dash import  html, Output, Input
+from dash import html, Output, Input
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import get_selected_doctors, TableUpdater, get_selected_dates
 from apps.analytical_app.components.filters import filter_doctors, date_start, date_end
 from apps.analytical_app.elements import card_table
+from apps.analytical_app.pages.doctor.doctor_date.query import sql_query_amb_date_form_def, sql_query_dd_date_form_def, \
+    sql_query_stac_date_form_def
 from apps.analytical_app.query_executor import engine
 
-type_page = "tab2-doctor-talon"
+type_page = "doctor-talon-date"
 
-tab2_doctor_talon_layout = html.Div(
+doctor_talon_date = html.Div(
     [
         dbc.Row(
             dbc.Col(
@@ -93,6 +95,6 @@ def update_table_dd(value_doctor, start_date, end_date):
     }
     columns1, data1 = TableUpdater.query_to_df(engine, sql_query_amb_date_form_def(), bind_params)
     columns2, data2 = TableUpdater.query_to_df(engine, sql_query_dd_date_form_def(), bind_params)
-    columns3, data3 = TableUpdater.query_to_df(engine, sql_query_dd_date_form_def(), bind_params)
+    columns3, data3 = TableUpdater.query_to_df(engine, sql_query_stac_date_form_def(), bind_params)
 
     return columns1, data1, columns2, data2, columns3, data3

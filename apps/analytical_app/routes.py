@@ -4,6 +4,7 @@ from apps.analytical_app.pages.administrator.delete_emd.page import admin_delete
 from apps.analytical_app.pages.administrator.main import admin_main
 from apps.analytical_app.pages.chief.main import chief_main
 from apps.analytical_app.pages.doctor.doctor.page import doctor_talon
+from apps.analytical_app.pages.doctor.doctor_date.page import doctor_talon_date
 from apps.analytical_app.pages.doctor.main import doctor_main
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
@@ -130,9 +131,9 @@ routes = {
     "/doctor/doctors": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Врач", "href": "/doctor"},
-            {"label": "Диспансеризация детей", "active": True},
+            {"label": "Талоны по врачам даты", "active": True},
         ]),
-        economist_doctors_talon_list
+        doctor_talon_date
     ]),
     "/doctor/disp_by_ages": html.Div([
         dbc.Breadcrumb(items=[

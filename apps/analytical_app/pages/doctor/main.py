@@ -9,9 +9,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Талоны по врачам", className="card-title"),
+                    html.H5("Талоны по врачу: отчетный период", className="card-title"),
                     html.P(
-                        "Талоны ОМС по \"ОТЧЕТНОМУ ПЕРИОДУ ТФОМС\"",
+                        "Талоны ОМС по отчетному периоду",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -23,9 +23,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("- Диспансеризация детей", className="card-title"),
+                    html.H5("Талоны по врачу: дата формирования", className="card-title"),
                     html.P(
-                        "-",
+                        "Талоны ОМС по дате формирования",
                         className="card-text",
                     ),
                     dbc.Button(
