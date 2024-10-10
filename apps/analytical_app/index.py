@@ -2,8 +2,10 @@
 import sys
 import os
 
-from config.settings import BASE_DIR
+# Получаем путь к корневой директории проекта
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
+# Добавляем корневую директорию проекта в PYTHONPATH
 sys.path.append(BASE_DIR)
 
 from dash import dcc, html
