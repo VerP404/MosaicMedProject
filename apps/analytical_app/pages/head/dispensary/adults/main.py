@@ -3,43 +3,46 @@ import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.components.cards import create_card
 
-type_page = "head"
-main_link = "head"  # начало ссылки
-label = "Заведующий"  # для хлебных крошек
+type_page = "adults"
+main_link = "adults"  # начало ссылки
+label = "Диспансеризация взрослых"  # для хлебных крошек
 
 cards_row_1 = dbc.Row(
     [
         dbc.Col(create_card(1, type_page,
-                            "- Диспансеризация взрослых",
-                            "-")),
+                            "По дате формирования карты",
+                            "По дате формирования карты")),
         dbc.Col(create_card(2, type_page,
-                            "- Диспансеризация детей",
-                            "-")),
+                            "По отчетному периоду",
+                            "По отчетному периоду")),
         dbc.Col(create_card(3, type_page,
-                            "- Диспансерное наблюдение",
-                            "-")),
+                            "По возрастам ДВ4 и ОПВ",
+                            "По возрастам ДВ4 и ОПВ")),
         dbc.Col(create_card(4, type_page,
-                            "Диспансерное наблюдение работающих",
-                            "Анализ работающих не прикрепленных пациентов, внесенных в ИСЗЛ")),
+                            "По возрастам ДВ4",
+                            "По возрастам ДВ4")),
     ],
     className="mb-4 align-items-stretch",
 )
-cards_2 = dbc.Row(
+cards_row_2 = dbc.Row(
     [
         dbc.Col(create_card(5, type_page,
-                            "Отчет Шараповой по диспансерному наблюдению",
-                            "Еженедельный отчет Шараповой по ДН по дате создания талонов цель 3.")),
+                            "По возрастам ОПВ",
+                            "По возрастам ОПВ")),
+        dbc.Col(create_card(8, type_page,
+                            "ДВ4 с группировкой по стоимости",
+                            "ДВ4 с группировкой по стоимости")),
     ],
     className="mb-4 align-items-stretch",
 )
 
-head_main = html.Div([
+head_adults_dd_main = html.Div([
     dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
         {"label": label, "active": True},
     ]),
     html.Hr(),
     html.Div(cards_row_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
-    html.Div(cards_2, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
+    html.Div(cards_row_2, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
 ])
 
 
@@ -52,10 +55,11 @@ head_main = html.Div([
      Input(f'open-report-3-{type_page}', 'n_clicks'),
      Input(f'open-report-4-{type_page}', 'n_clicks'),
      Input(f'open-report-5-{type_page}', 'n_clicks'),
+     Input(f'open-report-8-{type_page}', 'n_clicks'),
      ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5):
+def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_8):
     ctx = callback_context
     if not ctx.triggered:
         return no_update, no_update
@@ -67,18 +71,21 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
     if button_id.startswith("open-report-") and f'{main_link}' in button_id:
         if button_id == f'open-report-1-{type_page}' and open_report_1:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/svpod', breadcrumb_items
+            return f'/{main_link}/dv1', breadcrumb_items
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/doctors', breadcrumb_items
+            return f'/{main_link}/dv2', breadcrumb_items
         elif button_id == f'open-report-3-{type_page}' and open_report_3:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/disp_by_ages', breadcrumb_items
+            return f'/{main_link}/dv3', breadcrumb_items
         elif button_id == f'open-report-4-{type_page}' and open_report_4:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dn_job', breadcrumb_items
+            return f'/{main_link}/dv4', breadcrumb_items
         elif button_id == f'open-report-5-{type_page}' and open_report_5:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/statistic-sharapova', breadcrumb_items
+            return f'/{main_link}/dv5', breadcrumb_items
+        elif button_id == f'open-report-8-{type_page}' and open_report_8:
+            breadcrumb_items.append({"active": True})
+            return f'/{main_link}/dv8', breadcrumb_items
 
     return f'/{main_link}', breadcrumb_items
