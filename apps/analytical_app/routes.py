@@ -1,5 +1,6 @@
 from dash import Output, Input, html
 
+from apps.analytical_app.pages.administrator.delete_emd.page import admin_delete_emd
 from apps.analytical_app.pages.administrator.main import admin_main
 from apps.analytical_app.pages.chief.main import chief_main
 from apps.analytical_app.pages.doctor.main import doctor_main
@@ -148,12 +149,12 @@ routes = {
     ]),
 
     "/admin": admin_main,
-    "/admin/svpod": html.Div([
+    "/admin/admin_delete_emd": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Администратор", "href": "/admin"},
-            {"label": "Диспансеризация взрослых", "active": True},
+            {"label": "Аннулирование ЭМД", "active": True},
         ]),
-        economist_sv_pod
+        admin_delete_emd
     ]),
     "/admin/doctors": html.Div([
         dbc.Breadcrumb(items=[

@@ -97,8 +97,8 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4):
 
     if button_id.startswith("open-report-") and "admin" in button_id:
         if button_id == f'open-report-1-{type_page}' and open_report_1:
-            breadcrumb_items.append({"label": "Сверхподушевое финансирование", "active": True})
-            return '/admin/svpod', breadcrumb_items
+            breadcrumb_items.append({"label": "Аннулирование ЭМД", "active": True})
+            return '/admin/admin_delete_emd', breadcrumb_items
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
             breadcrumb_items.append({"label": "По врачам", "active": True})
             return '/admin/doctors', breadcrumb_items

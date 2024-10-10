@@ -29,9 +29,11 @@ INSTALLED_APPS += [
     'apps.organization',
     'apps.oms_reference',
     'apps.sql_manager',
+    'apps.reports',
 
     'dal',
     'dal_select2',
+
 ]
 MIDDLEWARE += [
     'debug_toolbar.middleware.DebugToolbarMiddleware',

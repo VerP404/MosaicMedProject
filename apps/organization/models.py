@@ -8,7 +8,8 @@ class MedicalOrganization(models.Model):
     address = models.TextField("Адрес")
     phone_number = models.CharField("Номер телефона", max_length=20)
     email = models.EmailField("Электронная почта")
-    code_mo = models.CharField("Код МО в СМО", max_length=20, blank=True, null=True)  # Новое поле
+    code_mo = models.CharField("Код МО в СМО", max_length=20, blank=True, null=True)
+    oid_mo = models.CharField("OID МО", max_length=50)
 
     class Meta:
         verbose_name = "Медицинскую организацию"
