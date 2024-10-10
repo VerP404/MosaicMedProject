@@ -110,7 +110,7 @@ def sql_query_stac_def(months_placeholder):
                      department || ' ' || split_part(doctor, ' ', 2) || ' ' || left(split_part(doctor, ' ', 3), 1) ||
                      '.' || left(split_part(doctor, ' ', 4), 1) || '.' || ' ' ||
                      CASE
-                         WHEN doctor_profile ~ '\(.*\)' THEN
+                         WHEN doctor_profile ~ '\\(.*\\)' THEN
                              substring(doctor_profile from 1 for position('(' in doctor_profile) - 1)
                          ELSE
                              doctor_profile
@@ -153,7 +153,7 @@ def sql_query_dd_def(months_placeholder):
                      department || ' ' || split_part(doctor, ' ', 2) || ' ' || left(split_part(doctor, ' ', 3), 1) ||
                      '.' || left(split_part(doctor, ' ', 4), 1) || '.' || ' ' ||
                      CASE
-                         WHEN doctor_profile ~ '\(.*\)' THEN
+                         WHEN doctor_profile ~ '\\(.*\\)' THEN
                              substring(doctor_profile from 1 for position('(' in doctor_profile) - 1)
                          ELSE
                              doctor_profile

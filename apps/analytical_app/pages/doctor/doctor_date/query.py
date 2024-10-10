@@ -23,7 +23,7 @@ SELECT goal,
                      department || ' ' || split_part(doctor, ' ', 2) || ' ' || left(split_part(doctor, ' ', 3), 1) ||
                      '.' || left(split_part(doctor, ' ', 4), 1) || '.' || ' ' ||
                      CASE
-                         WHEN doctor_profile ~ '\(.*\)' THEN
+                         WHEN doctor_profile ~ '\\(.*\\)' THEN
                              substring(doctor_profile from 1 for position('(' in doctor_profile) - 1)
                          ELSE
                              doctor_profile
@@ -164,7 +164,7 @@ def sql_query_stac_date_form_def():
                      department || ' ' || split_part(doctor, ' ', 2) || ' ' || left(split_part(doctor, ' ', 3), 1) ||
                      '.' || left(split_part(doctor, ' ', 4), 1) || '.' || ' ' ||
                      CASE
-                         WHEN doctor_profile ~ '\(.*\)' THEN
+                         WHEN doctor_profile ~ '\\(.*\\)' THEN
                              substring(doctor_profile from 1 for position('(' in doctor_profile) - 1)
                          ELSE
                              doctor_profile
