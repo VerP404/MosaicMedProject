@@ -19,14 +19,15 @@ class DeleteEmd(models.Model):
     oid_medical_organization = models.ForeignKey(MedicalOrganization, on_delete=models.PROTECT,
                                                  verbose_name="OID Медицинской организации", default=1)
     oid_document = models.CharField(max_length=255, verbose_name="OID документа",
-                                    help_text="Журнал ЭМД: ИД")
+                                    help_text="Идентификатор (OID) вида документа в 1.2.643.5.1.13.13.99.2.41")
     creation_date = models.DateField(verbose_name="Дата создания", help_text="Журнал ЭМД: Дата документа")
     registration_date = models.DateField(verbose_name="Дата регистрации",
                                          help_text="Журнал ЭМД: Дата отправки в РИР.РЭМД")
     reestr_number = models.CharField(max_length=255, verbose_name="Номер в реестре РЭМД",
                                      help_text="Журнал ЭМД: Регистрационный номер")
     local_identifier = models.CharField(max_length=255, verbose_name="Локальный идентификатор",
-                                        help_text="3e765e5d-acfc-4e44-b834-7a876acbe40c нужно понять откуда брать")
+                                        help_text="Журнал ЭМД:Сохранить документ в файл. Название файла xml при "
+                                                  "сохранении. Пример: 3e765e5d-acfc-4e44-b834-7a876acbe40c")
     reason_not_actual = models.ForeignKey(InvalidationReason, on_delete=models.CASCADE,
                                           verbose_name="Причина признания ЭМД не актуальным",
                                           help_text="Выберите причину аннулирования записи")
