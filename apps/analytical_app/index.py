@@ -1,13 +1,12 @@
 # apps/analytical_app/index.py
 import sys
 import os
-from dash import dcc, html
 
-# Добавляем корневой каталог проекта в PYTHONPATH
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from config.settings import BASE_DIR
+
 sys.path.append(BASE_DIR)
 
-
+from dash import dcc, html
 from apps.analytical_app.app import app
 from apps.analytical_app.routes import register_routes
 from components.sidebar import create_sidebar
