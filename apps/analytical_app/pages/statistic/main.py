@@ -16,11 +16,11 @@ cards_row_1 = dbc.Row(
                             "Кардиологический отчет",
                             "Ежемесячный отчет по кардиологическим показателям.")),
         dbc.Col(create_card(3, type_page,
-                            "-",
-                            "-")),
+                            "Пневмонии",
+                            "Отчет по пневмониям в талонах ОМС")),
         dbc.Col(create_card(4, type_page,
-                            "-",
-                            "-")),
+                            "Посещения в диспансеризации",
+                            "Посещения в диспансеризации и профосмотрах взрослых для вставки в гугл-таблицу")),
     ],
     className="mb-4 align-items-stretch",
 )
@@ -63,9 +63,9 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4):
             return f'/{main_link}/cardiology', breadcrumb_items
         elif button_id == f'open-report-3-{type_page}' and open_report_3:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/disp_by_ages', breadcrumb_items
+            return f'/{main_link}/pneumonia', breadcrumb_items
         elif button_id == f'open-report-4-{type_page}' and open_report_4:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dn_job', breadcrumb_items
+            return f'/{main_link}/dd-visits', breadcrumb_items
 
     return f'/{main_link}', breadcrumb_items

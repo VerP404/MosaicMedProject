@@ -18,7 +18,9 @@ from apps.analytical_app.pages.head.main import head_main
 from apps.analytical_app.pages.iszl.main import iszl_main
 from apps.analytical_app.pages.main.page import main_layout
 from apps.analytical_app.pages.statistic.cardiology_report.cardiology_report import statistic_cardiology
+from apps.analytical_app.pages.statistic.dispensary_visits.dispensary_visits import statistic_dd_visits
 from apps.analytical_app.pages.statistic.main import statistic_main
+from apps.analytical_app.pages.statistic.result_pneumonia.result_pneumonia import statistic_pneumonia
 from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapova
 
 # Все маршруты для страниц
@@ -106,19 +108,19 @@ routes = {
         ]),
         statistic_cardiology
     ]),
-    "/statistic/disp_by_ages": html.Div([
+    "/statistic/pneumonia": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Статистик", "href": "/statistic"},
-            {"label": "Диспансерное наблюдение", "active": True},
+            {"label": "Пневмонии по возрастам", "active": True},
         ]),
-        economist_dispensary_age
+        statistic_pneumonia
     ]),
-    "/statistic/dn_job": html.Div([
+    "/statistic/dd-visits": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Статистик", "href": "/statistic"},
-            {"label": "Диспансерное наблюдение работающих", "active": True},
+            {"label": "Посещения в диспансеризации", "active": True},
         ]),
-        head_dn_job
+        statistic_dd_visits
     ]),
 
     "/doctor": doctor_main,
