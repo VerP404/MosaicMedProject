@@ -23,9 +23,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансеризация детей", className="card-title"),
+                    html.H5("- Диспансеризация детей", className="card-title"),
                     html.P(
-                        "Диспансеризация детей.",
+                        "-",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -37,9 +37,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансерное наблюдение", className="card-title"),
+                    html.H5("- Диспансерное наблюдение", className="card-title"),
                     html.P(
-                        "Диспансерное наблюдение.",
+                        "-",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -51,10 +51,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансерное наблюдение работающих", className="card-title"),
+                    html.H5("- Диспансерное наблюдение работающих", className="card-title"),
                     html.P(
-                        "Анализ не прикрепленных пациентов, внесенных в ИСЗЛ как проходивших диспансерное "
-                        "наблюдение на основании договора заключенного с работодателем",
+                        "-",
                         className="card-text",
                     ),
                     dbc.Button(

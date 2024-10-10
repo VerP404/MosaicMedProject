@@ -9,9 +9,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансеризация взрослых", className="card-title"),
+                    html.H5("Аннулирование ЭМД", className="card-title"),
                     html.P(
-                        "Диспансеризация взрослых",
+                        "В разработке! Ввод данных для формирования запроса на аннулирование ЭМД",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -23,7 +23,7 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансеризация детей", className="card-title"),
+                    html.H5("- Диспансеризация детей", className="card-title"),
                     html.P(
                         "Диспансеризация детей.",
                         className="card-text",
@@ -37,7 +37,7 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансерное наблюдение", className="card-title"),
+                    html.H5("- Диспансерное наблюдение", className="card-title"),
                     html.P(
                         "Диспансерное наблюдение.",
                         className="card-text",
@@ -51,7 +51,7 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансерное наблюдение работающих", className="card-title"),
+                    html.H5("- Диспансерное наблюдение работающих", className="card-title"),
                     html.P(
                         "Анализ не прикрепленных пациентов, внесенных в ИСЗЛ как проходивших диспансерное "
                         "наблюдение на основании договора заключенного с работодателем",

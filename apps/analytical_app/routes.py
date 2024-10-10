@@ -3,6 +3,7 @@ from dash import Output, Input, html
 from apps.analytical_app.pages.administrator.delete_emd.page import admin_delete_emd
 from apps.analytical_app.pages.administrator.main import admin_main
 from apps.analytical_app.pages.chief.main import chief_main
+from apps.analytical_app.pages.doctor.doctor.page import doctor_talon
 from apps.analytical_app.pages.doctor.main import doctor_main
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
@@ -119,12 +120,12 @@ routes = {
     ]),
 
     "/doctor": doctor_main,
-    "/doctor/svpod": html.Div([
+    "/doctor/doctor_talon": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Врач", "href": "/doctor"},
-            {"label": "Диспансеризация взрослых", "active": True},
+            {"label": "Талоны по врачам", "active": True},
         ]),
-        economist_sv_pod
+        doctor_talon
     ]),
     "/doctor/doctors": html.Div([
         dbc.Breadcrumb(items=[

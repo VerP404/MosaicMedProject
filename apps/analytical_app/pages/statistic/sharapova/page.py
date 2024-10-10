@@ -43,7 +43,7 @@ statistic_sharapova = html.Div(
         dcc.Loading(id=f'loading-output-{type_page}', type='default'),
         html.Div(
             [
-                html.H3('Отчет по диспансерному наблюдению для Шараповой', className='label'),
+                html.H3('Отчет по диспансерному наблюдению для Шараповой (цель 3)', className='label'),
                 dash_table.DataTable(id=f'result-table-{type_page}',
                                      columns=[],
                                      export_format='xlsx',

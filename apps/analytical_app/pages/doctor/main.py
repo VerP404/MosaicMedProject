@@ -9,9 +9,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансеризация взрослых", className="card-title"),
+                    html.H5("Талоны по врачам", className="card-title"),
                     html.P(
-                        "Диспансеризация взрослых",
+                        "Талоны ОМС по \"ОТЧЕТНОМУ ПЕРИОДУ ТФОМС\"",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -23,9 +23,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансеризация детей", className="card-title"),
+                    html.H5("- Диспансеризация детей", className="card-title"),
                     html.P(
-                        "Диспансеризация детей.",
+                        "-",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -37,9 +37,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансерное наблюдение", className="card-title"),
+                    html.H5("- Диспансерное наблюдение", className="card-title"),
                     html.P(
-                        "Диспансерное наблюдение.",
+                        "-",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -51,10 +51,9 @@ cards_1 = dbc.CardGroup(
         dbc.Card(
             dbc.CardBody(
                 [
-                    html.H5("Диспансерное наблюдение работающих", className="card-title"),
+                    html.H5("- Диспансерное наблюдение работающих", className="card-title"),
                     html.P(
-                        "Анализ не прикрепленных пациентов, внесенных в ИСЗЛ как проходивших диспансерное "
-                        "наблюдение на основании договора заключенного с работодателем",
+                        "-",
                         className="card-text",
                     ),
                     dbc.Button(
@@ -97,8 +96,8 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4):
 
     if button_id.startswith("open-report-") and "doctor" in button_id:
         if button_id == f'open-report-1-{type_page}' and open_report_1:
-            breadcrumb_items.append({"label": "Сверхподушевое финансирование", "active": True})
-            return '/doctor/svpod', breadcrumb_items
+            breadcrumb_items.append({"label": "Талоны по врачам", "active": True})
+            return '/doctor/doctor_talon', breadcrumb_items
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
             breadcrumb_items.append({"label": "По врачам", "active": True})
             return '/doctor/doctors', breadcrumb_items
