@@ -1,22 +1,17 @@
 from .base import *
 
+
 DEBUG = True
 LOGGING['root']['level'] = 'DEBUG'
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'mosaicmed',
-        'USER': 'postgres',
-        'PASSWORD': 'password!24',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': env('Name'),
+        'USER': env('USER'),
+        'PASSWORD': env('PASSWORD'),
+        'HOST': env('HOST'),
+        'PORT': env('PORT'),
     }
 }
 

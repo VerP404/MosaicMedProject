@@ -12,3 +12,8 @@ pillow==10.4.0
 psycopg2-binary==2.9.9
 selenium==4.25.0
 SQLAlchemy==2.0.35
+
+celery
+django-debug-toolbar
+django-import-export
+django-autocomplete-light
