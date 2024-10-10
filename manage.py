@@ -4,11 +4,23 @@ import os
 import sys
 import subprocess
 
+from threading import Thread
 from config.settings import BASE_DIR
 
 
+def run_dash_app():
+    """Запуск Dash приложения."""
+    dash_app_path = os.path.join(BASE_DIR, 'apps', 'analytical_app', 'index.py')
+    dash_command = [sys.executable, dash_app_path]
+    dash_process = subprocess.Popen(dash_command)
+    try:
+        dash_process.wait()
+    except KeyboardInterrupt:
+        dash_process.terminate()
+
+
 def main():
-    """Run administrative tasks."""
+    """Запуск Django приложения."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     try:
         from django.core.management import execute_from_command_line
@@ -22,16 +34,13 @@ def main():
 
 
 if __name__ == '__main__':
-    # Путь к файлу Dash приложения (index.py)
-    dash_app_path = os.path.join(BASE_DIR, 'apps', 'analytical_app', 'index.py')
+    # Создание потока для запуска Dash приложения
+    dash_thread = Thread(target=run_dash_app)
+    dash_thread.start()
 
-    # Запуск Dash приложения
-    dash_command = [sys.executable, dash_app_path]
-    dash_process = subprocess.Popen(dash_command)
-
+    # Запуск Django приложения
     try:
-        # Запуск Django приложения
         main()
     except KeyboardInterrupt:
         # Завершение процессов при прерывании
-        dash_process.terminate()
+        dash_thread.join()
