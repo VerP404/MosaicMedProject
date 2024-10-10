@@ -72,3 +72,18 @@ def get_selected_doctors(selected_value):
     dropdown_options = [{'label': item, 'value': item} for item in extracted_names_list if item]
     selected_item_text = f'Выбранный врач: {selected_value}' if selected_value else 'Доктор не выбран'
     return dropdown_options, selected_item_text
+
+
+def get_extracted_names_list_specialist(engine, sql_query):
+    with engine.connect() as conn:
+        query = text(sql_query)
+        result = conn.execute(query)
+        extracted_names_list = [row[0] for row in result.fetchall()]
+        return extracted_names_list
+
+
+def get_selected_specialist(selected_value, sql_query):
+    extracted_names_list = get_extracted_names_list_specialist(engine, sql_query)
+    dropdown_options = [{'label': item, 'value': item} for item in extracted_names_list]
+    selected_item_text = f'Выбранная специальность: {selected_value}'
+    return dropdown_options, selected_item_text

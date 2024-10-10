@@ -1,41 +1,41 @@
-from dash import html, callback_context, no_update, Output, Input
+from dash import html, dcc, callback_context, no_update, Output, Input
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.components.cards import create_card
 
-type_page = "statistic"
-main_link = "statistic"  # начало ссылки
-label = "Статистик"  # для хлебных крошек
-# Карточки для отчётов
+type_page = "web_oms"
+main_link = "web_oms"  # начало ссылки
+label = "WEB.ОМС"  # для хлебных крошек
+
 cards_row_1 = dbc.Row(
     [
         dbc.Col(create_card(1, type_page,
-                            "Отчет Шараповой по ДН",
-                            "Еженедельный отчет Шараповой по ДН с формированием по дате создания талонов.")),
+                            "По целям",
+                            "Анализ ОМС: По целям")),
         dbc.Col(create_card(2, type_page,
-                            "Кардиологический отчет",
-                            "Ежемесячный отчет по кардиологическим показателям.")),
+                            "Специальность по целям",
+                            "Анализ ОМС: Специальность по целям")),
         dbc.Col(create_card(3, type_page,
-                            "Пневмонии",
-                            "Отчет по пневмониям в талонах ОМС")),
+                            "Корпуса по цели",
+                            "Анализ ОМС: Корпуса по цели")),
         dbc.Col(create_card(4, type_page,
-                            "Посещения в диспансеризации",
-                            "Посещения в диспансеризации и профосмотрах взрослых для вставки в гугл-таблицу")),
+                            "Корпус и специальность по целям",
+                            "Анализ ОМС: Корпус и специальность по целям")),
     ],
     className="mb-4 align-items-stretch",
 )
 cards_row_2 = dbc.Row(
     [
         dbc.Col(create_card(5, type_page,
-                            "Посещения в талонах",
-                            "Отчет по количеству посещений пациентами взрослыми и детьми.")),
+                            "Цели и диагнозы по корпусам",
+                            "Анализ ОМС: Цели и диагнозы по корпусам")),
         dbc.Col(create_card(6, type_page,
-                            "Отчет по ВОП",
-                            "Ежемесячный отчет по ВОП для кадров.")),
+                            "Список пациентов и их диагнозы в текущем году",
+                            "Анализ ОМС: Список пациентов и их диагнозы"))
     ],
     className="mb-4 align-items-stretch",
 )
-statistic_main = html.Div([
+web_oms_main = html.Div([
     dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
         {"label": label, "active": True},
     ]),
@@ -67,24 +67,24 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
 
     breadcrumb_items = [{"label": label, "href": f"/{main_link}", "active": True}]
 
-    if button_id.startswith("open-report-") and main_link in button_id:
+    if button_id.startswith("open-report-") and f'{main_link}' in button_id:
         if button_id == f'open-report-1-{type_page}' and open_report_1:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/statistic-sharapova', breadcrumb_items
+            return f'/{main_link}/web_oms_rep1', breadcrumb_items
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/cardiology', breadcrumb_items
+            return f'/{main_link}/web_oms_rep2', breadcrumb_items
         elif button_id == f'open-report-3-{type_page}' and open_report_3:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/pneumonia', breadcrumb_items
+            return f'/{main_link}/web_oms_rep3', breadcrumb_items
         elif button_id == f'open-report-4-{type_page}' and open_report_4:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dd-visits', breadcrumb_items
+            return f'/{main_link}/web_oms_rep4', breadcrumb_items
         elif button_id == f'open-report-5-{type_page}' and open_report_5:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/visits', breadcrumb_items
+            return f'/{main_link}/web_oms_rep5', breadcrumb_items
         elif button_id == f'open-report-6-{type_page}' and open_report_6:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/vop', breadcrumb_items
+            return f'/{main_link}/web_oms_rep6', breadcrumb_items
 
     return f'/{main_link}', breadcrumb_items

@@ -1,15 +1,47 @@
 from datetime import datetime, timedelta
-from dash import html, dcc, Output, Input, dash_table
+from dash import html, dcc, Output, Input, dash_table, State
+import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import get_selected_dates, TableUpdater
-from apps.analytical_app.pages.statistic.result_pneumonia.query import sql_query_pneumonia_in_talon, \
-    sql_query_pneumonia_in_talon_korpus_first, sql_query_pneumonia_in_talon_korpus_second
+from apps.analytical_app.pages.statistic.vop.query import sql_query_vop
 from apps.analytical_app.query_executor import engine
 
-type_page = "pneumonia"
+type_page = "vop"
+alert_text = """Внутренние болезни:
+- Группа диагнозов I00-I99: Болезни системы сердечно-сосудистого.
+- Группа диагнозов E00-E90: Заболевания щитовидной железы.
+- Группа диагнозов K00-K93: Болезни органов пищеварения.
+- Группа диагнозов N00-N99: Болезни мочеполовой системы.
+- Группа диагнозов J00-J99: Болезни органов дыхания.
+- Группа диагнозов D50-D89: Другие болезни крови и кроветворных органов.  
 
-statistic_pneumonia = html.Div(
+Неврология:
+- Группа диагнозов G00-G99: Болезни нервной системы.
+- Группа диагнозов F00-F99: Психические и поведенческие расстройства.
+- Группа диагнозов H80-H89: Болезни слухового и равновесия.  
+
+Отоларингология (оториноларингология):
+- Группа диагнозов H60-H95: Болезни уха и височной кости.  
+
+Офтальмология:
+- Группа диагнозов S05: Травмы, относящиеся к глазу и его придаточным органам.
+- Группа диагнозов H00-H59: Болезни глаза и его придаточного аппарата.  
+
+Хирургия:
+- Группа диагнозов C00-D49: Злокачественные новообразования.
+- Группа диагнозов S00-T98: Травмы, включая ожоги и множественные травмы.
+- Группа диагнозов M00-M99: Болезни опорно-двигательного аппарата.  
+
+Акушерство и гинекология:
+- Группа диагнозов O00-O99: Беременность, роды и послеродовой период.  
+
+Педиатрия:
+- Группа диагнозов P00-P96: Новорожденные дети.
+- Группа диагнозов Q00-Q99: Врожденные малформации, деформации и хромосомные нарушения.
+"""
+
+statistic_vop = html.Div(
     [
         # Блок 1: Выбор элемента из списка
         html.Div(
@@ -41,50 +73,44 @@ statistic_pneumonia = html.Div(
                 html.Div(id=f'selected-date-{type_page}', className='filters-label'),
 
             ], className='filter'),
+        html.Hr(),
         html.Div(
             [
-                html.H3('Отчет по пневмониям в талонах ОМС', className='label'),
+                dbc.Button(
+                    "Названия счетов", id=f"alert-toggle-auto-{type_page}", className="me-1", n_clicks=0
+                ),
+                html.Hr(),
+                dbc.Alert(dcc.Markdown(alert_text), id=f"alert-auto-{type_page}", color="warning", is_open=False,
+                          style={'padding': '0 0 0 10px'}),
+            ]
+        ),
+        # Блок 2: Диспансеризация
+        html.Div(
+            [
+                dbc.Alert('Отчет по ВОП', className='label', color="info"),
                 dash_table.DataTable(id=f'result-table-{type_page}',
                                      columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
                                      editable=True,
                                      filter_action="native",
                                      sort_action="native",
                                      sort_mode='multi',
-                                     ),
-            ], className='block'),
-        html.Hr(),
-        html.Div(
-            [
-                html.H3('Первичные по подразделениям', className='label'),
-                dash_table.DataTable(id=f'result-table1-{type_page}',
-                                     columns=[],
                                      export_format='xlsx',
                                      export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
                                      ),
             ], className='block'),
-        html.Hr(),
-        html.Div(
-            [
-                html.H3('Повторные по подразделениям', className='label'),
-                dash_table.DataTable(id=f'result-table2-{type_page}',
-                                     columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     ),
-            ], className='block'),
-        html.Hr(),
     ]
 )
+
+
+@app.callback(
+    Output(f"alert-auto-{type_page}", "is_open"),
+    [Input(f"alert-toggle-auto-{type_page}", "n_clicks")],
+    [State(f"alert-auto-{type_page}", "is_open")],
+)
+def toggle_alert(n, is_open):
+    if n:
+        return not is_open
+    return is_open
 
 
 # дата по умолчанию
@@ -93,6 +119,7 @@ statistic_pneumonia = html.Div(
     Input(f'interval-component-{type_page}', 'n_intervals')
 )
 def update_date_picker(n_intervals):
+    # Вычислите новую дату, например, на один день вперед от текущей даты
     new_date = datetime.now().date() - timedelta(days=1)
     return new_date
 
@@ -109,18 +136,13 @@ def update_selected_dates(start_date, end_date):
 
 @app.callback(
     [Output(f'result-table-{type_page}', 'columns'),
-     Output(f'result-table-{type_page}', 'data'),
-     Output(f'result-table1-{type_page}', 'columns'),
-     Output(f'result-table1-{type_page}', 'data'),
-     Output(f'result-table2-{type_page}', 'columns'),
-     Output(f'result-table2-{type_page}', 'data'),
-     ],
+     Output(f'result-table-{type_page}', 'data')],
     Input(f'date-picker-start-{type_page}', 'date'),
     Input(f'date-picker-end-{type_page}', 'date')
 )
 def update_table_dd(start_date, end_date):
     if (start_date is None) or (end_date is None):
-        return [], [], [], [], [], []
+        return [], []
     # запрос для формирования отчета
     start_date_formatted = datetime.strptime(start_date, '%Y-%m-%d').strftime('%d-%m-%Y')
     end_date_formatted = datetime.strptime(end_date, '%Y-%m-%d').strftime('%d-%m-%Y')
@@ -128,7 +150,5 @@ def update_table_dd(start_date, end_date):
         'start_date': start_date_formatted,
         'end_date': end_date_formatted
     }
-    columns, data = TableUpdater.query_to_df(engine, sql_query_pneumonia_in_talon, bind_params)
-    columns1, data1 = TableUpdater.query_to_df(engine, sql_query_pneumonia_in_talon_korpus_first, bind_params)
-    columns2, data2 = TableUpdater.query_to_df(engine, sql_query_pneumonia_in_talon_korpus_second, bind_params)
-    return columns, data, columns1, data1, columns2, data2
+    columns, data = TableUpdater.query_to_df(engine, sql_query_vop, bind_params)
+    return columns, data

@@ -22,6 +22,15 @@ from apps.analytical_app.pages.statistic.dispensary_visits.dispensary_visits imp
 from apps.analytical_app.pages.statistic.main import statistic_main
 from apps.analytical_app.pages.statistic.result_pneumonia.result_pneumonia import statistic_pneumonia
 from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapova
+from apps.analytical_app.pages.statistic.visits.visits import statistic_visits
+from apps.analytical_app.pages.statistic.vop.vop import statistic_vop
+from apps.analytical_app.pages.web_oms.main import web_oms_main
+from apps.analytical_app.pages.web_oms.status_talon.tab1 import web_oms_1
+from apps.analytical_app.pages.web_oms.status_talon.tab2 import web_oms_2
+from apps.analytical_app.pages.web_oms.status_talon.tab3 import web_oms_3
+from apps.analytical_app.pages.web_oms.status_talon.tab4 import web_oms_4
+from apps.analytical_app.pages.web_oms.status_talon.tab5 import web_oms_5
+from apps.analytical_app.pages.web_oms.status_talon.tab6 import web_oms_6
 
 # Все маршруты для страниц
 routes = {
@@ -122,6 +131,20 @@ routes = {
         ]),
         statistic_dd_visits
     ]),
+    "/statistic/visits": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Статистик", "href": "/statistic"},
+            {"label": "Посещения в талонах", "active": True},
+        ]),
+        statistic_visits
+    ]),
+    "/statistic/vop": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Статистик", "href": "/statistic"},
+            {"label": "Отчет по ВОП", "active": True},
+        ]),
+        statistic_vop
+    ]),
 
     "/doctor": doctor_main,
     "/doctor/doctor_talon": html.Div([
@@ -212,6 +235,52 @@ routes = {
         ]),
         head_dn_job
     ]),
+
+
+    "/web_oms": web_oms_main,
+    "/web_oms/web_oms_rep1": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "WEB.ОМС", "href": "/web_oms"},
+            {"label": "Отчет 1 - По целям", "active": True},
+        ]),
+        web_oms_1
+    ]),
+    "/web_oms/web_oms_rep2": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "WEB.ОМС", "href": "/web_oms"},
+            {"label": "Отчет 2 - Специальность по целям", "active": True},
+        ]),
+        web_oms_2
+    ]),
+    "/web_oms/web_oms_rep3": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "WEB.ОМС", "href": "/web_oms"},
+            {"label": "Отчет 3 - Цель по корпусам", "active": True},
+        ]),
+        web_oms_3
+    ]),
+    "/web_oms/web_oms_rep4": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "WEB.ОМС", "href": "/web_oms"},
+            {"label": "Отчет 4 - Корпус и специальность по целям", "active": True},
+        ]),
+        web_oms_4
+    ]),
+    "/web_oms/web_oms_rep5": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "WEB.ОМС", "href": "/web_oms"},
+            {"label": "Отчет 5 - Цели и диагнозы по корпусам", "active": True},
+        ]),
+        web_oms_5
+    ]),
+    "/web_oms/web_oms_rep6": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "WEB.ОМС", "href": "/web_oms"},
+            {"label": "Отчет 6 - Список пациентов и их диагнозы в текущем году", "active": True},
+        ]),
+        web_oms_6
+    ]),
+
 
     "/iszl": iszl_main,
     "/iszl/svpod": html.Div([

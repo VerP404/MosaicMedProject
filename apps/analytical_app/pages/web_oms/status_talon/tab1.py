@@ -3,13 +3,12 @@ from dash import html, dcc, Output, Input, dash_table
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import get_selected_dates, TableUpdater
-from apps.analytical_app.pages.statistic.result_pneumonia.query import sql_query_pneumonia_in_talon, \
-    sql_query_pneumonia_in_talon_korpus_first, sql_query_pneumonia_in_talon_korpus_second
+from apps.analytical_app.pages.web_oms.status_talon.query import sql_query_status
 from apps.analytical_app.query_executor import engine
 
-type_page = "pneumonia"
+type_page = "status"
 
-statistic_pneumonia = html.Div(
+web_oms_1 = html.Div(
     [
         # Блок 1: Выбор элемента из списка
         html.Div(
@@ -17,12 +16,13 @@ statistic_pneumonia = html.Div(
                 html.H3('Фильтры', className='label'),
                 html.Div(
                     [
+                        html.Label('По дате формирования талона в Web OMS'),
                         html.Div([
                             html.Label('Дата начала:', style={'width': '120px', 'display': 'inline-block'}),
                             dcc.DatePickerSingle(
                                 id=f'date-picker-start-{type_page}',
                                 first_day_of_week=1,
-                                date=datetime.now().date() - timedelta(days=1),  # Устанавливаем начальную дату
+                                date=datetime.now().date() - timedelta(days=1),
                                 display_format='DD.MM.YYYY'
                             ),
                         ], className='filters'),
@@ -41,48 +41,22 @@ statistic_pneumonia = html.Div(
                 html.Div(id=f'selected-date-{type_page}', className='filters-label'),
 
             ], className='filter'),
+        html.Hr(),
+        html.H3('Все цели', className='label'),
+        dcc.Loading(id=f'loading-output-{type_page}', type='default'),
         html.Div(
             [
-                html.H3('Отчет по пневмониям в талонах ОМС', className='label'),
                 dash_table.DataTable(id=f'result-table-{type_page}',
                                      columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
+                                     page_size=15,
                                      editable=True,
                                      filter_action="native",
                                      sort_action="native",
                                      sort_mode='multi',
-                                     ),
-            ], className='block'),
-        html.Hr(),
-        html.Div(
-            [
-                html.H3('Первичные по подразделениям', className='label'),
-                dash_table.DataTable(id=f'result-table1-{type_page}',
-                                     columns=[],
                                      export_format='xlsx',
                                      export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
                                      ),
             ], className='block'),
-        html.Hr(),
-        html.Div(
-            [
-                html.H3('Повторные по подразделениям', className='label'),
-                dash_table.DataTable(id=f'result-table2-{type_page}',
-                                     columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     ),
-            ], className='block'),
-        html.Hr(),
     ]
 )
 
@@ -93,6 +67,7 @@ statistic_pneumonia = html.Div(
     Input(f'interval-component-{type_page}', 'n_intervals')
 )
 def update_date_picker(n_intervals):
+    # Вычислите новую дату, например, на один день вперед от текущей даты
     new_date = datetime.now().date() - timedelta(days=1)
     return new_date
 
@@ -110,17 +85,14 @@ def update_selected_dates(start_date, end_date):
 @app.callback(
     [Output(f'result-table-{type_page}', 'columns'),
      Output(f'result-table-{type_page}', 'data'),
-     Output(f'result-table1-{type_page}', 'columns'),
-     Output(f'result-table1-{type_page}', 'data'),
-     Output(f'result-table2-{type_page}', 'columns'),
-     Output(f'result-table2-{type_page}', 'data'),
-     ],
+     Output(f'loading-output-{type_page}', 'children')],
     Input(f'date-picker-start-{type_page}', 'date'),
     Input(f'date-picker-end-{type_page}', 'date')
 )
 def update_table_dd(start_date, end_date):
     if (start_date is None) or (end_date is None):
-        return [], [], [], [], [], []
+        return [], [], html.Div()
+    loading_output = html.Div([dcc.Loading(type="default")])
     # запрос для формирования отчета
     start_date_formatted = datetime.strptime(start_date, '%Y-%m-%d').strftime('%d-%m-%Y')
     end_date_formatted = datetime.strptime(end_date, '%Y-%m-%d').strftime('%d-%m-%Y')
@@ -128,7 +100,5 @@ def update_table_dd(start_date, end_date):
         'start_date': start_date_formatted,
         'end_date': end_date_formatted
     }
-    columns, data = TableUpdater.query_to_df(engine, sql_query_pneumonia_in_talon, bind_params)
-    columns1, data1 = TableUpdater.query_to_df(engine, sql_query_pneumonia_in_talon_korpus_first, bind_params)
-    columns2, data2 = TableUpdater.query_to_df(engine, sql_query_pneumonia_in_talon_korpus_second, bind_params)
-    return columns, data, columns1, data1, columns2, data2
+    columns, data = TableUpdater.query_to_df(engine, sql_query_status, bind_params)
+    return columns, data, loading_output

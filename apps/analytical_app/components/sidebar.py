@@ -85,6 +85,13 @@ def create_sidebar():
                         id="iszl-link"
                     ),
                     dbc.NavLink(
+                        [html.I(className="bi bi-info-circle"),
+                         html.Span(" WEB.ОМС", className="ms-2", id="web-oms-label")],
+                        href="/web_oms",
+                        active="exact",
+                        id="web-oms-link"
+                    ),
+                    dbc.NavLink(
                         [html.I(className="bi bi-list"),
                          html.Span(" Главное меню", className="ms-2", id="main-menu-label")],
                         href=main_app_url,
@@ -135,6 +142,7 @@ def create_sidebar():
          Output("economist-label", "style"),
          Output("admin-label", "style"),
          Output("iszl-label", "style"),
+         Output("web-oms-label", "style"),
          Output("main-menu-label", "style")],
         [Input("btn_sidebar", "n_clicks")],
         [State("sidebar-state", "data"),
@@ -150,7 +158,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
-                    {"display": "none"},)
+                    {"display": "none"},{"display": "none"},)
         else:
             # Развернутый вид
             sidebar_style["width"] = "14rem"
@@ -158,7 +166,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
-                    {"display": "inline"},)
+                    {"display": "inline"},{"display": "inline"},)
 
     @app.callback(
         [Output("main-link", "active"),
@@ -169,6 +177,7 @@ def create_sidebar():
          Output("economist-link", "active"),
          Output("admin-link", "active"),
          Output("iszl-link", "active"),
+         Output("web-oms-link", "active"),
          ],
         [Input("url", "pathname")]
     )
@@ -182,6 +191,7 @@ def create_sidebar():
             pathname.startswith("/economist"),  # Для Экономиста, включая вложенные страницы
             pathname.startswith("/admin"),  # Для Администратора
             pathname.startswith("/iszl"),  # Для Помощи
+            pathname.startswith("/web_oms"),  # Для Помощи
         ]
 
     return sidebar
