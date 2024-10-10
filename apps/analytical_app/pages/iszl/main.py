@@ -1,4 +1,4 @@
-from dash import html, dcc, callback_context, no_update, Output, Input
+from dash import html, callback_context, no_update, Output, Input
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.components.cards import create_card

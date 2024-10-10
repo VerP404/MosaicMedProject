@@ -17,6 +17,7 @@ from apps.analytical_app.pages.head.dn_job.page import head_dn_job
 from apps.analytical_app.pages.head.main import head_main
 from apps.analytical_app.pages.iszl.main import iszl_main
 from apps.analytical_app.pages.main.page import main_layout
+from apps.analytical_app.pages.statistic.cardiology_report.cardiology_report import statistic_cardiology
 from apps.analytical_app.pages.statistic.main import statistic_main
 from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapova
 
@@ -98,12 +99,12 @@ routes = {
         ]),
         statistic_sharapova
     ]),
-    "/statistic/doctors": html.Div([
+    "/statistic/cardiology": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Статистик", "href": "/statistic"},
-            {"label": "Диспансеризация детей", "active": True},
+            {"label": "Кардиологический отчет", "active": True},
         ]),
-        economist_doctors_talon_list
+        statistic_cardiology
     ]),
     "/statistic/disp_by_ages": html.Div([
         dbc.Breadcrumb(items=[
