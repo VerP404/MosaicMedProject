@@ -8,6 +8,7 @@ env = environ.Env(
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = env('SECRET_KEY', default='default-secret-key')
+DEBUG = env.bool('DEBUG_DJ')
 
 ALLOWED_HOSTS = ['*']
 

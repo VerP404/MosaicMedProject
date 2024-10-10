@@ -2,6 +2,8 @@
 import sys
 import os
 
+from config.settings import DEBUG
+
 # Получаем путь к корневой директории проекта
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -35,7 +37,7 @@ app.layout = html.Div(
 
 register_routes(app)
 if __name__ == "__main__":
-    app.run_server(debug=True, host='0.0.0.0', port='5000')
+    app.run_server(debug=DEBUG, host='0.0.0.0', port='5000')
 
 # MosaicMedProject/
 # └──apps/
