@@ -40,7 +40,7 @@
 </div>
 <p class="footer-text">
     <img src="{% static 'peopledash/img/plotly-logomark.png' %}" alt="Icon" style="width: 25px; height: 25px; vertical-align: middle;">
-    МозаикаМед. 
+    МозаикаМед.
     {% now "Y" as current_year %} <!-- Получаем текущий год -->
     2023-{{ current_year}} <!-- Отображаем текущий год -->
 </p>
@@ -66,6 +66,6 @@
         fetchData();
         setInterval(fetchData, 60 * 1000);
     });
-    
+
 </script>
 {% endblock %}

@@ -13,9 +13,11 @@ from apps.data_loader.selenium_script import logger
 from apps.data_loader.models.oms_data import *
 from apps.data_loader.models.kvazar_data import *
 from apps.data_loader.models.iszl import *
+from apps.organization.models import MedicalOrganization
 
+organization = MedicalOrganization.objects.first()
 # Изменение заголовка и подписи панели администратора
-admin.site.site_header = "Административная панель МозаикаМед"
+admin.site.site_header = f"Административная панель МозаикаМед - {organization.name}"
 admin.site.site_title = "МозаикаМед"
 admin.site.index_title = "Админпанели"
 
