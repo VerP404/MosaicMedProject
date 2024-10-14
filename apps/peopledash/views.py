@@ -18,7 +18,7 @@ def index(request):
         'pages': pages,
         'organization': organization,
     }
-    return render(request, 'peopledash\index.html', context)
+    return render(request, 'peopledash/index.html', context)
 
 
 def get_report_datetime(request):
