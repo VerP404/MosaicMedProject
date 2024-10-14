@@ -6,6 +6,9 @@ db.sqlite3
 *.xlsx
 *.xls
 
+staticfiles
+uploads
+
 # Игнорирование миграций Django
 */migrations/*
 !*/migrations/__init__.py
