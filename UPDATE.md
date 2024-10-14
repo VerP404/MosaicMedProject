@@ -200,6 +200,12 @@ nano .env
 \MosaicMedProject>scp "mosaicmed_backup.rar" admindd@10.236.176.150:/home/admindd/code/MosaicMedProject
 ```
 
+Для просмотра пути к файлу:
+
+``` cmd
+pwd
+```
+
 Указываем нужного пользователя, адрес и папку проекта
 
 Устанавливаем архиватор
@@ -212,4 +218,30 @@ sudo apt install unrar
 
 ``` 
 unrar x mosaicmed_backup.rar
+```
+
+Разворачиваем бекап.
+
+``` cmd
+sudo -u postgres psql -d mosaicmed -f "mosaicmed_backup.sql"
+```
+
+Если ошибка доступа, то необходимо предоставить пользователю postgres доступ к папкам проекта.
+Нужно указать корректные пути.
+
+``` cmd
+sudo chmod +x /home/drpay
+sudo chmod +x /home/drpay/code
+sudo chmod +x /home/drpay/code/MosaicMedProject
+
+```
+
+Запуск в фоне
+
+``` cmd
+nohup python3.12 manage.py runserver 0.0.0.0:8000 &
+```
+
+``` cmd
+nohup python3.12 apps/analytical_app/index.py &
 ```
