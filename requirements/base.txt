@@ -17,3 +17,6 @@ celery
 django-debug-toolbar
 django-import-export
 django-autocomplete-light
+
+django-environ
+setuptools
