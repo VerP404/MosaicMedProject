@@ -15,9 +15,16 @@ from apps.data_loader.models.kvazar_data import *
 from apps.data_loader.models.iszl import *
 from apps.organization.models import MedicalOrganization
 
-organization = MedicalOrganization.objects.first()
-# Изменение заголовка и подписи панели администратора
-admin.site.site_header = f"Административная панель МозаикаМед - {organization.name}"
+
+def get_site_header():
+    organization = MedicalOrganization.objects.first()
+    if organization:
+        return f"Административная панель МозаикаМед - {organization.name}"
+    return "Административная панель МозаикаМед"
+
+
+# Изменение заголовка и подписи панели администратора с использованием функции
+admin.site.site_header = get_site_header()
 admin.site.site_title = "МозаикаМед"
 admin.site.index_title = "Админпанели"
 
