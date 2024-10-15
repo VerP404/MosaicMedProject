@@ -16,7 +16,7 @@
                 <td>{{ data_type.name }}</td>
                 <td>{{ data_type.last_import_date|default:"-" }}</td>
                 <td>
-                    <a href="{% url 'upload_file' data_type.id %}" class="btn btn-primary">Загрузить данные</a>
+                    <a href="{% url 'data_loader:upload_file' data_type.id %}" class="btn btn-primary">Загрузить данные</a>
                 </td>
             </tr>
         {% endfor %}

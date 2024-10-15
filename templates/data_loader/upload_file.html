@@ -1,0 +1,51 @@
+<div class="container">
+    <h2 class="my-4">Загрузка данных: {{ data_type.name }}</h2>
+    <form method="post" enctype="multipart/form-data" id="data-upload-form">
+        {% csrf_token %}
+        <div class="form-group">
+            {{ form.csv_file.label_tag }} {{ form.csv_file }}
+        </div>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Загрузить</button>
+    </form>
+
+    <div id="loading" style="display: none;">
+        <div class="spinner-border" role="status">
+            <span class="sr-only">Загрузка...</span>
+        </div>
+        <p>Идет загрузка данных. Пожалуйста, подождите...</p>
+    </div>
+
+    <div id="status" class="mt-4">
+        <h5>Статус загрузки:</h5>
+        <pre id="log-output" style="height: 300px; overflow-y: scroll; background-color: #f8f9fa;"></pre>
+    </div>
+</div>
+
+<script>
+    document.getElementById('data-upload-form').onsubmit = function(event) {
+        event.preventDefault();  // Отключаем стандартную отправку формы
+        document.getElementById('submit-btn').disabled = true;
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('log-output').textContent = '';  // Очищаем лог
+
+        // Создаем запрос для отправки формы через AJAX
+        const formData = new FormData(this);
+        fetch("{% url 'data_loader:upload_file' data_type.id %}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loading').style.display = 'none';
+            if (data.success) {
+                document.getElementById('log-output').textContent += data.message;
+            } else {
+                document.getElementById('log-output').textContent += 'Ошибка: ' + data.message;
+            }
+        })
+        .catch(error => {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('log-output').textContent += 'Ошибка отправки данных: ' + error;
+        });
+    };
+</script>

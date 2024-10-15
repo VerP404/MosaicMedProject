@@ -1,4 +1,4 @@
-# urls.py
+# apps.data_loader.urls
 from django.urls import path
 
 from apps.data_loader.views import *
