@@ -11,17 +11,18 @@ engine = create_engine(
 )
 
 
-def time_it(method):
-    def timed(*args, **kw):
-        start_time = datetime.now()
-        print(f"Начало '{method.__name__}' в {start_time}")
-        result = method(*args, **kw)
-        end_time = datetime.now()
-        elapsed_time = end_time - start_time
-        print(f"Завершение '{method.__name__}' в {end_time}. Время выполнения: {elapsed_time}")
-        return result
-
-    return timed
+def time_it(stage_name):
+    def decorator(method):
+        def timed(*args, **kw):
+            start_time = datetime.now()
+            result = method(*args, **kw)
+            end_time = datetime.now()
+            elapsed_time = end_time - start_time
+            if hasattr(args[0], 'message'):
+                args[0].message += f"Этап '{stage_name}' выполнен за: {elapsed_time}\n"
+            return result
+        return timed
+    return decorator
 
 
 class DataLoader:
@@ -64,8 +65,9 @@ class DataLoader:
         self.added_count = 0
         self.updated_count = 0
         self.error_count = 0
+        self.message = ''
 
-    @time_it
+    @time_it("Общее время загрузки данных")
     def load_data(self, file_path):
         """
         Основной метод для загрузки данных из файла в таблицу.
@@ -75,7 +77,6 @@ class DataLoader:
 
         # Шаг 1: Загрузка данных
         df = self._load_file_to_df(file_path)
-        print(f"Файл загружен. Количество строк: {df.shape[0]}")
 
         # Проверка столбцов
         self._check_columns(df)
@@ -98,9 +99,8 @@ class DataLoader:
         # Финальное время
         total_end_time = datetime.now()
         elapsed_time = total_end_time - total_start_time
-        print(f"Общее время выполнения: {elapsed_time}")
 
-    @time_it
+    @time_it("Загрузка списка столбцов из БД")
     def _get_columns_mapping(self):
         """
         Загружает соответствия столбцов для типа данных через SQL запрос, основываясь на имени типа данных.
@@ -118,13 +118,11 @@ class DataLoader:
 
         # Преобразуем результат запроса в словарь {csv_column_name: model_field_name}
         columns_mapping = {row[0]: row[1] for row in result}  # Используем индексы вместо строк
-        print(f"Сопоставление столбцов загружено: {columns_mapping}")
         return columns_mapping
 
-    @time_it
+    @time_it("Загрузка файла в DataFrame")
     def _load_file_to_df(self, file_path):
         """Загрузка файла в DataFrame."""
-        print(f"Начата загрузка файла {file_path}")
         if self.file_format == 'csv':
             df = pd.read_csv(file_path, sep=self.sep, low_memory=False, na_values="-", dtype=self.dtype,
                              encoding=self.encoding)
@@ -132,15 +130,14 @@ class DataLoader:
             df = pd.read_excel(file_path)
         else:
             raise ValueError("Неподдерживаемый формат файла")
-        print(f"Файл {file_path} успешно загружен. Размер данных: {df.shape}")
+        self.message += f" Файл загружен. Строк: {df.shape[0]}, Столбцов: {df.shape[1]}\n"
         return df
 
-    @time_it
+    @time_it("Проверка столбцов в DataFrame")
     def _check_columns(self, df):
         """
         Проверяет наличие и соответствие столбцов.
         """
-        print("Проверка соответствия столбцов...")
         file_columns = set(df.columns)
         expected_columns = set(self.columns_mapping.keys())
 
@@ -149,33 +146,28 @@ class DataLoader:
 
         if missing_columns or extra_columns:
             if missing_columns:
-                print(f"Отсутствующие столбцы: {missing_columns}")
+                self.message += f" Отсутствующие столбцы: {missing_columns}\n"
             if extra_columns:
-                print(f"Лишние столбцы: {extra_columns}")
+                self.message += f" Лишние столбцы: {extra_columns}\n"
             raise ValueError("Структура файла не соответствует ожиданиям.")
-        print("Все необходимые столбцы присутствуют.")
 
-    @time_it
     def _rename_columns(self, df):
         """
         Переименовывает столбцы DataFrame на основе словаря.
         """
-        print("Переименование столбцов...")
         df.rename(columns=self.columns_mapping, inplace=True)
-        print("Столбцы переименованы.")
 
-    @time_it
+    @time_it("Очистка DataFrame")
     def _process_dataframe(self, df):
         """
         Обрабатывает DataFrame: удаляет NaN и преобразует данные в строки.
         """
-        print("Обработка данных DataFrame...")
         try:
             # Удаляем строки, содержащие NaN на основании столбца column_check
             df.dropna(subset=[self.column_check], inplace=True)
         except KeyError as e:
-            print(f"Ошибка: столбец '{self.column_check}' не найден в данных. Проверьте наличие столбца в базе.")
-            print(f"Доступные столбцы: {list(df.columns)}")
+            self.message += f" Ошибка: столбец '{self.column_check}' не найден в данных. Проверьте наличие столбца в базе.\n"
+            self.message += f" Доступные столбцы: {list(df.columns)}\n"
             raise e  # Повторное возбуждение исключения для остановки выполнения, если необходимо
 
         # Заменяем NaN на '-' в датафрейме
@@ -189,53 +181,51 @@ class DataLoader:
 
         # Проверяем что тип данных у всех столбцов "текстовый"
         df = df.astype(str)
-
-        print("Обработка данных завершена.")
         return df
 
-    @time_it
+    @time_it("Удаление строк в БД для обновления записей")
     def _delete_existing_rows(self, df):
-        """
-        Удаляет строки из базы данных, если значения в столбцах из columns_for_update совпадают между DataFrame и базой данных.
-        """
-        print("Начат процесс удаления существующих строк из базы данных...")
+        """Удаляет строки из базы данных порциями, чтобы избежать переполнения параметров."""
+        total_deleted = 0  # Счетчик удаленных строк
+
         try:
-            # Приводим значения всех столбцов в DataFrame к строковому типу, если они еще не строки
             for column in self.columns_for_update:
                 df[column] = df[column].astype(str)
 
-            # Создаем список уникальных комбинаций ключей из DataFrame
             keys_in_df = df[self.columns_for_update].drop_duplicates()
 
-            # Формируем условие для SQL-запроса
-            conditions = ' OR '.join([
-                '(' + ' AND '.join([f"{col} = :{col}_{i}" for col in self.columns_for_update]) + ')'
-                for i in range(len(keys_in_df))
-            ])
+            # Разделяем данные на чанки по 500 строк, чтобы не превышать лимит параметров
+            chunk_size = 500
+            chunks = [keys_in_df[i:i + chunk_size] for i in range(0, len(keys_in_df), chunk_size)]
 
-            # Подготавливаем параметры для запроса
-            params = {}
-            for idx, row in keys_in_df.iterrows():
-                for col in self.columns_for_update:
-                    params[f"{col}_{idx}"] = row[col]
+            for chunk in chunks:
+                conditions = []
+                params = {}
+                for idx, row in chunk.iterrows():
+                    condition = ' AND '.join([f"{col} = :{col}_{idx}" for col in self.columns_for_update])
+                    conditions.append(f"({condition})")
 
-            if conditions:
-                delete_query = text(f"DELETE FROM {self.table_name} WHERE {conditions}")
-                with self.engine.begin() as connection:
-                    connection.execute(delete_query, params)
-                print(f"Удалены существующие строки по ключам: {self.columns_for_update}")
-            else:
-                print("Нет существующих строк для удаления.")
+                    for col in self.columns_for_update:
+                        params[f"{col}_{idx}"] = row[col]
+
+                condition_str = ' OR '.join(conditions)
+
+                if condition_str:
+                    delete_query = text(f"DELETE FROM {self.table_name} WHERE {condition_str}")
+                    with self.engine.begin() as connection:
+                        result = connection.execute(delete_query, params)
+                        total_deleted += result.rowcount  # Увеличиваем счетчик удаленных строк
+
+            self.message += f" Всего удалено строк: {total_deleted}.\n"
 
         except Exception as e:
-            print(f"Ошибка при удалении существующих строк: {e}")
+            self.message += f" Ошибка при удалении существующих строк: {e}\n"
 
-    @time_it
+    @time_it("Загрузка данных в БД")
     def _load_data_to_db(self, df):
         """
         Загружает данные в базу данных с отслеживанием прогресса.
         """
-        print("Начата загрузка данных в базу данных...")
         # Удаляем столбец combined_key, который используется только для внутренней обработки
         if 'combined_key' in df.columns:
             df.drop(columns=['combined_key'], inplace=True)
@@ -254,17 +244,17 @@ class DataLoader:
                 )
                 loaded_rows += chunk.shape[0]
                 self.added_count += chunk.shape[0]
-                print(f"Загружено {loaded_rows} строк из {total_rows}.")
+
+            self.message += f"Всего загружено {loaded_rows} строк из {total_rows}.\n"
         except Exception as e:
             self.error_count += 1
-            print(f"Ошибка при загрузке данных: {e}")
+            self.message += f" Ошибка при загрузке данных: {e}\n"
 
-    @time_it
+    @time_it("Сохранение информации о загрузке в БД")
     def _create_data_import_record(self):
         """
         Создает запись в таблице DataImport с информацией о загрузке через SQL-запрос.
         """
-        print("Создание записи о загрузке данных в таблице DataImport...")
         sql_query = """
         INSERT INTO data_loader_dataimport (csv_file, date_added, added_count, updated_count, error_count, data_type_id)
         VALUES (:csv_file, NOW(), :added_count, :updated_count, :error_count, :data_type_id)
@@ -272,7 +262,6 @@ class DataLoader:
 
         with self.engine.begin() as connection:
             data_type_query = "SELECT id FROM data_loader_datatype WHERE name = :data_type_name"
-            print(f"Поиск data_type_id для '{self.data_type_name}'")
             data_type_id_result = connection.execute(
                 text(data_type_query),
                 {'data_type_name': self.data_type_name}
@@ -280,7 +269,6 @@ class DataLoader:
 
             if data_type_id_result:
                 data_type_id = data_type_id_result[0]
-                print(f"Тип данных найден, ID: {data_type_id}")
                 try:
                     # Выполняем основной запрос, используя фактический data_type_id
                     connection.execute(text(sql_query), {
@@ -290,8 +278,8 @@ class DataLoader:
                         'error_count': self.error_count,
                         'data_type_id': data_type_id
                     })
-                    print("Запись в таблице DataImport успешно создана.")
+                    self.message += "Запись в таблице DataImport успешно создана.\n"
                 except Exception as e:
-                    print(f"Ошибка при вставке записи в DataImport: {e}")
+                    self.message += f" Ошибка при вставке записи в DataImport: {e}\n"
             else:
-                print(f"Ошибка: Тип данных с именем '{self.data_type_name}' не найден.")
+                self.message += f" Ошибка: Тип данных с именем '{self.data_type_name}' не найден.\n"

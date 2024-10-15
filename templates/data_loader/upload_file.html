@@ -1,51 +1,90 @@
-<div class="container">
-    <h2 class="my-4">Загрузка данных: {{ data_type.name }}</h2>
-    <form method="post" enctype="multipart/form-data" id="data-upload-form">
-        {% csrf_token %}
-        <div class="form-group">
-            {{ form.csv_file.label_tag }} {{ form.csv_file }}
-        </div>
-        <button type="submit" class="btn btn-primary" id="submit-btn">Загрузить</button>
-    </form>
+{% extends 'home/base.html' %}
+{% block content %}
+    <div class="container">
+        <h2 class="my-4">Загрузка данных: {{ data_type.name }}</h2>
+        <form method="post" enctype="multipart/form-data" id="data-upload-form">
+            {% csrf_token %}
+            <div class="form-group">
+                {{ form.csv_file.label_tag }} {{ form.csv_file }}
+            </div>
+            <button type="submit" class="btn btn-primary" id="submit-btn">Загрузить</button>
+            <button type="button" class="btn btn-secondary" id="reset-btn">Очистить</button> <!-- Кнопка для очистки -->
+        </form>
 
-    <div id="loading" style="display: none;">
-        <div class="spinner-border" role="status">
-            <span class="sr-only">Загрузка...</span>
+        <div id="loading" style="display: none;">
+            <div class="spinner-border" role="status">
+                <span class="sr-only">Загрузка...</span>
+            </div>
+            <p>Идет загрузка данных. Пожалуйста, подождите...</p>
         </div>
-        <p>Идет загрузка данных. Пожалуйста, подождите...</p>
-    </div>
 
-    <div id="status" class="mt-4">
-        <h5>Статус загрузки:</h5>
-        <pre id="log-output" style="height: 300px; overflow-y: scroll; background-color: #f8f9fa;"></pre>
+        <div id="status" class="mt-4">
+            <h5>Статус загрузки:</h5>
+            <pre id="log-output" style="height: 300px; overflow-y: scroll; background-color: #f8f9fa;">
+                {% if message %}
+                    {{ message }}
+                {% endif %}
+            </pre>
+        </div>
     </div>
-</div>
+{% endblock %}
 
 <script>
-    document.getElementById('data-upload-form').onsubmit = function(event) {
+    // Обработка отправки формы
+    document.getElementById('data-upload-form').onsubmit = function (event) {
         event.preventDefault();  // Отключаем стандартную отправку формы
+
+        const fileInput = document.querySelector('input[type="file"]');
+        if (!fileInput.files.length) {
+            alert('Пожалуйста, выберите файл для загрузки.');
+            return;
+        }
+
+        // Отключаем кнопку загрузки и показываем индикатор загрузки
         document.getElementById('submit-btn').disabled = true;
         document.getElementById('loading').style.display = 'block';
         document.getElementById('log-output').textContent = '';  // Очищаем лог
 
-        // Создаем запрос для отправки формы через AJAX
+        // Собираем данные формы
         const formData = new FormData(this);
         fetch("{% url 'data_loader:upload_file' data_type.id %}", {
             method: 'POST',
-            body: formData
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'  // Указываем серверу, что запрос AJAX
+            }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки: ' + response.statusText);
+            }
+            return response.json();
+        })
         .then(data => {
+            // Скрываем индикатор загрузки и активируем кнопку
             document.getElementById('loading').style.display = 'none';
+            document.getElementById('submit-btn').disabled = false;
+
             if (data.success) {
-                document.getElementById('log-output').textContent += data.message;
+                document.getElementById('log-output').textContent += data.message;  // Выводим сообщение об успешной загрузке
             } else {
-                document.getElementById('log-output').textContent += 'Ошибка: ' + data.message;
+                document.getElementById('log-output').textContent += 'Ошибка: ' + data.message;  // Выводим сообщение об ошибке
             }
         })
         .catch(error => {
+            // Скрываем индикатор загрузки и активируем кнопку
             document.getElementById('loading').style.display = 'none';
-            document.getElementById('log-output').textContent += 'Ошибка отправки данных: ' + error;
+            document.getElementById('submit-btn').disabled = false;
+            document.getElementById('log-output').textContent += 'Ошибка отправки данных: ' + error.message;
         });
     };
+
+    // Функция для сброса формы и очистки логов
+    document.getElementById('reset-btn').onclick = function () {
+        document.getElementById('data-upload-form').reset();  // Сбрасываем форму
+        document.getElementById('submit-btn').disabled = false;  // Включаем кнопку загрузки
+        document.getElementById('log-output').textContent = '';  // Очищаем лог
+        document.getElementById('loading').style.display = 'none';  // Скрываем индикатор загрузки
+    };
 </script>
+

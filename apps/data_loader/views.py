@@ -28,11 +28,29 @@ def upload_file(request, data_type_id):
                     sep=loader_config.delimiter
                 )
                 loader.load_data(file_instance.csv_file.path)  # Загружаем данные
-                return JsonResponse({'success': True, 'message': 'Загрузка завершена успешно.'})
+                context = {
+                    'success': True,
+                    'message': loader.message,
+                    'data_type': data_type,
+                    'form': form
+                }
+                return render(request, 'data_loader/upload_file.html', context)
             except Exception as e:
-                return JsonResponse({'success': False, 'message': str(e)})
+                context = {
+                    'success': False,
+                    'message': str(e),
+                    'data_type': data_type,
+                    'form': form
+                }
+                return render(request, 'data_loader/upload_file.html', context)
         else:
-            return JsonResponse({'success': False, 'message': 'Некорректная форма.'})
+            context = {
+                'success': False,
+                'message': 'Некорректная форма.',
+                'data_type': data_type,
+                'form': form
+            }
+            return render(request, 'data_loader/upload_file.html', context)
     else:
         form = FileUploadForm()
 
