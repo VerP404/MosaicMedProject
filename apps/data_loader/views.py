@@ -59,8 +59,12 @@ def upload_file(request, data_type_id):
 
 def data_upload_dashboard(request):
     data_types = DataType.objects.all()
+    categories = set(data_type.category for data_type in data_types)  # Собираем все категории
     for data_type in data_types:
         last_import = DataImport.objects.filter(data_type=data_type).order_by('-date_added').first()
         data_type.last_import_date = last_import.date_added if last_import else None
 
-    return render(request, 'data_loader/data_upload_dashboard.html', {'data_types': data_types})
+    return render(request, 'data_loader/data_upload_dashboard.html', {
+        'data_types': data_types,
+        'categories': categories  # Передаем категории
+    })

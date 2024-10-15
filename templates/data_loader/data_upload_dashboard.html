@@ -2,28 +2,118 @@
 
 {% block content %}
 <div class="container">
-    <h2 class="my-4">Управление загрузкой данных</h2>
-    <table class="table table-bordered">
-        <thead>
-        <tr>
-            <th>Категория</th>
-            <th>Тип данных</th>
-            <th>Дата последней загрузки</th>
-            <th>Действие</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for data_type in data_types %}
-            <tr>
-                <td>{{ data_type.category.name }}</td>
-                <td>{{ data_type.name }}</td>
-                <td>{{ data_type.last_import_date|default:"-" }}</td>
-                <td>
-                    <a href="{% url 'data_loader:upload_file' data_type.id %}" class="btn btn-primary">Загрузить данные</a>
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="d-flex justify-content-between align-items-center my-4">
+        <h2 class="mb-0">Управление загрузкой данных</h2>
+        <a href="{% url 'home' %}" class="btn btn-secondary">Назад</a> <!-- Кнопка "Назад" -->
+    </div>
+    <div class="row">
+        <!-- Левая колонка с фильтрами -->
+        <div class="col-md-4 col-xl-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Фильтры</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Категория</h6>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="all" id="filter-all" checked>
+                        <label class="form-check-label" for="filter-all">
+                            Все категории
+                        </label>
+                    </div>
+                    {% for category in categories %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="{{ category.id }}" id="filter-{{ category.id }}">
+                        <label class="form-check-label" for="filter-{{ category.id }}">
+                            {{ category.name }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая колонка с таблицей -->
+        <div class="col-md-8 col-xl-9">
+        
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Загрузка данных</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-bordered">
+                        <thead>
+                        <tr>
+                            <th>Категория</th>
+                            <th>Тип данных</th>
+                            <th>Дата последней загрузки</th>
+                            <th>Действие</th>
+                        </tr>
+                        </thead>
+                        <tbody id="data-table-body">
+                        {% for data_type in data_types %}
+                            <tr data-category-id="{{ data_type.category.id }}">
+                                <td>{{ data_type.category.name }}</td>
+                                <td>{{ data_type.name }}</td>
+                                <td>{{ data_type.last_import_date|default:"-" }}</td>
+                                <td>
+                                    <a href="{% url 'data_loader:upload_file' data_type.id %}" class="btn btn-primary">Загрузить данные</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Фильтрация по категориям
+        const checkboxes = document.querySelectorAll('.form-check-input');
+        const allCheckbox = document.getElementById('filter-all');
+        const tableRows = document.querySelectorAll('#data-table-body tr');
+
+        checkboxes.forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                if (allCheckbox.checked) {
+                    // Если выбрана категория "Все", показываем все строки
+                    tableRows.forEach(function (row) {
+                        row.style.display = '';
+                    });
+                } else {
+                    // Фильтруем таблицу по выбранным категориям
+                    const selectedCategories = Array.from(checkboxes)
+                        .filter(checkbox => checkbox.checked && checkbox !== allCheckbox)
+                        .map(checkbox => checkbox.value);
+
+                    tableRows.forEach(function (row) {
+                        if (selectedCategories.includes(row.getAttribute('data-category-id'))) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+                }
+            });
+        });
+
+        // При выборе "Все категории" отключаем остальные чекбоксы
+        allCheckbox.addEventListener('change', function () {
+            if (allCheckbox.checked) {
+                checkboxes.forEach(function (checkbox) {
+                    if (checkbox !== allCheckbox) {
+                        checkbox.checked = false;
+                    }
+                });
+                tableRows.forEach(function (row) {
+                    row.style.display = '';
+                });
+            }
+        });
+    });
+</script>
+
 {% endblock %}
