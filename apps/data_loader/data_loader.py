@@ -2,6 +2,8 @@ from datetime import datetime
 
 import pandas as pd
 from sqlalchemy import create_engine, text
+
+from apps.data_loader.selenium_scripts_auto import run_selenium_script_auto
 from config.settings import DATABASES
 
 # Настройка подключения к базе данных
@@ -21,7 +23,9 @@ def time_it(stage_name):
             if hasattr(args[0], 'message'):
                 args[0].message += f"Этап '{stage_name}' выполнен за: {elapsed_time}\n"
             return result
+
         return timed
+
     return decorator
 
 
@@ -283,3 +287,14 @@ class DataLoader:
                     self.message += f" Ошибка при вставке записи в DataImport: {e}\n"
             else:
                 self.message += f" Ошибка: Тип данных с именем '{self.data_type_name}' не найден.\n"
+
+    def load_data_via_selenium(self, username, password, start_date, end_date, start_date_treatment):
+        # Запускаем скрипт Selenium для загрузки файла
+        success, file_path = run_selenium_script_auto(username, password, start_date, end_date, start_date_treatment)
+
+        if success and file_path:
+            # После успешной загрузки файла, передаем его в метод load_data
+            return self.load_data(file_path)  # Метод load_data будет обрабатывать CSV
+        else:
+            self.message += "Ошибка при выполнении скрипта Selenium или файл не был загружен."
+            return False, 0, 0, 0
