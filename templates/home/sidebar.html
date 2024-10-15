@@ -7,41 +7,47 @@
         </a>
 
         <ul class="sidebar-nav">
-            {% block sidebar_nav %}
-            
-            <!-- Общие ссылки для всех модулей -->
+            <!-- Главная -->
             <li class="sidebar-item">
-                <a href="/" class="sidebar-link">Главная</a>
+                <a href="{% url 'home' %}" class="sidebar-link">
+                    <i class="align-middle" data-feather="home"></i> <span class="align-middle">Главная</span>
+                </a>
             </li>
 
-            <!-- Условие для отображения "Экономист" -->
-            {% if current_module == 'economic' %}
+            <!-- Аналитическая система -->
             <li class="sidebar-item">
-                <a href="/" class="sidebar-link">Панель экономиста</a>
+                <a href="{{ main_settings.get_dash_url }}" class="sidebar-link">
+                    <i class="align-middle" data-feather="bar-chart-2"></i> <span class="align-middle">Аналитическая система</span>
+                </a>
             </li>
-            <li class="sidebar-item">
-                <a href="/" class="sidebar-link">Отчеты экономиста</a>
-            </li>
-            {% endif %}
 
-            <!-- Условие для отображения "Статистик" -->
-            {% if current_module == 'statistics' %}
+            <!-- Панель пациента -->
             <li class="sidebar-item">
-                <a href="{% url '' %}" class="sidebar-link">Панель статистика</a>
+                <a href="{% url 'peopledash_home' %}" class="sidebar-link">
+                    <i class="align-middle" data-feather="user"></i> <span class="align-middle">Панель пациента</span>
+                </a>
             </li>
-            <li class="sidebar-item">
-                <a href="{% url '' %}" class="sidebar-link">Отчеты статистика</a>
-            </li>
-            {% endif %}
 
-            <!-- Условие для других модулей -->
-            {% if current_module == 'doctor' %}
+            <!-- Панель главного врача -->
             <li class="sidebar-item">
-                <a href="{% url '' %}" class="sidebar-link">Рабочее место врача</a>
+                <a href="/" class="sidebar-link">
+                    <i class="align-middle" data-feather="activity"></i> <span class="align-middle">Панель главного врача</span>
+                </a>
             </li>
-            {% endif %}
 
-            {% endblock %}
+            <!-- Административный сайт -->
+            <li class="sidebar-item">
+                <a href="/admin/" class="sidebar-link">
+                    <i class="align-middle" data-feather="settings"></i> <span class="align-middle">Административный сайт</span>
+                </a>
+            </li>
+
+            <!-- Обновление данных -->
+            <li class="sidebar-item">
+                <a href="{% url 'data_loader:data_upload_dashboard' %}" class="sidebar-link">
+                    <i class="align-middle" data-feather="upload-cloud"></i> <span class="align-middle">Обновление данных</span>
+                </a>
+            </li>
         </ul>
     </div>
 </nav>
