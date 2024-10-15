@@ -1,13 +1,11 @@
 # urls.py
 from django.urls import path
-from django.conf import settings
-from django.conf.urls.static import static
 
 from apps.data_loader.views import *
 
 app_name = 'data_loader'
 
 urlpatterns = [
+    path('upload-dashboard/', data_upload_dashboard, name='data_upload_dashboard'),
+    path('upload-file/<int:data_type_id>/', upload_file, name='upload_file'),
 ]
-
-

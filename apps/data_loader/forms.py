@@ -41,3 +41,12 @@ class WODataDownloadForm(forms.Form):
         input_formats=['%d-%m-%y'],
         widget=forms.DateInput(format='%d-%m-%y')
     )
+
+
+class FileUploadForm(forms.ModelForm):
+    class Meta:
+        model = DataImport
+        fields = ['csv_file']
+        widgets = {
+            'csv_file': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+        }

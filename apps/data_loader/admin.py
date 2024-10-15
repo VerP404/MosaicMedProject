@@ -533,7 +533,7 @@ class ISZLDisNabJobAdmin(admin.ModelAdmin):
 
 @admin.register(DS168n)
 class DS168nAdmin(admin.ModelAdmin):
-    list_display = ('ds', 'profile', 'speciality', 'joint_speciality')
+    list_display = ('ds', 'profile', 'category', 'speciality', 'joint_speciality')
     search_fields = ('ds', 'profile', 'speciality')
     list_filter = ('profile', 'speciality', 'joint_speciality')
 
@@ -543,3 +543,10 @@ class DataLoaderConfigAdmin(admin.ModelAdmin):
     list_display = ('data_type', 'table_name', 'column_check', 'columns_for_update', 'encoding', 'delimiter')
     search_fields = ('data_type', 'table_name')
     list_filter = ('data_type',)
+
+
+@admin.register(CategoryDN)
+class CategoryDNAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
+    list_filter = ('name',)

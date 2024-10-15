@@ -111,11 +111,24 @@ class ISZLDisNabJob(models.Model):
         verbose_name_plural = "ИСЗЛ: ДН работающих"
 
 
+class CategoryDN(models.Model):
+    name = models.CharField(max_length=250, verbose_name="Категория")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Категория ДН"
+        verbose_name_plural = "Категории ДН"
+
+
 class DS168n(models.Model):
     ds = models.CharField(max_length=250, verbose_name="Диагноз")
     profile = models.CharField(max_length=250, verbose_name="Профиль")
     speciality = models.CharField(max_length=250, verbose_name="Специальность")
     joint_speciality = models.CharField(max_length=250, verbose_name="Совместная специальность")
+    category = models.ForeignKey(CategoryDN, on_delete=models.SET_NULL, null=True, blank=True,
+                                 verbose_name="Категория ДН")
 
     def __str__(self):
         return self.ds
