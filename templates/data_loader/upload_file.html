@@ -73,6 +73,16 @@
                     document.getElementById('log-output').textContent += 'Ошибка отправки данных: ' + error.message;
                 });
         };
+        // Обработчик кнопки "Очистить"
+        document.getElementById('reset-btn').addEventListener('click', function () {
+            document.getElementById('log-output').textContent = '';  // Очищаем лог
+            document.getElementById('data-upload-form').reset();  // Сбрасываем форму
+        });
+
+        // Обработчик кнопки "Назад"
+        document.getElementById('back-btn').addEventListener('click', function () {
+            window.history.back();  // Возвращаемся на предыдущую страницу
+        });
     </script>
 
 
