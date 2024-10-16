@@ -28,29 +28,50 @@ def upload_file(request, data_type_id):
                     sep=loader_config.delimiter
                 )
                 loader.load_data(file_instance.csv_file.path)  # Загружаем данные
-                context = {
-                    'success': True,
-                    'message': loader.message,
-                    'data_type': data_type,
-                    'form': form
-                }
-                return render(request, 'data_loader/upload_file.html', context)
+
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    # Возвращаем JSON для AJAX-запросов
+                    return JsonResponse({
+                        'success': True,
+                        'message': loader.message
+                    })
+                else:
+                    # Стандартный рендеринг страницы
+                    context = {
+                        'success': True,
+                        'message': loader.message,
+                        'data_type': data_type,
+                        'form': form
+                    }
+                    return render(request, 'data_loader/upload_file.html', context)
             except Exception as e:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': False,
+                        'message': str(e)
+                    })
+                else:
+                    context = {
+                        'success': False,
+                        'message': str(e),
+                        'data_type': data_type,
+                        'form': form
+                    }
+                    return render(request, 'data_loader/upload_file.html', context)
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Некорректная форма.'
+                })
+            else:
                 context = {
                     'success': False,
-                    'message': str(e),
+                    'message': 'Некорректная форма.',
                     'data_type': data_type,
                     'form': form
                 }
                 return render(request, 'data_loader/upload_file.html', context)
-        else:
-            context = {
-                'success': False,
-                'message': 'Некорректная форма.',
-                'data_type': data_type,
-                'form': form
-            }
-            return render(request, 'data_loader/upload_file.html', context)
     else:
         form = FileUploadForm()
 

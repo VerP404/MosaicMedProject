@@ -2,7 +2,7 @@
 {% extends 'home/base.html' %}
 {% block content %}
     <div class="container">
-        <h2 class="my-4">Загрузка данных: {{ data_type.name}}-{{ data_type.description }} </h2>
+        <h2 class="my-4">Загрузка данных: {{ data_type.name }}-{{ data_type.description }} </h2>
         <form method="post" enctype="multipart/form-data" id="data-upload-form">
             {% csrf_token %}
             <div class="form-group">
@@ -31,7 +31,6 @@
     </div>
 
     <script>
-        // Обработка отправки формы
         document.getElementById('data-upload-form').onsubmit = function (event) {
             event.preventDefault();  // Отключаем стандартную отправку формы
 
@@ -55,12 +54,7 @@
                     'X-Requested-With': 'XMLHttpRequest'  // Указываем серверу, что запрос AJAX
                 }
             })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Ошибка загрузки: ' + response.statusText);
-                    }
-                    return response.json();
-                })
+                .then(response => response.json())  // Ожидаем JSON-ответ
                 .then(data => {
                     // Скрываем индикатор загрузки и активируем кнопку
                     document.getElementById('loading').style.display = 'none';
@@ -79,16 +73,7 @@
                     document.getElementById('log-output').textContent += 'Ошибка отправки данных: ' + error.message;
                 });
         };
-
-        // Функция для сброса формы и очистки логов
-        document.getElementById('reset-btn').addEventListener('click', function () {
-            document.getElementById('log-output').textContent = '';
-            document.getElementById('data-upload-form').reset();
-        });
-        // Функция для кнопки "Назад"
-        document.getElementById('back-btn').addEventListener('click', function () {
-            window.history.back();  // Возвращает пользователя на предыдущую страницу
-        });
     </script>
+
 
 {% endblock %}
