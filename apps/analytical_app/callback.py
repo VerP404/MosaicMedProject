@@ -35,6 +35,15 @@ class TableUpdater:
             data = df.to_dict('records')
             return columns, data
 
+    @staticmethod
+    def get_sql_month(month):
+        if month == '0':
+            return '%%'
+        elif len(month) == 1:
+            return f'%/0{month}/%'
+        else:
+            return f'%/{month}/%'
+
 
 def get_selected_dates(start_date, end_date):
     start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d')

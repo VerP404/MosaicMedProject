@@ -18,9 +18,12 @@ class InvalidationReason(models.Model):
 class DeleteEmd(models.Model):
     oid_medical_organization = models.ForeignKey(MedicalOrganization, on_delete=models.PROTECT,
                                                  verbose_name="OID Медицинской организации", default=1)
-    oid_document = models.CharField(max_length=255, verbose_name="OID документа",
-                                    help_text="Идентификатор (OID) вида документа в 1.2.643.5.1.13.13.99.2.41")
-    creation_date = models.DateField(verbose_name="Дата создания", help_text="Журнал ЭМД: Дата документа")
+    oid_document = models.CharField(
+        max_length=255,
+        verbose_name="OID документа",
+        help_text='Первые цифры Номера в реестре РЭМД. Идентификатор (OID) вида документа в <a href="https://nsi.rosminzdrav.ru/dictionaries/1.2.643.5.1.13.13.11.1520/passport/latest" target="_blank">1.2.643.5.1.13.13.11.1520</a>'
+    )
+    creation_date = models.DateField(verbose_name="Дата создания", help_text="Журнал ЭМД: Дата формирования ЭМД")
     registration_date = models.DateField(verbose_name="Дата регистрации",
                                          help_text="Журнал ЭМД: Дата отправки в РИР.РЭМД")
     reestr_number = models.CharField(max_length=255, verbose_name="Номер в реестре РЭМД",

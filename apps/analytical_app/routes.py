@@ -20,6 +20,7 @@ from apps.analytical_app.pages.head.dispensary.adults.tab3 import adults_dv3
 from apps.analytical_app.pages.head.dispensary.adults.tab4 import adults_dv4
 from apps.analytical_app.pages.head.dispensary.adults.tab5 import adults_dv5
 from apps.analytical_app.pages.head.dispensary.adults.tab8 import adults_dv8
+from apps.analytical_app.pages.head.dispensary.reports.page import dispensary_reports
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
 from apps.analytical_app.pages.head.main import head_main
 from apps.analytical_app.pages.iszl.main import iszl_main
@@ -154,6 +155,13 @@ routes = {
             {"label": "Отчет Шараповой по ДН", "active": True},
         ]),
         statistic_sharapova
+    ]),
+    "/head/dispensary-reports": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "131 форма", "active": True},
+        ]),
+        dispensary_reports
     ]),
 
 
