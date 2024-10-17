@@ -9,41 +9,9 @@ db.sqlite3
 staticfiles
 uploads
 
-# Игнорирование миграций Django
-*/migrations/*
-!*/migrations/__init__.py
 
 celery_debug.log
 *.log
-
-
-/apps/data_loader/migrations/0001_initial.py
-/apps/home/migrations/0001_initial.py
-/apps/data_loader/migrations/0002_alter_omsdata_age_alter_omsdata_amount_and_more.py
-/apps/home/migrations/0002_rename_settings_mainsettings_and_more.py
-/apps/home/migrations/0003_alter_mainsettings_options_mainsettings_main_app_ip_and_more.py
-/apps/data_loader/migrations/0003_alter_omsdata_newborn.py
-/apps/data_loader/migrations/0004_omsdataimport.py
-/apps/data_loader/migrations/0005_omssettings.py
-/apps/data_loader/migrations/0006_doctordata_alter_omsdataimport_options_and_more.py
-/apps/data_loader/migrations/0007_alter_omsdataimport_type.py
-/apps/data_loader/migrations/0008_detaileddata_alter_doctordata_options_and_more.py
-/apps/data_loader/migrations/0009_kvazarsettings.py
-/apps/data_loader/migrations/0010_dataimport_delete_omsdataimport.py
-/apps/data_loader/migrations/0011_alter_dataimport_type.py
-/apps/data_loader/migrations/0012_alter_dataimport_category.py
-/apps/organization/migrations/0002_medicalorganization_code_mo.py
-
-
-/apps/custom_auth/migrations/
-/apps/data_loader/migrations/
-/apps/home/migrations/
-/apps/oms_reference/migrations/
-/apps/organization/migrations/
-/apps/peopledash/migrations/
-/apps/personnel/migrations/
-/apps/reports/migrations/
-/apps/sql_manager/migrations/
 
 
 *.rar
