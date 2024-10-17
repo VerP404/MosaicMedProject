@@ -1,5 +1,6 @@
 from django.db import models
 
+from apps.data_loader.models.oms_data import OMSData
 from apps.oms_reference.models import MedicalOrganizationOMSTarget
 from apps.organization.models import MedicalOrganization
 
@@ -51,3 +52,81 @@ class DeleteEmd(models.Model):
     class Meta:
         verbose_name = "ЭМД: аннулирование"
         verbose_name_plural = "ЭМД: аннулирование"
+
+
+class SVOMember(models.Model):
+    last_name = models.CharField(max_length=100, verbose_name="Фамилия")
+    first_name = models.CharField(max_length=100, verbose_name="Имя")
+    middle_name = models.CharField(max_length=100, verbose_name="Отчество", blank=True, null=True)
+    birth_date = models.DateField(verbose_name="Дата рождения")
+    enp = models.CharField(max_length=16, verbose_name="ЕНП")
+    department = models.CharField(max_length=100, verbose_name="Подразделение")
+    address = models.TextField(verbose_name="Адрес", blank=True, null=True)
+    phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True, null=True)
+
+    def update_oms_data(self):
+        """
+        Обновляет данные участника СВО на основе информации из таблицы OMSData по ЕНП.
+        Создает или обновляет записи в SVOMemberOMSData, если ЕНП состоит из 16 символов.
+        """
+        # Проверяем, что длина ENP равна 16 символам
+        if len(self.enp) != 16:
+            # Если длина не равна 16, пропускаем обновление
+            return
+
+        # Если длина ENP корректна, производим сопоставление
+        oms_entries = OMSData.objects.filter(enp=self.enp)
+
+        for entry in oms_entries:
+            SVOMemberOMSData.objects.update_or_create(
+                svomember=self,
+                talon=entry.talon,
+                defaults={
+                    'goal': entry.goal,
+                    'treatment_end': entry.treatment_end,
+                    'main_diagnosis': entry.main_diagnosis
+                }
+            )
+
+    class Meta:
+        verbose_name = "СВО: Участники"
+        verbose_name_plural = "СВО: Участники"
+        constraints = [
+            models.UniqueConstraint(fields=['last_name', 'enp'], name='unique_last_name_enp')
+        ]
+
+class SVORelative(models.Model):
+    svomember = models.ForeignKey(SVOMember, on_delete=models.CASCADE, verbose_name="Участник СВО",
+                                  limit_choices_to={'is_active': True})
+    status = models.CharField(max_length=100, verbose_name="Статус")
+    last_name = models.CharField(max_length=100, verbose_name="Фамилия")
+    first_name = models.CharField(max_length=100, verbose_name="Имя")
+    middle_name = models.CharField(max_length=100, verbose_name="Отчество", blank=True, null=True)
+    birth_date = models.DateField(verbose_name="Дата рождения", blank=True, null=True)
+    enp = models.CharField(max_length=16, unique=True, verbose_name="ЕНП", blank=True, null=True)
+    address = models.TextField(verbose_name="Адрес", blank=True, null=True)
+    phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "СВО: Родственники"
+        verbose_name_plural = "СВО: Родственники"
+
+
+class Survey(models.Model):
+    svomember = models.ForeignKey(SVOMember, on_delete=models.CASCADE, related_name='surveys')
+    note = models.TextField(verbose_name="Примечание")
+    date = models.DateField(verbose_name="Дата")
+
+    def __str__(self):
+        return f"Опрос {self.svomember} от {self.date}"
+
+
+class SVOMemberOMSData(models.Model):
+    svomember = models.ForeignKey('SVOMember', on_delete=models.CASCADE, related_name='oms_data')
+    talon = models.CharField(max_length=255, verbose_name="Номер талона")
+    goal = models.CharField(max_length=255, blank=True, null=True, verbose_name="Цель лечения")
+    treatment_end = models.CharField(max_length=255, blank=True, null=True, verbose_name="Дата окончания лечения")
+    main_diagnosis = models.CharField(max_length=255, blank=True, null=True, verbose_name="Основной диагноз")
+
+    def __str__(self):
+        return f"Талон {self.talon} - {self.svomember}"

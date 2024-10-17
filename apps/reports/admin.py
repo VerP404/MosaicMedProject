@@ -1,6 +1,13 @@
-from django.contrib import admin
+from datetime import datetime
 
-from apps.reports.models import DeleteEmd, InvalidationReason
+import openpyxl
+from django.contrib import admin
+from django.contrib.admin.views.main import ChangeList
+from django.http import HttpResponse, JsonResponse
+from django.template.response import TemplateResponse
+from django.urls import path
+
+from apps.reports.models import DeleteEmd, InvalidationReason, SVOMember, SVOMemberOMSData
 
 
 @admin.register(DeleteEmd)
@@ -16,3 +23,130 @@ class DeleteEmdAdmin(admin.ModelAdmin):
 @admin.register(InvalidationReason)
 class InvalidationReasonAdmin(admin.ModelAdmin):
     list_display = ('reason_text',)
+
+
+def update_oms_data_action(modeladmin, request, queryset):
+    """
+    Действие для обновления данных участников СВО на основе информации из OMSData.
+    """
+    for member in queryset:
+        member.update_oms_data()
+    modeladmin.message_user(request, "Данные успешно обновлены для выбранных участников.")
+
+
+update_oms_data_action.short_description = "Обновить данные из OMSData"
+
+
+def export_to_excel_action(modeladmin, request, queryset):
+    """
+    Действие для экспорта данных участников СВО в Excel.
+    """
+    # Создаем новый workbook и активируем его
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Участники СВО"
+
+    # Добавляем заголовки
+    ws.append(['№', 'ФИО', 'Дата рождения', 'Подразделение', 'Адрес', 'Телефон', 'Цели', 'Диагнозы'])
+
+    # Заполняем данные для каждого участника
+    for idx, member in enumerate(queryset, start=1):
+        # Получаем цели и диагнозы, если есть связанные записи
+        goals = ', '.join([data.goal for data in member.oms_data.all() if data.goal])
+        diagnoses = ', '.join([data.main_diagnosis for data in member.oms_data.all() if data.main_diagnosis])
+
+        # Преобразуем дату рождения в формат дд.мм.гггг
+        birth_date_formatted = member.birth_date.strftime('%d.%m.%Y') if member.birth_date else ''
+
+        # Заполняем строку данными
+        ws.append([
+            idx,
+            f"{member.last_name} {member.first_name} {member.middle_name}",  # ФИО
+            birth_date_formatted,  # Дата рождения в формате дд.мм.гггг
+            member.department,  # Подразделение
+            member.address,  # Адрес
+            member.phone,  # Телефон
+            goals,  # Цели
+            diagnoses  # Диагнозы
+        ])
+
+    # Получаем текущую дату в формате ддммгггг
+    current_date = datetime.now().strftime('%d%m%Y')
+
+    # Формируем имя файла с текущей датой
+    filename = f"SVO_{current_date}.xlsx"
+
+    # Создаем HTTP-ответ с Excel-файлом
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    # Сохраняем workbook в HTTP-ответ
+    wb.save(response)
+    return response
+
+
+export_to_excel_action.short_description = "Выгрузить данные в Excel"
+
+
+def export_dv4_opv_report_action(modeladmin, request, queryset):
+    """
+    Действие для экспорта данных о пациентах с целью ДВ4 и ОПВ в Excel.
+    """
+    # Создаем новый workbook и активируем его
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Отчет по целям ДВ4 и ОПВ"
+
+    # Добавляем заголовки
+    ws.append(['Цель', 'Количество пациентов'])
+
+    # Считаем общее количество пациентов
+    total_patients = queryset.count()
+
+    # Считаем количество пациентов с целью "ДВ4" и "ОПВ"
+    dv4_count = SVOMemberOMSData.objects.filter(svomember__in=queryset, goal='ДВ4').count()
+    opv_count = SVOMemberOMSData.objects.filter(svomember__in=queryset, goal='ОПВ').count()
+
+    # Добавляем данные в отчет
+    ws.append(['Всего пациентов', total_patients])
+    ws.append(['Пациенты с целью ДВ4', dv4_count])
+    ws.append(['Пациенты с целью ОПВ', opv_count])
+
+    # Получаем текущую дату в формате ддммгггг
+    current_date = datetime.now().strftime('%d%m%Y')
+
+    # Формируем имя файла с текущей датой
+    filename = f"SVO_DV4_OPV_{current_date}.xlsx"
+
+    # Создаем HTTP-ответ с Excel-файлом
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+
+    # Сохраняем workbook в HTTP-ответ
+    wb.save(response)
+    return response
+
+
+export_dv4_opv_report_action.short_description = "Выгрузить отчет по ДВ4 и ОПВ"
+
+
+class SVOMemberOMSDataInline(admin.TabularInline):
+    model = SVOMemberOMSData
+    extra = 0  # Не показывать пустые строки для новых записей
+    readonly_fields = ('talon', 'goal', 'treatment_end', 'main_diagnosis')
+
+
+@admin.register(SVOMember)
+class SVOMemberAdmin(admin.ModelAdmin):
+    list_display = ('last_name', 'first_name', 'middle_name', 'enp', 'department')
+    search_fields = ('last_name', 'first_name', 'enp')
+    list_filter = ('enp', 'department')
+    inlines = [SVOMemberOMSDataInline]  # Inline для связанной модели OMS данных
+    actions = [update_oms_data_action, export_to_excel_action, export_dv4_opv_report_action]  # Действия админки
+
+    def save_model(self, request, obj, form, change):
+        """
+        Сохраняем участника СВО и обновляем OMS данные, если изменилось что-то.
+        """
+        super().save_model(request, obj, form, change)
+        obj.update_oms_data()  # Вызов метода для обновления данных из OMSData
