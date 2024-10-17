@@ -136,13 +136,43 @@ class SVOMemberOMSDataInline(admin.TabularInline):
     readonly_fields = ('talon', 'goal', 'treatment_end', 'main_diagnosis')
 
 
+class HasDV4OrOPVFilter(admin.SimpleListFilter):
+    """
+    Кастомный фильтр, проверяющий наличие целей "ДВ4" или "ОПВ" у участников СВО.
+    """
+    title = 'Наличие цели ДВ4/ОПВ'
+    parameter_name = 'has_dv4_opv'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('yes', 'Да'),
+            ('no', 'Нет'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'yes':
+            return queryset.filter(oms_data__goal__in=['ДВ4', 'ОПВ']).distinct()
+        if self.value() == 'no':
+            return queryset.exclude(oms_data__goal__in=['ДВ4', 'ОПВ']).distinct()
+        return queryset
+
+
 @admin.register(SVOMember)
 class SVOMemberAdmin(admin.ModelAdmin):
-    list_display = ('last_name', 'first_name', 'middle_name', 'enp', 'department')
+    list_display = ('last_name', 'first_name', 'middle_name', 'enp', 'department', 'has_dv4_opv')
     search_fields = ('last_name', 'first_name', 'enp')
-    list_filter = ('enp', 'department')
+    list_filter = ('department', HasDV4OrOPVFilter, 'enp')
     inlines = [SVOMemberOMSDataInline]  # Inline для связанной модели OMS данных
     actions = [update_oms_data_action, export_to_excel_action, export_dv4_opv_report_action]  # Действия админки
+
+    def has_dv4_opv(self, obj):
+        """
+        Проверяет, есть ли у участника цель "ДВ4" или "ОПВ".
+        """
+        return obj.oms_data.filter(goal__in=['ДВ4', 'ОПВ']).exists()
+
+    has_dv4_opv.boolean = True
+    has_dv4_opv.short_description = 'ДВ4/ОПВ'
 
     def save_model(self, request, obj, form, change):
         """
