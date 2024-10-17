@@ -21,3 +21,5 @@ django-autocomplete-light
 django-environ
 setuptools
 requests
+
+openpyxl
