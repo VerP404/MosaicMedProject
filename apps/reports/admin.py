@@ -159,7 +159,7 @@ class HasDV4OrOPVFilter(admin.SimpleListFilter):
 
 @admin.register(SVOMember)
 class SVOMemberAdmin(admin.ModelAdmin):
-    list_display = ('last_name', 'first_name', 'middle_name', 'enp', 'department', 'has_dv4_opv')
+    list_display = ('last_name', 'first_name', 'middle_name', 'phone', 'enp', 'department', 'has_dv4_opv')
     search_fields = ('last_name', 'first_name', 'enp')
     list_filter = ('department', HasDV4OrOPVFilter, 'enp')
     inlines = [SVOMemberOMSDataInline]  # Inline для связанной модели OMS данных
