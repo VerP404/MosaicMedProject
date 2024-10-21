@@ -228,7 +228,7 @@ class DataLoader:
     @time_it("Загрузка данных в БД")
     def _load_data_to_db(self, df):
         """
-        Загружает данные в базу данных с отслеживанием прогресса.
+        Загружает данные в базу данных с отслеживанием прогресса и проверкой длины строк.
         """
         # Удаляем столбец combined_key, который используется только для внутренней обработки
         if 'combined_key' in df.columns:
@@ -237,6 +237,15 @@ class DataLoader:
         total_rows = df.shape[0]
         loaded_rows = 0
         try:
+            # Проверка длины данных в столбцах
+            for column in df.columns:
+                if df[column].dtype == 'object':  # Проверяем только текстовые столбцы
+                    max_length_exceeded = df[column].str.len().max()
+                    if max_length_exceeded > 255:
+                        self.message += f"Превышение длины в столбце '{column}'. Максимальная длина: {max_length_exceeded}\n"
+                        # Вы можете обрезать значение или выбросить ошибку
+                        df[column] = df[column].apply(lambda x: x[:255] if isinstance(x, str) else x)
+
             for chunk_start in range(0, total_rows, 1000):
                 chunk = df.iloc[chunk_start:chunk_start + 1000]
                 chunk.to_sql(
