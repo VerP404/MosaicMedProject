@@ -101,6 +101,7 @@ class KvazarMortality(models.Model):
     death_date = models.CharField(max_length=255, verbose_name="Дата смерти")
     gender = models.CharField(max_length=255, verbose_name="Пол")
     age = models.CharField(max_length=255, verbose_name="Возраст, лет")
+    initial_statistics = models.CharField(max_length=255, verbose_name="Первоначальная (статистика)")
     cause_a = models.CharField(max_length=255, verbose_name="Причина (а)")
     cause_b = models.CharField(max_length=255, verbose_name="Причина (б)")
     cause_c = models.CharField(max_length=255, verbose_name="Причина (в)")
@@ -112,7 +113,9 @@ class KvazarMortality(models.Model):
     house = models.CharField(max_length=255, verbose_name="Дом")
     apartment = models.CharField(max_length=255, verbose_name="Квартира")
     attachment = models.CharField(max_length=255, verbose_name="Прикрепление")
-    initial_statistics = models.CharField(max_length=255, verbose_name="Первоначальная (статистика)")
+    number_1 = models.CharField(max_length=255, verbose_name="Номер.1")
+    issue_date_1 = models.CharField(max_length=255, verbose_name="Дата выдачи.1")
+    initial_statistics_1 = models.CharField(max_length=255, verbose_name="Первоначальная (статистика).1")
 
     def __str__(self):
         return f"KvazarDead: {self.series} - {self.deceased_name}"

@@ -129,7 +129,8 @@ class DataLoader:
         """Загрузка файла в DataFrame."""
         if self.file_format == 'csv':
             df = pd.read_csv(file_path, sep=self.sep, low_memory=False, na_values="-", dtype=self.dtype,
-                             encoding=self.encoding)
+                             encoding=self.encoding, )
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
         elif self.file_format == 'excel':
             df = pd.read_excel(file_path)
         else:
@@ -153,7 +154,6 @@ class DataLoader:
                 self.message += f" Отсутствующие столбцы: {missing_columns}\n"
             if extra_columns:
                 self.message += f" Лишние столбцы: {extra_columns}\n"
-            raise ValueError("Структура файла не соответствует ожиданиям.")
 
     def _rename_columns(self, df):
         """
