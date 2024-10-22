@@ -1,5 +1,5 @@
 import csv
-from datetime import date
+from datetime import date, datetime
 
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
@@ -106,8 +106,47 @@ class DoctorRecordAdmin(admin.ModelAdmin):
         custom_urls = [
             path('update-doctor-records/', self.admin_site.admin_view(self.update_doctor_records),
                  name='update_doctor_records'),
+            path('insert-doctors-into-person/', self.admin_site.admin_view(self.insert_doctors_into_person),
+                 name='insert_doctors_into_person'),
         ]
         return custom_urls + urls
+
+    def insert_doctors_into_person(self, request):
+        inserted_count = 0
+        existing_snils = []
+
+        # Получаем все записи из DoctorData
+        doctor_data_records = DoctorData.objects.all()
+
+        for doctor_data in doctor_data_records:
+            # Проверяем, существует ли Person с таким СНИЛС
+            if not Person.objects.filter(snils=doctor_data.snils).exists():
+                # Преобразуем дату рождения в формат YYYY-MM-DD
+                try:
+                    birth_date = datetime.strptime(doctor_data.birth_date, '%d-%m-%Y').date()
+                except ValueError:
+                    messages.error(request,
+                                   f"Неверный формат даты для СНИЛС {doctor_data.snils}: {doctor_data.birth_date}")
+                    continue
+
+                # Если такого физлица нет, создаём новое
+                Person.objects.create(
+                    snils=doctor_data.snils,
+                    last_name=doctor_data.last_name,
+                    first_name=doctor_data.first_name,
+                    patronymic=doctor_data.middle_name,
+                    date_of_birth=birth_date,
+                    gender=doctor_data.gender[0].upper()  # предполагается, что гендер представлен буквой (M/F)
+                )
+                inserted_count += 1
+            else:
+                existing_snils.append(doctor_data.snils)
+
+        messages.success(request, f'Вставлено {inserted_count} новых записей в Person.')
+        if existing_snils:
+            messages.warning(request, f"Следующие СНИЛС уже существуют: {', '.join(existing_snils)}")
+
+        return redirect('admin:personnel_doctorrecord_changelist')
 
     def update_doctor_records(self, request):
         updated_count = 0
