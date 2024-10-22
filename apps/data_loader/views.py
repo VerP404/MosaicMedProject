@@ -4,11 +4,14 @@ from django.shortcuts import render, get_object_or_404, redirect
 from .data_loader import DataLoader, engine
 from .forms import FileUploadForm
 from .models.oms_data import DataType, DataImport, DataLoaderConfig
+from ..organization.models import MedicalOrganization
+from ..peopledash.models import Organization
 
 
 def upload_file(request, data_type_id):
     data_type = get_object_or_404(DataType, id=data_type_id)
     loader_config = get_object_or_404(DataLoaderConfig, data_type=data_type)
+    organization = MedicalOrganization.objects.first()
 
     if request.method == 'POST':
         form = FileUploadForm(request.POST, request.FILES)
@@ -38,6 +41,7 @@ def upload_file(request, data_type_id):
                 else:
                     # Стандартный рендеринг страницы
                     context = {
+                        'organization': organization,
                         'success': True,
                         'message': loader.message,
                         'data_type': data_type,
@@ -52,6 +56,7 @@ def upload_file(request, data_type_id):
                     })
                 else:
                     context = {
+                        'organization': organization,
                         'success': False,
                         'message': str(e),
                         'data_type': data_type,
@@ -66,6 +71,7 @@ def upload_file(request, data_type_id):
                 })
             else:
                 context = {
+                    'organization': organization,
                     'success': False,
                     'message': 'Некорректная форма.',
                     'data_type': data_type,
@@ -75,17 +81,20 @@ def upload_file(request, data_type_id):
     else:
         form = FileUploadForm()
 
-    return render(request, 'data_loader/upload_file.html', {'form': form, 'data_type': data_type})
+    return render(request, 'data_loader/upload_file.html',
+                  {'organization': organization, 'form': form, 'data_type': data_type})
 
 
 def data_upload_dashboard(request):
     data_types = DataType.objects.all()
+    organization = MedicalOrganization.objects.first()
     categories = set(data_type.category for data_type in data_types)  # Собираем все категории
     for data_type in data_types:
         last_import = DataImport.objects.filter(data_type=data_type).order_by('-date_added').first()
         data_type.last_import_date = last_import.date_added if last_import else None
 
     return render(request, 'data_loader/data_upload_dashboard.html', {
+        'organization': organization,
         'data_types': data_types,
         'categories': categories  # Передаем категории
     })
