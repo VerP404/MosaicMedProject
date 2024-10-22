@@ -24,7 +24,7 @@ class ISZLPeople(models.Model):
     lpuuch = models.CharField(max_length=255, verbose_name="LPUUCH")
     upd = models.CharField(max_length=255, verbose_name="Upd")
     closed = models.CharField(max_length=255, verbose_name="CLOSED")
-    column1 = models.CharField(max_length=255, verbose_name="Column1")
+    column1 = models.CharField(max_length=255, verbose_name="Column1", default="-")
 
     def __str__(self):
         return f"{self.fio} {self.dr} {self.enp} {self.lpuuch}"
@@ -75,7 +75,7 @@ class ISZLDisNab(models.Model):
     dateprev = models.CharField(max_length=255, verbose_name="DatePrev")
     placew = models.CharField(max_length=255, verbose_name="PlaceW")
     w = models.CharField(max_length=255, verbose_name="w")
-    column1 = models.CharField(max_length=255, verbose_name="Column1")
+    column1 = models.CharField(max_length=255, verbose_name="Column1", default="-")
 
     def __str__(self):
         return f"{self.fio} - {self.dr} - {self.enp} - {self.ds}"
@@ -101,7 +101,7 @@ class ISZLDisNabJob(models.Model):
     fact = models.CharField(max_length=255, verbose_name="Факт")
     smo = models.CharField(max_length=255, verbose_name="СМО")
     modification_date_operator = models.CharField(max_length=255, verbose_name="Дата изм./Оператор")
-    column1 = models.CharField(max_length=255, verbose_name="Column1")
+    column1 = models.CharField(max_length=255, verbose_name="Column1", default="-")
 
     def __str__(self):
         return f'{self.fio} - {self.birth_date} - {self.enp}'

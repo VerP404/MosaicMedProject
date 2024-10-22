@@ -13,7 +13,7 @@ select 'Первичные' as Случаи,
                else 0 end)                                                         as Всего
 
 from data_loader_omsdata
-where "case" = 'Первичный' and 
+where case_code = 'Первичный' and 
 to_date(treatment_end, 'DD-MM-YYYY') BETWEEN to_date(:start_date, 'DD-MM-YYYY') and to_date(:end_date, 'DD-MM-YYYY')
 
 UNION ALL
@@ -30,7 +30,7 @@ select 'Повторные' as Случаи,
                else 0 end)                                                         as Всего
 
 from data_loader_omsdata
-where "case" = 'Повторный' and 
+where case_code = 'Повторный' and 
 to_date(treatment_end, 'DD-MM-YYYY') BETWEEN to_date(:start_date, 'DD-MM-YYYY') and to_date(:end_date, 'DD-MM-YYYY')
 """
 
@@ -48,7 +48,7 @@ select department as Корпус,
                else 0 end)                                                         as Всего
 
 from data_loader_omsdata
-where "case" = 'Первичный' and
+where case_code = 'Первичный' and
 to_date(treatment_end, 'DD-MM-YYYY') BETWEEN to_date(:start_date, 'DD-MM-YYYY') and to_date(:end_date, 'DD-MM-YYYY')
 group by department
 """
@@ -67,7 +67,7 @@ select department as Корпус,
                else 0 end)                                                         as Всего
 
 from data_loader_omsdata
-where "case" = 'Повторный' and 
+where case_code = 'Повторный' and 
 to_date(treatment_end, 'DD-MM-YYYY') BETWEEN to_date(:start_date, 'DD-MM-YYYY') and to_date(:end_date, 'DD-MM-YYYY')
 group by department
 """
