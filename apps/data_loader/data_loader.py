@@ -91,10 +91,12 @@ class DataLoader:
         # Шаг 3: Обработка DataFrame
         df = self._process_dataframe(df)
 
-        # Шаг 4: Удаление существующих строк по уникальному столбцу
-        self._delete_existing_rows(df)
+        # self._update_or_insert_data(df)  #
 
-        # Шаг 5: Загрузка данных в базу
+        # # Шаг 4: Удаление существующих строк по уникальному столбцу
+        self._delete_existing_rows(df)
+        #
+        # # Шаг 5: Загрузка данных в базу
         self._load_data_to_db(df)
 
         # Шаг 6: Создаем запись в DataImport
@@ -147,6 +149,8 @@ class DataLoader:
         expected_columns = set(self.columns_mapping.keys())
 
         missing_columns = expected_columns - file_columns
+        missing_columns = {col for col in missing_columns if "Unnamed" not in col}
+
         extra_columns = file_columns - expected_columns
 
         if missing_columns or extra_columns:
@@ -154,6 +158,7 @@ class DataLoader:
                 self.message += f" Отсутствующие столбцы: {missing_columns}\n"
             if extra_columns:
                 self.message += f" Лишние столбцы: {extra_columns}\n"
+            raise ValueError(f"{self.message} \n Структура файла не соответствует ожиданиям.")
 
     def _rename_columns(self, df):
         """
@@ -174,6 +179,10 @@ class DataLoader:
             self.message += f" Доступные столбцы: {list(df.columns)}\n"
             raise e  # Повторное возбуждение исключения для остановки выполнения, если необходимо
 
+        # Проверяем, если в self.columns_mapping.keys() есть "Unnamed" и если в df.columns нет "column1"
+        if any("Unnamed" in col for col in self.columns_mapping.keys()) and "column1" not in df.columns:
+            df["column1"] = '-'  # Добавляем столбец 'column1' и заполняем его значениями '-'
+
         # Заменяем NaN на '-' в датафрейме
         df.fillna('-', inplace=True)
 
@@ -185,6 +194,7 @@ class DataLoader:
 
         # Проверяем что тип данных у всех столбцов "текстовый"
         df = df.astype(str)
+
         return df
 
     @time_it("Удаление строк в БД для обновления записей")
@@ -263,6 +273,36 @@ class DataLoader:
             self.error_count += 1
             self.message += f" Ошибка при загрузке данных: {e}\n"
 
+    @time_it("Обновление и добавление записей в БД")
+    def _update_or_insert_data(self, df):
+        try:
+            # Выборка существующих данных из таблицы
+            existing_data_query = f"SELECT {', '.join(self.columns_for_update)} FROM {self.table_name}"
+            existing_data = pd.read_sql(existing_data_query, self.engine)
+
+            # Помечаем строки для обновления и добавления
+            df_existing = df[df[self.columns_for_update].isin(existing_data.to_dict('list')).all(axis=1)]
+            df_new = df[~df.index.isin(df_existing.index)]
+
+            # Обновление существующих данных
+            if not df_existing.empty:
+                for _, row in df_existing.iterrows():
+                    update_query = f"UPDATE {self.table_name} SET {', '.join([f'{col} = :{col}' for col in df.columns if col not in self.columns_for_update])} WHERE {' AND '.join([f'{col} = :{col}' for col in self.columns_for_update])}"
+                    params = row.to_dict()
+                    with self.engine.begin() as connection:
+                        connection.execute(text(update_query), params)
+                    self.updated_count += 1
+
+            # Вставка новых данных
+            if not df_new.empty:
+                df_new.to_sql(self.table_name, self.engine, if_exists='append', index=False, method='multi')
+                self.added_count += len(df_new)
+
+            self.message += f"Обновлено записей: {self.updated_count}. Добавлено новых записей: {self.added_count}.\n"
+
+        except Exception as e:
+            self.error_count += 1
+            self.message += f" Ошибка при обновлении/вставке данных: {e}\n"
     @time_it("Сохранение информации о загрузке в БД")
     def _create_data_import_record(self):
         """
