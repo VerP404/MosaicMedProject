@@ -1,5 +1,8 @@
 from django.contrib import admin
+from import_export.admin import ImportExportModelAdmin
+
 from .models import *
+from import_export import resources
 
 
 @admin.register(MedicalOrganization)
@@ -48,11 +51,17 @@ class MiskauzDepartmentInline(admin.TabularInline):
     extra = 1
 
 
+class DepartmentResource(resources.ModelResource):
+    class Meta:
+        model = Department
+
+
 @admin.register(Department)
-class DepartmentAdmin(admin.ModelAdmin):
+class DepartmentAdmin(ImportExportModelAdmin):
     list_display = ('name', 'additional_name', 'building')
     list_filter = ('building',)
     search_fields = ('name',)
+    resource_class = DepartmentResource
 
     inlines = [OMSDepartmentInline, KvazarDepartmentInline, MiskauzDepartmentInline]
 

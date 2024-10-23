@@ -26,6 +26,8 @@ INSTALLED_APPS = [
     'apps.data_loader',
     'apps.peopledash',
 
+    'import_export',
+
 ]
 
 MIDDLEWARE = [

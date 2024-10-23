@@ -23,3 +23,6 @@ setuptools
 requests
 
 openpyxl
+
+django-import-export
+xlrd
