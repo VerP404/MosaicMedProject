@@ -12,6 +12,7 @@ from django.shortcuts import render, redirect
 from .forms import *
 from .models import *
 from ..data_loader.models.oms_data import *
+from ..organization.models import MiskauzDepartment, OMSDepartment
 
 
 class DoctorRecordInline(admin.TabularInline):
@@ -108,8 +109,36 @@ class DoctorRecordAdmin(admin.ModelAdmin):
                  name='update_doctor_records'),
             path('insert-doctors-into-person/', self.admin_site.admin_view(self.insert_doctors_into_person),
                  name='insert_doctors_into_person'),
+            path('match-departments/', self.admin_site.admin_view(self.match_departments), name='match_departments'),
+
         ]
         return custom_urls + urls
+
+    def match_departments(self, request):
+        updated_count = 0
+
+        # Получаем все записи DoctorRecord
+        doctor_records = DoctorRecord.objects.all()
+
+        for record in doctor_records:
+            # Сначала ищем совпадение в OMSDepartment
+            oms_department = OMSDepartment.objects.filter(name=record.structural_unit).first()
+            if oms_department:
+                record.department = oms_department.department
+                record.save()
+                updated_count += 1
+                continue  # Переходим к следующей записи
+
+            # Если не найдено в OMSDepartment, ищем в MiskauzDepartment
+            miskauz_department = MiskauzDepartment.objects.filter(name=record.structural_unit).first()
+            if miskauz_department:
+                record.department = miskauz_department.department
+                record.save()
+                updated_count += 1
+
+        # Выводим сообщение об обновленных записях
+        messages.success(request, f'Обновлено {updated_count} записей в DoctorRecord.')
+        return redirect('admin:personnel_doctorrecord_changelist')
 
     def insert_doctors_into_person(self, request):
         inserted_count = 0
