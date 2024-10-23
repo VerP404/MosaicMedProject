@@ -25,18 +25,27 @@ class BuildingAdmin(admin.ModelAdmin):
 
 
 class OMSDepartmentInline(admin.TabularInline):
+    formfield_overrides = {
+        models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
+    }
     model = OMSDepartment
-    extra = 1  # Количество пустых строк для добавления новых записей
+    extra = 1
 
 
 class KvazarDepartmentInline(admin.TabularInline):
+    formfield_overrides = {
+        models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
+    }
     model = KvazarDepartment
     extra = 1
 
 
 class MiskauzDepartmentInline(admin.TabularInline):
+    formfield_overrides = {
+        models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
+    }
     model = MiskauzDepartment
-    extra = 19
+    extra = 1
 
 
 @admin.register(Department)
@@ -46,3 +55,7 @@ class DepartmentAdmin(admin.ModelAdmin):
     search_fields = ('name',)
 
     inlines = [OMSDepartmentInline, KvazarDepartmentInline, MiskauzDepartmentInline]
+
+    formfield_overrides = {
+        models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
+    }
