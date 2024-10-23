@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import MedicalOrganization, Building, Department
+from .models import *
 
 
 @admin.register(MedicalOrganization)
@@ -21,7 +21,22 @@ class BuildingAdmin(admin.ModelAdmin):
     list_display = ('name', 'additional_name', 'organization', 'address', 'name_kvazar', 'name_miskauz')
     list_filter = ('organization',)
     search_fields = ('name', 'additional_name', 'address')
-    list_editable = ('additional_name','name_kvazar', 'name_miskauz')
+    list_editable = ('additional_name', 'name_kvazar', 'name_miskauz')
+
+
+class OMSDepartmentInline(admin.TabularInline):
+    model = OMSDepartment
+    extra = 1  # Количество пустых строк для добавления новых записей
+
+
+class KvazarDepartmentInline(admin.TabularInline):
+    model = KvazarDepartment
+    extra = 1
+
+
+class MiskauzDepartmentInline(admin.TabularInline):
+    model = MiskauzDepartment
+    extra = 19
 
 
 @admin.register(Department)
@@ -29,3 +44,5 @@ class DepartmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'additional_name', 'building')
     list_filter = ('building',)
     search_fields = ('name',)
+
+    inlines = [OMSDepartmentInline, KvazarDepartmentInline, MiskauzDepartmentInline]

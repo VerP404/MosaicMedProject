@@ -58,3 +58,56 @@ class Department(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.building.name})"
+
+
+class OMSDepartment(models.Model):
+    department = models.ForeignKey(
+        'Department',
+        on_delete=models.CASCADE,
+        related_name='oms_departments',
+        verbose_name="Отделение"
+    )
+    name = models.CharField("Название отделения в Web-ОМС", max_length=255)
+
+    class Meta:
+        verbose_name = "Отделение Web-ОМС"
+        verbose_name_plural = "Отделения Web-ОМС"
+
+    def __str__(self):
+        return f"{self.name} (Web-ОМС)"
+
+
+# Модель для связи с отделениями Квазар
+class KvazarDepartment(models.Model):
+    department = models.ForeignKey(
+        'Department',
+        on_delete=models.CASCADE,
+        related_name='kvazar_departments',
+        verbose_name="Отделение"
+    )
+    name = models.CharField("Название отделения в Квазар", max_length=255)
+
+    class Meta:
+        verbose_name = "Отделение Квазар"
+        verbose_name_plural = "Отделения Квазар"
+
+    def __str__(self):
+        return f"{self.name} (Квазар)"
+
+
+# Модель для связи с отделениями МИСКАУЗ
+class MiskauzDepartment(models.Model):
+    department = models.ForeignKey(
+        'Department',
+        on_delete=models.CASCADE,
+        related_name='miskauz_departments',
+        verbose_name="Отделение"
+    )
+    name = models.CharField("Название отделения в МИСКАУЗ", max_length=255)
+
+    class Meta:
+        verbose_name = "Отделение МИСКАУЗ"
+        verbose_name_plural = "Отделения МИСКАУЗ"
+
+    def __str__(self):
+        return f"{self.name} (МИСКАУЗ)"
