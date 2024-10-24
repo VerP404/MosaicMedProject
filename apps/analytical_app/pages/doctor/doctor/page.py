@@ -128,9 +128,11 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
     [Input(f'dropdown-doctor-{type_page}', 'value'),
      Input(f'selected-period-{type_page}', 'children'),
      Input(f'dropdown-year-{type_page}', 'value'),
-     Input(f'switch-inogorodniy-{type_page}', 'value')]
+     Input(f'switch-inogorodniy-{type_page}', 'value'),
+     Input(f'dropdown-building-{type_page}', 'value'),
+     Input(f'dropdown-department-{type_page}', 'value')]
 )
-def update_table_dd(value_doctor, selected_period, selected_year, inogorodniy):
+def update_table_dd(value_doctor, selected_period, selected_year, inogorodniy, building_ids, department_ids):
     if value_doctor is None or not selected_period:
         return ([], []
                 # , [], [], [], []
@@ -139,9 +141,9 @@ def update_table_dd(value_doctor, selected_period, selected_year, inogorodniy):
     months_placeholder = ', '.join(
         [str(month) for month in range(selected_period[0], selected_period[1] + 1)])
 
-    bind_params = {'value_doctor': value_doctor}
     columns1, data1 = TableUpdater.query_to_df(engine,
-                                               sql_query_amb_def(selected_year, months_placeholder, inogorodniy))
+                                               sql_query_amb_def(selected_year, months_placeholder, inogorodniy,
+                                                                 building_ids, department_ids))
     # columns2, data2 = TableUpdater.query_to_df(engine, sql_query_dd_def(months_placeholder), bind_params)
     # columns3, data3 = TableUpdater.query_to_df(engine, sql_query_stac_def(months_placeholder), bind_params)
 

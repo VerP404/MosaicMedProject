@@ -55,13 +55,20 @@ def get_available_buildings():
 
 
 def get_available_departments(building_id=None):
+    # Приводим building_id к списку, даже если это одно значение
     if building_id:
+        # Если передан список или одно значение
+        if not isinstance(building_id, list):
+            building_id = [building_id]  # Преобразуем в список, если передано одно значение
+
+        building_id_str = ', '.join(map(str, building_id))
         query = f"""
             SELECT id, name
             FROM organization_department
-            WHERE building_id = {building_id}
+            WHERE building_id IN ({building_id_str})
         """
     else:
+        # Если корпус не выбран, возвращаем все отделения
         query = """
             SELECT id, name
             FROM organization_department
@@ -78,7 +85,9 @@ def filter_building(type_page):
         dcc.Dropdown(
             id=f'dropdown-building-{type_page}',
             placeholder='Выберите корпус...',
-            clearable=True
+            clearable=True,
+            multi=True,
+            options=get_available_buildings(),
         ),
         style={"width": "100%"}
     )
@@ -89,7 +98,9 @@ def filter_department(type_page):
         dcc.Dropdown(
             id=f'dropdown-department-{type_page}',
             placeholder='Выберите отделение...',
-            clearable=True
+            clearable=True,
+            multi=True,
+            options=[],
         ),
         style={"width": "100%"}
     )

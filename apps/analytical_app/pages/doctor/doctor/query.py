@@ -1,4 +1,16 @@
-def base_query(year, months, ino: bool):
+def base_query(year, months, ino: bool, building_ids=None, department_ids=None):
+    building_filter = ""
+    department_filter = ""
+
+    # Фильтрация по корпусам (если выбран один или несколько корпусов)
+    if building_ids:
+        building_filter = f"AND building_id IN ({','.join(map(str, building_ids))})"
+
+    # Фильтрация по отделениям (если выбрано одно или несколько отделений)
+    if department_ids:
+        department_filter = f"AND department_id IN ({','.join(map(str, department_ids))})"
+
+
     return f"""
         WITH report_data AS (SELECT oms.*,
                             CASE
@@ -42,49 +54,50 @@ def base_query(year, months, ino: bool):
                                 END AS report_month_number
                      FROM data_loader_omsdata oms),
      oms_data as (SELECT report_data.talon,
-                    (ARRAY ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'])[report_data.report_month_number] AS report_month,
+                    (ARRAY ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 
+                    'Октябрь', 'Ноябрь', 'Декабрь'])[report_data.report_month_number] AS report_month,
                     report_data.report_year,
                     report_data.status,
                     CASE
                         WHEN report_data.goal = '-' AND report_data.talon_type = 'Стоматология'
                             THEN report_data.talon_type
                         ELSE report_data.goal
-                        END                                                                                                                                                       AS goal,
+                        END                                                 AS goal,
                     COALESCE(
                             ARRAY_TO_STRING(
                                     ARRAY(
-                                            SELECT otc.name
-                                            FROM oms_reference_generalomstarget og
-                                                     LEFT JOIN oms_reference_medicalorganizationomstarget mo
-                                                               ON mo.general_target_id = og.id
-                                                     LEFT JOIN oms_reference_medicalorganizationomstarget_categories moc
-                                                               ON moc.medicalorganizationomstarget_id = mo.id
-                                                     LEFT JOIN oms_reference_omstargetcategory otc ON otc.id = moc.omstargetcategory_id
-                                            WHERE og.code = report_data.goal
+                            SELECT otc.name
+                            FROM oms_reference_generalomstarget og
+                                     LEFT JOIN oms_reference_medicalorganizationomstarget mo
+                                               ON mo.general_target_id = og.id
+                                     LEFT JOIN oms_reference_medicalorganizationomstarget_categories moc
+                                               ON moc.medicalorganizationomstarget_id = mo.id
+                                     LEFT JOIN oms_reference_omstargetcategory otc ON otc.id = moc.omstargetcategory_id
+                            WHERE og.code = report_data.goal
                                     ),
                                     ', '
                             ),
                             '-'
-                    )                                                                                                                                                             AS target_categories,
+                    )                                                          AS target_categories,
                     report_data.patient,
                     report_data.birth_date,
                     CASE
-                        WHEN report_data.treatment_end ~ '^\d{2}-\d{2}-\d{4}$' AND
-                             report_data.birth_date ~ '^\d{2}-\d{2}-\d{4}$' THEN
+                        WHEN report_data.treatment_end ~ '^\\d{2}-\\d{2}-\\d{4}$' AND
+                             report_data.birth_date ~ '^\\d{2}-\\d{2}-\\d{4}$' THEN
                             CAST(SUBSTRING(report_data.treatment_end FROM 7 FOR 4) AS INTEGER) -
                             CAST(SUBSTRING(report_data.birth_date FROM 7 FOR 4) AS INTEGER)
                         ELSE NULL
-                        END                                                                                                                                                       AS age,
+                        END                                                    AS age,
                     report_data.gender,
                     CASE
                         WHEN report_data.enp = '-' THEN report_data.policy
                         ELSE report_data.enp
-                        END                                                                                                                                                       AS enp,
+                        END                                                                  AS enp,
                     report_data.smo_code,
                     CASE
                         WHEN report_data.smo_code LIKE '360%' THEN false
                         ELSE true
-                        END                                                                                                                                                       AS inogorodniy,
+                        END                                                        AS inogorodniy,
                     report_data.treatment_start,
                     report_data.treatment_end,
                     report_data.visits,
@@ -93,7 +106,7 @@ def base_query(year, months, ino: bool):
                     CASE
                         WHEN report_data.main_diagnosis = '-' THEN NULL
                         ELSE SPLIT_PART(report_data.main_diagnosis, ' ', 1)
-                        END                                                                                                                                                       AS main_diagnosis_code,
+                        END                                                           AS main_diagnosis_code,
                     CASE
                         WHEN report_data.additional_diagnosis = '-' THEN report_data.additional_diagnosis
                         ELSE
@@ -101,29 +114,31 @@ def base_query(year, months, ino: bool):
                                     ARRAY(
                                             SELECT SPLIT_PART(TRIM(s), ' ', 1)
                                             FROM UNNEST(STRING_TO_ARRAY(report_data.additional_diagnosis, ',')) AS s
-                                            WHERE SPLIT_PART(TRIM(s), ' ', 1) ~ '^[A-Z]\d{2}(\.\d)?$'
+                                            WHERE SPLIT_PART(TRIM(s), ' ', 1) ~ '^[A-Z]\\d{2}(\\.\\d)?$'
                                     ),
                                     ','
                             )
-                        END                                                                                                                                                       AS additional_diagnosis_codes,
+                        END        AS additional_diagnosis_codes,
                     report_data.initial_input_date,
                     report_data.last_change_date,
                     CASE
-                        WHEN report_data.amount ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(report_data.amount AS NUMERIC)
+                        WHEN report_data.amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN CAST(report_data.amount AS NUMERIC)
                         ELSE NULL
-                        END                                                                                                                                                       AS amount_numeric,
+                        END                                                      AS amount_numeric,
                     report_data.sanctions,
                     report_data.ksg,
-                    department.name                                                                                                                                               AS department,
-                    building.name                                                                                                                                                 AS building,
-                    SUBSTRING(report_data.doctor FROM 1 FOR POSITION(' ' IN report_data.doctor) -
-                                                            1)                                                                                                                    AS doctor_code,
-                                 CONCAT(person.last_name, ' ',
+                    department.id as department_id,                
+                    department.name                                                    AS department,
+                    building.id as building_id,
+                    building.name      AS building,
+                    SUBSTRING(report_data.doctor FROM 1 FOR POSITION(' ' IN report_data.doctor) - 1)   AS doctor_code,
+                    CONCAT(person.last_name, ' ',
                            SUBSTRING(person.first_name FROM 1 FOR 1), '.',
                            SUBSTRING(person.patronymic FROM 1 FOR 1),
-                           '.')                                                                                                                                                   AS doctor,
-                    specialty.description                                                                                                                                         AS specialty,
-                    profile.description                                                                                                                                           AS profile
+                           '.')                                                    AS doctor,
+                    specialty.description                 AS specialty,
+                    profile.description               AS profile
+                    
              FROM report_data
                       LEFT JOIN (SELECT DISTINCT ON (doctor_code) * 
                                  FROM personnel_doctorrecord
@@ -139,7 +154,9 @@ def base_query(year, months, ino: bool):
      ),
             oms as (select *
                     from oms_data
-                               WHERE inogorodniy = {ino})
+                               WHERE inogorodniy = {ino}
+                               {building_filter}
+                               {department_filter})
         """
 
 
@@ -166,8 +183,8 @@ def columns_by_status_oms():
     """
 
 
-def sql_query_amb_def(selected_year, months_placeholder, inogor: bool):
-    base = base_query(selected_year, months_placeholder, inogor)
+def sql_query_amb_def(selected_year, months_placeholder, inogor: bool, building: None, department=""):
+    base = base_query(selected_year, months_placeholder, inogor, building, department)
     query = f"""
     {base}
     SELECT goal,
