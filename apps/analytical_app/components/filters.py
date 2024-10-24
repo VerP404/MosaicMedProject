@@ -1,6 +1,9 @@
 from datetime import datetime, timedelta
 from dash import dcc, html
 import dash_bootstrap_components as dbc
+from sqlalchemy import text
+
+from apps.analytical_app.query_executor import engine
 
 # Словарь для группировки статусов
 status_groups = {
@@ -32,12 +35,64 @@ def get_current_reporting_month():
     current_month_number = current_date.month
 
     if current_day <= 4:
-        if current_month_number == 1:  # для января возвращаем декабрь
+        if current_month_number == 1:
             current_month_number = 12
         else:
             current_month_number = current_month_number - 1
     current_month_name = f"Текущий отчетный месяц: {months_dict.get(current_month_number)}"
     return current_month_number, current_month_name
+
+
+def get_available_buildings():
+    query = """
+        SELECT id, name
+        FROM organization_building
+    """
+    with engine.connect() as connection:
+        result = connection.execute(text(query))
+        buildings = [{'label': row[1], 'value': row[0]} for row in result.fetchall()]  # Доступ через индексы
+    return buildings
+
+
+def get_available_departments(building_id=None):
+    if building_id:
+        query = f"""
+            SELECT id, name
+            FROM organization_department
+            WHERE building_id = {building_id}
+        """
+    else:
+        query = """
+            SELECT id, name
+            FROM organization_department
+        """
+
+    with engine.connect() as connection:
+        result = connection.execute(text(query))
+        departments = [{'label': row[1], 'value': row[0]} for row in result.fetchall()]
+    return departments
+
+
+def filter_building(type_page):
+    return dbc.Col(
+        dcc.Dropdown(
+            id=f'dropdown-building-{type_page}',
+            placeholder='Выберите корпус...',
+            clearable=True
+        ),
+        style={"width": "100%"}
+    )
+
+
+def filter_department(type_page):
+    return dbc.Col(
+        dcc.Dropdown(
+            id=f'dropdown-department-{type_page}',
+            placeholder='Выберите отделение...',
+            clearable=True
+        ),
+        style={"width": "100%"}
+    )
 
 
 def filter_years(type_page):
@@ -51,7 +106,9 @@ def filter_years(type_page):
             placeholder='Выберите год...',
             value=current_year,  # Текущий год выбран по умолчанию
             clearable=False  # Можно выбрать только один год
-        )
+        ),
+        style={"width": "100%"}
+
     )
 
 
@@ -143,4 +200,3 @@ def filter_goals_and_categories():
             )
         ]
     )
-

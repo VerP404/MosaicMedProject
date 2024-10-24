@@ -7,7 +7,9 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.contrib import messages
 from django.utils import timezone
+from sqlalchemy import text
 
+from apps.analytical_app.query_executor import engine
 from apps.data_loader.forms import *
 from apps.data_loader.selenium_script import logger
 from apps.data_loader.models.oms_data import *
@@ -16,10 +18,23 @@ from apps.data_loader.models.iszl import *
 from apps.organization.models import MedicalOrganization
 
 
+def get_organization_name():
+    query = """
+    SELECT name FROM organization_medicalorganization
+    LIMIT 1;
+    """
+    with engine.connect() as connection:
+        result = connection.execute(text(query))
+        organization_name = result.fetchone()  # Получаем первую строку
+        if organization_name:
+            return organization_name[0]  # Возвращаем значение поля name
+        return 'МозаикаМед'
+
+
 def get_site_header():
-    organization = MedicalOrganization.objects.first()
+    organization = get_organization_name()
     if organization:
-        return f"Административная панель МозаикаМед - {organization.name}"
+        return f"Административная панель МозаикаМед - {organization}"
     return "Административная панель МозаикаМед"
 
 
