@@ -1,15 +1,20 @@
-def base_query(year, months, ino: bool, building_ids=None, department_ids=None):
+def base_query(year, months, ino: bool, building_ids=None, department_ids=None, profile_ids=None, doctor_ids=None):
     building_filter = ""
     department_filter = ""
+    profile_filter = ""
+    doctor_filter = ""
 
-    # Фильтрация по корпусам (если выбран один или несколько корпусов)
     if building_ids:
         building_filter = f"AND building_id IN ({','.join(map(str, building_ids))})"
 
-    # Фильтрация по отделениям (если выбрано одно или несколько отделений)
     if department_ids:
         department_filter = f"AND department_id IN ({','.join(map(str, department_ids))})"
 
+    if profile_ids:
+        profile_filter = f"AND profile_id IN ({','.join(map(str, profile_ids))})"
+
+    if doctor_ids:
+        doctor_filter = f"AND doctor_id IN ({','.join(map(str, doctor_ids))})"
 
     return f"""
         WITH report_data AS (SELECT oms.*,
@@ -132,12 +137,14 @@ def base_query(year, months, ino: bool, building_ids=None, department_ids=None):
                     building.id as building_id,
                     building.name      AS building,
                     SUBSTRING(report_data.doctor FROM 1 FOR POSITION(' ' IN report_data.doctor) - 1)   AS doctor_code,
+                    pd.id as doctor_id,
                     CONCAT(person.last_name, ' ',
                            SUBSTRING(person.first_name FROM 1 FOR 1), '.',
                            SUBSTRING(person.patronymic FROM 1 FOR 1),
                            '.')                                                    AS doctor,
                     specialty.description                 AS specialty,
-                    profile.description               AS profile
+                    profile.description               AS profile,
+                    profile.id as profile_id
                     
              FROM report_data
                       LEFT JOIN (SELECT DISTINCT ON (doctor_code) * 
@@ -156,7 +163,9 @@ def base_query(year, months, ino: bool, building_ids=None, department_ids=None):
                     from oms_data
                                WHERE inogorodniy = {ino}
                                {building_filter}
-                               {department_filter})
+                               {department_filter}
+                               {profile_filter}
+                               {doctor_filter})
         """
 
 
@@ -183,8 +192,9 @@ def columns_by_status_oms():
     """
 
 
-def sql_query_amb_def(selected_year, months_placeholder, inogor: bool, building: None, department=""):
-    base = base_query(selected_year, months_placeholder, inogor, building, department)
+def sql_query_amb_def(selected_year, months_placeholder, inogor: bool, building: None, department=None, profile=None,
+                      doctor=None):
+    base = base_query(selected_year, months_placeholder, inogor, building, department, profile, doctor)
     query = f"""
     {base}
     SELECT goal,

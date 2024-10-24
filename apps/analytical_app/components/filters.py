@@ -106,6 +106,87 @@ def filter_department(type_page):
     )
 
 
+def get_available_profiles(building_ids=None, department_ids=None):
+    building_filter = ""
+    department_filter = ""
+
+    if building_ids:
+        building_filter = f"AND department.building_id IN ({','.join(map(str, building_ids))})"
+
+    if department_ids:
+        department_filter = f"AND doctor.department_id IN ({','.join(map(str, department_ids))})"
+
+    query = f"""
+        SELECT DISTINCT profile.id, profile.description
+        FROM personnel_doctorrecord doctor
+        JOIN personnel_profile profile ON profile.id = doctor.profile_id
+        JOIN organization_department department ON department.id = doctor.department_id
+        WHERE 1=1
+        {building_filter}
+        {department_filter}
+    """
+    with engine.connect() as connection:
+        result = connection.execute(text(query))
+        profiles = [{'label': row[1], 'value': row[0]} for row in result.fetchall()]
+    return profiles
+
+
+def get_available_doctors(building_ids=None, department_ids=None, profile_ids=None):
+    building_filter = ""
+    department_filter = ""
+    profile_filter = ""
+
+    if building_ids:
+        building_filter = f"AND department.building_id IN ({','.join(map(str, building_ids))})"
+
+    if department_ids:
+        department_filter = f"AND doctor.department_id IN ({','.join(map(str, department_ids))})"
+
+    if profile_ids:
+        profile_filter = f"AND doctor.profile_id IN ({','.join(map(str, profile_ids))})"
+
+    query = f"""
+        SELECT doctor.id, CONCAT(person.last_name, ' ', SUBSTRING(person.first_name, 1, 1), '.', SUBSTRING(person.patronymic, 1, 1), '.')
+        FROM personnel_doctorrecord doctor
+        JOIN personnel_person person ON person.id = doctor.person_id
+        JOIN organization_department department ON department.id = doctor.department_id
+        WHERE 1=1
+        {building_filter}
+        {department_filter}
+        {profile_filter}
+    """
+    with engine.connect() as connection:
+        result = connection.execute(text(query))
+        doctors = [{'label': row[1], 'value': row[0]} for row in result.fetchall()]
+    return doctors
+
+
+def filter_profile(type_page):
+    return dbc.Col(
+        dcc.Dropdown(
+            id=f'dropdown-profile-{type_page}',
+            options=[],  # Initially empty, will be filled by callback
+            placeholder='Выберите профиль...',
+            clearable=True,
+            multi=True,
+        ),
+        style={"width": "100%"}
+    )
+
+
+def filter_doctor(type_page):
+    return dbc.Col(
+        dcc.Dropdown(
+            id=f'dropdown-doctor-{type_page}',
+            options=[],  # Initially empty, will be filled by callback
+            placeholder='Выберите врача...',
+            clearable=True,
+            multi=True,
+        ),
+        style={"width": "100%"}
+    )
+
+
 def filter_years(type_page):
     # Генерируем список годов от 2023 до текущего года
     year_options = [{'label': str(year), 'value': year} for year in range(2023, current_year + 1)]
