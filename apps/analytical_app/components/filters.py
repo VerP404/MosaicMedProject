@@ -146,18 +146,29 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
         profile_filter = f"AND doctor.profile_id IN ({','.join(map(str, profile_ids))})"
 
     query = f"""
-        SELECT doctor.id, CONCAT(person.last_name, ' ', SUBSTRING(person.first_name, 1, 1), '.', SUBSTRING(person.patronymic, 1, 1), '.')
+        SELECT ARRAY_AGG(doctor.id) AS doctor_ids,
+               CONCAT(person.last_name, ' ', SUBSTRING(person.first_name, 1, 1), '.', SUBSTRING(person.patronymic, 1, 1), '. - ',
+                      CASE 
+                          WHEN pp.description = 'общей врачебной практике (семейной медицине)' THEN 'ВОП'
+                          WHEN pp.description = 'акушерству и гинекологии (за исключением использования вспомогательных репродуктивных технологий и искусственного прерывания беременности)' THEN 'акушерству и гинекологии'
+                          ELSE pp.description
+                      END, ' - ', department.name) AS doctor_info
         FROM personnel_doctorrecord doctor
         JOIN personnel_person person ON person.id = doctor.person_id
         JOIN organization_department department ON department.id = doctor.department_id
+        JOIN personnel_profile pp ON pp.id = doctor.profile_id
         WHERE 1=1
         {building_filter}
         {department_filter}
         {profile_filter}
+        GROUP BY person.last_name, person.first_name, person.patronymic, pp.description, department.name
     """
+
     with engine.connect() as connection:
         result = connection.execute(text(query))
-        doctors = [{'label': row[1], 'value': row[0]} for row in result.fetchall()]
+        doctors = [{'label': row[1], 'value': ','.join(map(str, row[0]))} for row in result.fetchall()]
+
+
     return doctors
 
 

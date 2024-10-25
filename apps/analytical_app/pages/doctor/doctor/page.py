@@ -136,6 +136,9 @@ def update_table(value_doctor, value_profile, selected_period, selected_year, in
         return [], []
 
     months_placeholder = ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)])
+    selected_doctor_ids = [int(id) for id in value_doctor.split(',')] if isinstance(value_doctor, str) else [int(id) for
+                                                                                                             id in
+                                                                                                             value_doctor]
 
     # Генерация SQL-запроса с учетом всех фильтров, включая профиль и врача
     columns1, data1 = TableUpdater.query_to_df(engine,
@@ -146,7 +149,7 @@ def update_table(value_doctor, value_profile, selected_period, selected_year, in
                                                    building_ids,
                                                    department_ids,
                                                    value_profile,  # Добавляем фильтр по профилю
-                                                   value_doctor    # Добавляем фильтр по врачу
+                                                   selected_doctor_ids    # Добавляем фильтр по врачу
                                                ))
 
     return columns1, data1
