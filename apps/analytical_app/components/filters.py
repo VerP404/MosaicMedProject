@@ -55,20 +55,28 @@ def get_available_buildings():
 
 
 def get_available_departments(building_id=None):
-    # Приводим building_id к списку, даже если это одно значение
+    # Проверяем, передан ли building_id и не является ли он пустым
     if building_id:
-        # Если передан список или одно значение
+        # Если передан не список, преобразуем в список
         if not isinstance(building_id, list):
             building_id = [building_id]  # Преобразуем в список, если передано одно значение
 
-        building_id_str = ', '.join(map(str, building_id))
-        query = f"""
-            SELECT id, name
-            FROM organization_department
-            WHERE building_id IN ({building_id_str})
-        """
+        # Проверяем, что список не пустой
+        if building_id:
+            building_id_str = ', '.join(map(str, building_id))
+            query = f"""
+                SELECT id, name
+                FROM organization_department
+                WHERE building_id IN ({building_id_str})
+            """
+        else:
+            # Если список пустой, выбираем все отделения
+            query = """
+                SELECT id, name
+                FROM organization_department
+            """
     else:
-        # Если корпус не выбран, возвращаем все отделения
+        # Если building_id равен None, выбираем все отделения
         query = """
             SELECT id, name
             FROM organization_department
@@ -111,10 +119,20 @@ def get_available_profiles(building_ids=None, department_ids=None):
     department_filter = ""
 
     if building_ids:
-        building_filter = f"AND department.building_id IN ({','.join(map(str, building_ids))})"
+        if not isinstance(building_ids, list):
+            building_ids = [building_ids]
+
+        if building_ids:
+            building_ids_str = ', '.join(map(str, building_ids))
+            building_filter = f"AND department.building_id IN ({building_ids_str})"
 
     if department_ids:
-        department_filter = f"AND doctor.department_id IN ({','.join(map(str, department_ids))})"
+        if not isinstance(department_ids, list):
+            department_ids = [department_ids]
+
+        if department_ids:
+            department_ids_str = ', '.join(map(str, department_ids))
+            department_filter = f"AND doctor.department_id IN ({department_ids_str})"
 
     query = f"""
         SELECT DISTINCT profile.id, profile.description
@@ -131,19 +149,35 @@ def get_available_profiles(building_ids=None, department_ids=None):
     return profiles
 
 
+
 def get_available_doctors(building_ids=None, department_ids=None, profile_ids=None):
     building_filter = ""
     department_filter = ""
     profile_filter = ""
 
     if building_ids:
-        building_filter = f"AND department.building_id IN ({','.join(map(str, building_ids))})"
+        if not isinstance(building_ids, list):
+            building_ids = [building_ids]
+
+        if building_ids:
+            building_ids_str = ', '.join(map(str, building_ids))
+            building_filter = f"AND department.building_id IN ({building_ids_str})"
 
     if department_ids:
-        department_filter = f"AND doctor.department_id IN ({','.join(map(str, department_ids))})"
+        if not isinstance(department_ids, list):
+            department_ids = [department_ids]
+
+        if department_ids:
+            department_ids_str = ', '.join(map(str, department_ids))
+            department_filter = f"AND doctor.department_id IN ({department_ids_str})"
 
     if profile_ids:
-        profile_filter = f"AND doctor.profile_id IN ({','.join(map(str, profile_ids))})"
+        if not isinstance(profile_ids, list):
+            profile_ids = [profile_ids]
+
+        if profile_ids:
+            profile_ids_str = ', '.join(map(str, profile_ids))
+            profile_filter = f"AND doctor.profile_id IN ({profile_ids_str})"
 
     query = f"""
         SELECT ARRAY_AGG(doctor.id) AS doctor_ids,
@@ -151,8 +185,8 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
                       CASE 
                           WHEN pp.description = 'общей врачебной практике (семейной медицине)' THEN 'ВОП'
                           WHEN pp.description = 'акушерству и гинекологии (за исключением использования вспомогательных репродуктивных технологий и искусственного прерывания беременности)' THEN 'акушерству и гинекологии'
-                          ELSE pp.description
-                      END, ' - ', department.name) AS doctor_info
+                        ELSE pp.description
+                      END) AS doctor_info
         FROM personnel_doctorrecord doctor
         JOIN personnel_person person ON person.id = doctor.person_id
         JOIN organization_department department ON department.id = doctor.department_id
@@ -167,9 +201,8 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
     with engine.connect() as connection:
         result = connection.execute(text(query))
         doctors = [{'label': row[1], 'value': ','.join(map(str, row[0]))} for row in result.fetchall()]
-
-
     return doctors
+
 
 
 def filter_profile(type_page):
@@ -303,3 +336,49 @@ def filter_goals_and_categories():
             )
         ]
     )
+
+
+def get_departments_by_doctor(doctor_id):
+    # Если doctor_id передан как список, берем первый элемент
+    if isinstance(doctor_id, list) and doctor_id:
+        doctor_id = doctor_id[0]
+
+    query = """
+        SELECT DISTINCT department.id, department.name
+        FROM organization_department department
+        JOIN personnel_doctorrecord doctor ON doctor.department_id = department.id
+        WHERE doctor.id = :doctor_id
+    """
+    with engine.connect() as connection:
+        result = connection.execute(text(query), {'doctor_id': doctor_id})
+        departments = [{'label': row[1], 'value': row[0]} for row in result.fetchall()]
+
+    # Добавляем опцию "Все" в начало списка
+    departments.insert(0, {'label': 'Все', 'value': 'all'})
+    return departments
+
+
+def get_doctor_details(doctor_id):
+    query = """
+        SELECT 
+            CONCAT(p.last_name, ' ', SUBSTRING(p.first_name FROM 1 FOR 1), '.', SUBSTRING(p.patronymic FROM 1 FOR 1), '.') AS doctor_name,
+            s.description AS specialty,
+            d.name AS department,
+            b.name AS building
+        FROM personnel_person p
+        JOIN personnel_doctorrecord dr ON p.id = dr.person_id
+        JOIN personnel_specialty s ON dr.specialty_id = s.id
+        JOIN organization_department d ON dr.department_id = d.id
+        JOIN organization_building b ON d.building_id = b.id
+        WHERE dr.id = :doctor_id
+    """
+    with engine.connect() as connection:
+        result = connection.execute(text(query), {'doctor_id': doctor_id}).fetchone()
+    if result:
+        return {
+            'doctor_name': result[0],
+            'specialty': result[1],
+            'department': result[2],
+            'building': result[3]
+        }
+    return None
