@@ -1,8 +1,12 @@
-def base_query(year, months, ino: bool, building_ids=None, department_ids=None, profile_ids=None, doctor_ids=None):
+def base_query(year, months, inogorodniy, sanction, amount_null, building_ids=None, department_ids=None,
+               profile_ids=None, doctor_ids=None):
     building_filter = ""
     department_filter = ""
     profile_filter = ""
     doctor_filter = ""
+    inogorodniy_filter = ""
+    status_filter = ""
+    amount_null_filter = ""
 
     if building_ids:
         building_filter = f"AND building_id IN ({','.join(map(str, building_ids))})"
@@ -15,6 +19,22 @@ def base_query(year, months, ino: bool, building_ids=None, department_ids=None, 
 
     if doctor_ids:
         doctor_filter = f"AND doctor_id IN ({','.join(map(str, doctor_ids))})"
+
+    if inogorodniy == '1':
+        inogorodniy_filter = f"AND inogorodniy = false"
+    if inogorodniy == '2':
+        inogorodniy_filter = f"AND inogorodniy = true"
+
+    if sanction == '1':
+        status_filter = f"AND sanctions = '-'"
+    if sanction == '2':
+        status_filter = f"AND sanctions != '-'"
+
+    if amount_null == '1':
+        amount_null_filter = f"AND amount_numeric != '0'"
+    if amount_null == '2':
+        amount_null_filter = f"AND amount_numeric = '0'"
+
 
     return f"""
         WITH report_data AS (SELECT oms.*,
@@ -161,7 +181,10 @@ def base_query(year, months, ino: bool, building_ids=None, department_ids=None, 
      ),
             oms as (select *
                     from oms_data
-                               WHERE inogorodniy = {ino}
+                    where talon notnull
+                               {inogorodniy_filter}
+                               {status_filter}
+                               {amount_null_filter}
                                {building_filter}
                                {department_filter}
                                {profile_filter}
@@ -192,9 +215,10 @@ def columns_by_status_oms():
     """
 
 
-def sql_query_amb_def(selected_year, months_placeholder, inogor: bool, building: None, department=None, profile=None,
+def sql_query_amb_def(selected_year, months_placeholder, inogorod, sanction, amount_null, building: None, department=None,
+                      profile=None,
                       doctor=None):
-    base = base_query(selected_year, months_placeholder, inogor, building, department, profile, doctor)
+    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile, doctor)
     query = f"""
     {base}
     SELECT goal,

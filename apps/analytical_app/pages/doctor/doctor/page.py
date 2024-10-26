@@ -6,7 +6,7 @@ from apps.analytical_app.callback import get_selected_doctors, TableUpdater
 from apps.analytical_app.components.filters import filter_doctors, filter_years, filter_months, \
     get_current_reporting_month, get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
-    get_doctor_details
+    get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null
 from apps.analytical_app.elements import card_table, get_selected_period
 from apps.analytical_app.pages.doctor.doctor.query import sql_query_amb_def, sql_query_dd_def, sql_query_stac_def
 from apps.analytical_app.query_executor import engine
@@ -24,10 +24,9 @@ doctor_talon = html.Div(
                             dbc.Row(
                                 [
                                     dbc.Col(filter_years(type_page), width=1),  # Увеличено с 1 до 2 для баланса
-                                    dbc.Col(
-                                        dbc.Switch(id=f'switch-inogorodniy-{type_page}', label="Иногородние",
-                                                   value=False),
-                                        width=2),
+                                    dbc.Col(filter_inogorod(type_page), width=2),
+                                    dbc.Col(filter_sanction(type_page), width=2),
+                                    dbc.Col(filter_amount_null(type_page), width=2),
                                 ]
                             ),
                             dbc.Row(
@@ -61,7 +60,8 @@ doctor_talon = html.Div(
                                 className='selected-filters-block',
                                 style={'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
                                        'border-radius': '5px'}
-                            )
+                            ),
+
                         ]
                     ),
                     style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
@@ -133,6 +133,7 @@ def update_filters(building_id, department_id, profile_id, doctor_id):
 
     return buildings, departments, profiles, doctors
 
+
 @app.callback(
     Output(f'selected-filters-{type_page}', 'children'),
     [Input(f'dropdown-doctor-{type_page}', 'value')]
@@ -161,7 +162,6 @@ def update_selected_filters(doctor_id):
         return []
 
 
-
 @app.callback(
     Output(f'selected-period-{type_page}', 'children'),
     [Input(f'range-slider-month-{type_page}', 'value'),
@@ -180,11 +180,15 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
      Input(f'dropdown-profile-{type_page}', 'value'),  # Добавляем фильтр по профилю
      Input(f'selected-period-{type_page}', 'children'),
      Input(f'dropdown-year-{type_page}', 'value'),
-     Input(f'switch-inogorodniy-{type_page}', 'value'),
+     Input(f'dropdown-inogorodniy-{type_page}', 'value'),
+     Input(f'dropdown-sanction-{type_page}', 'value'),
+     Input(f'dropdown-amount-null-{type_page}', 'value'),
      Input(f'dropdown-building-{type_page}', 'value'),
-     Input(f'dropdown-department-{type_page}', 'value')]
+     Input(f'dropdown-department-{type_page}', 'value'),
+     ]
 )
-def update_table(value_doctor, value_profile, selected_period, selected_year, inogorodniy, building_ids,
+def update_table(value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction, amount_null,
+                 building_ids,
                  department_ids):
     # Проверка на наличие выбранного периода
     if not selected_period:
@@ -215,11 +219,12 @@ def update_table(value_doctor, value_profile, selected_period, selected_year, in
             selected_year,
             months_placeholder,
             inogorodniy,
+            sanction,
+            amount_null,
             building_ids,
             department_ids,
             value_profile,  # Фильтр по профилю
-            selected_doctor_ids  # Фильтр по врачу
+            selected_doctor_ids,  # Фильтр по врачу
         )
     )
-
     return columns1, data1

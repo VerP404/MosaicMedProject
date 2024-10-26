@@ -149,7 +149,6 @@ def get_available_profiles(building_ids=None, department_ids=None):
     return profiles
 
 
-
 def get_available_doctors(building_ids=None, department_ids=None, profile_ids=None):
     building_filter = ""
     department_filter = ""
@@ -204,7 +203,6 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
     return doctors
 
 
-
 def filter_profile(type_page):
     return dbc.Col(
         dcc.Dropdown(
@@ -245,6 +243,51 @@ def filter_years(type_page):
         ),
         style={"width": "100%"}
 
+    )
+
+
+def filter_inogorod(type_page):
+    return dbc.Col(
+        dcc.Dropdown(
+            id=f'dropdown-inogorodniy-{type_page}',
+            options=[
+                {'label': 'Местные', 'value': '1'},
+                {'label': 'Иногородние', 'value': '2'},
+                {'label': 'Все', 'value': '3'}
+            ],
+            value='1'
+        ),
+        style={"width": "100%"}
+    )
+
+
+def filter_sanction(type_page):
+    return dbc.Col(
+        dcc.Dropdown(
+            id=f'dropdown-sanction-{type_page}',
+            options=[
+                {'label': 'Без санкций', 'value': '1'},
+                {'label': 'Санкции', 'value': '2'},
+                {'label': 'Все', 'value': '3'}
+            ],
+            value='1'
+        ),
+        style={"width": "100%"}
+    )
+
+
+def filter_amount_null(type_page):
+    return dbc.Col(
+        dcc.Dropdown(
+            id=f'dropdown-amount-null-{type_page}',
+            options=[
+                {'label': 'Не нулевые', 'value': '1'},
+                {'label': 'Нулевые', 'value': '2'},
+                {'label': 'Все', 'value': '3'}
+            ],
+            value='1'
+        ),
+        style={"width": "100%"}
     )
 
 
