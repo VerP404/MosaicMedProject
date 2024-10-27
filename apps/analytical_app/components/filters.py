@@ -381,6 +381,26 @@ def filter_goals_and_categories():
     )
 
 
+def date_picker(type_page):
+    # Вычисляем вчерашнюю дату
+    yesterday = datetime.now() - timedelta(days=1)
+
+    return html.Div(
+        [
+            dcc.DatePickerRange(
+                id=f'date-picker-range-{type_page}',
+                start_date_placeholder_text="Начало",
+                end_date_placeholder_text="Конец",
+                end_date=yesterday,  # Устанавливаем вчерашнюю дату по умолчанию
+                display_format="DD.MM.YYYY",  # Формат отображения дд.мм.гггг
+                calendar_orientation='horizontal',
+                style={'margin': '10px'},
+                first_day_of_week=1  # Начало недели с понедельника
+            )
+        ]
+    )
+
+
 def get_departments_by_doctor(doctor_id):
     # Если doctor_id передан как список, берем первый элемент
     if isinstance(doctor_id, list) and doctor_id:

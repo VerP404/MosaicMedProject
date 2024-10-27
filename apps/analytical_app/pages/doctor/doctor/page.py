@@ -6,7 +6,7 @@ from apps.analytical_app.callback import get_selected_doctors, TableUpdater
 from apps.analytical_app.components.filters import filter_doctors, filter_years, filter_months, \
     get_current_reporting_month, get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
-    get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null
+    get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker
 from apps.analytical_app.elements import card_table, get_selected_period
 from apps.analytical_app.pages.doctor.doctor.query import sql_query_amb_def, sql_query_dd_def, sql_query_stac_def
 from apps.analytical_app.query_executor import engine
@@ -27,6 +27,7 @@ doctor_talon = html.Div(
                                     dbc.Col(filter_inogorod(type_page), width=2),
                                     dbc.Col(filter_sanction(type_page), width=2),
                                     dbc.Col(filter_amount_null(type_page), width=2),
+                                    dbc.Col(date_picker(type_page), width=4),
                                 ]
                             ),
                             dbc.Row(
