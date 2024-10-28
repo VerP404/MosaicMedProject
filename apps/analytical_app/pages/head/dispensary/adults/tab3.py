@@ -8,7 +8,8 @@ from apps.analytical_app.app import app
 from apps.analytical_app.callback import get_selected_dates, TableUpdater
 from apps.analytical_app.components.filters import filter_status, date_start, date_end, status_groups, filter_years, \
     filter_report_type, filter_inogorod, filter_sanction, filter_amount_null, update_buttons, \
-    get_current_reporting_month, date_picker, filter_months
+    get_current_reporting_month, date_picker, filter_months, get_available_buildings, get_departments_by_doctor, \
+    get_available_departments, get_available_profiles, get_available_doctors, filter_building, filter_department
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.doctor.doctor.query import sql_query_amb_def
 from apps.analytical_app.pages.head.dispensary.adults.query import sql_query_adults_age_dispensary, \
@@ -75,6 +76,12 @@ adults_dv3 = html.Div(
                                     ]
                                 ),
                             ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(filter_building(type_page), width=6),  # Увеличено до 6
+                                    dbc.Col(filter_department(type_page), width=6),  # Увеличено до 6
+                                ]
+                            ),
                             dbc.Card(
                                 dbc.Row(
                                     html.Div(
@@ -98,6 +105,7 @@ adults_dv3 = html.Div(
                                     ),
                                 ),
                             ),
+
                             dcc.Loading(id=f'loading-output-{type_page}', type='default'),
                         ]
                     ),
@@ -188,6 +196,30 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
 
 
 @app.callback(
+    [
+        Output(f'dropdown-building-{type_page}', 'options'),
+        Output(f'dropdown-department-{type_page}', 'options'),
+    ],
+    [
+        Input(f'dropdown-building-{type_page}', 'value'),
+    ]
+)
+def update_filters(building_id):
+    # Получаем доступные корпуса
+    buildings = get_available_buildings()
+
+    # Определяем доступные отделения
+    if building_id:
+        # Если выбран корпус, фильтруем по корпусу
+        departments = get_available_departments(building_id)
+    else:
+        # Если ничего не выбрано, возвращаем все отделения
+        departments = get_available_departments()
+
+    return buildings, departments
+
+
+@app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data'),
      Output(f'loading-output-{type_page}', 'children')],
@@ -197,6 +229,8 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
      State(f'dropdown-inogorodniy-{type_page}', 'value'),
      State(f'dropdown-sanction-{type_page}', 'value'),
      State(f'dropdown-amount-null-{type_page}', 'value'),
+     State(f'dropdown-building-{type_page}', 'value'),
+     State(f'dropdown-department-{type_page}', 'value'),
      State(f'date-picker-range-input-{type_page}', 'start_date'),
      State(f'date-picker-range-input-{type_page}', 'end_date'),
      State(f'date-picker-range-treatment-{type_page}', 'start_date'),
@@ -208,6 +242,7 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
 )
 def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction,
                  amount_null,
+                 building_ids, department_ids,
                  start_date_input, end_date_input,
                  start_date_treatment, end_date_treatment, report_type,
                  selected_type_dv,
@@ -245,7 +280,8 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
             inogorodniy,
             sanction,
             amount_null,
-            building=None,
+            building=building_ids,
+            department=department_ids,
             profile=None,
             doctor=None,
             input_start=start_date_input_formatted,
