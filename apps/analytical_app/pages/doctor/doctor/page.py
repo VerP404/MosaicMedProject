@@ -8,7 +8,7 @@ from apps.analytical_app.callback import get_selected_doctors, TableUpdater
 from apps.analytical_app.components.filters import filter_doctors, filter_years, filter_months, \
     get_current_reporting_month, get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
-    get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker
+    get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type
 from apps.analytical_app.elements import card_table, get_selected_period
 from apps.analytical_app.pages.doctor.doctor.query import sql_query_amb_def, sql_query_dd_def, sql_query_stac_def
 from apps.analytical_app.query_executor import engine
@@ -25,16 +25,36 @@ doctor_talon = html.Div(
                             dbc.CardHeader("Фильтры"),
                             dbc.Row(
                                 [
-                                    dbc.Col(filter_years(type_page), width=1),  # Увеличено с 1 до 2 для баланса
+                                    dbc.Col(filter_years(type_page), width=1),
+                                    dbc.Col(filter_report_type(type_page), width=2),
                                     dbc.Col(filter_inogorod(type_page), width=2),
                                     dbc.Col(filter_sanction(type_page), width=2),
                                     dbc.Col(filter_amount_null(type_page), width=2),
-                                    dbc.Col(date_picker(type_page), width=4),
                                 ]
                             ),
                             dbc.Row(
                                 [
-                                    filter_months(type_page)  # фильтр по месяцам
+                                    dbc.Row(
+                                        [
+                                            dbc.Col(filter_months(type_page), width=12),
+                                            dbc.Row(
+                                                [
+                                                    dbc.Col(
+                                                        html.Label("Выберите дату", id=f'label-date-{type_page}',
+                                                                   style={'font-weight': 'bold', 'display': 'none'}),
+                                                        width="auto"
+                                                    ),
+                                                    dbc.Col(date_picker(f'input-{type_page}'), width=4,
+                                                            id=f'col-input-{type_page}', style={'display': 'none'}),
+                                                    dbc.Col(date_picker(f'treatment-{type_page}'), width=4,
+                                                            id=f'col-treatment-{type_page}', style={'display': 'none'}),
+                                                ],
+                                                align="center",
+                                                style={"display": "flex", "align-items": "center",
+                                                       "margin-bottom": "10px"}
+                                            )
+                                        ]
+                                    ),
                                 ]
                             ),
                             dbc.Row(
@@ -78,6 +98,58 @@ doctor_talon = html.Div(
     ],
     style={"padding": "0rem"}
 )
+
+
+@app.callback(
+    [
+        Output(f'range-slider-month-{type_page}', 'style'),
+        Output(f'date-picker-range-input-{type_page}', 'style'),
+        Output(f'date-picker-range-treatment-{type_page}', 'style')
+    ],
+    [Input(f'dropdown-report-type-{type_page}', 'value')]
+)
+def toggle_filters(report_type):
+    if report_type == 'month':
+        return {'display': 'block'}, {'display': 'none'}, {'display': 'none'}
+    elif report_type == 'initial_input':
+        return {'display': 'none'}, {'display': 'block'}, {'display': 'none'}
+    elif report_type == 'treatment':
+        return {'display': 'none'}, {'display': 'none'}, {'display': 'block'}
+    return {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
+
+
+@app.callback(
+    [
+        Output(f'col-input-{type_page}', 'style'),
+        Output(f'col-treatment-{type_page}', 'style'),
+    ],
+    [Input(f'dropdown-report-type-{type_page}', 'value')]
+)
+def toggle_datepickers(report_type):
+    if report_type == 'initial_input':
+        return {'display': 'block'}, {'display': 'none'}
+    elif report_type == 'treatment':
+        return {'display': 'none'}, {'display': 'block'}
+    return {'display': 'none'}, {'display': 'none'}
+
+
+@app.callback(
+    Output(f'label-date-{type_page}', 'style'),
+    [
+        Input(f'dropdown-report-type-{type_page}', 'value'),
+        Input(f'date-picker-range-input-{type_page}', 'start_date'),
+        Input(f'date-picker-range-input-{type_page}', 'end_date'),
+        Input(f'date-picker-range-treatment-{type_page}', 'start_date'),
+        Input(f'date-picker-range-treatment-{type_page}', 'end_date')
+    ]
+)
+def toggle_label_visibility(report_type, start_date_input, end_date_input, start_date_treatment, end_date_treatment):
+    # Показать подпись только если выбран тип "initial_input" или "treatment", и установлены даты
+    if report_type in ['initial_input', 'treatment'] and (
+            start_date_input or end_date_input or start_date_treatment or end_date_treatment):
+        return {'display': 'block'}
+    # В противном случае скрыть подпись
+    return {'display': 'none'}
 
 
 @app.callback(
@@ -180,63 +252,60 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data')],
     [Input(f'dropdown-doctor-{type_page}', 'value'),
-     Input(f'dropdown-profile-{type_page}', 'value'),  # Добавляем фильтр по профилю
-     Input(f'selected-period-{type_page}', 'children'),
+     Input(f'dropdown-profile-{type_page}', 'value'),
+     Input(f'range-slider-month-{type_page}', 'value'),
      Input(f'dropdown-year-{type_page}', 'value'),
      Input(f'dropdown-inogorodniy-{type_page}', 'value'),
      Input(f'dropdown-sanction-{type_page}', 'value'),
      Input(f'dropdown-amount-null-{type_page}', 'value'),
      Input(f'dropdown-building-{type_page}', 'value'),
      Input(f'dropdown-department-{type_page}', 'value'),
-     Input(f'date-picker-range-{type_page}', 'start_date'),  # Добавляем начало периода
-     Input(f'date-picker-range-{type_page}', 'end_date')     # Добавляем конец периода
-     ]
+     Input(f'date-picker-range-input-{type_page}', 'start_date'),
+     Input(f'date-picker-range-input-{type_page}', 'end_date'),
+     Input(f'date-picker-range-treatment-{type_page}', 'start_date'),
+     Input(f'date-picker-range-treatment-{type_page}', 'end_date'),
+     Input(f'dropdown-report-type-{type_page}', 'value')]
 )
 def update_table(value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction, amount_null,
-                 building_ids,
-                 department_ids,
-                 start_date,
-                 end_date):
-    # Проверка на наличие выбранного периода
-    if not selected_period:
-        return [], []
-
+                 building_ids, department_ids, start_date_input, end_date_input,
+                 start_date_treatment, end_date_treatment, report_type):
     # Проверка и обработка значения value_doctor
     if value_doctor:
         if isinstance(value_doctor, str):
-            # Разделяем строку на части и преобразуем каждую в int
             selected_doctor_ids = [int(id) for id in value_doctor.split(',') if id.strip().isdigit()]
         else:
-            # Если это список, конвертируем каждый элемент в int
             selected_doctor_ids = [int(id) for id in value_doctor if isinstance(id, (int, str)) and str(id).isdigit()]
     else:
         selected_doctor_ids = []
 
-    # Проверка и обработка значения value_profile
-    if not value_profile:
-        value_profile = []
+    # Определяем используемый период в зависимости от типа отчета
+    start_date_input_formatted, end_date_input_formatted = None, None
+    start_date_treatment_formatted, end_date_treatment_formatted = None, None
 
-    # Генерация списка месяцев для SQL-запроса
-    months_placeholder = ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)])
-
-    start_date_formatted = datetime.strptime(start_date, '%Y-%m-%d').strftime('%d-%m-%Y')
-    end_date_formatted = datetime.strptime(end_date, '%Y-%m-%d').strftime('%d-%m-%Y')
-
+    if report_type == 'month':
+        start_date_input_formatted, end_date_input_formatted = None, None
+        start_date_treatment_formatted, end_date_treatment_formatted = None, None
+    elif report_type == 'initial_input':
+        start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+    elif report_type == 'treatment':
+        start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
+            '%d-%m-%Y')
+        end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
+            '%d-%m-%Y')
     # Генерация SQL-запроса с учетом всех фильтров
     columns1, data1 = TableUpdater.query_to_df(
         engine,
         sql_query_amb_def(
             selected_year,
-            months_placeholder,
-            inogorodniy,
-            sanction,
-            amount_null,
-            building_ids,
-            department_ids,
-            value_profile,  # Фильтр по профилю
-            selected_doctor_ids,  # Фильтр по врачу
-            start_date_formatted,
-            end_date_formatted
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy, sanction, amount_null,
+            building_ids, department_ids,
+            value_profile,
+            selected_doctor_ids,
+            start_date_input_formatted, end_date_input_formatted,
+            start_date_treatment_formatted, end_date_treatment_formatted
         )
     )
+
     return columns1, data1

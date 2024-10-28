@@ -98,21 +98,6 @@ def create_sidebar():
                         active="exact",
                         id="main-menu-link"
                     ),
-                    dbc.NavLink(
-                        [html.I(className="bi bi-list"),
-                         html.Span(" Старая версия", className="ms-2", id="old1-label")],
-                        href='http://10.136.29.166:5001/',
-                        active="exact",
-                        id="old1-link"
-                    ),
-
-                    dbc.NavLink(
-                        [html.I(className="bi bi-list"),
-                         html.Span(" Старая версия ГП11", className="ms-2", id="old2-label")],
-                        href='http://192.168.1.19:5001/',
-                        active="exact",
-                        id="old2-link"
-                    ),
                 ],
                 vertical=True,
                 pills=True,

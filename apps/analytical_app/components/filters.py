@@ -276,6 +276,21 @@ def filter_sanction(type_page):
     )
 
 
+def filter_report_type(type_page):
+    return dbc.Col(
+        dcc.Dropdown(
+            id=f'dropdown-report-type-{type_page}',
+            options=[
+                {'label': 'По отчетному месяцу', 'value': 'month'},
+                {'label': 'По дате формирования', 'value': 'initial_input'},
+                {'label': 'По дате лечения', 'value': 'treatment'}
+            ],
+            value='month'
+        ),
+        style={"width": "100%"}
+    )
+
+
 def filter_amount_null(type_page):
     return dbc.Col(
         dcc.Dropdown(
@@ -384,6 +399,7 @@ def filter_goals_and_categories():
 def date_picker(type_page):
     # Вычисляем вчерашнюю дату
     yesterday = datetime.now() - timedelta(days=1)
+    week_ago = datetime.now() - timedelta(days=7)
 
     return html.Div(
         [
@@ -391,11 +407,12 @@ def date_picker(type_page):
                 id=f'date-picker-range-{type_page}',
                 start_date_placeholder_text="Начало",
                 end_date_placeholder_text="Конец",
-                end_date=yesterday,  # Устанавливаем вчерашнюю дату по умолчанию
-                display_format="DD.MM.YYYY",  # Формат отображения дд.мм.гггг
+                start_date=week_ago,
+                end_date=yesterday,
+                display_format="DD.MM.YYYY",
                 calendar_orientation='horizontal',
                 style={'margin': '10px'},
-                first_day_of_week=1  # Начало недели с понедельника
+                first_day_of_week=1
             )
         ]
     )

@@ -3,8 +3,9 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                department_ids=None,
                profile_ids=None,
                doctor_ids=None,
-               treatment_start=None,
-               treatment_end=None):
+               initial_input_date_start=None, initial_input_date_end=None,
+               treatment_start=None, treatment_end=None,
+               ):
     building_filter = ""
     department_filter = ""
     profile_filter = ""
@@ -13,6 +14,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
     status_filter = ""
     amount_null_filter = ""
     treatment = ""
+    initial_input = ""
 
     if building_ids:
         building_filter = f"AND building_id IN ({','.join(map(str, building_ids))})"
@@ -40,8 +42,19 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
         amount_null_filter = f"AND amount_numeric != '0'"
     if amount_null == '2':
         amount_null_filter = f"AND amount_numeric = '0'"
+
+
+
     if treatment_start and treatment_end:
-        date = f"AND to_date(initial_input_date, 'DD-MM-YYYY') BETWEEN to_date({treatment_start}, 'DD-MM-YYYY') and to_date({treatment_end}, 'DD-MM-YYYY')"
+        treatment = (f"AND to_date(treatment_end, 'DD-MM-YYYY') BETWEEN to_date('{treatment_start}', "
+                     f"'DD-MM-YYYY') and to_date('{treatment_end}', 'DD-MM-YYYY')")
+
+    if initial_input_date_start and initial_input_date_end:
+        initial_input = (f"AND to_date(initial_input_date, 'DD-MM-YYYY') BETWEEN to_date('{initial_input_date_start}', "
+                         f"'DD-MM-YYYY') and to_date('{initial_input_date_end}', 'DD-MM-YYYY')")
+
+
+
 
     return f"""
         WITH report_data AS (SELECT oms.*,
@@ -196,7 +209,9 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                                {department_filter}
                                {profile_filter}
                                {doctor_filter}
-                               {treatment})
+                               {treatment}
+                               {initial_input}
+                               )
         """
 
 
@@ -227,12 +242,13 @@ def sql_query_amb_def(selected_year, months_placeholder, inogorod, sanction, amo
                       department=None,
                       profile=None,
                       doctor=None,
+                      input_start=None, input_end=None,
                       treatment_start=None,
                       treatment_end=None):
     base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
                       doctor,
-                      treatment_start=None,
-                      treatment_end=None)
+                      input_start, input_end,
+                      treatment_start, treatment_end)
     query = f"""
     {base}
     SELECT goal,
