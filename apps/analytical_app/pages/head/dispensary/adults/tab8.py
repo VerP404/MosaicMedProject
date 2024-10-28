@@ -1,12 +1,16 @@
+from datetime import datetime
+
 from dash import html, dcc, Output, Input, exceptions, State
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
-from apps.analytical_app.components.filters import filter_status, status_groups, months_labels, \
-    get_current_reporting_month, filter_months, filter_years
-from apps.analytical_app.elements import get_selected_period, card_table
-from apps.analytical_app.pages.head.dispensary.adults.query import query_dv4_price
+from apps.analytical_app.components.filters import filter_status, status_groups,  \
+    get_current_reporting_month, filter_months, filter_years, get_available_buildings, get_available_departments, \
+    filter_department, filter_building, date_picker, update_buttons, filter_report_type, filter_inogorod, \
+    filter_sanction, filter_amount_null
+from apps.analytical_app.elements import card_table
+from apps.analytical_app.pages.head.dispensary.adults.query import sql_query_dispensary_amount_group
 from apps.analytical_app.query_executor import engine
 
 type_page = "tab8-da"
@@ -19,24 +23,86 @@ adults_dv8 = html.Div(
                     dbc.CardBody(
                         [
                             dbc.CardHeader("Фильтры"),
-                            dbc.Row(
-                                [
-                                    filter_status(type_page),  # фильтр по статусам
-                                    filter_years(type_page)  # фильтр по годам
-                                ]
+                            dbc.Card(
+                                dbc.Row(
+                                    [
+                                        dbc.Col(update_buttons(type_page), width=2),
+                                        dbc.Col(filter_years(type_page), width=1),
+                                        dbc.Col(filter_report_type(type_page), width=3),
+                                        dbc.Col(filter_inogorod(type_page), width=2),
+                                        dbc.Col(filter_sanction(type_page), width=2),
+                                        dbc.Col(filter_amount_null(type_page), width=2),
+                                    ],
+                                    align="center",
+                                    justify="between",
+                                ),
+                            ),
+                            dbc.Card(
+                                dbc.Row(
+                                    [
+                                        filter_status(type_page),  # фильтр по статусам
+                                    ]
+                                ),
+                            ),
+                            dbc.Card(
+                                dbc.Row(
+                                    [
+                                        dbc.Row(
+                                            [
+                                                dbc.Col(filter_months(type_page), width=12),
+                                                dbc.Row(
+                                                    [
+                                                        dbc.Col(
+                                                            html.Label("Выберите дату", id=f'label-date-{type_page}',
+                                                                       style={'font-weight': 'bold',
+                                                                              'display': 'none'}),
+                                                            width="auto"
+                                                        ),
+                                                        dbc.Col(date_picker(f'input-{type_page}'), width=4,
+                                                                id=f'col-input-{type_page}', style={'display': 'none'}),
+                                                        dbc.Col(date_picker(f'treatment-{type_page}'), width=4,
+                                                                id=f'col-treatment-{type_page}',
+                                                                style={'display': 'none'}),
+                                                    ],
+                                                    align="center",
+                                                    style={"display": "flex", "align-items": "center",
+                                                           "margin-bottom": "10px"}
+                                                )
+                                            ]
+                                        ),
+                                    ]
+                                ),
                             ),
                             dbc.Row(
                                 [
-                                    filter_months(type_page)  # фильтр по месяцам
+                                    dbc.Col(filter_building(type_page), width=6),  # Увеличено до 6
+                                    dbc.Col(filter_department(type_page), width=6),  # Увеличено до 6
                                 ]
                             ),
-                            html.Div(id=f'selected-doctor-{type_page}', className='filters-label',
-                                     style={'display': 'none'}),
-                            html.Div(id=f'selected-period-{type_page}', className='filters-label',
-                                     style={'display': 'none'}),
-                            html.Div(id=f'current-month-name-{type_page}', className='filters-label'),
-                            html.Div(id=f'selected-month-{type_page}', className='filters-label'),
-                            html.Button('Получить данные', id=f'get-data-button-{type_page}'),
+                            dbc.Card(
+                                dbc.Row(
+                                    html.Div(
+                                        [
+                                            dbc.Label("Выберите тип диспансеризации:"),
+                                            dbc.Checklist(
+                                                options=[
+                                                    {"label": "ДВ4", "value": 'ДВ4'},
+                                                    {"label": "ДВ2", "value": 'ДВ2'},
+                                                    {"label": "ОПВ", "value": 'ОПВ'},
+                                                    {"label": "УД1", "value": 'УД1'},
+                                                    {"label": "УД2", "value": 'УД2'},
+                                                    {"label": "ДР1", "value": 'ДР1'},
+                                                    {"label": "ДР2", "value": 'ДР2'},
+                                                ],
+                                                value=['ДВ4'],
+                                                id=f"checklist-input-{type_page}",
+                                                inline=True,
+                                            ),
+                                        ]
+                                    ),
+                                ),
+                            ),
+
                             dcc.Loading(id=f'loading-output-{type_page}', type='default'),
                         ]
                     ),
@@ -47,13 +113,65 @@ adults_dv8 = html.Div(
             ),
             style={"margin": "0 auto", "padding": "0rem"}
         ),
-        card_table(f'result-table-{type_page}', "Отчет по ДВ4 с группировкой по стоимости")
+        card_table(f'result-table1-{type_page}',
+                   "Отчет по видам диспансеризации взрослых с группировкой по стоимости")
     ],
     style={"padding": "0rem"}
 )
 
 
-# Определяем отчетный месяц и выводим его на страницу и в переменную dcc Store
+@app.callback(
+    [
+        Output(f'range-slider-month-{type_page}', 'style'),
+        Output(f'date-picker-range-input-{type_page}', 'style'),
+        Output(f'date-picker-range-treatment-{type_page}', 'style')
+    ],
+    [Input(f'dropdown-report-type-{type_page}', 'value')]
+)
+def toggle_filters(report_type):
+    if report_type == 'month':
+        return {'display': 'block'}, {'display': 'none'}, {'display': 'none'}
+    elif report_type == 'initial_input':
+        return {'display': 'none'}, {'display': 'block'}, {'display': 'none'}
+    elif report_type == 'treatment':
+        return {'display': 'none'}, {'display': 'none'}, {'display': 'block'}
+    return {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
+
+
+@app.callback(
+    [
+        Output(f'col-input-{type_page}', 'style'),
+        Output(f'col-treatment-{type_page}', 'style'),
+    ],
+    [Input(f'dropdown-report-type-{type_page}', 'value')]
+)
+def toggle_datepickers(report_type):
+    if report_type == 'initial_input':
+        return {'display': 'block'}, {'display': 'none'}
+    elif report_type == 'treatment':
+        return {'display': 'none'}, {'display': 'block'}
+    return {'display': 'none'}, {'display': 'none'}
+
+
+@app.callback(
+    Output(f'label-date-{type_page}', 'style'),
+    [
+        Input(f'dropdown-report-type-{type_page}', 'value'),
+        Input(f'date-picker-range-input-{type_page}', 'start_date'),
+        Input(f'date-picker-range-input-{type_page}', 'end_date'),
+        Input(f'date-picker-range-treatment-{type_page}', 'start_date'),
+        Input(f'date-picker-range-treatment-{type_page}', 'end_date')
+    ]
+)
+def toggle_label_visibility(report_type, start_date_input, end_date_input, start_date_treatment, end_date_treatment):
+    # Показать подпись только если выбран тип "initial_input" или "treatment", и установлены даты
+    if report_type in ['initial_input', 'treatment'] and (
+            start_date_input or end_date_input or start_date_treatment or end_date_treatment):
+        return {'display': 'block'}
+    # В противном случае скрыть подпись
+    return {'display': 'none'}
+
+
 @app.callback(
     Output(f'current-month-name-{type_page}', 'children'),
     Input('date-interval', 'n_intervals')
@@ -64,53 +182,111 @@ def update_current_month(n_intervals):
 
 
 @app.callback(
-    Output(f'selected-month-{type_page}', 'children'),
-    Input(f'range-slider-month-{type_page}', 'value')
-)
-def update_selected_month(selected_months):
-    if selected_months is None:
-        return "Выбранный месяц: Не выбран"
-
-    start_month, end_month = selected_months
-    start_month_name = months_labels.get(start_month, 'Неизвестно')
-    end_month_name = months_labels.get(end_month, 'Неизвестно')
-    if start_month_name == end_month_name:
-        return f'Выбранный месяц: {start_month_name}'
-    else:
-        return f'Выбранный месяц: с {start_month_name} по {end_month_name}'
-
-
-@app.callback(
     Output(f'selected-period-{type_page}', 'children'),
     [Input(f'range-slider-month-{type_page}', 'value'),
      Input(f'dropdown-year-{type_page}', 'value'),
-     Input(f'current-month-name-{type_page}', 'children')]
+     Input(f'current-month-name-{type_page}', 'children'),
+     ]
 )
 def update_selected_period_list(selected_months_range, selected_year, current_month_name):
-    return get_selected_period(selected_months_range, selected_year, current_month_name)
+    return selected_months_range
 
 
 @app.callback(
-    [Output(f'result-table-{type_page}', 'columns'),
-     Output(f'result-table-{type_page}', 'data'),
-     Output(f'loading-output-{type_page}', 'children')],
-    [Input(f'get-data-button-{type_page}', 'n_clicks'),
-     State(f'selected-period-{type_page}', 'children'),
-     State(f'status-group-radio-{type_page}', 'value')]
+    [
+        Output(f'dropdown-building-{type_page}', 'options'),
+        Output(f'dropdown-department-{type_page}', 'options'),
+    ],
+    [
+        Input(f'dropdown-building-{type_page}', 'value'),
+    ]
 )
-def update_table(n_clicks, selected_period, selected_status):
-    if n_clicks is None or not selected_period or not selected_status:
+def update_filters(building_id):
+    # Получаем доступные корпуса
+    buildings = get_available_buildings()
+
+    # Определяем доступные отделения
+    if building_id:
+        # Если выбран корпус, фильтруем по корпусу
+        departments = get_available_departments(building_id)
+    else:
+        # Если ничего не выбрано, возвращаем все отделения
+        departments = get_available_departments()
+
+    return buildings, departments
+
+
+@app.callback(
+    [Output(f'result-table1-{type_page}', 'columns'),
+     Output(f'result-table1-{type_page}', 'data'),
+     Output(f'loading-output-{type_page}', 'children')],
+    [Input(f'update-button-{type_page}', 'n_clicks')],
+    [State(f'range-slider-month-{type_page}', 'value'),
+     State(f'dropdown-year-{type_page}', 'value'),
+     State(f'dropdown-inogorodniy-{type_page}', 'value'),
+     State(f'dropdown-sanction-{type_page}', 'value'),
+     State(f'dropdown-amount-null-{type_page}', 'value'),
+     State(f'dropdown-building-{type_page}', 'value'),
+     State(f'dropdown-department-{type_page}', 'value'),
+     State(f'date-picker-range-input-{type_page}', 'start_date'),
+     State(f'date-picker-range-input-{type_page}', 'end_date'),
+     State(f'date-picker-range-treatment-{type_page}', 'start_date'),
+     State(f'date-picker-range-treatment-{type_page}', 'end_date'),
+     State(f'dropdown-report-type-{type_page}', 'value'),
+     State(f'checklist-input-{type_page}', 'value'),
+     State(f'status-group-radio-{type_page}', 'value'),
+     ]
+)
+def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction,
+                 amount_null,
+                 building_ids, department_ids,
+                 start_date_input, end_date_input,
+                 start_date_treatment, end_date_treatment, report_type,
+                 selected_type_dv,
+                 selected_status):
+    # Если кнопка не была нажата, обновление не происходит
+    if n_clicks is None:
         raise exceptions.PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
+    selected_type_dv_tuple = tuple(selected_type_dv)
     selected_status_values = status_groups[selected_status]
     selected_status_tuple = tuple(selected_status_values)
+    # Определяем используемый период в зависимости от типа отчета
+    start_date_input_formatted, end_date_input_formatted = None, None
+    start_date_treatment_formatted, end_date_treatment_formatted = None, None
 
-    sql_cond = ', '.join([f"'{period}'" for period in selected_period])
-    cel = "ДВ4"
-    bind_params = {
-        'status_list': selected_status_tuple,
-        'cel': cel
-    }
-    columns, data = TableUpdater.query_to_df(engine, query_dv4_price(sql_cond), bind_params)
-    return columns, data, loading_output
+    if report_type == 'month':
+        start_date_input_formatted, end_date_input_formatted = None, None
+        start_date_treatment_formatted, end_date_treatment_formatted = None, None
+    elif report_type == 'initial_input':
+        start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+    elif report_type == 'treatment':
+        start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
+            '%d-%m-%Y')
+        end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
+            '%d-%m-%Y')
+
+    # Генерация SQL-запроса с учетом всех фильтров
+    columns1, data1 = TableUpdater.query_to_df(
+        engine,
+        sql_query_dispensary_amount_group(
+            selected_year,
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy,
+            sanction,
+            amount_null,
+            building=building_ids,
+            department=department_ids,
+            profile=None,
+            doctor=None,
+            input_start=start_date_input_formatted,
+            input_end=end_date_input_formatted,
+            treatment_start=start_date_treatment_formatted,
+            treatment_end=end_date_treatment_formatted,
+            cel_list=selected_type_dv_tuple,
+            status_list=selected_status_tuple
+        )
+    )
+    return columns1, data1, loading_output

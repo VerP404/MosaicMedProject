@@ -9,11 +9,9 @@ from apps.analytical_app.callback import get_selected_dates, TableUpdater
 from apps.analytical_app.components.filters import filter_status, date_start, date_end, status_groups, filter_years, \
     filter_report_type, filter_inogorod, filter_sanction, filter_amount_null, update_buttons, \
     get_current_reporting_month, date_picker, filter_months, get_available_buildings, get_departments_by_doctor, \
-    get_available_departments, get_available_profiles, get_available_doctors, filter_building, filter_department
+    get_available_departments, filter_building, filter_department
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.doctor.doctor.query import sql_query_amb_def
-from apps.analytical_app.pages.head.dispensary.adults.query import sql_query_adults_age_dispensary, \
-    sql_query_dispensary, sql_query_dispensary_age
+from apps.analytical_app.pages.head.dispensary.adults.query import sql_query_dispensary_age
 from apps.analytical_app.query_executor import engine
 
 type_page = "tab3-da"

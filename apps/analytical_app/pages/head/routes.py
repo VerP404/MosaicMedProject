@@ -6,8 +6,6 @@ from apps.analytical_app.pages.economist.doctors.page import economist_doctors_t
 from apps.analytical_app.pages.head.dispensary.adults.main import head_adults_dd_main
 from apps.analytical_app.pages.head.dispensary.adults.tab1 import adults_dv1
 from apps.analytical_app.pages.head.dispensary.adults.tab3 import adults_dv3
-from apps.analytical_app.pages.head.dispensary.adults.tab4 import adults_dv4
-from apps.analytical_app.pages.head.dispensary.adults.tab5 import adults_dv5
 from apps.analytical_app.pages.head.dispensary.adults.tab8 import adults_dv8
 from apps.analytical_app.pages.head.dispensary.reports.page import dispensary_reports
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
@@ -76,7 +74,7 @@ routes_head = {
     "/head/adults/dv8": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Диспансеризация взрослых", "href": "/head/adults"},
-            {"label": "8", "active": True},
+            {"label": "Диспансеризация с группировкой по стоимости", "active": True},
         ]),
         adults_dv8
     ]),
