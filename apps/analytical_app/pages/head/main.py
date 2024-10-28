@@ -16,8 +16,8 @@ cards_row_1 = dbc.Row(
                             "Диспансеризация детей",
                             "Отчеты по диспансеризации детей")),
         dbc.Col(create_card(3, type_page,
-                            "- Диспансерное наблюдение",
-                            "-")),
+                            "Репродуктивное здоровье",
+                            "Отчеты по диспансеризации репродуктивного здоровья")),
         dbc.Col(create_card(4, type_page,
                             "Диспансерное наблюдение работающих",
                             "Анализ работающих не прикрепленных пациентов, внесенных в ИСЗЛ")),
@@ -32,6 +32,9 @@ cards_2 = dbc.Row(
         dbc.Col(create_card(6, type_page,
                             "131 форма",
                             "131 форма по данным из WEB-ОМС")),
+        dbc.Col(create_card(7, type_page,
+                            "- Диспансерное наблюдение",
+                            "-")),
     ],
     className="mb-4 align-items-stretch",
 )
@@ -54,10 +57,12 @@ head_main = html.Div([
      Input(f'open-report-3-{type_page}', 'n_clicks'),
      Input(f'open-report-4-{type_page}', 'n_clicks'),
      Input(f'open-report-5-{type_page}', 'n_clicks'),
-     Input(f'open-report-6-{type_page}', 'n_clicks')],
+     Input(f'open-report-6-{type_page}', 'n_clicks'),
+     Input(f'open-report-7-{type_page}', 'n_clicks'),
+     ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_6):
+def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_6, open_report_7):
     ctx = callback_context
     if not ctx.triggered:
         return no_update, no_update
@@ -74,12 +79,14 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
             new_segment = "children"
         elif button_id == f'open-report-3-{type_page}' and open_report_3:
-            new_segment = "disp_by_ages"
+            new_segment = "reproductive"
         elif button_id == f'open-report-4-{type_page}' and open_report_4:
             new_segment = "dn_job"
         elif button_id == f'open-report-5-{type_page}' and open_report_5:
             new_segment = "statistic-sharapova"
         elif button_id == f'open-report-6-{type_page}' and open_report_6:
+            new_segment = "dispensary-reports"
+        elif button_id == f'open-report-7-{type_page}' and open_report_7:
             new_segment = "dispensary-reports"
 
         if new_segment:

@@ -11,6 +11,9 @@ from apps.analytical_app.pages.head.dispensary.children.main import head_childre
 from apps.analytical_app.pages.head.dispensary.children.tab1 import children_dn1
 from apps.analytical_app.pages.head.dispensary.children.tab2 import children_dn2
 from apps.analytical_app.pages.head.dispensary.reports.page import dispensary_reports
+from apps.analytical_app.pages.head.dispensary.reproductive.main import head_reproductive_main
+from apps.analytical_app.pages.head.dispensary.reproductive.tab1 import reproductive_dr1
+from apps.analytical_app.pages.head.dispensary.reproductive.tab2 import reproductive_dr2
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
 from apps.analytical_app.pages.head.main import head_main
 from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapova
@@ -105,5 +108,29 @@ routes_head = {
             {"label": "По возрастам диспансеризация детей", "active": True},
         ]),
         children_dn2
+    ]),
+
+    "/head/reproductive": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Репродуктивное здоровье", "active": True},
+        ]),
+        head_reproductive_main
+    ]),
+    "/head/reproductive/dr1": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Репродуктивное здоровье", "href": "/head/reproductive"},
+            {"label": "Отчет по видам диспансеризации", "active": True},
+        ]),
+        reproductive_dr1
+    ]),
+    "/head/reproductive/dr2": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Репродуктивное здоровье", "href": "/head/reproductive"},
+            {"label": "Списки пациентов репродуктивного здоровья", "active": True},
+        ]),
+        reproductive_dr2
     ]),
 }
