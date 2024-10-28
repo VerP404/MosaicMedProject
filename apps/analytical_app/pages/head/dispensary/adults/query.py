@@ -134,25 +134,3 @@ def sql_query_dispensary_amount_group(selected_year, months_placeholder, inogoro
            group by "-";
     """
     return query
-
-
-
-def query_dv4_price(sql_cond=None):
-    return f"""
-select department,
-       count(*) as "Всего",
-       sum(case when CAST(amount AS numeric(15, 2)) < 2000 then 1 else 0 end) as "<2000",
-       sum(case when CAST(amount AS numeric(15, 2)) >= 2000 and CAST(amount AS numeric(15, 2)) < 3000 then 1 else 0 end) as "2000-3000",
-       sum(case when CAST(amount AS numeric(15, 2)) >= 3000 and CAST(amount AS numeric(15, 2)) < 4000 then 1 else 0 end) as "3000-4000",
-       sum(case when CAST(amount AS numeric(15, 2)) >= 4000 and CAST(amount AS numeric(15, 2)) < 5000 then 1 else 0 end) as "4000-5000",
-       sum(case when CAST(amount AS numeric(15, 2)) >= 5000  then 1 else 0 end) as ">5000"
-from data_loader_omsdata
-              WHERE 
-              goal = :cel 
-              and tariff != '0'
-                and smo_code like '360%'
-                AND sanctions != '-'
-                and report_period IN ({sql_cond})
-                AND status IN :status_list
-    group by ROLLUP (department)
-"""

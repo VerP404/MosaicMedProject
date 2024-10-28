@@ -7,6 +7,9 @@ from apps.analytical_app.pages.head.dispensary.adults.main import head_adults_dd
 from apps.analytical_app.pages.head.dispensary.adults.tab1 import adults_dv1
 from apps.analytical_app.pages.head.dispensary.adults.tab3 import adults_dv3
 from apps.analytical_app.pages.head.dispensary.adults.tab8 import adults_dv8
+from apps.analytical_app.pages.head.dispensary.children.main import head_children_dd_main
+from apps.analytical_app.pages.head.dispensary.children.tab1 import children_dn1
+from apps.analytical_app.pages.head.dispensary.children.tab2 import children_dn2
 from apps.analytical_app.pages.head.dispensary.reports.page import dispensary_reports
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
 from apps.analytical_app.pages.head.main import head_main
@@ -66,17 +69,41 @@ routes_head = {
     ]),
     "/head/adults/dv3": html.Div([
         dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
             {"label": "Диспансеризация взрослых", "href": "/head/adults"},
-            {"label": "По возрастам ДВ4 и ОПВ", "active": True},
+            {"label": "Диспансеризация взрослых по возрастам", "active": True},
         ]),
         adults_dv3
     ]),
     "/head/adults/dv8": html.Div([
         dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
             {"label": "Диспансеризация взрослых", "href": "/head/adults"},
             {"label": "Диспансеризация с группировкой по стоимости", "active": True},
         ]),
         adults_dv8
     ]),
-
+    "/head/children": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансеризация детей", "active": True},
+        ]),
+        head_children_dd_main
+    ]),
+    "/head/children/pn1": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансеризация детей", "href": "/head/children"},
+            {"label": "Отчет по видам диспансеризации детей", "active": True},
+        ]),
+        children_dn1
+    ]),
+    "/head/children/pn2": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансеризация детей", "href": "/head/children"},
+            {"label": "По возрастам диспансеризация детей", "active": True},
+        ]),
+        children_dn2
+    ]),
 }

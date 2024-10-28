@@ -11,7 +11,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
     profile_filter = ""
     doctor_filter = ""
     inogorodniy_filter = ""
-    status_filter = ""
+    sanction_filter = ""
     amount_null_filter = ""
     treatment = ""
     initial_input = ""
@@ -40,9 +40,9 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
         inogorodniy_filter = f"AND inogorodniy = true"
 
     if sanction == '1':
-        status_filter = f"AND sanctions = '-'"
+        sanction_filter = f"AND sanctions = '-'"
     if sanction == '2':
-        status_filter = f"AND sanctions != '-'"
+        sanction_filter = f"AND sanctions != '-'"
 
     if amount_null == '1':
         amount_null_filter = f"AND amount_numeric != '0'"
@@ -102,6 +102,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
      oms_data as (SELECT report_data.talon,
                     (ARRAY ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 
                     'Октябрь', 'Ноябрь', 'Декабрь'])[report_data.report_month_number] AS report_month,
+                    report_month_number,
                     report_data.report_year,
                     report_data.status,
                     CASE
@@ -197,14 +198,13 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                       LEFT JOIN public.personnel_specialty specialty ON specialty.id = pd.specialty_id
                       LEFT JOIN public.personnel_profile profile ON profile.id = pd.profile_id
                       LEFT JOIN public.personnel_person person ON person.id = pd.person_id
-                                WHERE report_data.report_year = '{year}' 
-                                AND report_data.report_month_number IN ({months})
      ),
             oms as (select *
                     from oms_data
-                    where talon notnull
+                     WHERE report_year = '{year}' 
+                           AND report_month_number IN ({months})
                                {inogorodniy_filter}
-                               {status_filter}
+                               {sanction_filter}
                                {amount_null_filter}
                                {building_filter}
                                {department_filter}
@@ -240,34 +240,3 @@ def columns_by_status_oms():
                SUM(CASE WHEN status = '17' THEN 1 ELSE 0 END) AS "17"
     """
 
-
-def columns_by_department(selected_buildings):
-    dynamic_columns = []
-    dynamic_column_names = []
-    dynamic_column_sums = []
-
-    # Генерация столбцов только для выбранных корпусов
-    for department in selected_buildings:
-        dynamic_columns.append(
-            f"SUM(CASE WHEN ob.name = '{department}' AND dlo.gender = 'М' THEN 1 ELSE 0 END) AS \"М {department}\"")
-        dynamic_columns.append(
-            f"ROUND(SUM(CASE WHEN ob.name = '{department}' AND dlo.gender = 'М' THEN ROUND(CAST(dlo.amount AS numeric(15, 2)):: numeric, 2) ELSE 0 END):: numeric, 2) AS \"М {building} Сумма\"")
-        dynamic_columns.append(
-            f"SUM(CASE WHEN ob.name = '{department}' AND dlo.gender = 'Ж' THEN 1 ELSE 0 END) AS \"Ж {department}\"")
-        dynamic_columns.append(
-            f"ROUND(SUM(CASE WHEN ob.name = '{department}' AND dlo.gender = 'Ж' THEN ROUND(CAST(dlo.amount AS numeric(15, 2)):: numeric, 2) ELSE 0 END):: numeric, 2) AS \"Ж {building} Сумма\"")
-
-        dynamic_column_names.append(f"\"М {department}\"")
-        dynamic_column_names.append(f"\"М {department} Сумма\"")
-        dynamic_column_names.append(f"\"Ж {department}\"")
-        dynamic_column_names.append(f"\"Ж {department} Сумма\"")
-
-        dynamic_column_sums.append(f"SUM(\"М {department}\")")
-        dynamic_column_sums.append(f"SUM(\"М {department} Сумма\")")
-        dynamic_column_sums.append(f"SUM(\"Ж {department}\")")
-        dynamic_column_sums.append(f"SUM(\"Ж {department} Сумма\")")
-
-    dynamic_columns_sql = ',\n    '.join(dynamic_columns)
-    dynamic_column_names_sql = ',\n       '.join(dynamic_column_names)
-    dynamic_column_sums_sql = ',\n       '.join(dynamic_column_sums)
-    return dynamic_columns_sql, dynamic_column_names_sql, dynamic_column_sums_sql

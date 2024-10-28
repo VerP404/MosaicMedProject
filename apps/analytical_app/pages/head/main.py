@@ -13,8 +13,8 @@ cards_row_1 = dbc.Row(
                             "Диспансеризация взрослых",
                             "Отчеты по диспансеризации взрослых")),
         dbc.Col(create_card(2, type_page,
-                            "- Диспансеризация детей",
-                            "-")),
+                            "Диспансеризация детей",
+                            "Отчеты по диспансеризации детей")),
         dbc.Col(create_card(3, type_page,
                             "- Диспансерное наблюдение",
                             "-")),
@@ -72,7 +72,7 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
         if button_id == f'open-report-1-{type_page}' and open_report_1:
             new_segment = "adults"
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
-            new_segment = "doctors"
+            new_segment = "children"
         elif button_id == f'open-report-3-{type_page}' and open_report_3:
             new_segment = "disp_by_ages"
         elif button_id == f'open-report-4-{type_page}' and open_report_4:
