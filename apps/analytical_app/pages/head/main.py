@@ -48,15 +48,13 @@ head_main = html.Div([
 
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
-     Output(f'breadcrumb-{type_page}', 'items'),
-     ],
+     Output(f'breadcrumb-{type_page}', 'items')],
     [Input(f'open-report-1-{type_page}', 'n_clicks'),
      Input(f'open-report-2-{type_page}', 'n_clicks'),
      Input(f'open-report-3-{type_page}', 'n_clicks'),
      Input(f'open-report-4-{type_page}', 'n_clicks'),
      Input(f'open-report-5-{type_page}', 'n_clicks'),
-     Input(f'open-report-6-{type_page}', 'n_clicks'),
-     ],
+     Input(f'open-report-6-{type_page}', 'n_clicks')],
     prevent_initial_call=True
 )
 def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_6):
@@ -65,27 +63,30 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
         return no_update, no_update
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    current_path = f'/{main_link}'
 
-    breadcrumb_items = [{"label": label, "href": f"/{main_link}", "active": True}]
+    breadcrumb_items = [{"label": label, "href": current_path, "active": True}]
 
-    if button_id.startswith("open-report-") and f'{main_link}' in button_id:
+    if button_id.startswith("open-report-"):
+        new_segment = None
         if button_id == f'open-report-1-{type_page}' and open_report_1:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/svpod', breadcrumb_items
+            new_segment = "adults"
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/doctors', breadcrumb_items
+            new_segment = "doctors"
         elif button_id == f'open-report-3-{type_page}' and open_report_3:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/disp_by_ages', breadcrumb_items
+            new_segment = "disp_by_ages"
         elif button_id == f'open-report-4-{type_page}' and open_report_4:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dn_job', breadcrumb_items
+            new_segment = "dn_job"
         elif button_id == f'open-report-5-{type_page}' and open_report_5:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/statistic-sharapova', breadcrumb_items
+            new_segment = "statistic-sharapova"
         elif button_id == f'open-report-6-{type_page}' and open_report_6:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dispensary-reports', breadcrumb_items
+            new_segment = "dispensary-reports"
 
-    return f'/{main_link}', breadcrumb_items
+        if new_segment:
+            # Добавляем новый сегмент к текущему маршруту
+            new_path = f'{current_path}/{new_segment}'
+            breadcrumb_items.append({"label": new_segment, "active": True})
+            return new_path, breadcrumb_items
+
+    return no_update, no_update
+

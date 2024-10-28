@@ -18,9 +18,8 @@ from apps.analytical_app.pages.head.dispensary.adults.tab3 import adults_dv3
 from apps.analytical_app.pages.head.dispensary.adults.tab4 import adults_dv4
 from apps.analytical_app.pages.head.dispensary.adults.tab5 import adults_dv5
 from apps.analytical_app.pages.head.dispensary.adults.tab8 import adults_dv8
-from apps.analytical_app.pages.head.dispensary.reports.page import dispensary_reports
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
-from apps.analytical_app.pages.head.main import head_main
+from apps.analytical_app.pages.head.routes import routes_head
 from apps.analytical_app.pages.iszl.main import iszl_main
 from apps.analytical_app.pages.main.page import main_layout
 from apps.analytical_app.pages.statistic.cardiology_report.cardiology_report import statistic_cardiology
@@ -72,95 +71,7 @@ routes = {
     ]),
 
 
-    "/adults": head_adults_dd_main,
-    "/adults/dv1": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Диспансеризация взрослых", "href": "/adults"},
-            {"label": "По дате формирования карты", "active": True},
-        ]),
-        adults_dv1
-    ]),
-    "/adults/dv2": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Диспансеризация взрослых", "href": "/adults"},
-            {"label": "По отчетному периоду", "active": True},
-        ]),
-        adults_dv2
-    ]),
-    "/adults/dv3": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Диспансеризация взрослых", "href": "/adults"},
-            {"label": "По возрастам ДВ4 и ОПВ", "active": True},
-        ]),
-        adults_dv3
-    ]),
-    "/adults/dv4": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Диспансеризация взрослых", "href": "/adults"},
-            {"label": "По возрастам ДВ4", "active": True},
-        ]),
-        adults_dv4
-    ]),
-    "/adults/dv5": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Диспансеризация взрослых", "href": "/adults"},
-            {"label": "По возрастам ОПВ", "active": True},
-        ]),
-        adults_dv5
-    ]),
-    "/adults/dv8": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Диспансеризация взрослых", "href": "/adults"},
-            {"label": "8", "active": True},
-        ]),
-        adults_dv8
-    ]),
 
-
-
-    "/head": head_main,
-    "/head/svpod": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Заведующий", "href": "/head"},
-            {"label": "Диспансеризация взрослых", "active": True},
-        ]),
-        head_adults_dd_main
-    ]),
-    "/head/doctors": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Заведующий", "href": "/head"},
-            {"label": "Диспансеризация детей", "active": True},
-        ]),
-        economist_doctors_talon_list
-    ]),
-    "/head/disp_by_ages": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Заведующий", "href": "/head"},
-            {"label": "Диспансерное наблюдение", "active": True},
-        ]),
-        economist_dispensary_age
-    ]),
-    "/head/dn_job": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Заведующий", "href": "/head"},
-            {"label": "Диспансерное наблюдение работающих", "active": True},
-        ]),
-        head_dn_job
-    ]),
-    "/head/statistic-sharapova": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Заведующий", "href": "/head"},
-            {"label": "Отчет Шараповой по ДН", "active": True},
-        ]),
-        statistic_sharapova
-    ]),
-    "/head/dispensary-reports": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Заведующий", "href": "/head"},
-            {"label": "131 форма", "active": True},
-        ]),
-        dispensary_reports
-    ]),
 
 
     "/statistic": statistic_main,
@@ -347,6 +258,7 @@ routes = {
 }
 
 routes.update(routes_doctors)
+routes.update(routes_head)
 
 
 def page_not_found(pathname):
@@ -364,5 +276,4 @@ def register_routes(app):
         [Input('url', 'pathname')]
     )
     def display_page(pathname):
-        # Если путь существует, вернуть соответствующую страницу, иначе вернуть страницу 404
         return routes.get(pathname, page_not_found(pathname))

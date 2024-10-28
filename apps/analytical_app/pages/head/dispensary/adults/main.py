@@ -4,7 +4,7 @@ from apps.analytical_app.app import app
 from apps.analytical_app.components.cards import create_card
 
 type_page = "adults"
-main_link = "adults"  # начало ссылки
+main_link = "head/adults"  # начало ссылки
 label = "Диспансеризация взрослых"  # для хлебных крошек
 
 cards_row_1 = dbc.Row(
@@ -68,24 +68,23 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
 
     breadcrumb_items = [{"label": label, "href": f"/{main_link}", "active": True}]
 
-    if button_id.startswith("open-report-") and f'{main_link}' in button_id:
-        if button_id == f'open-report-1-{type_page}' and open_report_1:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dv1', breadcrumb_items
-        elif button_id == f'open-report-2-{type_page}' and open_report_2:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dv2', breadcrumb_items
-        elif button_id == f'open-report-3-{type_page}' and open_report_3:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dv3', breadcrumb_items
-        elif button_id == f'open-report-4-{type_page}' and open_report_4:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dv4', breadcrumb_items
-        elif button_id == f'open-report-5-{type_page}' and open_report_5:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dv5', breadcrumb_items
-        elif button_id == f'open-report-8-{type_page}' and open_report_8:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dv8', breadcrumb_items
+    if button_id == f'open-report-1-{type_page}' and open_report_1:
+        breadcrumb_items.append({"active": True})
+        return f'/{main_link}/dv1', breadcrumb_items
+    elif button_id == f'open-report-2-{type_page}' and open_report_2:
+        breadcrumb_items.append({"active": True})
+        return f'/{main_link}/dv2', breadcrumb_items
+    elif button_id == f'open-report-3-{type_page}' and open_report_3:
+        breadcrumb_items.append({"active": True})
+        return f'/{main_link}/dv3', breadcrumb_items
+    elif button_id == f'open-report-4-{type_page}' and open_report_4:
+        breadcrumb_items.append({"active": True})
+        return f'/{main_link}/dv4', breadcrumb_items
+    elif button_id == f'open-report-5-{type_page}' and open_report_5:
+        breadcrumb_items.append({"active": True})
+        return f'/{main_link}/dv5', breadcrumb_items
+    elif button_id == f'open-report-8-{type_page}' and open_report_8:
+        breadcrumb_items.append({"active": True})
+        return f'/{main_link}/dv8', breadcrumb_items
 
     return f'/{main_link}', breadcrumb_items
