@@ -15,17 +15,6 @@ cards_row_1 = dbc.Row(
         dbc.Col(create_card(3, type_page,
                             "По возрастам ДВ4 и ОПВ",
                             "По возрастам ДВ4 и ОПВ")),
-        dbc.Col(create_card(4, type_page,
-                            "По возрастам ДВ4",
-                            "По возрастам ДВ4")),
-    ],
-    className="mb-4 align-items-stretch",
-)
-cards_row_2 = dbc.Row(
-    [
-        dbc.Col(create_card(5, type_page,
-                            "По возрастам ОПВ",
-                            "По возрастам ОПВ")),
         dbc.Col(create_card(8, type_page,
                             "ДВ4 с группировкой по стоимости",
                             "ДВ4 с группировкой по стоимости")),
@@ -39,7 +28,6 @@ head_adults_dd_main = html.Div([
     ]),
     html.Hr(),
     html.Div(cards_row_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
-    html.Div(cards_row_2, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
 ])
 
 
@@ -49,13 +37,11 @@ head_adults_dd_main = html.Div([
      ],
     [Input(f'open-report-1-{type_page}', 'n_clicks'),
      Input(f'open-report-3-{type_page}', 'n_clicks'),
-     Input(f'open-report-4-{type_page}', 'n_clicks'),
-     Input(f'open-report-5-{type_page}', 'n_clicks'),
      Input(f'open-report-8-{type_page}', 'n_clicks'),
      ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1,  open_report_3, open_report_4, open_report_5, open_report_8):
+def navigate_pages(open_report_1, open_report_3, open_report_8):
     ctx = callback_context
     if not ctx.triggered:
         return no_update, no_update
@@ -70,12 +56,6 @@ def navigate_pages(open_report_1,  open_report_3, open_report_4, open_report_5, 
     elif button_id == f'open-report-3-{type_page}' and open_report_3:
         breadcrumb_items.append({"active": True})
         return f'/{main_link}/dv3', breadcrumb_items
-    elif button_id == f'open-report-4-{type_page}' and open_report_4:
-        breadcrumb_items.append({"active": True})
-        return f'/{main_link}/dv4', breadcrumb_items
-    elif button_id == f'open-report-5-{type_page}' and open_report_5:
-        breadcrumb_items.append({"active": True})
-        return f'/{main_link}/dv5', breadcrumb_items
     elif button_id == f'open-report-8-{type_page}' and open_report_8:
         breadcrumb_items.append({"active": True})
         return f'/{main_link}/dv8', breadcrumb_items

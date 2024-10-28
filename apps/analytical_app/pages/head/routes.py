@@ -16,13 +16,6 @@ from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapo
 
 routes_head = {
     "/head": head_main,
-    "/head/svpod": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Заведующий", "href": "/head"},
-            {"label": "Диспансеризация взрослых", "active": True},
-        ]),
-        head_adults_dd_main
-    ]),
     "/head/doctors": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Заведующий", "href": "/head"},
@@ -79,20 +72,6 @@ routes_head = {
             {"label": "По возрастам ДВ4 и ОПВ", "active": True},
         ]),
         adults_dv3
-    ]),
-    "/head/adults/dv4": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Диспансеризация взрослых", "href": "/head/adults"},
-            {"label": "По возрастам ДВ4", "active": True},
-        ]),
-        adults_dv4
-    ]),
-    "/head/adults/dv5": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Диспансеризация взрослых", "href": "/head/adults"},
-            {"label": "По возрастам ОПВ", "active": True},
-        ]),
-        adults_dv5
     ]),
     "/head/adults/dv8": html.Div([
         dbc.Breadcrumb(items=[

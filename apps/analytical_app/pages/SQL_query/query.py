@@ -5,7 +5,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                doctor_ids=None,
                initial_input_date_start=None, initial_input_date_end=None,
                treatment_start=None, treatment_end=None,
-               cel_list=None):
+               cel_list=None, status_list=None):
     building_filter = ""
     department_filter = ""
     profile_filter = ""
@@ -16,13 +16,15 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
     treatment = ""
     initial_input = ""
     cels = ""
-
-    if building_ids:
-        building_filter = f"AND building_id IN ({','.join(map(str, building_ids))})"
+    status = ""
 
     if cel_list:
         cels = f"AND goal IN ({','.join(f'\'{cel}\'' for cel in cel_list)})"
+    if status_list:
+        status = f"AND status IN ({','.join(f'\'{cel}\'' for cel in status_list)})"
 
+    if building_ids:
+        building_filter = f"AND building_id IN ({','.join(map(str, building_ids))})"
     if department_ids:
         department_filter = f"AND department_id IN ({','.join(map(str, department_ids))})"
 
@@ -126,8 +128,8 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                     report_data.patient,
                     report_data.birth_date,
                     CASE
-                        WHEN report_data.treatment_end ~ '^\d{{2}}-\d{{2}}-\d{{4}}$' AND
-                             report_data.birth_date ~ '^\d{{2}}-\d{{2}}-\d{{4}}$' THEN
+                        WHEN report_data.treatment_end ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' AND
+                             report_data.birth_date ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' THEN
                             CAST(SUBSTRING(report_data.treatment_end FROM 7 FOR 4) AS INTEGER) -
                             CAST(SUBSTRING(report_data.birth_date FROM 7 FOR 4) AS INTEGER)
                         ELSE NULL
@@ -211,6 +213,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                                {treatment}
                                {initial_input}
                                {cels}
+                               {status}
                                )
         """
 
@@ -238,11 +241,33 @@ def columns_by_status_oms():
     """
 
 
-def columns_by_department():
+def columns_by_department(selected_buildings):
     dynamic_columns = []
     dynamic_column_names = []
     dynamic_column_sums = []
 
-    return f"""
-     
-   """
+    # Генерация столбцов только для выбранных корпусов
+    for department in selected_buildings:
+        dynamic_columns.append(
+            f"SUM(CASE WHEN ob.name = '{department}' AND dlo.gender = 'М' THEN 1 ELSE 0 END) AS \"М {department}\"")
+        dynamic_columns.append(
+            f"ROUND(SUM(CASE WHEN ob.name = '{department}' AND dlo.gender = 'М' THEN ROUND(CAST(dlo.amount AS numeric(15, 2)):: numeric, 2) ELSE 0 END):: numeric, 2) AS \"М {building} Сумма\"")
+        dynamic_columns.append(
+            f"SUM(CASE WHEN ob.name = '{department}' AND dlo.gender = 'Ж' THEN 1 ELSE 0 END) AS \"Ж {department}\"")
+        dynamic_columns.append(
+            f"ROUND(SUM(CASE WHEN ob.name = '{department}' AND dlo.gender = 'Ж' THEN ROUND(CAST(dlo.amount AS numeric(15, 2)):: numeric, 2) ELSE 0 END):: numeric, 2) AS \"Ж {building} Сумма\"")
+
+        dynamic_column_names.append(f"\"М {department}\"")
+        dynamic_column_names.append(f"\"М {department} Сумма\"")
+        dynamic_column_names.append(f"\"Ж {department}\"")
+        dynamic_column_names.append(f"\"Ж {department} Сумма\"")
+
+        dynamic_column_sums.append(f"SUM(\"М {department}\")")
+        dynamic_column_sums.append(f"SUM(\"М {department} Сумма\")")
+        dynamic_column_sums.append(f"SUM(\"Ж {department}\")")
+        dynamic_column_sums.append(f"SUM(\"Ж {department} Сумма\")")
+
+    dynamic_columns_sql = ',\n    '.join(dynamic_columns)
+    dynamic_column_names_sql = ',\n       '.join(dynamic_column_names)
+    dynamic_column_sums_sql = ',\n       '.join(dynamic_column_sums)
+    return dynamic_columns_sql, dynamic_column_names_sql, dynamic_column_sums_sql

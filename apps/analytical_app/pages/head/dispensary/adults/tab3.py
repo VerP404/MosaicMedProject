@@ -25,45 +25,55 @@ adults_dv3 = html.Div(
                     dbc.CardBody(
                         [
                             dbc.CardHeader("Фильтры"),
-                            dbc.Row(
-                                [
-                                    dbc.Col(update_buttons(type_page), width=2),
-                                    dbc.Col(filter_years(type_page), width=1),
-                                    dbc.Col(filter_report_type(type_page), width=2),
-                                    dbc.Col(filter_inogorod(type_page), width=2),
-                                    dbc.Col(filter_sanction(type_page), width=2),
-                                    dbc.Col(filter_amount_null(type_page), width=2),
-                                ]
+                            dbc.Card(
+                                dbc.Row(
+                                    [
+                                        dbc.Col(update_buttons(type_page), width=2),
+                                        dbc.Col(filter_years(type_page), width=1),
+                                        dbc.Col(filter_report_type(type_page), width=3),
+                                        dbc.Col(filter_inogorod(type_page), width=2),
+                                        dbc.Col(filter_sanction(type_page), width=2),
+                                        dbc.Col(filter_amount_null(type_page), width=2),
+                                    ],
+                                    align="center",
+                                    justify="between",
+                                ),
                             ),
-                            dbc.Row(
-                                [
-                                    filter_status(type_page),  # фильтр по статусам
-                                ]
+                            dbc.Card(
+                                dbc.Row(
+                                    [
+                                        filter_status(type_page),  # фильтр по статусам
+                                    ]
+                                ),
                             ),
-                            dbc.Row(
-                                [
-                                    dbc.Row(
-                                        [
-                                            dbc.Col(filter_months(type_page), width=12),
-                                            dbc.Row(
-                                                [
-                                                    dbc.Col(
-                                                        html.Label("Выберите дату", id=f'label-date-{type_page}',
-                                                                   style={'font-weight': 'bold', 'display': 'none'}),
-                                                        width="auto"
-                                                    ),
-                                                    dbc.Col(date_picker(f'input-{type_page}'), width=4,
-                                                            id=f'col-input-{type_page}', style={'display': 'none'}),
-                                                    dbc.Col(date_picker(f'treatment-{type_page}'), width=4,
-                                                            id=f'col-treatment-{type_page}', style={'display': 'none'}),
-                                                ],
-                                                align="center",
-                                                style={"display": "flex", "align-items": "center",
-                                                       "margin-bottom": "10px"}
-                                            )
-                                        ]
-                                    ),
-                                ]
+                            dbc.Card(
+                                dbc.Row(
+                                    [
+                                        dbc.Row(
+                                            [
+                                                dbc.Col(filter_months(type_page), width=12),
+                                                dbc.Row(
+                                                    [
+                                                        dbc.Col(
+                                                            html.Label("Выберите дату", id=f'label-date-{type_page}',
+                                                                       style={'font-weight': 'bold',
+                                                                              'display': 'none'}),
+                                                            width="auto"
+                                                        ),
+                                                        dbc.Col(date_picker(f'input-{type_page}'), width=4,
+                                                                id=f'col-input-{type_page}', style={'display': 'none'}),
+                                                        dbc.Col(date_picker(f'treatment-{type_page}'), width=4,
+                                                                id=f'col-treatment-{type_page}',
+                                                                style={'display': 'none'}),
+                                                    ],
+                                                    align="center",
+                                                    style={"display": "flex", "align-items": "center",
+                                                           "margin-bottom": "10px"}
+                                                )
+                                            ]
+                                        ),
+                                    ]
+                                ),
                             ),
                             dbc.Card(
                                 dbc.Row(
@@ -79,8 +89,6 @@ adults_dv3 = html.Div(
                                                     {"label": "УД2", "value": 'УД2'},
                                                     {"label": "ДР1", "value": 'ДР1'},
                                                     {"label": "ДР2", "value": 'ДР2'},
-                                                    {"label": "ПН1", "value": 'ПН1'},
-                                                    {"label": "ДС2", "value": 'ДС2'},
                                                 ],
                                                 value=['ДВ4'],
                                                 id=f"checklist-input-{type_page}",
@@ -101,7 +109,7 @@ adults_dv3 = html.Div(
             style={"margin": "0 auto", "padding": "0rem"}
         ),
         card_table(f'result-table1-{type_page}',
-                   "Отчет по диспансеризации и профосмотрам взрослых с разбивкой по возрастам")
+                   "Отчет по всем видам диспансеризации взрослых с разбивкой по возрастам")
     ],
     style={"padding": "0rem"}
 )
@@ -194,19 +202,24 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
      State(f'date-picker-range-treatment-{type_page}', 'start_date'),
      State(f'date-picker-range-treatment-{type_page}', 'end_date'),
      State(f'dropdown-report-type-{type_page}', 'value'),
-     State(f'checklist-input-{type_page}', 'value'), ]
+     State(f'checklist-input-{type_page}', 'value'),
+     State(f'status-group-radio-{type_page}', 'value'),
+     ]
 )
 def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction,
                  amount_null,
                  start_date_input, end_date_input,
                  start_date_treatment, end_date_treatment, report_type,
-                 selected_type_dv):
+                 selected_type_dv,
+                 selected_status):
     # Если кнопка не была нажата, обновление не происходит
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
     selected_type_dv_tuple = tuple(selected_type_dv)
+    selected_status_values = status_groups[selected_status]
+    selected_status_tuple = tuple(selected_status_values)
     # Определяем используемый период в зависимости от типа отчета
     start_date_input_formatted, end_date_input_formatted = None, None
     start_date_treatment_formatted, end_date_treatment_formatted = None, None
@@ -239,22 +252,8 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
             input_end=end_date_input_formatted,
             treatment_start=start_date_treatment_formatted,
             treatment_end=end_date_treatment_formatted,
-            cel_list=selected_type_dv_tuple
+            cel_list=selected_type_dv_tuple,
+            status_list=selected_status_tuple
         )
     )
-    print(sql_query_dispensary_age(
-            selected_year,
-            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
-            inogorodniy,
-            sanction,
-            amount_null,
-            building=None,
-            profile=None,
-            doctor=None,
-            input_start=start_date_input_formatted,
-            input_end=end_date_input_formatted,
-            treatment_start=start_date_treatment_formatted,
-            treatment_end=end_date_treatment_formatted,
-            cel_list=selected_type_dv_tuple
-        ))
     return columns1, data1, loading_output

@@ -85,15 +85,18 @@ def sql_query_dispensary_age(selected_year, months_placeholder, inogorod, sancti
                              input_end=None,
                              treatment_start=None,
                              treatment_end=None,
-                             cel_list=None):
+                             cel_list=None,
+                             status_list=None):
     base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
                       doctor,
                       input_start, input_end,
-                      treatment_start, treatment_end, cel_list)
+                      treatment_start, treatment_end, cel_list, status_list)
     query = f"""
     {base}
-    SELECT age,
-           {columns_by_status_oms()}
+    SELECT age "Возраст",
+           COUNT(*)                                                                   AS "Всего",
+           SUM(CASE WHEN gender = 'М' THEN 1 ELSE 0 END) AS "М",
+           SUM(CASE WHEN gender = 'Ж' THEN 1 ELSE 0 END) AS "Ж"              
            FROM oms
            WHERE target_categories like '%Диспансеризация взрослых%'
            group by age
