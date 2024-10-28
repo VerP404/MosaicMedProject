@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from dash import dcc, html, Output, Input
 import dash_bootstrap_components as dbc
 
@@ -186,11 +188,15 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
      Input(f'dropdown-amount-null-{type_page}', 'value'),
      Input(f'dropdown-building-{type_page}', 'value'),
      Input(f'dropdown-department-{type_page}', 'value'),
+     Input(f'date-picker-range-{type_page}', 'start_date'),  # Добавляем начало периода
+     Input(f'date-picker-range-{type_page}', 'end_date')     # Добавляем конец периода
      ]
 )
 def update_table(value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction, amount_null,
                  building_ids,
-                 department_ids):
+                 department_ids,
+                 start_date,
+                 end_date):
     # Проверка на наличие выбранного периода
     if not selected_period:
         return [], []
@@ -213,6 +219,9 @@ def update_table(value_doctor, value_profile, selected_period, selected_year, in
     # Генерация списка месяцев для SQL-запроса
     months_placeholder = ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)])
 
+    start_date_formatted = datetime.strptime(start_date, '%Y-%m-%d').strftime('%d-%m-%Y')
+    end_date_formatted = datetime.strptime(end_date, '%Y-%m-%d').strftime('%d-%m-%Y')
+
     # Генерация SQL-запроса с учетом всех фильтров
     columns1, data1 = TableUpdater.query_to_df(
         engine,
@@ -226,6 +235,8 @@ def update_table(value_doctor, value_profile, selected_period, selected_year, in
             department_ids,
             value_profile,  # Фильтр по профилю
             selected_doctor_ids,  # Фильтр по врачу
+            start_date_formatted,
+            end_date_formatted
         )
     )
     return columns1, data1

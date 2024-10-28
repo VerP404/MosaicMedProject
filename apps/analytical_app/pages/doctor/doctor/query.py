@@ -1,5 +1,10 @@
-def base_query(year, months, inogorodniy, sanction, amount_null, building_ids=None, department_ids=None,
-               profile_ids=None, doctor_ids=None):
+def base_query(year, months, inogorodniy, sanction, amount_null,
+               building_ids=None,
+               department_ids=None,
+               profile_ids=None,
+               doctor_ids=None,
+               treatment_start=None,
+               treatment_end=None):
     building_filter = ""
     department_filter = ""
     profile_filter = ""
@@ -7,6 +12,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null, building_ids=No
     inogorodniy_filter = ""
     status_filter = ""
     amount_null_filter = ""
+    treatment = ""
 
     if building_ids:
         building_filter = f"AND building_id IN ({','.join(map(str, building_ids))})"
@@ -34,7 +40,8 @@ def base_query(year, months, inogorodniy, sanction, amount_null, building_ids=No
         amount_null_filter = f"AND amount_numeric != '0'"
     if amount_null == '2':
         amount_null_filter = f"AND amount_numeric = '0'"
-
+    if treatment_start and treatment_end:
+        date = f"AND to_date(initial_input_date, 'DD-MM-YYYY') BETWEEN to_date({treatment_start}, 'DD-MM-YYYY') and to_date({treatment_end}, 'DD-MM-YYYY')"
 
     return f"""
         WITH report_data AS (SELECT oms.*,
@@ -188,7 +195,8 @@ def base_query(year, months, inogorodniy, sanction, amount_null, building_ids=No
                                {building_filter}
                                {department_filter}
                                {profile_filter}
-                               {doctor_filter})
+                               {doctor_filter}
+                               {treatment})
         """
 
 
@@ -215,10 +223,16 @@ def columns_by_status_oms():
     """
 
 
-def sql_query_amb_def(selected_year, months_placeholder, inogorod, sanction, amount_null, building: None, department=None,
+def sql_query_amb_def(selected_year, months_placeholder, inogorod, sanction, amount_null, building: None,
+                      department=None,
                       profile=None,
-                      doctor=None):
-    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile, doctor)
+                      doctor=None,
+                      treatment_start=None,
+                      treatment_end=None):
+    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
+                      doctor,
+                      treatment_start=None,
+                      treatment_end=None)
     query = f"""
     {base}
     SELECT goal,
