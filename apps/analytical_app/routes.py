@@ -11,13 +11,6 @@ from apps.analytical_app.pages.economist.stationary.page import economist_statio
 from apps.analytical_app.pages.economist.svpod.page import economist_sv_pod
 import dash_bootstrap_components as dbc
 
-from apps.analytical_app.pages.head.dispensary.adults.main import head_adults_dd_main
-from apps.analytical_app.pages.head.dispensary.adults.tab1 import adults_dv1
-from apps.analytical_app.pages.head.dispensary.adults.tab2 import adults_dv2
-from apps.analytical_app.pages.head.dispensary.adults.tab3 import adults_dv3
-from apps.analytical_app.pages.head.dispensary.adults.tab4 import adults_dv4
-from apps.analytical_app.pages.head.dispensary.adults.tab5 import adults_dv5
-from apps.analytical_app.pages.head.dispensary.adults.tab8 import adults_dv8
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
 from apps.analytical_app.pages.head.routes import routes_head
 from apps.analytical_app.pages.iszl.main import iszl_main

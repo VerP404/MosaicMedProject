@@ -1,20 +1,105 @@
 # отчет по диспансеризации
-def sql_query_dispensary():
-    return """
-    SELECT
-        coalesce(department, 'Итого')              as Корпус,
-        sum(case when goal = 'ДВ4' then 1 else 0 end) as ДВ4,
-        sum(case when goal = 'ДВ2' then 1 else 0 end) as ДВ2,
-        sum(case when goal = 'ОПВ' then 1 else 0 end) as ОПВ,
-        sum(case when goal = 'УД1' then 1 else 0 end) as УД1,
-        sum(case when goal = 'УД2' then 1 else 0 end) as УД2
-    from data_loader_omsdata
-    where to_date(initial_input_date, 'DD-MM-YYYY') BETWEEN to_date(:start_date, 'DD-MM-YYYY') 
-    and to_date(:end_date, 'DD-MM-YYYY')
-      AND department NOT LIKE '%ДП%'
-      and department NOT LIKE '%ЖК%'
-    group by rollup (department)
-"""
+from apps.analytical_app.pages.SQL_query.query import base_query, columns_by_status_oms
+
+
+def sql_query_dispensary(selected_year, months_placeholder, inogorod, sanction, amount_null,
+                         building=None,
+                         department=None,
+                         profile=None,
+                         doctor=None,
+                         input_start=None,
+                         input_end=None,
+                         treatment_start=None,
+                         treatment_end=None):
+    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
+                      doctor,
+                      input_start, input_end,
+                      treatment_start, treatment_end)
+    query = f"""
+    {base}
+    SELECT goal,
+           {columns_by_status_oms()}
+           FROM oms
+           WHERE target_categories like '%Диспансеризация взрослых%'
+           group by goal;
+    """
+    return query
+
+
+def sql_query_dispensary_building(selected_year, months_placeholder, inogorod, sanction, amount_null,
+                                  building=None,
+                                  department=None,
+                                  profile=None,
+                                  doctor=None,
+                                  input_start=None,
+                                  input_end=None,
+                                  treatment_start=None,
+                                  treatment_end=None):
+    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
+                      doctor,
+                      input_start, input_end,
+                      treatment_start, treatment_end)
+    query = f"""
+    {base}
+    SELECT building, 
+            goal,
+           {columns_by_status_oms()}
+           FROM oms
+           WHERE target_categories like '%Диспансеризация взрослых%'
+           group by building, goal;
+    """
+    return query
+
+
+def sql_query_dispensary_building_department(selected_year, months_placeholder, inogorod, sanction, amount_null,
+                                             building=None,
+                                             department=None,
+                                             profile=None,
+                                             doctor=None,
+                                             input_start=None,
+                                             input_end=None,
+                                             treatment_start=None,
+                                             treatment_end=None):
+    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
+                      doctor,
+                      input_start, input_end,
+                      treatment_start, treatment_end)
+    query = f"""
+    {base}
+    SELECT building, department, 
+            goal,
+           {columns_by_status_oms()}
+           FROM oms
+           WHERE target_categories like '%Диспансеризация взрослых%'
+           group by building, department, goal;
+    """
+    return query
+
+
+def sql_query_dispensary_age(selected_year, months_placeholder, inogorod, sanction, amount_null,
+                             building=None,
+                             department=None,
+                             profile=None,
+                             doctor=None,
+                             input_start=None,
+                             input_end=None,
+                             treatment_start=None,
+                             treatment_end=None,
+                             cel_list=None):
+    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
+                      doctor,
+                      input_start, input_end,
+                      treatment_start, treatment_end, cel_list)
+    query = f"""
+    {base}
+    SELECT age,
+           {columns_by_status_oms()}
+           FROM oms
+           WHERE target_categories like '%Диспансеризация взрослых%'
+           group by age
+           order by age;
+    """
+    return query
 
 
 def sql_query_do_korpus_dd(sql_cond):

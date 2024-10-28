@@ -201,6 +201,14 @@ def filter_years(type_page):
     )
 
 
+def update_buttons(type_page):
+    return dbc.Col(
+        dbc.Button("Обновить данные", id=f'update-button-{type_page}', color="primary",
+                   className="mt-3"),
+        style={"text-align": "center"}
+    ),
+
+
 def filter_inogorod(type_page):
     return dbc.Col(
         dcc.Dropdown(
@@ -330,13 +338,16 @@ def date_end(label, type_page):
 
 def filter_status(type_page):
     return (
-        dcc.RadioItems(
-            id=f'status-group-radio-{type_page}',
-            options=[{'label': group, 'value': group} for group in status_groups.keys()],
-            value='Предъявленные и оплаченные (2, 3)',
-            labelStyle={'display': 'block'}
-        )
-    )
+        dbc.Card(
+            dbc.CardBody(
+                dcc.RadioItems(
+                    id=f'status-group-radio-{type_page}',
+                    options=[{'label': group, 'value': group} for group in status_groups.keys()],
+                    value='Предъявленные и оплаченные (2, 3)',
+                    labelStyle={'display': 'block'}
+                )
+            )
+        ))
 
 
 def filter_goals_and_categories():

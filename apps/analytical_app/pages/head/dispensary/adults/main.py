@@ -10,11 +10,8 @@ label = "Диспансеризация взрослых"  # для хлебны
 cards_row_1 = dbc.Row(
     [
         dbc.Col(create_card(1, type_page,
-                            "По дате формирования карты",
-                            "По дате формирования карты")),
-        dbc.Col(create_card(2, type_page,
-                            "По отчетному периоду",
-                            "По отчетному периоду")),
+                            "Отчет по видам диспансеризации",
+                            "Все виды диспансеризации с разбивкой по целям, корпусам и отделениям")),
         dbc.Col(create_card(3, type_page,
                             "По возрастам ДВ4 и ОПВ",
                             "По возрастам ДВ4 и ОПВ")),
@@ -51,7 +48,6 @@ head_adults_dd_main = html.Div([
      Output(f'breadcrumb-{type_page}', 'items'),
      ],
     [Input(f'open-report-1-{type_page}', 'n_clicks'),
-     Input(f'open-report-2-{type_page}', 'n_clicks'),
      Input(f'open-report-3-{type_page}', 'n_clicks'),
      Input(f'open-report-4-{type_page}', 'n_clicks'),
      Input(f'open-report-5-{type_page}', 'n_clicks'),
@@ -59,7 +55,7 @@ head_adults_dd_main = html.Div([
      ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_8):
+def navigate_pages(open_report_1,  open_report_3, open_report_4, open_report_5, open_report_8):
     ctx = callback_context
     if not ctx.triggered:
         return no_update, no_update
@@ -71,9 +67,6 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
     if button_id == f'open-report-1-{type_page}' and open_report_1:
         breadcrumb_items.append({"active": True})
         return f'/{main_link}/dv1', breadcrumb_items
-    elif button_id == f'open-report-2-{type_page}' and open_report_2:
-        breadcrumb_items.append({"active": True})
-        return f'/{main_link}/dv2', breadcrumb_items
     elif button_id == f'open-report-3-{type_page}' and open_report_3:
         breadcrumb_items.append({"active": True})
         return f'/{main_link}/dv3', breadcrumb_items

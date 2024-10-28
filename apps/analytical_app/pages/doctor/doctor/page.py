@@ -8,7 +8,8 @@ from apps.analytical_app.callback import get_selected_doctors, TableUpdater
 from apps.analytical_app.components.filters import filter_doctors, filter_years, filter_months, \
     get_current_reporting_month, get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
-    get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type
+    get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
+    update_buttons
 from apps.analytical_app.elements import card_table, get_selected_period
 from apps.analytical_app.pages.doctor.doctor.query import sql_query_amb_def, sql_query_dd_def, sql_query_stac_def
 from apps.analytical_app.query_executor import engine
@@ -25,12 +26,7 @@ doctor_talon = html.Div(
                             dbc.CardHeader("Фильтры"),
                             dbc.Row(
                                 [
-                                    dbc.Col(
-                                        dbc.Button("Обновить данные", id=f'update-button-{type_page}', color="primary",
-                                                   className="mt-3"),
-                                        width=2,
-                                        style={"text-align": "center"}
-                                    ),
+                                    dbc.Col(update_buttons(type_page), width=2),
                                     dbc.Col(filter_years(type_page), width=1),
                                     dbc.Col(filter_report_type(type_page), width=2),
                                     dbc.Col(filter_inogorod(type_page), width=2),

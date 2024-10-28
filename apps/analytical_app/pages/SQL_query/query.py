@@ -5,7 +5,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                doctor_ids=None,
                initial_input_date_start=None, initial_input_date_end=None,
                treatment_start=None, treatment_end=None,
-               ):
+               cel_list=None):
     building_filter = ""
     department_filter = ""
     profile_filter = ""
@@ -15,9 +15,13 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
     amount_null_filter = ""
     treatment = ""
     initial_input = ""
+    cels = ""
 
     if building_ids:
         building_filter = f"AND building_id IN ({','.join(map(str, building_ids))})"
+
+    if cel_list:
+        cels = f"AND goal IN ({','.join(f'\'{cel}\'' for cel in cel_list)})"
 
     if department_ids:
         department_filter = f"AND department_id IN ({','.join(map(str, department_ids))})"
@@ -122,8 +126,8 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                     report_data.patient,
                     report_data.birth_date,
                     CASE
-                        WHEN report_data.treatment_end ~ '^\\d{2}-\\d{2}-\\d{4}$' AND
-                             report_data.birth_date ~ '^\\d{2}-\\d{2}-\\d{4}$' THEN
+                        WHEN report_data.treatment_end ~ '^\d{{2}}-\d{{2}}-\d{{4}}$' AND
+                             report_data.birth_date ~ '^\d{{2}}-\d{{2}}-\d{{4}}$' THEN
                             CAST(SUBSTRING(report_data.treatment_end FROM 7 FOR 4) AS INTEGER) -
                             CAST(SUBSTRING(report_data.birth_date FROM 7 FOR 4) AS INTEGER)
                         ELSE NULL
@@ -206,6 +210,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                                {doctor_filter}
                                {treatment}
                                {initial_input}
+                               {cels}
                                )
         """
 
@@ -231,3 +236,13 @@ def columns_by_status_oms():
                SUM(CASE WHEN status = '13' THEN 1 ELSE 0 END) AS "13",
                SUM(CASE WHEN status = '17' THEN 1 ELSE 0 END) AS "17"
     """
+
+
+def columns_by_department():
+    dynamic_columns = []
+    dynamic_column_names = []
+    dynamic_column_sums = []
+
+    return f"""
+     
+   """
