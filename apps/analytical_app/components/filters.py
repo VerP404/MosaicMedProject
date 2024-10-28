@@ -4,6 +4,7 @@ import dash_bootstrap_components as dbc
 from sqlalchemy import text
 
 from apps.analytical_app.query_executor import engine
+from apps.analytical_app.utils import build_sql_filters
 
 # Словарь для группировки статусов
 status_groups = {
@@ -115,24 +116,7 @@ def filter_department(type_page):
 
 
 def get_available_profiles(building_ids=None, department_ids=None):
-    building_filter = ""
-    department_filter = ""
-
-    if building_ids:
-        if not isinstance(building_ids, list):
-            building_ids = [building_ids]
-
-        if building_ids:
-            building_ids_str = ', '.join(map(str, building_ids))
-            building_filter = f"AND department.building_id IN ({building_ids_str})"
-
-    if department_ids:
-        if not isinstance(department_ids, list):
-            department_ids = [department_ids]
-
-        if department_ids:
-            department_ids_str = ', '.join(map(str, department_ids))
-            department_filter = f"AND doctor.department_id IN ({department_ids_str})"
+    filters = build_sql_filters(building_ids=building_ids, department_ids=department_ids)
 
     query = f"""
         SELECT DISTINCT profile.id, profile.description
@@ -140,8 +124,7 @@ def get_available_profiles(building_ids=None, department_ids=None):
         JOIN personnel_profile profile ON profile.id = doctor.profile_id
         JOIN organization_department department ON department.id = doctor.department_id
         WHERE 1=1
-        {building_filter}
-        {department_filter}
+        {filters}
     """
     with engine.connect() as connection:
         result = connection.execute(text(query))
@@ -150,33 +133,7 @@ def get_available_profiles(building_ids=None, department_ids=None):
 
 
 def get_available_doctors(building_ids=None, department_ids=None, profile_ids=None):
-    building_filter = ""
-    department_filter = ""
-    profile_filter = ""
-
-    if building_ids:
-        if not isinstance(building_ids, list):
-            building_ids = [building_ids]
-
-        if building_ids:
-            building_ids_str = ', '.join(map(str, building_ids))
-            building_filter = f"AND department.building_id IN ({building_ids_str})"
-
-    if department_ids:
-        if not isinstance(department_ids, list):
-            department_ids = [department_ids]
-
-        if department_ids:
-            department_ids_str = ', '.join(map(str, department_ids))
-            department_filter = f"AND doctor.department_id IN ({department_ids_str})"
-
-    if profile_ids:
-        if not isinstance(profile_ids, list):
-            profile_ids = [profile_ids]
-
-        if profile_ids:
-            profile_ids_str = ', '.join(map(str, profile_ids))
-            profile_filter = f"AND doctor.profile_id IN ({profile_ids_str})"
+    filters = build_sql_filters(building_ids=building_ids, department_ids=department_ids, profile_ids=profile_ids)
 
     query = f"""
         SELECT ARRAY_AGG(doctor.id) AS doctor_ids,
@@ -191,9 +148,7 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
         JOIN organization_department department ON department.id = doctor.department_id
         JOIN personnel_profile pp ON pp.id = doctor.profile_id
         WHERE 1=1
-        {building_filter}
-        {department_filter}
-        {profile_filter}
+        {filters}
         GROUP BY person.last_name, person.first_name, person.patronymic, pp.description, department.name
     """
 
@@ -239,7 +194,7 @@ def filter_years(type_page):
             id=f'dropdown-year-{type_page}',
             placeholder='Выберите год...',
             value=current_year,  # Текущий год выбран по умолчанию
-            clearable=False  # Можно выбрать только один год
+            clearable=False
         ),
         style={"width": "100%"}
 
@@ -255,7 +210,8 @@ def filter_inogorod(type_page):
                 {'label': 'Иногородние', 'value': '2'},
                 {'label': 'Все', 'value': '3'}
             ],
-            value='1'
+            value='1',
+            clearable=False
         ),
         style={"width": "100%"}
     )
@@ -270,7 +226,8 @@ def filter_sanction(type_page):
                 {'label': 'Санкции', 'value': '2'},
                 {'label': 'Все', 'value': '3'}
             ],
-            value='1'
+            value='1',
+            clearable=False
         ),
         style={"width": "100%"}
     )
@@ -285,7 +242,8 @@ def filter_report_type(type_page):
                 {'label': 'По дате формирования', 'value': 'initial_input'},
                 {'label': 'По дате лечения', 'value': 'treatment'}
             ],
-            value='month'
+            value='month',
+            clearable=False
         ),
         style={"width": "100%"}
     )
@@ -300,7 +258,8 @@ def filter_amount_null(type_page):
                 {'label': 'Нулевые', 'value': '2'},
                 {'label': 'Все', 'value': '3'}
             ],
-            value='1'
+            value='1',
+            clearable=False
         ),
         style={"width": "100%"}
     )

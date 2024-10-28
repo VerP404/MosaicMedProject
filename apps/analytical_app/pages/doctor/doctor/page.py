@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from dash import dcc, html, Output, Input
+from dash import dcc, html, Output, Input, exceptions, State
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
@@ -25,6 +25,12 @@ doctor_talon = html.Div(
                             dbc.CardHeader("Фильтры"),
                             dbc.Row(
                                 [
+                                    dbc.Col(
+                                        dbc.Button("Обновить данные", id=f'update-button-{type_page}', color="primary",
+                                                   className="mt-3"),
+                                        width=2,
+                                        style={"text-align": "center"}
+                                    ),
                                     dbc.Col(filter_years(type_page), width=1),
                                     dbc.Col(filter_report_type(type_page), width=2),
                                     dbc.Col(filter_inogorod(type_page), width=2),
@@ -94,7 +100,9 @@ doctor_talon = html.Div(
             ),
             style={"margin": "0 auto", "padding": "0rem"}
         ),
-        card_table(f'result-table1-{type_page}', "Амбулаторная помощь"),
+        dcc.Loading(id=f'loading-output-{type_page}', type='default'),
+        card_table(f'result-table1-{type_page}', "По категориям"),
+        card_table(f'result-table2-{type_page}', "По целям"),
     ],
     style={"padding": "0rem"}
 )
@@ -250,25 +258,35 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
 
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
-     Output(f'result-table1-{type_page}', 'data')],
-    [Input(f'dropdown-doctor-{type_page}', 'value'),
-     Input(f'dropdown-profile-{type_page}', 'value'),
-     Input(f'range-slider-month-{type_page}', 'value'),
-     Input(f'dropdown-year-{type_page}', 'value'),
-     Input(f'dropdown-inogorodniy-{type_page}', 'value'),
-     Input(f'dropdown-sanction-{type_page}', 'value'),
-     Input(f'dropdown-amount-null-{type_page}', 'value'),
-     Input(f'dropdown-building-{type_page}', 'value'),
-     Input(f'dropdown-department-{type_page}', 'value'),
-     Input(f'date-picker-range-input-{type_page}', 'start_date'),
-     Input(f'date-picker-range-input-{type_page}', 'end_date'),
-     Input(f'date-picker-range-treatment-{type_page}', 'start_date'),
-     Input(f'date-picker-range-treatment-{type_page}', 'end_date'),
-     Input(f'dropdown-report-type-{type_page}', 'value')]
+     Output(f'result-table1-{type_page}', 'data'),
+     Output(f'result-table2-{type_page}', 'columns'),
+     Output(f'result-table2-{type_page}', 'data'),
+     Output(f'loading-output-{type_page}', 'children')],
+    [Input(f'update-button-{type_page}', 'n_clicks')],
+    [State(f'dropdown-doctor-{type_page}', 'value'),
+     State(f'dropdown-profile-{type_page}', 'value'),
+     State(f'range-slider-month-{type_page}', 'value'),
+     State(f'dropdown-year-{type_page}', 'value'),
+     State(f'dropdown-inogorodniy-{type_page}', 'value'),
+     State(f'dropdown-sanction-{type_page}', 'value'),
+     State(f'dropdown-amount-null-{type_page}', 'value'),
+     State(f'dropdown-building-{type_page}', 'value'),
+     State(f'dropdown-department-{type_page}', 'value'),
+     State(f'date-picker-range-input-{type_page}', 'start_date'),
+     State(f'date-picker-range-input-{type_page}', 'end_date'),
+     State(f'date-picker-range-treatment-{type_page}', 'start_date'),
+     State(f'date-picker-range-treatment-{type_page}', 'end_date'),
+     State(f'dropdown-report-type-{type_page}', 'value')]
 )
-def update_table(value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction, amount_null,
+def update_table(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction, amount_null,
                  building_ids, department_ids, start_date_input, end_date_input,
                  start_date_treatment, end_date_treatment, report_type):
+    # Если кнопка не была нажата, обновление не происходит
+    if n_clicks is None:
+        raise exceptions.PreventUpdate
+
+    loading_output = html.Div([dcc.Loading(type="default")])
+
     # Проверка и обработка значения value_doctor
     if value_doctor:
         if isinstance(value_doctor, str):
@@ -293,6 +311,7 @@ def update_table(value_doctor, value_profile, selected_period, selected_year, in
             '%d-%m-%Y')
         end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
             '%d-%m-%Y')
+
     # Генерация SQL-запроса с учетом всех фильтров
     columns1, data1 = TableUpdater.query_to_df(
         engine,
@@ -308,4 +327,18 @@ def update_table(value_doctor, value_profile, selected_period, selected_year, in
         )
     )
 
-    return columns1, data1
+    columns2, data2 = TableUpdater.query_to_df(
+        engine,
+        sql_query_dd_def(
+            selected_year,
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy, sanction, amount_null,
+            building_ids, department_ids,
+            value_profile,
+            selected_doctor_ids,
+            start_date_input_formatted, end_date_input_formatted,
+            start_date_treatment_formatted, end_date_treatment_formatted
+        )
+    )
+
+    return columns1, data1, columns2, data2, loading_output

@@ -10,11 +10,8 @@ label = "Врач"  # для хлебных крошек
 cards_row_1 = dbc.Row(
     [
         dbc.Col(create_card(1, type_page,
-                            "Талоны по врачу: отчетный период",
-                            "Талоны ОМС по отчетному периоду")),
-        dbc.Col(create_card(2, type_page,
-                            "Талоны по врачу: дата формирования",
-                            "Талоны ОМС по дате формирования")),
+                            "Талоны по типу и цели",
+                            "Талоны ОМС по типам и цели. Фильтрация по всем параметрам.")),
     ],
     className="mb-4 align-items-stretch",
 )
@@ -33,11 +30,10 @@ doctor_main = html.Div([
      Output(f'breadcrumb-{type_page}', 'items'),
      ],
     [Input(f'open-report-1-{type_page}', 'n_clicks'),
-     Input(f'open-report-2-{type_page}', 'n_clicks'),
      ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2):
+def navigate_pages(open_report_1):
     ctx = callback_context
     if not ctx.triggered:
         return no_update, no_update
@@ -50,8 +46,4 @@ def navigate_pages(open_report_1, open_report_2):
         if button_id == f'open-report-1-{type_page}' and open_report_1:
             breadcrumb_items.append({"label": "Талоны по врачам", "active": True})
             return f'/{main_link}/doctor_talon', breadcrumb_items
-        elif button_id == f'open-report-2-{type_page}' and open_report_2:
-            breadcrumb_items.append({"label": "По врачам", "active": True})
-            return f'/{main_link}/doctors', breadcrumb_items
-
     return f'/{main_link}', breadcrumb_items

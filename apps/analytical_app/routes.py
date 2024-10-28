@@ -3,9 +3,7 @@ from dash import Output, Input, html
 from apps.analytical_app.pages.administrator.delete_emd.page import admin_delete_emd
 from apps.analytical_app.pages.administrator.main import admin_main
 from apps.analytical_app.pages.chief.main import chief_main
-from apps.analytical_app.pages.doctor.doctor.page import doctor_talon
-from apps.analytical_app.pages.doctor.doctor_date.page import doctor_talon_date
-from apps.analytical_app.pages.doctor.main import doctor_main
+from apps.analytical_app.pages.doctor.routes import routes_doctors
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
 from apps.analytical_app.pages.economist.main import economist_main
@@ -209,35 +207,7 @@ routes = {
         statistic_vop
     ]),
 
-    "/doctor": doctor_main,
-    "/doctor/doctor_talon": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Врач", "href": "/doctor"},
-            {"label": "Талоны по врачам", "active": True},
-        ]),
-        doctor_talon
-    ]),
-    "/doctor/doctors": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Врач", "href": "/doctor"},
-            {"label": "Талоны по врачам даты", "active": True},
-        ]),
-        doctor_talon_date
-    ]),
-    "/doctor/disp_by_ages": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Врач", "href": "/doctor"},
-            {"label": "Диспансерное наблюдение", "active": True},
-        ]),
-        economist_dispensary_age
-    ]),
-    "/doctor/dn_job": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Врач", "href": "/doctor"},
-            {"label": "Диспансерное наблюдение работающих", "active": True},
-        ]),
-        head_dn_job
-    ]),
+
 
     "/admin": admin_main,
     "/admin/admin_delete_emd": html.Div([
@@ -375,6 +345,8 @@ routes = {
         head_dn_job
     ]),
 }
+
+routes.update(routes_doctors)
 
 
 def page_not_found(pathname):
