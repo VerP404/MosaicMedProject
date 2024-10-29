@@ -19,9 +19,9 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
     status = ""
 
     if cel_list:
-        status = "AND status IN (" + ",".join(f"'{cel}'" for cel in status_list) + ")"
+        status = "AND status IN (" + ",".join(f"'{cel}'" for cel in cel_list) + ")"
     if status_list:
-        status = f"AND status IN ({','.join(f'\'{cel}\'' for cel in status_list)})"
+        status = "AND status IN (" + ",".join(f"'{cel}'" for cel in status_list) + ")"
 
     if building_ids:
         building_filter = f"AND building_id IN ({','.join(map(str, building_ids))})"
