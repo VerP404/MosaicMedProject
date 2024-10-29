@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'apps.peopledash',
 
     'import_export',
+    'channels',
 
 ]
 
@@ -107,3 +108,11 @@ LOGGING = {
 
 MEDIA_URL = '/uploads/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'uploads/')
+
+ASGI_APPLICATION = 'config.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}

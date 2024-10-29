@@ -1,4 +1,6 @@
 import pandas as pd
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 import io
@@ -37,23 +39,27 @@ def dynamic_page(request, path):
         'page': page,
         'data_from_db': data_from_db,
         'report_datetime': report_datetime,
-        'url_data': f'/get_data_{path}/',
+        'url_data': f'/peopledash/get_data_{path}/',  # Добавьте 'peopledash/' к пути
         'organization': organization,
     }
     return render(request, 'peopledash/base_peopledash.html', context)
 
 
 def dynamic_page_get_data(request, path):
+    # Проверка, что объект Page существует для данного path
     page = get_object_or_404(Page, path=path)
+    # Извлечение данных из RegisteredPatients
     data_from_db = RegisteredPatients.objects.filter(subdivision=page.subdivision)
-    data = []
-    for row in data_from_db:
-        data.append({
+    data = [
+        {
             'Наименование должности': row.speciality,
             'Всего_1': row.slots_today,
             'Слоты свободные для записи_1': row.free_slots_today,
             'Слоты свободные для записи_14': row.free_slots_14_days,
-        })
+        }
+        for row in data_from_db
+    ]
+    # Возвращаем данные в формате JSON
     return JsonResponse(data, safe=False)
 
 
@@ -235,3 +241,18 @@ def upload_data(request):
         form = UploadDataForm()
 
     return render(request, 'peopledash/upload_data.html', {'form': form, 'organization': organization})
+
+
+def notify_television_updates():
+    channel_layer = get_channel_layer()
+    data = list(RegisteredPatients.objects.values(
+        'speciality', 'slots_today', 'free_slots_today', 'free_slots_14_days'
+    ))
+    async_to_sync(channel_layer.group_send)(
+        "television_group",
+        {
+            "type": "send_update",
+            "data": data  # Отправляем данные для обновления таблицы
+        }
+    )
+

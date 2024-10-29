@@ -197,7 +197,7 @@
         function fetchData() {
             // Получение данных для report_datetime
             $.ajax({
-                url: '/get_report_datetime/',
+                url: '{% url "get_report_datetime" %}',
                 type: 'GET',
                 success: function (data) {
                     // Обновление значения report_datetime на странице

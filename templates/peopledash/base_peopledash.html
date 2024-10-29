@@ -5,67 +5,108 @@
 {% block titlesystem %}{{ page.subdivision }}{% endblock %}
 
 {% block main %}
-<div class="main-container">
-    <div class="table-title">
-        <h2>Доступность записи на первичный прием</h2>
-    </div>
-    <div class="table-data">
-        <table id="patient-table">
-            <thead>
-            <tr>
-                <th>Специальность</th>
-                <th>Слоты сегодня</th>
-                <th>Свободные сегодня</th>
-                <th>Свободные на 14 дней</th>
-            </tr>
-            </thead>
-            <tbody id="data-body">
-            {% for row in data_from_db %}
+    <div class="main-container">
+        <div class="table-title">
+            <h2>Доступность записи на первичный прием</h2>
+        </div>
+        <div class="table-data">
+            <table id="patient-table">
+                <thead>
                 <tr>
-                    <td>{{ row.speciality }}</td>
-                    <td>{{ row.slots_today }}</td>
-                    <td>{{ row.free_slots_today }}</td>
-                    <td>{{ row.free_slots_14_days }}</td>
+                    <th>Специальность</th>
+                    <th>Слоты сегодня</th>
+                    <th>Свободные сегодня</th>
+                    <th>Свободные на 14 дней</th>
                 </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody id="data-body">
+                {% for row in data_from_db %}
+                    <tr>
+                        <td>{{ row.speciality }}</td>
+                        <td>{{ row.slots_today }}</td>
+                        <td>{{ row.free_slots_today }}</td>
+                        <td>{{ row.free_slots_14_days }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% block content %}{% endblock %}
     </div>
-    {% block content %}{% endblock %}
-</div>
-<div class="info-container">
-    <div class="text-info">
-    {% block info %}По вопросам записи на прием обратитесь к помощникам{% endblock %}
+    <div class="info-container">
+        <div class="text-info">
+            {% block info %}По вопросам записи на прием обратитесь к помощникам{% endblock %}
+        </div>
     </div>
-</div>
-<p class="footer-text">
-    <img src="{% static 'peopledash/img/plotly-logomark.png' %}" alt="Icon" style="width: 25px; height: 25px; vertical-align: middle;">
-    МозаикаМед.
-    {% now "Y" as current_year %} <!-- Получаем текущий год -->
-    2023-{{ current_year}} <!-- Отображаем текущий год -->
-</p>
-<script>
-    $(document).ready(function () {
-        function fetchData() {
+    <p class="footer-text">
+        <img src="{% static 'peopledash/img/plotly-logomark.png' %}" alt="Icon"
+             style="width: 25px; height: 25px; vertical-align: middle;">
+        МозаикаМед.
+        {% now "Y" as current_year %} <!-- Получаем текущий год -->
+        2023-{{ current_year }} <!-- Отображаем текущий год -->
+    </p>
+    <script>
+        $(document).ready(function () {
+            function fetchData() {
+                $.ajax({
+                    url: '{{ url_data }}',
+                    type: 'GET',
+                    success: function (data) {
+                        $('#data-body').empty();
+                        data.forEach(function (row) {
+                            $('#data-body').append(`<tr>
+                                <td>${row['Наименование должности']}</td>
+                                <td>${row['Всего_1']}</td>
+                                <td>${row['Слоты свободные для записи_1']}</td>
+                                <td>${row['Слоты свободные для записи_14']}</td>
+                            </tr>`);
+                        });
+                    },
+                    error: function (xhr, status, error) {
+                        console.error("Ошибка при запросе данных:", status, error);
+                    }
+                });
+            }
+
+            fetchData();
+            setInterval(fetchData, 60000);  // Обновление каждые 60 секунд
+        });
+
+        const socket = new WebSocket('ws://' + window.location.host + '/ws/television_updates/');
+        socket.onmessage = function (event) {
+            const data = JSON.parse(event.data);
+
+            const tableBody = document.getElementById('data-body');
+            tableBody.innerHTML = '';
+
+            data.forEach(row => {
+                const newRow = document.createElement('tr');
+                newRow.innerHTML = `
+                    <td>${row['speciality']}</td>
+                    <td>${row['slots_today']}</td>
+                    <td>${row['free_slots_today']}</td>
+                    <td>${row['free_slots_14_days']}</td>
+                `;
+                tableBody.appendChild(newRow);
+            });
+        };
+
+        function fetchReportDatetime() {
             $.ajax({
-                url: '{{ url_data }}',
+                url: '{% url "get_report_datetime" %}',
                 type: 'GET',
                 success: function (data) {
-                    $('#data-body').empty();
-                    data.forEach(function (row) {
-                        $('#data-body').append(`<tr>
-                            <td>${row['Наименование должности']}</td>
-                            <td>${row['Всего_1']}</td>
-                            <td>${row['Слоты свободные для записи_1']}</td>
-                            <td>${row['Слоты свободные для записи_14']}</td>
-                        </tr>`);
-                    });
+                    document.querySelector('.row-report-datetime').textContent = 'Обновлено: ' + data.report_datetime;
+                },
+                error: function (xhr, status, error) {
+                    console.error("Ошибка при запросе данных:", status, error);
                 }
             });
         }
-        fetchData();
-        setInterval(fetchData, 60 * 1000);
-    });
 
-</script>
+        fetchReportDatetime();
+        setInterval(fetchReportDatetime, 60000);
+    </script>
+
+
 {% endblock %}
