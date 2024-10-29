@@ -19,7 +19,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
     status = ""
 
     if cel_list:
-        cels = f"AND goal IN ({','.join(f'\'{cel}\'' for cel in cel_list)})"
+        cels = f"AND goal IN ({','.join([f'\"{cel}\"' for cel in cel_list])})"
     if status_list:
         status = f"AND status IN ({','.join(f'\'{cel}\'' for cel in status_list)})"
 
