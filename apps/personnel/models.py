@@ -78,7 +78,7 @@ class DoctorRecord(models.Model):
         verbose_name="Специальность"
     )
     department = models.ForeignKey(
-        'organization.Department',  # Исправлено
+        'organization.Department',
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Отделение"

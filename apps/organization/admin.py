@@ -5,10 +5,36 @@ from .models import *
 from import_export import resources
 
 
+class DoctorAssignmentInline(admin.TabularInline):
+    model = DoctorAssignment
+    extra = 0  # Убираем лишние пустые строки для добавления
+    fields = ('doctor', 'start_date', 'end_date', 'reason_for_transfer')
+    readonly_fields = ('doctor', 'start_date', 'end_date', 'reason_for_transfer')
+    ordering = ['-start_date']  # Сортировка от новых к старым назначениям
+
+
+@admin.register(Station)
+class StationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code', 'department', 'doctor', 'open_date', 'close_date')
+    list_filter = ('department',)
+    search_fields = ('name', 'code')
+    inlines = [DoctorAssignmentInline]  # Включаем инлайн для всех назначений врачей
+
+    def get_doctors_list(self, obj):
+        # Метод для отображения всех врачей, работавших на участке
+        return ", ".join(
+            f"{assignment.doctor} (с {assignment.start_date} по {assignment.end_date or 'настоящее время'})"
+            for assignment in obj.doctor_assignments.all().order_by('-start_date')
+        )
+
+    get_doctors_list.short_description = "История врачей на участке"  # Название столбца в админке
+
+
 @admin.register(MedicalOrganization)
 class MedicalOrganizationAdmin(admin.ModelAdmin):
     list_display = ('name', 'code_mo', 'name_kvazar', 'name_miskauz', 'address', 'phone_number', 'email')
     search_fields = ('name', 'address')
+    ordering = ('name',)
 
     # Ограничение на создание только одной записи
     def has_add_permission(self, request):
