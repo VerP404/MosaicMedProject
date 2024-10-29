@@ -10,6 +10,7 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(BASE_DIR)
 
 from config.settings import DEBUG_DASH
+from config.settings import PORT_DASH
 
 from dash import dcc, html
 from apps.analytical_app.app import app
@@ -38,7 +39,7 @@ app.layout = html.Div(
 
 register_routes(app)
 if __name__ == "__main__":
-    app.run_server(debug=DEBUG_DASH, host='0.0.0.0', port='5000')
+    app.run_server(debug=DEBUG_DASH, host='0.0.0.0', port=PORT_DASH)
 
 # MosaicMedProject/
 # └──apps/
