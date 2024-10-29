@@ -241,18 +241,3 @@ def upload_data(request):
         form = UploadDataForm()
 
     return render(request, 'peopledash/upload_data.html', {'form': form, 'organization': organization})
-
-
-def notify_television_updates():
-    channel_layer = get_channel_layer()
-    data = list(RegisteredPatients.objects.values(
-        'speciality', 'slots_today', 'free_slots_today', 'free_slots_14_days'
-    ))
-    async_to_sync(channel_layer.group_send)(
-        "television_group",
-        {
-            "type": "send_update",
-            "data": data  # Отправляем данные для обновления таблицы
-        }
-    )
-

@@ -72,25 +72,6 @@
             setInterval(fetchData, 60000);  // Обновление каждые 60 секунд
         });
 
-        const socket = new WebSocket('ws://' + window.location.host + '/ws/television_updates/');
-        socket.onmessage = function (event) {
-            const data = JSON.parse(event.data);
-
-            const tableBody = document.getElementById('data-body');
-            tableBody.innerHTML = '';
-
-            data.forEach(row => {
-                const newRow = document.createElement('tr');
-                newRow.innerHTML = `
-                    <td>${row['speciality']}</td>
-                    <td>${row['slots_today']}</td>
-                    <td>${row['free_slots_today']}</td>
-                    <td>${row['free_slots_14_days']}</td>
-                `;
-                tableBody.appendChild(newRow);
-            });
-        };
-
         function fetchReportDatetime() {
             $.ajax({
                 url: '{% url "get_report_datetime" %}',
