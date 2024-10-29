@@ -143,35 +143,35 @@ routes = {
         head_dn_job
     ]),
 
-    "/chief": chief_main,
-    "/chief/svpod": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Главный врач", "href": "/chief"},
-            {"label": "Диспансеризация взрослых", "active": True},
-        ]),
-        economist_sv_pod
-    ]),
-    "/chief/doctors": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Главный врач", "href": "/chief"},
-            {"label": "Диспансеризация детей", "active": True},
-        ]),
-        economist_doctors_talon_list
-    ]),
-    "/chief/disp_by_ages": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Главный врач", "href": "/chief"},
-            {"label": "Диспансерное наблюдение", "active": True},
-        ]),
-        economist_dispensary_age
-    ]),
-    "/chief/dn_job": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Главный врач", "href": "/chief"},
-            {"label": "Диспансерное наблюдение работающих", "active": True},
-        ]),
-        head_dn_job
-    ]),
+    # "/chief": chief_main,
+    # "/chief/svpod": html.Div([
+    #     dbc.Breadcrumb(items=[
+    #         {"label": "Главный врач", "href": "/chief"},
+    #         {"label": "Диспансеризация взрослых", "active": True},
+    #     ]),
+    #     economist_sv_pod
+    # ]),
+    # "/chief/doctors": html.Div([
+    #     dbc.Breadcrumb(items=[
+    #         {"label": "Главный врач", "href": "/chief"},
+    #         {"label": "Диспансеризация детей", "active": True},
+    #     ]),
+    #     economist_doctors_talon_list
+    # ]),
+    # "/chief/disp_by_ages": html.Div([
+    #     dbc.Breadcrumb(items=[
+    #         {"label": "Главный врач", "href": "/chief"},
+    #         {"label": "Диспансерное наблюдение", "active": True},
+    #     ]),
+    #     economist_dispensary_age
+    # ]),
+    # "/chief/dn_job": html.Div([
+    #     dbc.Breadcrumb(items=[
+    #         {"label": "Главный врач", "href": "/chief"},
+    #         {"label": "Диспансерное наблюдение работающих", "active": True},
+    #     ]),
+    #     head_dn_job
+    # ]),
 
 
     "/web_oms": web_oms_main,

@@ -49,13 +49,13 @@ def create_sidebar():
                         id="head-link"
                     ),
 
-                    dbc.NavLink(
-                        [html.I(className="bi bi-person-check"),
-                         html.Span(" Главный врач", className="ms-2", id="chief-label")],
-                        href="/chief",
-                        active="exact",
-                        id="chief-link"
-                    ),
+                    # dbc.NavLink(
+                    #     [html.I(className="bi bi-person-check"),
+                    #      html.Span(" Главный врач", className="ms-2", id="chief-label")],
+                    #     href="/chief",
+                    #     active="exact",
+                    #     id="chief-link"
+                    # ),
                     dbc.NavLink(
                         [html.I(className="bi bi-bar-chart"),
                          html.Span(" Статистик", className="ms-2", id="statistic-label")],
@@ -77,13 +77,13 @@ def create_sidebar():
                         active="exact",
                         id="admin-link"
                     ),
-                    dbc.NavLink(
-                        [html.I(className="bi bi-info-circle"),
-                         html.Span(" ИСЗЛ", className="ms-2", id="iszl-label")],
-                        href="/iszl",
-                        active="exact",
-                        id="iszl-link"
-                    ),
+                    # dbc.NavLink(
+                    #     [html.I(className="bi bi-info-circle"),
+                    #      html.Span(" ИСЗЛ", className="ms-2", id="iszl-label")],
+                    #     href="/iszl",
+                    #     active="exact",
+                    #     id="iszl-link"
+                    # ),
                     dbc.NavLink(
                         [html.I(className="bi bi-info-circle"),
                          html.Span(" WEB.ОМС", className="ms-2", id="web-oms-label")],
@@ -122,11 +122,11 @@ def create_sidebar():
          Output("main-label", "style"),
          Output("doctor-label", "style"),
          Output("head-label", "style"),
-         Output("chief-label", "style"),
+         # Output("chief-label", "style"),
          Output("statistic-label", "style"),
          Output("economist-label", "style"),
          Output("admin-label", "style"),
-         Output("iszl-label", "style"),
+         # Output("iszl-label", "style"),
          Output("web-oms-label", "style"),
          Output("main-menu-label", "style")],
         [Input("btn_sidebar", "n_clicks")],
@@ -143,7 +143,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
-                    {"display": "none"},{"display": "none"},)
+                    )
         else:
             # Развернутый вид
             sidebar_style["width"] = "14rem"
@@ -151,17 +151,17 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
-                    {"display": "inline"},{"display": "inline"},)
+                    )
 
     @app.callback(
         [Output("main-link", "active"),
          Output("doctor-link", "active"),
          Output("head-link", "active"),
-         Output("chief-link", "active"),
+         # Output("chief-link", "active"),
          Output("statistic-link", "active"),
          Output("economist-link", "active"),
          Output("admin-link", "active"),
-         Output("iszl-link", "active"),
+         # Output("iszl-link", "active"),
          Output("web-oms-link", "active"),
          ],
         [Input("url", "pathname")]
@@ -171,11 +171,11 @@ def create_sidebar():
             pathname == "/",  # Для главной страницы
             pathname.startswith("/doctor"),  # Для Врача
             pathname.startswith("/head"),  # Для Заведующего
-            pathname.startswith("/chief"),  # Для Главного врача
+            # pathname.startswith("/chief"),  # Для Главного врача
             pathname.startswith("/statistic"),  # Для Статистика
             pathname.startswith("/economist"),  # Для Экономиста, включая вложенные страницы
             pathname.startswith("/admin"),  # Для Администратора
-            pathname.startswith("/iszl"),  # Для Помощи
+            # pathname.startswith("/iszl"),  # Для Помощи
             pathname.startswith("/web_oms"),  # Для Помощи
         ]
 
