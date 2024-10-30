@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'apps.home',
     'apps.data_loader',
     'apps.peopledash',
+    'apps.plan',
 
     'import_export',
     'channels',
