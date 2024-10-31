@@ -18,6 +18,11 @@ class GroupIndicators(models.Model):
             self.level = 1
         super(GroupIndicators, self).save(*args, **kwargs)
 
+        # Проверка и создание записей для каждого месяца
+        if not self.monthly_plans.exists():
+            for month in range(1, 13):
+                MonthlyPlan.objects.create(group=self, month=month, quantity=0, amount=0.00)
+
     def __str__(self):
         return self.name
 
@@ -73,3 +78,27 @@ class FilterCondition(models.Model):
 
     def get_values_list(self):
         return [v.strip() for v in self.values.split(",")]
+
+
+# models.py
+class MonthlyPlan(models.Model):
+    group = models.ForeignKey(GroupIndicators, on_delete=models.CASCADE, related_name="monthly_plans", verbose_name="Группа")
+    month = models.PositiveSmallIntegerField(verbose_name="Месяц")
+    quantity = models.PositiveIntegerField(verbose_name="Количество")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Деньги")
+
+    class Meta:
+        unique_together = ('group', 'month')
+        verbose_name = "План на месяц"
+        verbose_name_plural = "Планы на месяц"
+
+    def save(self, *args, **kwargs):
+        # Запрещаем изменение номера месяца
+        if self.pk is not None:
+            original = MonthlyPlan.objects.get(pk=self.pk)
+            if original.month != self.month:
+                raise ValueError("Номер месяца не может быть изменен.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Удаление записей месячного плана запрещено.")

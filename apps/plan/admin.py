@@ -4,8 +4,16 @@ from django.contrib import admin, messages
 from django.utils.html import format_html
 from django.urls import reverse
 
-from .models import GroupIndicators, FilterCondition
+from .models import GroupIndicators, FilterCondition, MonthlyPlan
 from .utils import copy_filters_to_new_year
+
+
+class MonthlyPlanInline(admin.TabularInline):
+    model = MonthlyPlan
+    extra = 0  # Не добавлять пустые строки, так как записи уже созданы автоматически
+    can_delete = False  # Запрещаем удаление записей
+    readonly_fields = ('month',)  # Создает пустые строки для каждого месяца
+    fields = ('month', 'quantity', 'amount')
 
 
 class FilterConditionInline(admin.TabularInline):
@@ -43,8 +51,8 @@ class GroupIndicatorsAdmin(admin.ModelAdmin):
     list_display = ('name', 'parent', 'level', 'latest_filter_year', 'view_subgroups')
     list_filter = ('level', FilterYearListFilter)
     search_fields = ('name',)
-    inlines = [FilterConditionInline]
-    actions = [copy_filters_action]  # Добавляем действие
+    inlines = [FilterConditionInline, MonthlyPlanInline]
+    actions = [copy_filters_action]
 
     def latest_filter_year(self, obj):
         # Метод для отображения последнего года фильтра

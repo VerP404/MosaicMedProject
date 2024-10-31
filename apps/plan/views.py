@@ -3,7 +3,7 @@ from datetime import datetime
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 
-from .models import GroupIndicators
+from .models import GroupIndicators, FilterCondition, MonthlyPlan
 from ..oms_reference.models import GeneralOMSTarget
 
 
@@ -70,3 +70,17 @@ def copy_filters_to_new_year(request, new_year):
 def goals_list(request):
     goals = GeneralOMSTarget.objects.values_list('code', flat=True)
     return JsonResponse({"goals": list(goals)})
+
+
+def get_monthly_plan_for_group(request, group_id, year):
+    try:
+        group = GroupIndicators.objects.get(id=group_id)
+        if not FilterCondition.objects.filter(group=group, year=year).exists():
+            return JsonResponse({"error": "План не найден для указанного года"}, status=404)
+
+        monthly_plans = MonthlyPlan.objects.filter(group=group)
+        plans_data = [{"month": plan.month, "quantity": plan.quantity, "amount": plan.amount} for plan in monthly_plans]
+
+        return JsonResponse({"group": group.name, "year": year, "monthly_plans": plans_data})
+    except GroupIndicators.DoesNotExist:
+        return JsonResponse({"error": "Группа не найдена"}, status=404)
