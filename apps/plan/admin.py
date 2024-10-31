@@ -1,24 +1,58 @@
-from django.contrib import admin
-from django.utils.html import format_html
-from django.utils.safestring import mark_safe
+from datetime import datetime
 
-from .models import GroupIndicators, OptionsForReportFilters, FilterCondition
+from django.contrib import admin, messages
+from django.utils.html import format_html
 from django.urls import reverse
+
+from .models import GroupIndicators, FilterCondition
+from .utils import copy_filters_to_new_year
 
 
 class FilterConditionInline(admin.TabularInline):
     model = FilterCondition
     extra = 1
+    fields = ['field_name', 'filter_type', 'values', 'year']
 
 
+# Кнопка для копирования фильтров в новый год
+def copy_filters_action(modeladmin, request, queryset):
+    new_year = datetime.now().year + 1  # Предположим, что копирование в следующий год
+    copy_filters_to_new_year(new_year)
+    modeladmin.message_user(request, f"Фильтры скопированы на {new_year}", messages.SUCCESS)
+
+
+copy_filters_action.short_description = "Скопировать фильтры на следующий год"
+
+
+class FilterYearListFilter(admin.SimpleListFilter):
+    title = 'Год фильтра'
+    parameter_name = 'filter_year'
+
+    def lookups(self, request, model_admin):
+        years = FilterCondition.objects.values_list('year', flat=True).distinct()
+        return [(year, year) for year in sorted(years)]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(filters__year=self.value()).distinct()
+        return queryset
+
+
+@admin.register(GroupIndicators)
 class GroupIndicatorsAdmin(admin.ModelAdmin):
-    list_display = ('name', 'parent', 'level', 'view_subgroups')
-    list_filter = ('level',)
+    list_display = ('name', 'parent', 'level', 'latest_filter_year', 'view_subgroups')
+    list_filter = ('level', FilterYearListFilter)
     search_fields = ('name',)
     inlines = [FilterConditionInline]
+    actions = [copy_filters_action]  # Добавляем действие
+
+    def latest_filter_year(self, obj):
+        # Метод для отображения последнего года фильтра
+        latest_filter = obj.filters.order_by('-year').first()
+        return latest_filter.year if latest_filter else "Нет фильтров"
 
     def view_subgroups(self, obj):
-        """Ссылки на подгруппы"""
+        """Отображает ссылки на подгруппы в виде ссылок в списке"""
         subgroups = obj.subgroups.all()
         if subgroups:
             links = [format_html('<a href="{}">{}</a>',
@@ -30,33 +64,8 @@ class GroupIndicatorsAdmin(admin.ModelAdmin):
     view_subgroups.short_description = "Вложенные группы"
 
     def get_readonly_fields(self, request, obj=None):
-        """Добавление поля с унаследованными фильтрами на страницу редактирования"""
+        """Добавление поля с подгруппами на страницу редактирования"""
         readonly_fields = super().get_readonly_fields(request, obj)
-        if obj and obj.parent:
-            readonly_fields = list(readonly_fields) + ['inherited_filters', 'view_subgroups']
-        else:
+        if obj:
             readonly_fields = list(readonly_fields) + ['view_subgroups']
         return readonly_fields
-
-    def inherited_filters(self, obj):
-        """Отображение унаследованных фильтров на странице редактирования"""
-        filters = obj.parent.get_all_filters() if obj.parent else []
-        if filters:
-            inherited_filters_html = "<h3>Наследуемые фильтры</h3><ul>"
-            for filter in filters:
-                inherited_filters_html += f"<li>{filter.field_name} ({filter.get_filter_type_display()}): {filter.values}</li>"
-            inherited_filters_html += "</ul>"
-            return mark_safe(inherited_filters_html)
-        return "Нет унаследованных фильтров"
-
-    inherited_filters.short_description = "Наследуемые фильтры"
-
-    def get_fields(self, request, obj=None):
-        """Определение стандартных полей без добавления inherited_filters в fields"""
-        fields = super().get_fields(request, obj)
-        return fields
-
-
-admin.site.register(GroupIndicators, GroupIndicatorsAdmin)
-admin.site.register(OptionsForReportFilters)
-

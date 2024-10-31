@@ -1,17 +1,27 @@
-from dash import html, dcc, Output, Input, exceptions, State
+from dash import html, dcc, Output, Input, State, ALL, exceptions
 import dash_bootstrap_components as dbc
+import pandas as pd
+from dash.exceptions import PreventUpdate
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
-from apps.analytical_app.components.filters import filter_status, filter_years, filter_months, \
-    get_current_reporting_month, months_labels, status_groups
-from apps.analytical_app.components.toast import toast
-from apps.analytical_app.elements import card_table, get_selected_period
-from apps.analytical_app.pages.economist.svpod.query import sql_qery_sv_pod
+from apps.analytical_app.components.filters import filter_years, update_buttons
+from apps.analytical_app.elements import card_table
+from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions
 from apps.analytical_app.query_executor import engine
 
 type_page = "econ-sv-pod"
 
+# Функция для получения опций уровня
+def get_level_options(parent_id=None):
+    if parent_id is None:
+        query = "SELECT DISTINCT id, name FROM plan_groupindicators WHERE parent_id IS NULL"
+    else:
+        query = f"SELECT id, name FROM plan_groupindicators WHERE parent_id = {parent_id}"
+    levels = pd.read_sql(query, engine)
+    return [{'label': level['name'], 'value': level['id']} for _, level in levels.iterrows()]
+
+# Макет с контейнером для динамических выпадающих списков
 economist_sv_pod = html.Div(
     [
         dbc.Row(
@@ -22,23 +32,22 @@ economist_sv_pod = html.Div(
                             dbc.CardHeader("Фильтры"),
                             dbc.Row(
                                 [
-                                    filter_status(type_page),  # фильтр по статусам
-                                    filter_years(type_page)  # фильтр по годам
+                                    dbc.Col(update_buttons(type_page), width=2),
+                                    dbc.Col(filter_years(type_page), width=2),
+                                    html.Div(id='dropdown-container', children=[
+                                        # Начальный выпадающий список уровня 0
+                                        dbc.Col(
+                                            dcc.Dropdown(
+                                                id={'type': 'dynamic-dropdown', 'index': 0},
+                                                options=get_level_options(),
+                                                placeholder="Выберите уровень 1",
+                                                value=None
+                                            ),
+                                            width=3
+                                        ),
+                                    ]),
                                 ]
                             ),
-                            dbc.Row(
-                                [
-                                    filter_months(type_page)  # фильтр по месяцам
-                                ]
-                            ),
-                            html.Div(id=f'selected-doctor-{type_page}', className='filters-label',
-                                     style={'display': 'none'}),
-                            html.Div(id=f'selected-period-{type_page}', className='filters-label',
-                                     style={'display': 'none'}),
-                            html.Div(id=f'current-month-name-{type_page}', className='filters-label'),
-                            html.Div(id=f'selected-month-{type_page}', className='filters-label'),
-                            html.Button('Получить данные', id=f'get-data-button-{type_page}'),
-                            dcc.Loading(id=f'loading-output-{type_page}', type='default'),
                         ]
                     ),
                     style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
@@ -48,75 +57,96 @@ economist_sv_pod = html.Div(
             ),
             style={"margin": "0 auto", "padding": "0rem"}
         ),
-        card_table(f'result-table-{type_page}', "Отчет по счетам ОМС сверх подушевого финансирования"),
-        toast(type_page)  # уведомление, если данные не найдены
+        dcc.Loading(id=f'loading-output-{type_page}', type='default'),
+        card_table(f'result-table1-{type_page}', "Данные"),
     ],
     style={"padding": "0rem"}
 )
 
-
-# Определяем отчетный месяц и выводим его на страницу и в переменную dcc Store
+# Колбэк для динамического обновления выпадающих списков
 @app.callback(
-    Output(f'current-month-name-{type_page}', 'children'),
-    Input('date-interval', 'n_intervals')
+    Output('dropdown-container', 'children'),
+    Input({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
 )
-def update_current_month(n_intervals):
-    current_month_num, current_month_name = get_current_reporting_month()
-    return current_month_name
+def display_dynamic_dropdowns(values):
+    # Инициализируем список выпадающих списков
+    dropdowns = []
+    level = 0
 
+    # Начальный уровень
+    options = get_level_options()
+    value = values[0] if values else None
 
+    dropdown = dbc.Col(
+        dcc.Dropdown(
+            id={'type': 'dynamic-dropdown', 'index': level},
+            options=options,
+            placeholder="Выберите уровень 1",
+            value=value
+        ),
+        width=3
+    )
+    dropdowns.append(dropdown)
+
+    # Проходим по выбранным значениям и динамически создаём выпадающие списки
+    while True:
+        if value is None:
+            break  # Если значение не выбрано, прекращаем добавлять уровни
+
+        # Получаем опции для следующего уровня
+        options = get_level_options(value)
+        if not options:
+            break  # Если нет дочерних элементов, прекращаем добавлять уровни
+
+        level += 1
+        value = values[level] if len(values) > level else None
+
+        dropdown = dbc.Col(
+            dcc.Dropdown(
+                id={'type': 'dynamic-dropdown', 'index': level},
+                options=options,
+                placeholder=f"Выберите уровень {level + 1}",
+                value=value
+            ),
+            width=3
+        )
+        dropdowns.append(dropdown)
+
+    return dropdowns
+
+# Колбэк для обновления таблицы на основе последнего выбранного уровня
 @app.callback(
-    Output(f'selected-month-{type_page}', 'children'),
-    Input(f'range-slider-month-{type_page}', 'value')
+    [Output(f'result-table1-{type_page}', 'columns'),
+     Output(f'result-table1-{type_page}', 'data'),
+     Output(f'loading-output-{type_page}', 'children')],
+    Input(f'update-button-{type_page}', 'n_clicks'),
+    State(f'dropdown-year-{type_page}', 'value'),
+    State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
 )
-def update_selected_month(selected_months):
-    if selected_months is None:
-        return "Выбранный месяц: Не выбран"
-
-    start_month, end_month = selected_months
-    start_month_name = months_labels.get(start_month, 'Неизвестно')
-    end_month_name = months_labels.get(end_month, 'Неизвестно')
-    if start_month_name == end_month_name:
-        return f'Выбранный месяц: {start_month_name}'
-    else:
-        return f'Выбранный месяц: с {start_month_name} по {end_month_name}'
-
-
-@app.callback(
-    Output(f'selected-period-{type_page}', 'children'),
-    [Input(f'range-slider-month-{type_page}', 'value'),
-     Input(f'dropdown-year-{type_page}', 'value'),
-     Input(f'current-month-name-{type_page}', 'children')]
-)
-def update_selected_period_list(selected_months_range, selected_year, current_month_name):
-    return get_selected_period(selected_months_range, selected_year, current_month_name)
-
-
-@app.callback(
-    [Output(f'result-table-{type_page}', 'columns'),
-     Output(f'result-table-{type_page}', 'data'),
-     Output(f'loading-output-{type_page}', 'children'),
-     Output(f'no-data-toast-{type_page}', 'is_open')],
-    [Input(f'get-data-button-{type_page}', 'n_clicks')],
-    [State(f'selected-period-{type_page}', 'children'),
-     State(f'status-group-radio-{type_page}', 'value')]
-)
-def update_table(n_clicks, selected_period, selected_status):
-    if n_clicks is None or not selected_period or not selected_status:
-        raise exceptions.PreventUpdate
+def update_table(n_clicks, selected_year, selected_levels):
+    if n_clicks is None:
+        raise PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
 
-    selected_status_values = status_groups[selected_status]
-    selected_status_tuple = tuple(selected_status_values)
+    # Оставляем только выбранные значения
+    selected_levels = [level for level in selected_levels if level is not None]
+    if not selected_levels:
+        raise PreventUpdate
 
-    sql_cond = ', '.join([f"'{period}'" for period in selected_period])
-    sql_query = sql_qery_sv_pod(sql_cond)
+    final_level = selected_levels[-1]
 
-    bind_params = {
-        'status_list': selected_status_tuple
-    }
-    columns, data = TableUpdater.query_to_df(engine, sql_query, bind_params)
-    if len(data) == 0:
-        return columns, data, loading_output, True
-    return columns, data, loading_output, False
+    # Получаем условия для последнего выбранного уровня
+    filter_conditions = get_filter_conditions([final_level], selected_year)
+
+    # Генерация SQL-запроса с учетом только условий последнего уровня
+    columns1, data1 = TableUpdater.query_to_df(
+        engine,
+        sql_query_rep(
+            selected_year,
+            group_id=[final_level],
+            filter_conditions=filter_conditions
+        )
+    )
+
+    return columns1, data1, loading_output

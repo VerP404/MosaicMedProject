@@ -1,3 +1,9 @@
+import pandas as pd
+
+from apps.analytical_app.pages.SQL_query.query import base_query
+from apps.analytical_app.query_executor import engine
+
+
 def sql_qery_sv_pod(sql_cond):
     return f"""
 SELECT CASE
@@ -162,3 +168,72 @@ where report_period IN ({sql_cond})
    and sanctions = '-'
 group by ksg
 """
+
+
+# Функция для генерации условий фильтрации на основе планов
+def get_filter_conditions(group_ids, year):
+    # Преобразуем group_ids в строку формата "1, 2, 3" для использования в SQL
+    group_ids_str = ", ".join(map(str, group_ids))
+
+    # Получаем условия фильтрации из таблицы на основе group_ids и year
+    query = f"""
+    SELECT field_name, filter_type, values
+    FROM plan_filtercondition
+    WHERE group_id IN ({group_ids_str}) AND year = {year}
+    """
+    conditions_df = pd.read_sql(query, engine)
+
+    # Генерируем условия для SQL
+    filter_clauses = []
+    for _, row in conditions_df.iterrows():
+        field_name = row['field_name']
+        filter_type = row['filter_type']
+        values = row['values']
+
+        if filter_type == 'in':
+            filter_clauses.append(f"{field_name} IN ({values})")
+        elif filter_type == 'exact':
+            filter_clauses.append(f"{field_name} = {values}")
+
+    # Объединяем условия через AND
+    return " AND ".join(filter_clauses)
+
+
+def sql_query_rep(selected_year, group_id, months_placeholder='1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12', inogorod=None,
+                  sanction=None, amount_null=None,
+                  building=None, department=None, profile=None, doctor=None, input_start=None, input_end=None,
+                  treatment_start=None, treatment_end=None, filter_conditions=None):
+    # Основной базовый запрос
+    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
+                      doctor, input_start, input_end, treatment_start, treatment_end)
+
+    # Начало основного запроса
+    query = f"""
+    {base}
+    SELECT
+        report_month_number AS month,
+        COUNT(CASE WHEN status = '1' THEN 1 END) AS новые,
+        COUNT(CASE WHEN status = '2' THEN 1 END) AS в_тфомс,
+        COUNT(CASE WHEN status = '3' THEN 1 END) AS оплачено,
+        COUNT(CASE WHEN status IN ('5', '7') THEN 1 END) AS отказано,
+        COUNT(CASE WHEN status IN ('6', '8') THEN 1 END) AS исправлено,
+        COUNT(CASE WHEN status = '0' THEN 1 END) AS отменено
+    FROM oms
+    """
+
+    # Условия WHERE
+    where_conditions = []
+    if filter_conditions:
+        where_conditions.append(filter_conditions)
+
+    # Добавляем условия WHERE в запрос, если они есть
+    if where_conditions:
+        query += " WHERE " + " AND ".join(where_conditions)
+
+    # Завершаем запрос с группировкой и сортировкой
+    query += """
+    GROUP BY month
+    ORDER BY month
+    """
+
+    return query

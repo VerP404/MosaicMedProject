@@ -1,64 +1,72 @@
+from datetime import datetime
+
+from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 
-from .models import FilterCondition, GroupIndicators, OptionsForReportFilters
+from .models import GroupIndicators
+from ..oms_reference.models import GeneralOMSTarget
 
 
-def build_filter_conditions(group):
-    # Получаем все фильтры для данной группы и всех родительских групп
-    filters = group.get_all_filters()
-    conditions = []
+def get_group_filters(request, group_id, year):
+    try:
+        group = GroupIndicators.objects.get(id=group_id)
+        filters = group.get_all_filters(year=year)
 
-    for filter in filters:
-        field = filter.field_name
-        values = filter.get_values_list()
+        filters_data = []
+        for filter in filters:
+            filters_data.append({
+                "field_name": filter.field_name,
+                "filter_type": filter.filter_type,
+                "values": filter.get_values_list(),
+                "year": filter.year
+            })
 
-        # Основное условие
-        if filter.filter_type == 'exact':
-            conditions.append(f"{field} = '{values[0]}'")
-        elif filter.filter_type == 'in':
-            values_str = ', '.join(f"'{v}'" for v in values)
-            conditions.append(f"{field} IN ({values_str})")
-        elif filter.filter_type == 'like':
-            like_conditions = " OR ".join(f"{field} LIKE '%{v}%'" for v in values)
-            conditions.append(f"({like_conditions})")
-
-    return " AND ".join(conditions) if conditions else ""
-
-
-def report_data(request, year):
-    def get_hierarchical_groups(group=None, level=0):
-        groups = GroupIndicators.objects.filter(parent=group) if group else GroupIndicators.objects.filter(
-            parent__isnull=True)
-        result = []
-
-        for g in groups:
-            filters = [f"{f.field_name} ({f.get_filter_type_display()}): {f.values}" for f in g.filters.all()]
-            group_data = {
-                "id": g.id,
-                "name": g.name,
-                "level": g.level,
-                "filters": filters,
-                "subgroups": get_hierarchical_groups(g, level + 1),
-            }
-            result.append(group_data)
-
-        return result
-
-    # Получение данных отчета по заданному году
-    report_data = [
-        {
-            "group_id": report.group.id,
-            "group_name": report.group.name,
-            "year": report.year,
-            "purpose": report.purpose,
-            "sum_values": report.sum_values,
-            "visits": report.visits,
-            "profile_mp": report.profile_mp,
+        response_data = {
+            "group": group.name,
+            "year": year,
+            "filters": filters_data
         }
-        for report in OptionsForReportFilters.objects.filter(year=year)
-    ]
 
-    return JsonResponse({
-        "groups": get_hierarchical_groups(),
-        "data": report_data,
-    })
+        return JsonResponse(response_data)
+    except GroupIndicators.DoesNotExist:
+        return JsonResponse({"error": "Group not found"}, status=404)
+
+
+def get_nested_groups_for_year(request, year):
+    """Получить все группы и фильтры для указанного года с учетом вложенности"""
+
+    def get_group_data(group):
+        """Рекурсивная функция для построения вложенной структуры"""
+        filters = group.get_all_filters(year=year)
+        filters_data = [{
+            "field_name": f.field_name,
+            "filter_type": f.filter_type,
+            "values": f.get_values_list(),
+            "year": f.year
+        } for f in filters]
+
+        return {
+            "group_name": group.name,
+            "level": group.level,
+            "filters": filters_data,
+            "subgroups": [get_group_data(subgroup) for subgroup in group.subgroups.all()]
+        }
+
+    # Получаем все корневые группы (те, у которых нет родительской)
+    root_groups = GroupIndicators.objects.filter(parent__isnull=True)
+    data = [get_group_data(group) for group in root_groups]
+
+    return JsonResponse({"year": year, "groups": data})
+
+
+@staff_member_required  # Ограничиваем доступ к этому представлению только для администраторов
+def copy_filters_to_new_year(request, new_year):
+    """Копирование фильтров для нового года"""
+    current_year = datetime.now().year
+    copy_filters_to_new_year(new_year=new_year)
+    return JsonResponse({"status": "success", "message": f"Фильтры скопированы с {current_year} на {new_year}"})
+
+
+def goals_list(request):
+    goals = GeneralOMSTarget.objects.values_list('code', flat=True)
+    return JsonResponse({"goals": list(goals)})
