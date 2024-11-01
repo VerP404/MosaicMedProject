@@ -2,6 +2,7 @@ from datetime import datetime
 
 from dash import dcc, html, Output, Input, exceptions, State
 import dash_bootstrap_components as dbc
+from dash.exceptions import PreventUpdate
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
@@ -97,10 +98,48 @@ admin_gen_inv = html.Div(
             style={"margin": "0 auto", "padding": "0rem"}
         ),
         dcc.Loading(id=f'loading-output-{type_page}', type='default'),
-        card_table(f'result-table1-{type_page}', "Талоны для формирования"),
+        card_table(f'result-table1-{type_page}', "Талоны для формирования", page_size=10),
     ],
     style={"padding": "0rem"}
 )
+
+
+# Callback для кнопки "Суммировать"
+@app.callback(
+    Output(f'sum-result-result-table1-{type_page}', 'children'),
+    Input(f'sum-button-result-table1-{type_page}', 'n_clicks'),
+    State(f'result-table1-{type_page}', 'derived_virtual_data'),
+    State(f'result-table1-{type_page}', 'selected_cells')
+)
+def calculate_sum_and_count(n_clicks, rows, selected_cells):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    # Проверка на наличие данных и выделенных ячеек
+    if rows is None or not selected_cells:
+        return "Нет данных или не выбраны ячейки для подсчета."
+
+    # Инициализация суммы и счетчика
+    total_sum = 0
+    count = 0
+
+    # Суммируем значения только в выделенных ячейках и считаем их количество
+    for cell in selected_cells:
+        row_idx = cell['row']  # Индекс строки
+        col_id = cell['column_id']  # ID столбца
+
+        # Получаем значение ячейки и добавляем к сумме, если оно является числом
+        value = rows[row_idx].get(col_id, 0)
+        if isinstance(value, (int, float)):  # Проверяем, что значение является числом
+            total_sum += value
+            count += 1  # Увеличиваем счетчик для числовых значений
+
+    # Округляем сумму до 2 знаков и форматируем с разделителями
+    total_sum_formatted = f"{total_sum:,.2f}".replace(",", " ")
+
+    # Формируем строку с результатом
+    return f"Количество выбранных ячеек: {count}, Сумма значений: {total_sum}"
+
 
 
 @app.callback(
