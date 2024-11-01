@@ -201,7 +201,8 @@ def fetch_plan_data(selected_level, year, mode='volumes'):
 # Callback для обновления таблицы с добавлением процента выполнения
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
-     Output(f'result-table1-{type_page}', 'data')],
+     Output(f'result-table1-{type_page}', 'data'),
+     Output(f'loading-output-{type_page}', 'children')],
     Input(f'update-button-{type_page}', 'n_clicks'),  # Кнопка обновления как основной триггер
     State(f'mode-toggle-{type_page}', 'value'),  # Используем `State`, чтобы тип плана обновлялся только при нажатии
     State(f'dropdown-year-{type_page}', 'value'),
@@ -210,6 +211,8 @@ def fetch_plan_data(selected_level, year, mode='volumes'):
 def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_levels):
     if n_clicks is None:
         raise PreventUpdate
+
+    loading_output = html.Div([dcc.Loading(type="default")])
 
     selected_levels = [level for level in selected_levels if level is not None]
     if not selected_levels:
@@ -267,4 +270,4 @@ def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_l
         {"name": ["План 1/12", "Входящий остаток"], "id": "Входящий остаток"},
     ]
 
-    return columns, fact_data
+    return columns, fact_data, loading_output
