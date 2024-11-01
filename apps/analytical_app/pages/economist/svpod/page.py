@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from dash import html, dcc, Output, Input, State, ALL, exceptions
 import dash_bootstrap_components as dbc
 import pandas as pd
@@ -153,61 +155,94 @@ def display_dynamic_dropdowns(values):
     return dropdowns
 
 # Функция для получения данных плана
-def fetch_plan_data(selected_levels, year):
-    # Запрашиваем данные плана для всех выбранных уровней и конкретного года
+def fetch_plan_data(selected_level, year):
+    # Запрашиваем данные плана для одного выбранного уровня и конкретного года
     query = text("""
         SELECT month, SUM(quantity) AS plan
         FROM plan_monthlyplan
-        WHERE group_id = ANY(:selected_levels) AND month BETWEEN 1 AND 12
+        WHERE group_id = :selected_level AND month BETWEEN 1 AND 12
         GROUP BY month
         ORDER BY month
     """)
     with engine.connect() as connection:
-        result = connection.execute(query, {"selected_levels": selected_levels}).mappings()
+        result = connection.execute(query, {"selected_level": selected_level}).mappings()
         plan_data = {row["month"]: row["plan"] for row in result}
     return plan_data
 
 
-# Callback для обновления таблицы на основе всех выбранных уровней
+# Callback для обновления таблицы с добавлением процента выполнения
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
-     Output(f'result-table1-{type_page}', 'data'),
-     Output(f'loading-output-{type_page}', 'children')],
+     Output(f'result-table1-{type_page}', 'data')],
     Input(f'update-button-{type_page}', 'n_clicks'),
     State(f'dropdown-year-{type_page}', 'value'),
     State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
 )
-def update_table_with_plan(n_clicks, selected_year, selected_levels):
+def update_table_with_plan_and_balance(n_clicks, selected_year, selected_levels):
     if n_clicks is None:
         raise PreventUpdate
 
-    loading_output = html.Div([dcc.Loading(type="default")])
-
-    # Фильтрация уровней, оставляя только выбранные значения
     selected_levels = [level for level in selected_levels if level is not None]
     if not selected_levels:
         raise PreventUpdate
 
-    # Генерация условий для всех выбранных уровней
-    filter_conditions = get_filter_conditions(selected_levels, selected_year)
-
-    # Получаем фактические данные из основного запроса
-    columns1, data1 = TableUpdater.query_to_df(
+    # Получаем фактические данные и план для одного выбранного уровня
+    selected_level = selected_levels[-1]
+    filter_conditions = get_filter_conditions([selected_level], selected_year)
+    fact_columns, fact_data = TableUpdater.query_to_df(
         engine,
-        sql_query_rep(
-            selected_year,
-            group_id=selected_levels,  # передаем все выбранные уровни
-            filter_conditions=filter_conditions
-        )
+        sql_query_rep(selected_year, group_id=[selected_level], filter_conditions=filter_conditions)
     )
+    plan_data = fetch_plan_data(selected_level, selected_year)
 
-    # Получаем данные плана и добавляем их к фактическим данным
-    plan_data = fetch_plan_data(selected_levels, selected_year)
-    for row in data1:
+    # Получаем текущую дату и месяц
+    today = datetime.today()
+    current_month = today.month
+    current_day = today.day
+
+    # Добавляем "План 1/12", "Входящий остаток" и вычисляем "План" и "Факт"
+    incoming_balance = 0
+    for row in fact_data:
         month = row.get("month")
-        row["План"] = plan_data.get(month, 0)  # Используем план или 0, если данных нет
+        row["План 1/12"] = plan_data.get(month, 0)  # Извлеченное значение из базы
+        row["Входящий остаток"] = incoming_balance
+        row["План"] = row["План 1/12"] + row["Входящий остаток"]  # Сумма "План 1/12" и "Входящий остаток"
 
-    # Добавляем колонку "План" к отображаемым колонкам
-    columns1.append({"name": "План", "id": "План"})
+        # Условие для расчета Итогового "Факт"
+        if month < current_month - 1:
+            # Для месяцев до предыдущего текущего месяца используем только "оплачено"
+            row["Факт"] = row.get("оплачено", 0)
+        elif month == current_month - 1:
+            # Для предыдущего месяца используем "оплачено" после 10-го числа, иначе суммируем "новые", "в_тфомс", "оплачено", "исправлено"
+            if current_day <= 10:
+                row["Факт"] = sum(row.get(col, 0) for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
+            else:
+                row["Факт"] = row.get("оплачено", 0)
+        elif month == current_month:
+            # Для текущего месяца суммируем "новые", "в_тфомс", "оплачено", "исправлено"
+            row["Факт"] = sum(row.get(col, 0) for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
 
-    return columns1, data1, loading_output
+        # Рассчитываем процент выполнения (если План не равен нулю) и форматируем до одного знака после запятой
+        row["%"] = round((row["Факт"] / row["План"] * 100), 1) if row["План"] != 0 else 0
+
+        # Обновляем входящий остаток для следующего месяца
+        incoming_balance = row["План 1/12"] - row.get("оплачено", 0)
+
+    # Структура заголовков с учетом всех требований
+    columns = [
+        {"name": ["", "Месяц"], "id": "month"},
+        {"name": ["Итог", "План"], "id": "План"},
+        {"name": ["Итог", "Факт"], "id": "Факт"},
+        {"name": ["Итог", "%"], "id": "%"},
+        {"name": ["Факт", "Новые"], "id": "новые"},
+        {"name": ["Факт", "В ТФОМС"], "id": "в_тфомс"},
+        {"name": ["Факт", "Оплачено"], "id": "оплачено"},
+        {"name": ["Факт", "Отказано"], "id": "отказано"},
+        {"name": ["Факт", "Исправлено"], "id": "исправлено"},
+        {"name": ["Факт", "Отменено"], "id": "отменено"},
+        {"name": ["План 1/12", "План 1/12"], "id": "План 1/12"},  # Значение плана из базы
+        {"name": ["План 1/12", "Входящий остаток"], "id": "Входящий остаток"},
+    ]
+
+    return columns, fact_data
+
