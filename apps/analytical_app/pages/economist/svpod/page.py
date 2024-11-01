@@ -52,6 +52,21 @@ economist_sv_pod = html.Div(
                                     ]),
                                 ]
                             ),
+                            html.Div(
+                                [
+                                    dcc.RadioItems(
+                                        id=f'mode-toggle-{type_page}',
+                                        options=[
+                                            {'label': 'Объемы', 'value': 'volumes'},
+                                            {'label': 'Финансы', 'value': 'finance'}
+                                        ],
+                                        value='volumes',  # По умолчанию отображаем объемы
+                                        inline=True,
+                                        labelStyle={'margin-right': '15px'}
+                                    ),
+                                ],
+                                style={'margin-bottom': '10px'}
+                            )
                         ]
                     ),
                     style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
@@ -74,9 +89,10 @@ economist_sv_pod = html.Div(
     Output(f'sum-result-result-table1-{type_page}', 'children'),
     Input(f'sum-button-result-table1-{type_page}', 'n_clicks'),
     State(f'result-table1-{type_page}', 'derived_virtual_data'),
-    State(f'result-table1-{type_page}', 'selected_cells')
+    State(f'result-table1-{type_page}', 'selected_cells'),
+    State(f'mode-toggle-{type_page}', 'value')  # Добавляем состояние для режима (Объемы или Финансы)
 )
-def calculate_sum_and_count(n_clicks, rows, selected_cells):
+def calculate_sum_and_count(n_clicks, rows, selected_cells, mode):
     if n_clicks is None:
         raise PreventUpdate
 
@@ -99,8 +115,15 @@ def calculate_sum_and_count(n_clicks, rows, selected_cells):
             total_sum += value
             count += 1  # Увеличиваем счетчик для числовых значений
 
+    # Округляем сумму до 2 знаков и форматируем с разделителями для финансового режима
+    if mode == 'finance':
+        total_sum = f"{total_sum:,.2f}".replace(",", " ")  # Разделитель тысяч - пробел, два знака после запятой
+    else:
+        total_sum = f"{int(total_sum):,}".replace(",", " ")  # Для объемов без дробной части и разделитель тысяч - пробел
+
     # Формируем строку с результатом
-    return f"Количество выбранных ячеек: {count}, Сумма значений: {total_sum}"
+    return f"Количество: {count}, Сумма: {total_sum}"
+
 
 
 # Колбэк для динамического обновления выпадающих списков
@@ -154,19 +177,24 @@ def display_dynamic_dropdowns(values):
 
     return dropdowns
 
+
 # Функция для получения данных плана
-def fetch_plan_data(selected_level, year):
-    # Запрашиваем данные плана для одного выбранного уровня и конкретного года
-    query = text("""
-        SELECT month, SUM(quantity) AS plan
+def fetch_plan_data(selected_level, year, mode='volumes'):
+    # В зависимости от режима выбираем соответствующее поле для плана
+    plan_field = "quantity" if mode == 'volumes' else "amount"
+
+    query = text(f"""
+        SELECT month, SUM({plan_field}) AS plan
         FROM plan_monthlyplan
         WHERE group_id = :selected_level AND month BETWEEN 1 AND 12
         GROUP BY month
         ORDER BY month
     """)
+
     with engine.connect() as connection:
         result = connection.execute(query, {"selected_level": selected_level}).mappings()
         plan_data = {row["month"]: row["plan"] for row in result}
+
     return plan_data
 
 
@@ -174,11 +202,12 @@ def fetch_plan_data(selected_level, year):
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data')],
-    Input(f'update-button-{type_page}', 'n_clicks'),
+    Input(f'update-button-{type_page}', 'n_clicks'),  # Кнопка обновления как основной триггер
+    State(f'mode-toggle-{type_page}', 'value'),  # Используем `State`, чтобы тип плана обновлялся только при нажатии
     State(f'dropdown-year-{type_page}', 'value'),
     State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
 )
-def update_table_with_plan_and_balance(n_clicks, selected_year, selected_levels):
+def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_levels):
     if n_clicks is None:
         raise PreventUpdate
 
@@ -186,49 +215,43 @@ def update_table_with_plan_and_balance(n_clicks, selected_year, selected_levels)
     if not selected_levels:
         raise PreventUpdate
 
-    # Получаем фактические данные и план для одного выбранного уровня
     selected_level = selected_levels[-1]
     filter_conditions = get_filter_conditions([selected_level], selected_year)
+
+    # Передаем `mode` в `sql_query_rep` для переключения между объемами и финансами
     fact_columns, fact_data = TableUpdater.query_to_df(
         engine,
-        sql_query_rep(selected_year, group_id=[selected_level], filter_conditions=filter_conditions)
+        sql_query_rep(selected_year, group_id=[selected_level], filter_conditions=filter_conditions, mode=mode)
     )
-    plan_data = fetch_plan_data(selected_level, selected_year)
 
-    # Получаем текущую дату и месяц
+    # Получаем данные плана с учетом выбранного режима
+    plan_data = fetch_plan_data(selected_level, selected_year, mode)
+
     today = datetime.today()
     current_month = today.month
     current_day = today.day
 
-    # Добавляем "План 1/12", "Входящий остаток" и вычисляем "План" и "Факт"
     incoming_balance = 0
     for row in fact_data:
         month = row.get("month")
-        row["План 1/12"] = plan_data.get(month, 0)  # Извлеченное значение из базы
+        row["План 1/12"] = plan_data.get(month, 0)
         row["Входящий остаток"] = incoming_balance
-        row["План"] = row["План 1/12"] + row["Входящий остаток"]  # Сумма "План 1/12" и "Входящий остаток"
+        row["План"] = (row["План 1/12"] or 0) + (row["Входящий остаток"] or 0)
 
-        # Условие для расчета Итогового "Факт"
         if month < current_month - 1:
-            # Для месяцев до предыдущего текущего месяца используем только "оплачено"
-            row["Факт"] = row.get("оплачено", 0)
+            row["Факт"] = row.get("оплачено", 0) or 0
         elif month == current_month - 1:
-            # Для предыдущего месяца используем "оплачено" после 10-го числа, иначе суммируем "новые", "в_тфомс", "оплачено", "исправлено"
             if current_day <= 10:
-                row["Факт"] = sum(row.get(col, 0) for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
+                row["Факт"] = sum(row.get(col, 0) or 0 for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
             else:
-                row["Факт"] = row.get("оплачено", 0)
+                row["Факт"] = row.get("оплачено", 0) or 0
         elif month == current_month:
-            # Для текущего месяца суммируем "новые", "в_тфомс", "оплачено", "исправлено"
-            row["Факт"] = sum(row.get(col, 0) for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
+            row["Факт"] = sum(row.get(col, 0) or 0 for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
 
-        # Рассчитываем процент выполнения (если План не равен нулю) и форматируем до одного знака после запятой
         row["%"] = round((row["Факт"] / row["План"] * 100), 1) if row["План"] != 0 else 0
 
-        # Обновляем входящий остаток для следующего месяца
-        incoming_balance = row["План 1/12"] - row.get("оплачено", 0)
+        incoming_balance = (row["План 1/12"] or 0) - (row.get("оплачено", 0) or 0)
 
-    # Структура заголовков с учетом всех требований
     columns = [
         {"name": ["", "Месяц"], "id": "month"},
         {"name": ["Итог", "План"], "id": "План"},
@@ -240,9 +263,8 @@ def update_table_with_plan_and_balance(n_clicks, selected_year, selected_levels)
         {"name": ["Факт", "Отказано"], "id": "отказано"},
         {"name": ["Факт", "Исправлено"], "id": "исправлено"},
         {"name": ["Факт", "Отменено"], "id": "отменено"},
-        {"name": ["План 1/12", "План 1/12"], "id": "План 1/12"},  # Значение плана из базы
+        {"name": ["План 1/12", "План 1/12"], "id": "План 1/12"},
         {"name": ["План 1/12", "Входящий остаток"], "id": "Входящий остаток"},
     ]
 
     return columns, fact_data
-

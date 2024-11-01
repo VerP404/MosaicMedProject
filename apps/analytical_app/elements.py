@@ -37,7 +37,7 @@ def card_table(id_table, card_header, page_size=None, column_selectable=None):
                             ),
                             dbc.Row([
                                 dbc.Col(html.Button("Суммировать", id=f'sum-button-{id_table}',
-                                                    className="btn btn-primary"), width=3),
+                                                    className="btn btn-primary"), width=4),
                                 dbc.Col(html.Div(id=f'sum-result-{id_table}', style={"marginTop": "10px"}), width=4)
                             ]),
                         ]

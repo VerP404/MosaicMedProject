@@ -202,24 +202,38 @@ def get_filter_conditions(group_ids, year):
 def sql_query_rep(selected_year, group_id, months_placeholder='1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12', inogorod=None,
                   sanction=None, amount_null=None,
                   building=None, department=None, profile=None, doctor=None, input_start=None, input_end=None,
-                  treatment_start=None, treatment_end=None, filter_conditions=None):
+                  treatment_start=None, treatment_end=None, filter_conditions=None, mode='finance'):
     # Основной базовый запрос
     base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
                       doctor, input_start, input_end, treatment_start, treatment_end)
 
     # Начало основного запроса
-    query = f"""
-    {base}
-    SELECT
-        report_month_number AS month,
-        COUNT(CASE WHEN status = '1' THEN 1 END) AS новые,
-        COUNT(CASE WHEN status = '2' THEN 1 END) AS в_тфомс,
-        COUNT(CASE WHEN status = '3' THEN 1 END) AS оплачено,
-        COUNT(CASE WHEN status IN ('5', '7') THEN 1 END) AS отказано,
-        COUNT(CASE WHEN status IN ('6', '8') THEN 1 END) AS исправлено,
-        COUNT(CASE WHEN status = '0' THEN 1 END) AS отменено
-    FROM oms
-    """
+    if mode == 'finance':
+        query = f"""
+        {base}
+            SELECT
+                report_month_number AS month,
+                SUM(CASE WHEN status = '1' THEN amount_numeric END) AS новые,
+                SUM(CASE WHEN status = '2' THEN amount_numeric END) AS в_тфомс,
+                SUM(CASE WHEN status = '3' THEN amount_numeric END) AS оплачено,
+                SUM(CASE WHEN status IN ('5', '7', '12') THEN amount_numeric END) AS отказано,
+                SUM(CASE WHEN status IN ('6', '8', '4') THEN amount_numeric END) AS исправлено,
+                SUM(CASE WHEN status IN ('0', '13', '17') THEN amount_numeric END) AS отменено
+            FROM oms
+            """
+    else:
+        query = f"""
+        {base}
+            SELECT
+                report_month_number AS month,
+                COUNT(CASE WHEN status = '1' THEN 1 END) AS новые,
+                COUNT(CASE WHEN status = '2' THEN 1 END) AS в_тфомс,
+                COUNT(CASE WHEN status = '3' THEN 1 END) AS оплачено,
+                COUNT(CASE WHEN status IN ('5', '7', '12') THEN 1 END) AS отказано,
+                COUNT(CASE WHEN status IN ('6', '8', '4') THEN 1 END) AS исправлено,
+                COUNT(CASE WHEN status IN ('0', '13', '17') THEN 1 END) AS отменено
+            FROM oms
+        """
 
     # Условия WHERE
     where_conditions = []
