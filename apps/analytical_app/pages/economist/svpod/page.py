@@ -12,6 +12,7 @@ from apps.analytical_app.query_executor import engine
 
 type_page = "econ-sv-pod"
 
+
 # Функция для получения опций уровня
 def get_level_options(parent_id=None):
     if parent_id is None:
@@ -20,6 +21,7 @@ def get_level_options(parent_id=None):
         query = f"SELECT id, name FROM plan_groupindicators WHERE parent_id = {parent_id}"
     levels = pd.read_sql(query, engine)
     return [{'label': level['name'], 'value': level['id']} for _, level in levels.iterrows()]
+
 
 # Макет с контейнером для динамических выпадающих списков
 economist_sv_pod = html.Div(
@@ -35,11 +37,10 @@ economist_sv_pod = html.Div(
                                     dbc.Col(update_buttons(type_page), width=2),
                                     dbc.Col(filter_years(type_page), width=2),
                                     html.Div(id='dropdown-container', children=[
-                                        # Начальный выпадающий список уровня 0
                                         dbc.Col(
                                             dcc.Dropdown(
                                                 id={'type': 'dynamic-dropdown', 'index': 0},
-                                                options=get_level_options(),
+                                                options=[],
                                                 placeholder="Выберите уровень 1",
                                                 value=None
                                             ),
@@ -58,10 +59,46 @@ economist_sv_pod = html.Div(
             style={"margin": "0 auto", "padding": "0rem"}
         ),
         dcc.Loading(id=f'loading-output-{type_page}', type='default'),
-        card_table(f'result-table1-{type_page}', "Данные"),
+        card_table(f'result-table1-{type_page}', "Данные", column_selectable='multi'),
+        dcc.Store(id=f'selected-data-{type_page}'),
     ],
     style={"padding": "0rem"}
 )
+
+
+# Callback для кнопки "Суммировать"
+@app.callback(
+    Output(f'sum-result-result-table1-{type_page}', 'children'),
+    Input(f'sum-button-result-table1-{type_page}', 'n_clicks'),
+    State(f'result-table1-{type_page}', 'derived_virtual_data'),
+    State(f'result-table1-{type_page}', 'selected_cells')
+)
+def calculate_sum_and_count(n_clicks, rows, selected_cells):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    # Проверка на наличие данных и выделенных ячеек
+    if rows is None or not selected_cells:
+        return "Нет данных или не выбраны ячейки для подсчета."
+
+    # Инициализация суммы и счетчика
+    total_sum = 0
+    count = 0
+
+    # Суммируем значения только в выделенных ячейках и считаем их количество
+    for cell in selected_cells:
+        row_idx = cell['row']  # Индекс строки
+        col_id = cell['column_id']  # ID столбца
+
+        # Получаем значение ячейки и добавляем к сумме, если оно является числом
+        value = rows[row_idx].get(col_id, 0)
+        if isinstance(value, (int, float)):  # Проверяем, что значение является числом
+            total_sum += value
+            count += 1  # Увеличиваем счетчик для числовых значений
+
+    # Формируем строку с результатом
+    return f"Количество выбранных ячеек: {count}, Сумма значений: {total_sum}"
+
 
 # Колбэк для динамического обновления выпадающих списков
 @app.callback(
@@ -113,6 +150,7 @@ def display_dynamic_dropdowns(values):
         dropdowns.append(dropdown)
 
     return dropdowns
+
 
 # Колбэк для обновления таблицы на основе последнего выбранного уровня
 @app.callback(

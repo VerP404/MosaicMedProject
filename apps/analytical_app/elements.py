@@ -4,7 +4,8 @@ from dash import html, dash_table
 from apps.analytical_app.components.filters import get_current_reporting_month, months_sql_labels
 
 
-def card_table(id_table, card_header, page_size=None):
+# Функция для создания таблицы с возможностью выбора колонок
+def card_table(id_table, card_header, page_size=None, column_selectable=None):
     table_kwargs = {
         'id': id_table,
         'editable': False,
@@ -20,6 +21,9 @@ def card_table(id_table, card_header, page_size=None):
     if page_size is not None:
         table_kwargs['page_size'] = page_size
 
+    if column_selectable is not None:
+        table_kwargs['column_selectable'] = column_selectable
+
     return (
         dbc.Row(
             dbc.Col(
@@ -30,7 +34,12 @@ def card_table(id_table, card_header, page_size=None):
                             html.Div(
                                 dash_table.DataTable(**table_kwargs),
                                 style={"maxWidth": "100%", "overflowX": "auto"}
-                            )
+                            ),
+                            dbc.Row([
+                                dbc.Col(html.Button("Суммировать", id=f'sum-button-{id_table}',
+                                                    className="btn btn-primary"), width=3),
+                                dbc.Col(html.Div(id=f'sum-result-{id_table}', style={"marginTop": "10px"}), width=4)
+                            ]),
                         ]
                     ),
                     style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
