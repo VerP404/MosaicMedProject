@@ -10,17 +10,11 @@ label = "Администратор"  # для хлебных крошек
 cards_row_1 = dbc.Row(
     [
         dbc.Col(create_card(1, type_page,
+                            "Для сборки талонов",
+                            "Отчет для сборки талонов по дате создания талона и цели.")),
+        dbc.Col(create_card(2, type_page,
                             "Аннулирование ЭМД",
                             "В разработке! Ввод данных для формирования запроса на аннулирование ЭМД")),
-        dbc.Col(create_card(2, type_page,
-                            "-",
-                            "-")),
-        dbc.Col(create_card(3, type_page,
-                            "-",
-                            "-")),
-        dbc.Col(create_card(4, type_page,
-                            "-",
-                            "-")),
     ],
     className="mb-4 align-items-stretch",
 )
@@ -40,12 +34,10 @@ admin_main = html.Div([
      ],
     [Input(f'open-report-1-{type_page}', 'n_clicks'),
      Input(f'open-report-2-{type_page}', 'n_clicks'),
-     Input(f'open-report-3-{type_page}', 'n_clicks'),
-     Input(f'open-report-4-{type_page}', 'n_clicks'),
      ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4):
+def navigate_pages(open_report_1, open_report_2):
     ctx = callback_context
     if not ctx.triggered:
         return no_update, no_update
@@ -57,15 +49,9 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4):
     if button_id.startswith("open-report-") and main_link in button_id:
         if button_id == f'open-report-1-{type_page}' and open_report_1:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/admin_delete_emd', breadcrumb_items
+            return f'/{main_link}/gen_invoices', breadcrumb_items
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
             breadcrumb_items.append({"active": True})
-            return f'/{main_link}/doctors', breadcrumb_items
-        elif button_id == f'open-report-3-{type_page}' and open_report_3:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/disp_by_ages', breadcrumb_items
-        elif button_id == f'open-report-4-{type_page}' and open_report_4:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dn_job', breadcrumb_items
+            return f'/{main_link}/admin_delete_emd', breadcrumb_items
 
     return f'/{main_link}', breadcrumb_items

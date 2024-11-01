@@ -2,6 +2,7 @@ from dash import Output, Input, html
 
 from apps.analytical_app.pages.administrator.delete_emd.page import admin_delete_emd
 from apps.analytical_app.pages.administrator.main import admin_main
+from apps.analytical_app.pages.administrator.routes import routes_administrator
 from apps.analytical_app.pages.chief.main import chief_main
 from apps.analytical_app.pages.doctor.routes import routes_doctors
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
@@ -113,35 +114,7 @@ routes = {
 
 
 
-    "/admin": admin_main,
-    "/admin/admin_delete_emd": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Администратор", "href": "/admin"},
-            {"label": "Аннулирование ЭМД", "active": True},
-        ]),
-        admin_delete_emd
-    ]),
-    "/admin/doctors": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Администратор", "href": "/admin"},
-            {"label": "Диспансеризация детей", "active": True},
-        ]),
-        economist_doctors_talon_list
-    ]),
-    "/admin/disp_by_ages": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Администратор", "href": "/admin"},
-            {"label": "Диспансерное наблюдение", "active": True},
-        ]),
-        economist_dispensary_age
-    ]),
-    "/admin/dn_job": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Администратор", "href": "/admin"},
-            {"label": "Диспансерное наблюдение работающих", "active": True},
-        ]),
-        head_dn_job
-    ]),
+
 
     # "/chief": chief_main,
     # "/chief/svpod": html.Div([
@@ -252,6 +225,7 @@ routes = {
 
 routes.update(routes_doctors)
 routes.update(routes_head)
+routes.update(routes_administrator)
 
 
 def page_not_found(pathname):
