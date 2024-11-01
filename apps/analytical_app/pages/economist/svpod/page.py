@@ -2,6 +2,7 @@ from dash import html, dcc, Output, Input, State, ALL, exceptions
 import dash_bootstrap_components as dbc
 import pandas as pd
 from dash.exceptions import PreventUpdate
+from sqlalchemy import text
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
@@ -151,8 +152,23 @@ def display_dynamic_dropdowns(values):
 
     return dropdowns
 
+# Функция для получения данных плана
+def fetch_plan_data(selected_levels, year):
+    # Запрашиваем данные плана для всех выбранных уровней и конкретного года
+    query = text("""
+        SELECT month, SUM(quantity) AS plan
+        FROM plan_monthlyplan
+        WHERE group_id = ANY(:selected_levels) AND month BETWEEN 1 AND 12
+        GROUP BY month
+        ORDER BY month
+    """)
+    with engine.connect() as connection:
+        result = connection.execute(query, {"selected_levels": selected_levels}).mappings()
+        plan_data = {row["month"]: row["plan"] for row in result}
+    return plan_data
 
-# Колбэк для обновления таблицы на основе последнего выбранного уровня
+
+# Callback для обновления таблицы на основе всех выбранных уровней
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data'),
@@ -161,30 +177,37 @@ def display_dynamic_dropdowns(values):
     State(f'dropdown-year-{type_page}', 'value'),
     State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
 )
-def update_table(n_clicks, selected_year, selected_levels):
+def update_table_with_plan(n_clicks, selected_year, selected_levels):
     if n_clicks is None:
         raise PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
 
-    # Оставляем только выбранные значения
+    # Фильтрация уровней, оставляя только выбранные значения
     selected_levels = [level for level in selected_levels if level is not None]
     if not selected_levels:
         raise PreventUpdate
 
-    final_level = selected_levels[-1]
+    # Генерация условий для всех выбранных уровней
+    filter_conditions = get_filter_conditions(selected_levels, selected_year)
 
-    # Получаем условия для последнего выбранного уровня
-    filter_conditions = get_filter_conditions([final_level], selected_year)
-
-    # Генерация SQL-запроса с учетом только условий последнего уровня
+    # Получаем фактические данные из основного запроса
     columns1, data1 = TableUpdater.query_to_df(
         engine,
         sql_query_rep(
             selected_year,
-            group_id=[final_level],
+            group_id=selected_levels,  # передаем все выбранные уровни
             filter_conditions=filter_conditions
         )
     )
+
+    # Получаем данные плана и добавляем их к фактическим данным
+    plan_data = fetch_plan_data(selected_levels, selected_year)
+    for row in data1:
+        month = row.get("month")
+        row["План"] = plan_data.get(month, 0)  # Используем план или 0, если данных нет
+
+    # Добавляем колонку "План" к отображаемым колонкам
+    columns1.append({"name": "План", "id": "План"})
 
     return columns1, data1, loading_output
