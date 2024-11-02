@@ -194,6 +194,10 @@ def get_filter_conditions(group_ids, year):
             filter_clauses.append(f"{field_name} IN ({values})")
         elif filter_type == 'exact':
             filter_clauses.append(f"{field_name} = {values}")
+        elif filter_type == 'like':
+            filter_clauses.append(f"{field_name} LIKE '%{values}%'")
+        elif filter_type == 'not_like':  # Новый тип фильтра
+            filter_clauses.append(f"{field_name} NOT LIKE '%{values}%'")
 
     # Объединяем условия через AND
     return " AND ".join(filter_clauses)

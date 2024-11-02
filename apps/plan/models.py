@@ -65,6 +65,7 @@ class FilterCondition(models.Model):
         ('exact', 'Точное соответствие (=)'),
         ('in', 'В списке (IN)'),
         ('like', 'Похож на (LIKE)'),
+        ('not_like', 'Не содержит (NOT LIKE)'),
     ]
 
     group = models.ForeignKey(GroupIndicators, on_delete=models.CASCADE, related_name="filters")
