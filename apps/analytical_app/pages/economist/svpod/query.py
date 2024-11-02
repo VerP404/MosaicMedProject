@@ -233,13 +233,15 @@ def sql_query_rep(selected_year, group_id, months_placeholder='1, 2, 3, 4, 5, 6,
                 COUNT(CASE WHEN status IN ('6', '8', '4') THEN 1 END) AS исправлено,
                 COUNT(CASE WHEN status IN ('0', '13', '17') THEN 1 END) AS отменено
             FROM oms
-            WHERE inogorodniy = false
-            AND sanctions = '-'
-            AND amount_numeric != '0'
+            
         """
 
     # Условия WHERE
-    where_conditions = []
+    where_conditions = [
+        "inogorodniy = false",
+        "sanctions = '-'",
+        "amount_numeric != '0'"
+    ]
     if filter_conditions:
         where_conditions.append(filter_conditions)
 
