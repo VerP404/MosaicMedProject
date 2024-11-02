@@ -1,11 +1,10 @@
 import dash
-from dash import html, dcc
+from dash import html, dcc, Output, Input
 import plotly.express as px
 import pandas as pd
 
-from apps.chief_app import date_update
 from config.settings import PORT_DASH_CHIEF
-from header import header_func
+from header import header_func, get_current_date_update, initial_time
 
 app = dash.Dash(__name__)
 
@@ -483,8 +482,28 @@ card_container = html.Div([
 title_text = 'Система мониторинга показателей для главного врача'
 
 app.layout = html.Div([
-    header_func(title_text, date_update, app),
-    card_container
+    header_func("Система мониторинга показателей для главного врача", initial_time, app),
+    card_container,
+    dcc.Interval(
+        id='interval-component',
+        interval=1 * 60 * 1000,  # Проверка каждую минуту
+        n_intervals=0
+    )
 ])
+
+
+@app.callback(
+    Output('title1', 'children'),
+    Input('interval-component', 'n_intervals')
+)
+def update_time(n):
+    # Получаем обновленное время
+    updated_time = get_current_date_update()
+    return [
+        html.H6(f'Обновлено: {updated_time}', style={'color': 'white'}),
+        html.Div(id='current-date-output', style={"color": "white", 'font-size': '30px'})
+    ]
+
+
 if __name__ == '__main__':
     app.run_server(debug=False, host='0.0.0.0', port=PORT_DASH_CHIEF)

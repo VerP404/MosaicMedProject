@@ -1,4 +1,27 @@
+from datetime import datetime
+
 from dash import html
+
+# Переменная для хранения времени первого запуска
+initial_time = datetime.now().strftime('%d.%m.%Y %H:%M')
+
+
+def get_current_date_update():
+    now = datetime.now()
+    hour = now.hour
+
+    # Определяем ближайшее время обновления
+    if hour < 8:
+        update_time = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    elif hour < 12:
+        update_time = now.replace(hour=12, minute=0, second=0, microsecond=0)
+    elif hour < 16:
+        update_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    else:
+        update_time = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        update_time = update_time.replace(day=now.day + 1)
+
+    return update_time.strftime('%d.%m.%Y %H:%M')
 
 
 def header_func(_title_text, _date_update, app):
@@ -33,4 +56,3 @@ def header_func(_title_text, _date_update, app):
 
     ], id="header",
         className="row flex-display")
-
