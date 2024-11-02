@@ -1,9 +1,18 @@
+import sys
+import os
+
+# Определяем корневую директорию проекта
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.append(BASE_DIR)
+
+# Импортируем настройки
+from config.settings import PORT_DASH_CHIEF
+
 import dash
 from dash import html, dcc, Output, Input
 import plotly.express as px
 import pandas as pd
 
-from config.settings import PORT_DASH_CHIEF
 from header import header_func, get_current_date_update, initial_time
 
 app = dash.Dash(__name__)
