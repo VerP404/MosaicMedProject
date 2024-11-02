@@ -1,5 +1,6 @@
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from django.apps import apps
 
 from .data_loader import DataLoader, engine
 from .forms import FileUploadForm
@@ -89,12 +90,23 @@ def data_upload_dashboard(request):
     data_types = DataType.objects.all()
     organization = MedicalOrganization.objects.first()
     categories = set(data_type.category for data_type in data_types)  # Собираем все категории
+
     for data_type in data_types:
+        # Получаем дату последней загрузки
         last_import = DataImport.objects.filter(data_type=data_type).order_by('-date_added').first()
         data_type.last_import_date = last_import.date_added if last_import else None
+
+        # Подсчитываем количество строк в таблице, связанной с data_type
+        if hasattr(data_type, 'loaderconfig') and data_type.loaderconfig.table_name:
+            # Получаем модель по имени таблицы
+            table_model = apps.get_model('data_loader', data_type.loaderconfig.table_name)
+            data_type.row_count = table_model.objects.count()
+        else:
+            data_type.row_count = 0
 
     return render(request, 'data_loader/data_upload_dashboard.html', {
         'organization': organization,
         'data_types': data_types,
         'categories': categories  # Передаем категории
     })
+
