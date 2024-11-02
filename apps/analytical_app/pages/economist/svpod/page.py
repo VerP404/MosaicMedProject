@@ -268,5 +268,4 @@ def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_l
         {"name": ["План 1/12", "План 1/12"], "id": "План 1/12"},
         {"name": ["План 1/12", "Входящий остаток"], "id": "Входящий остаток"},
     ]
-    # print(sql_query_rep(selected_year, group_id=[selected_level], filter_conditions=filter_conditions, mode=mode))
     return columns, fact_data, loading_output
