@@ -35,23 +35,27 @@ economist_sv_pod = html.Div(
                     dbc.CardBody(
                         [
                             dbc.CardHeader("Фильтры"),
-                            dbc.Row(
-                                [
-                                    dbc.Col(update_buttons(type_page), width=2),
-                                    dbc.Col(filter_years(type_page), width=2),
-                                    html.Div(id='dropdown-container', children=[
-                                        dbc.Col(
-                                            dcc.Dropdown(
-                                                id={'type': 'dynamic-dropdown', 'index': 0},
-                                                options=[],
-                                                placeholder="Выберите уровень 1",
-                                                value=None
-                                            ),
-                                            width=3
-                                        ),
-                                    ]),
-                                ]
+                            dbc.Row([
+                                dbc.Col(update_buttons(type_page), width=2),
+                                dbc.Col(filter_years(type_page), width=1),
+                                dbc.Col(dbc.Alert(
+                                    "Отобраны талоны: без санкций, местные (по полису ОМС), сумма талона не равна 0",
+                                    color="primary"), width=8),
+                            ]
                             ),
+                            dbc.Row([
+                                html.Div(id='dropdown-container', children=[
+                                    dbc.Col(
+                                        dcc.Dropdown(
+                                            id={'type': 'dynamic-dropdown', 'index': 0},
+                                            options=[],
+                                            placeholder="Выберите уровень 1",
+                                            value=None
+                                        ),
+                                        width=3
+                                    ),
+                                ]),
+                            ]),
                             html.Div(
                                 [
                                     dcc.RadioItems(
@@ -119,11 +123,11 @@ def calculate_sum_and_count(n_clicks, rows, selected_cells, mode):
     if mode == 'finance':
         total_sum = f"{total_sum:,.2f}".replace(",", " ")  # Разделитель тысяч - пробел, два знака после запятой
     else:
-        total_sum = f"{int(total_sum):,}".replace(",", " ")  # Для объемов без дробной части и разделитель тысяч - пробел
+        total_sum = f"{int(total_sum):,}".replace(",",
+                                                  " ")  # Для объемов без дробной части и разделитель тысяч - пробел
 
     # Формируем строку с результатом
     return f"Количество: {count}, Сумма: {total_sum}"
-
 
 
 # Колбэк для динамического обновления выпадающих списков
