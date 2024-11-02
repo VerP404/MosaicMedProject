@@ -38,7 +38,7 @@ routes = {
     "/economist/svpod": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Экономист", "href": "/economist"},
-            {"label": "Сверхподушевое финансирование", "active": True},
+            {"label": "Показатели: выполнение по месяцам", "active": True},
         ]),
         economist_sv_pod
     ]),
