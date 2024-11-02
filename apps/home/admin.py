@@ -13,6 +13,8 @@ class MainSettingsForm(forms.ModelForm):
             'dash_port': forms.NumberInput(attrs={'placeholder': 'Введите порт аналитической системы'}),
             'main_app_ip': forms.TextInput(attrs={'placeholder': 'Введите IP основного приложения'}),
             'main_app_port': forms.NumberInput(attrs={'placeholder': 'Введите порт основного приложения'}),
+            'dash_chief_ip': forms.TextInput(attrs={'placeholder': 'Введите IP панели главного врача'}),
+            'dash_chief_port': forms.NumberInput(attrs={'placeholder': 'Введите порт панели главного врача'}),
         }
 
 

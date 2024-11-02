@@ -11,6 +11,8 @@ SECRET_KEY = env('SECRET_KEY', default='default-secret-key')
 DEBUG = env.bool('DEBUG_DJ')
 DEBUG_DASH = env.bool('DEBUG_DASH')
 PORT_DASH = env.int('PORT_DASH', default=5000)
+PORT_DASH_CHIEF = env.int('PORT_DASH', default=5010)
+
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
