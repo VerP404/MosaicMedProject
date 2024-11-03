@@ -1,0 +1,1166 @@
+{
+    "Category": [
+        {
+            "id": 1,
+            "name": "Web-ОМС",
+            "description": "Web-ОМС"
+        },
+        {
+            "id": 2,
+            "name": "ISZL",
+            "description": "ИСЗЛ"
+        }
+    ],
+    "DataType": [
+        {
+            "id": 1,
+            "name": "DOCTORS",
+            "description": "Врачи",
+            "category_id": 1
+        },
+        {
+            "id": 3,
+            "name": "DETAILED",
+            "description": "Детализация диспансеризации",
+            "category_id": 1
+        },
+        {
+            "id": 4,
+            "name": "people",
+            "description": "население",
+            "category_id": 2
+        },
+        {
+            "id": 5,
+            "name": "disnab",
+            "description": "диспансерное",
+            "category_id": 2
+        },
+        {
+            "id": 6,
+            "name": "disnabjob",
+            "description": "диспансерное работающих",
+            "category_id": 2
+        },
+        {
+            "id": 2,
+            "name": "OMS",
+            "description": "Талоны ОМС",
+            "category_id": 1
+        }
+    ],
+    "DataTypeFieldMapping": [
+        {
+            "id": 1,
+            "data_type_id": 2,
+            "csv_column_name": "Талон",
+            "model_field_name": "talon"
+        },
+        {
+            "id": 2,
+            "data_type_id": 2,
+            "csv_column_name": "Источник",
+            "model_field_name": "source"
+        },
+        {
+            "id": 3,
+            "data_type_id": 2,
+            "csv_column_name": "ID источника",
+            "model_field_name": "source_id"
+        },
+        {
+            "id": 4,
+            "data_type_id": 2,
+            "csv_column_name": "Номер счёта",
+            "model_field_name": "account_number"
+        },
+        {
+            "id": 5,
+            "data_type_id": 2,
+            "csv_column_name": "Дата выгрузки",
+            "model_field_name": "upload_date"
+        },
+        {
+            "id": 6,
+            "data_type_id": 2,
+            "csv_column_name": "Причина аннулирования",
+            "model_field_name": "cancellation_reason"
+        },
+        {
+            "id": 7,
+            "data_type_id": 2,
+            "csv_column_name": "Статус",
+            "model_field_name": "status"
+        },
+        {
+            "id": 8,
+            "data_type_id": 2,
+            "csv_column_name": "Тип талона",
+            "model_field_name": "talon_type"
+        },
+        {
+            "id": 9,
+            "data_type_id": 2,
+            "csv_column_name": "Цель",
+            "model_field_name": "goal"
+        },
+        {
+            "id": 10,
+            "data_type_id": 2,
+            "csv_column_name": "Фед. цель",
+            "model_field_name": "federal_goal"
+        },
+        {
+            "id": 11,
+            "data_type_id": 2,
+            "csv_column_name": "Пациент",
+            "model_field_name": "patient"
+        },
+        {
+            "id": 12,
+            "data_type_id": 2,
+            "csv_column_name": "Дата рождения",
+            "model_field_name": "birth_date"
+        },
+        {
+            "id": 13,
+            "data_type_id": 2,
+            "csv_column_name": "Возраст",
+            "model_field_name": "age"
+        },
+        {
+            "id": 14,
+            "data_type_id": 2,
+            "csv_column_name": "Пол",
+            "model_field_name": "gender"
+        },
+        {
+            "id": 15,
+            "data_type_id": 2,
+            "csv_column_name": "Полис",
+            "model_field_name": "policy"
+        },
+        {
+            "id": 16,
+            "data_type_id": 2,
+            "csv_column_name": "Код СМО",
+            "model_field_name": "smo_code"
+        },
+        {
+            "id": 17,
+            "data_type_id": 2,
+            "csv_column_name": "Страховая",
+            "model_field_name": "insurance"
+        },
+        {
+            "id": 18,
+            "data_type_id": 2,
+            "csv_column_name": "ЕНП",
+            "model_field_name": "enp"
+        },
+        {
+            "id": 19,
+            "data_type_id": 2,
+            "csv_column_name": "Начало лечения",
+            "model_field_name": "treatment_start"
+        },
+        {
+            "id": 20,
+            "data_type_id": 2,
+            "csv_column_name": "Окончание лечения",
+            "model_field_name": "treatment_end"
+        },
+        {
+            "id": 21,
+            "data_type_id": 2,
+            "csv_column_name": "Врач",
+            "model_field_name": "doctor"
+        },
+        {
+            "id": 22,
+            "data_type_id": 2,
+            "csv_column_name": "Врач (Профиль МП)",
+            "model_field_name": "doctor_profile"
+        },
+        {
+            "id": 23,
+            "data_type_id": 2,
+            "csv_column_name": "Должность мед.персонала (V021)",
+            "model_field_name": "staff_position"
+        },
+        {
+            "id": 24,
+            "data_type_id": 2,
+            "csv_column_name": "Подразделение",
+            "model_field_name": "department"
+        },
+        {
+            "id": 25,
+            "data_type_id": 2,
+            "csv_column_name": "Условия оказания помощи",
+            "model_field_name": "care_conditions"
+        },
+        {
+            "id": 26,
+            "data_type_id": 2,
+            "csv_column_name": "Вид мед. помощи",
+            "model_field_name": "medical_assistance_type"
+        },
+        {
+            "id": 27,
+            "data_type_id": 2,
+            "csv_column_name": "Тип заболевания",
+            "model_field_name": "disease_type"
+        },
+        {
+            "id": 28,
+            "data_type_id": 2,
+            "csv_column_name": "Характер основного заболевания",
+            "model_field_name": "main_disease_character"
+        },
+        {
+            "id": 29,
+            "data_type_id": 2,
+            "csv_column_name": "Посещения",
+            "model_field_name": "visits"
+        },
+        {
+            "id": 30,
+            "data_type_id": 2,
+            "csv_column_name": "Посещения в МО",
+            "model_field_name": "mo_visits"
+        },
+        {
+            "id": 31,
+            "data_type_id": 2,
+            "csv_column_name": "Посещения на Дому",
+            "model_field_name": "home_visits"
+        },
+        {
+            "id": 33,
+            "data_type_id": 2,
+            "csv_column_name": "Диагноз основной (DS1)",
+            "model_field_name": "main_diagnosis"
+        },
+        {
+            "id": 34,
+            "data_type_id": 2,
+            "csv_column_name": "Сопутствующий диагноз (DS2)",
+            "model_field_name": "additional_diagnosis"
+        },
+        {
+            "id": 35,
+            "data_type_id": 2,
+            "csv_column_name": "Профиль МП",
+            "model_field_name": "mp_profile"
+        },
+        {
+            "id": 36,
+            "data_type_id": 2,
+            "csv_column_name": "Профиль койки",
+            "model_field_name": "bed_profile"
+        },
+        {
+            "id": 37,
+            "data_type_id": 2,
+            "csv_column_name": "Диспансерное наблюдение",
+            "model_field_name": "dispensary_monitoring"
+        },
+        {
+            "id": 38,
+            "data_type_id": 2,
+            "csv_column_name": "Специальность",
+            "model_field_name": "specialty"
+        },
+        {
+            "id": 39,
+            "data_type_id": 2,
+            "csv_column_name": "Исход",
+            "model_field_name": "outcome"
+        },
+        {
+            "id": 40,
+            "data_type_id": 2,
+            "csv_column_name": "Результат",
+            "model_field_name": "result"
+        },
+        {
+            "id": 41,
+            "data_type_id": 2,
+            "csv_column_name": "Оператор",
+            "model_field_name": "operator"
+        },
+        {
+            "id": 42,
+            "data_type_id": 2,
+            "csv_column_name": "Первоначальная дата ввода",
+            "model_field_name": "initial_input_date"
+        },
+        {
+            "id": 43,
+            "data_type_id": 2,
+            "csv_column_name": "Дата последнего изменения",
+            "model_field_name": "last_change_date"
+        },
+        {
+            "id": 44,
+            "data_type_id": 2,
+            "csv_column_name": "Тариф",
+            "model_field_name": "tariff"
+        },
+        {
+            "id": 45,
+            "data_type_id": 2,
+            "csv_column_name": "Сумма",
+            "model_field_name": "amount"
+        },
+        {
+            "id": 46,
+            "data_type_id": 2,
+            "csv_column_name": "Оплачено",
+            "model_field_name": "paid"
+        },
+        {
+            "id": 47,
+            "data_type_id": 2,
+            "csv_column_name": "Тип оплаты",
+            "model_field_name": "payment_type"
+        },
+        {
+            "id": 48,
+            "data_type_id": 2,
+            "csv_column_name": "Санкции",
+            "model_field_name": "sanctions"
+        },
+        {
+            "id": 49,
+            "data_type_id": 2,
+            "csv_column_name": "КСГ",
+            "model_field_name": "ksg"
+        },
+        {
+            "id": 50,
+            "data_type_id": 2,
+            "csv_column_name": "КЗ",
+            "model_field_name": "kz"
+        },
+        {
+            "id": 51,
+            "data_type_id": 2,
+            "csv_column_name": "Код схемы лекарственной терапии",
+            "model_field_name": "therapy_schema_code"
+        },
+        {
+            "id": 52,
+            "data_type_id": 2,
+            "csv_column_name": "УЕТ",
+            "model_field_name": "uet"
+        },
+        {
+            "id": 53,
+            "data_type_id": 2,
+            "csv_column_name": "Классификационный критерий",
+            "model_field_name": "classification_criterion"
+        },
+        {
+            "id": 54,
+            "data_type_id": 2,
+            "csv_column_name": "ШРМ",
+            "model_field_name": "shrm"
+        },
+        {
+            "id": 55,
+            "data_type_id": 2,
+            "csv_column_name": "МО, направившая",
+            "model_field_name": "directing_mo"
+        },
+        {
+            "id": 56,
+            "data_type_id": 2,
+            "csv_column_name": "Код способа оплаты",
+            "model_field_name": "payment_method_code"
+        },
+        {
+            "id": 57,
+            "data_type_id": 2,
+            "csv_column_name": "Новорожденный",
+            "model_field_name": "newborn"
+        },
+        {
+            "id": 58,
+            "data_type_id": 2,
+            "csv_column_name": "Представитель",
+            "model_field_name": "representative"
+        },
+        {
+            "id": 59,
+            "data_type_id": 2,
+            "csv_column_name": "Доп. инф. о статусе талона",
+            "model_field_name": "additional_status_info"
+        },
+        {
+            "id": 60,
+            "data_type_id": 2,
+            "csv_column_name": "КСЛП",
+            "model_field_name": "kslp"
+        },
+        {
+            "id": 61,
+            "data_type_id": 2,
+            "csv_column_name": "Источник оплаты",
+            "model_field_name": "payment_source"
+        },
+        {
+            "id": 62,
+            "data_type_id": 2,
+            "csv_column_name": "Отчетный период выгрузки",
+            "model_field_name": "report_period"
+        },
+        {
+            "id": 63,
+            "data_type_id": 1,
+            "csv_column_name": "СНИЛС:",
+            "model_field_name": "snils"
+        },
+        {
+            "id": 64,
+            "data_type_id": 1,
+            "csv_column_name": "Код врача:",
+            "model_field_name": "doctor_code"
+        },
+        {
+            "id": 65,
+            "data_type_id": 1,
+            "csv_column_name": "Фамилия:",
+            "model_field_name": "last_name"
+        },
+        {
+            "id": 66,
+            "data_type_id": 1,
+            "csv_column_name": "Имя:",
+            "model_field_name": "first_name"
+        },
+        {
+            "id": 67,
+            "data_type_id": 1,
+            "csv_column_name": "Отчество:",
+            "model_field_name": "middle_name"
+        },
+        {
+            "id": 68,
+            "data_type_id": 1,
+            "csv_column_name": "Дата рождения:",
+            "model_field_name": "birth_date"
+        },
+        {
+            "id": 69,
+            "data_type_id": 1,
+            "csv_column_name": "Пол",
+            "model_field_name": "gender"
+        },
+        {
+            "id": 70,
+            "data_type_id": 1,
+            "csv_column_name": "Дата начала работы:",
+            "model_field_name": "start_date"
+        },
+        {
+            "id": 71,
+            "data_type_id": 1,
+            "csv_column_name": "Дата окончания работы:",
+            "model_field_name": "end_date"
+        },
+        {
+            "id": 72,
+            "data_type_id": 1,
+            "csv_column_name": "Структурное подразделение:",
+            "model_field_name": "department"
+        },
+        {
+            "id": 73,
+            "data_type_id": 1,
+            "csv_column_name": "Код профиля медпомощи:",
+            "model_field_name": "medical_profile_code"
+        },
+        {
+            "id": 74,
+            "data_type_id": 1,
+            "csv_column_name": "Код специальности:",
+            "model_field_name": "specialty_code"
+        },
+        {
+            "id": 75,
+            "data_type_id": 1,
+            "csv_column_name": "Код отделения:",
+            "model_field_name": "department_code"
+        },
+        {
+            "id": 76,
+            "data_type_id": 1,
+            "csv_column_name": "Комментарий:",
+            "model_field_name": "comment"
+        },
+        {
+            "id": 77,
+            "data_type_id": 3,
+            "csv_column_name": "Номер талона",
+            "model_field_name": "talon_number"
+        },
+        {
+            "id": 78,
+            "data_type_id": 3,
+            "csv_column_name": "Счет",
+            "model_field_name": "account_number"
+        },
+        {
+            "id": 79,
+            "data_type_id": 3,
+            "csv_column_name": "Дата выгрузки",
+            "model_field_name": "upload_date"
+        },
+        {
+            "id": 80,
+            "data_type_id": 3,
+            "csv_column_name": "Статус",
+            "model_field_name": "status"
+        },
+        {
+            "id": 81,
+            "data_type_id": 3,
+            "csv_column_name": "МО",
+            "model_field_name": "mo"
+        },
+        {
+            "id": 82,
+            "data_type_id": 3,
+            "csv_column_name": "Дата начала",
+            "model_field_name": "start_date"
+        },
+        {
+            "id": 83,
+            "data_type_id": 3,
+            "csv_column_name": "Дата окончания",
+            "model_field_name": "end_date"
+        },
+        {
+            "id": 84,
+            "data_type_id": 3,
+            "csv_column_name": "Серия полиса",
+            "model_field_name": "policy_series"
+        },
+        {
+            "id": 85,
+            "data_type_id": 3,
+            "csv_column_name": "Номер полиса",
+            "model_field_name": "policy_number"
+        },
+        {
+            "id": 86,
+            "data_type_id": 3,
+            "csv_column_name": "ЕНП",
+            "model_field_name": "enp"
+        },
+        {
+            "id": 87,
+            "data_type_id": 3,
+            "csv_column_name": "Фамилия",
+            "model_field_name": "last_name"
+        },
+        {
+            "id": 88,
+            "data_type_id": 3,
+            "csv_column_name": "Имя",
+            "model_field_name": "first_name"
+        },
+        {
+            "id": 89,
+            "data_type_id": 3,
+            "csv_column_name": "Отчество",
+            "model_field_name": "middle_name"
+        },
+        {
+            "id": 90,
+            "data_type_id": 3,
+            "csv_column_name": "Страховая организация",
+            "model_field_name": "insurance_org"
+        },
+        {
+            "id": 91,
+            "data_type_id": 3,
+            "csv_column_name": "Пол",
+            "model_field_name": "gender"
+        },
+        {
+            "id": 92,
+            "data_type_id": 3,
+            "csv_column_name": "Дата рождения",
+            "model_field_name": "birth_date"
+        },
+        {
+            "id": 93,
+            "data_type_id": 3,
+            "csv_column_name": "Тип талона",
+            "model_field_name": "talon_type"
+        },
+        {
+            "id": 94,
+            "data_type_id": 3,
+            "csv_column_name": "Основной диагноз",
+            "model_field_name": "main_diagnosis"
+        },
+        {
+            "id": 95,
+            "data_type_id": 3,
+            "csv_column_name": "Сопутствующий диагноз",
+            "model_field_name": "additional_diagnosis"
+        },
+        {
+            "id": 96,
+            "data_type_id": 3,
+            "csv_column_name": "Группа здоровья",
+            "model_field_name": "health_group"
+        },
+        {
+            "id": 97,
+            "data_type_id": 3,
+            "csv_column_name": "Доктор (Код)",
+            "model_field_name": "doctor_code"
+        },
+        {
+            "id": 98,
+            "data_type_id": 3,
+            "csv_column_name": "Доктор (ФИО)",
+            "model_field_name": "doctor_name"
+        },
+        {
+            "id": 99,
+            "data_type_id": 3,
+            "csv_column_name": "Стоимость",
+            "model_field_name": "cost"
+        },
+        {
+            "id": 100,
+            "data_type_id": 3,
+            "csv_column_name": "Название услуги",
+            "model_field_name": "service_name"
+        },
+        {
+            "id": 101,
+            "data_type_id": 3,
+            "csv_column_name": "Номенклатурный код услуги",
+            "model_field_name": "service_code"
+        },
+        {
+            "id": 102,
+            "data_type_id": 3,
+            "csv_column_name": "Доктор-Услуги (Код)",
+            "model_field_name": "service_doctor_code"
+        },
+        {
+            "id": 103,
+            "data_type_id": 3,
+            "csv_column_name": "Доктор-Услуги (ФИО)",
+            "model_field_name": "service_doctor_name"
+        },
+        {
+            "id": 104,
+            "data_type_id": 3,
+            "csv_column_name": "Дата-Услуги",
+            "model_field_name": "service_date"
+        },
+        {
+            "id": 105,
+            "data_type_id": 3,
+            "csv_column_name": "Статус-Услуги",
+            "model_field_name": "service_status"
+        },
+        {
+            "id": 106,
+            "data_type_id": 3,
+            "csv_column_name": "Маршрут",
+            "model_field_name": "route"
+        },
+        {
+            "id": 107,
+            "data_type_id": 3,
+            "csv_column_name": "Подразделение врача-Услуги",
+            "model_field_name": "service_department"
+        },
+        {
+            "id": 108,
+            "data_type_id": 3,
+            "csv_column_name": "Код МО (при оказ.услуги в другой МО)",
+            "model_field_name": "external_mo_code"
+        },
+        {
+            "id": 159,
+            "data_type_id": 5,
+            "csv_column_name": "w",
+            "model_field_name": "w"
+        },
+        {
+            "id": 161,
+            "data_type_id": 6,
+            "csv_column_name": "id",
+            "model_field_name": "id_iszl"
+        },
+        {
+            "id": 162,
+            "data_type_id": 6,
+            "csv_column_name": "МО проф.м.",
+            "model_field_name": "mo_prof"
+        },
+        {
+            "id": 163,
+            "data_type_id": 6,
+            "csv_column_name": "МО прикрепления",
+            "model_field_name": "mo_pri"
+        },
+        {
+            "id": 164,
+            "data_type_id": 6,
+            "csv_column_name": "Организация Проф.м.",
+            "model_field_name": "organization"
+        },
+        {
+            "id": 165,
+            "data_type_id": 6,
+            "csv_column_name": "Адрес",
+            "model_field_name": "address"
+        },
+        {
+            "id": 166,
+            "data_type_id": 6,
+            "csv_column_name": "Ф.И.О.",
+            "model_field_name": "fio"
+        },
+        {
+            "id": 167,
+            "data_type_id": 6,
+            "csv_column_name": "Д.Р.",
+            "model_field_name": "birth_date"
+        },
+        {
+            "id": 168,
+            "data_type_id": 6,
+            "csv_column_name": "ЕНП",
+            "model_field_name": "enp"
+        },
+        {
+            "id": 169,
+            "data_type_id": 6,
+            "csv_column_name": "DS",
+            "model_field_name": "ds"
+        },
+        {
+            "id": 170,
+            "data_type_id": 6,
+            "csv_column_name": "Дата",
+            "model_field_name": "date"
+        },
+        {
+            "id": 171,
+            "data_type_id": 6,
+            "csv_column_name": "Время",
+            "model_field_name": "time"
+        },
+        {
+            "id": 172,
+            "data_type_id": 6,
+            "csv_column_name": "Инф.",
+            "model_field_name": "info"
+        },
+        {
+            "id": 173,
+            "data_type_id": 6,
+            "csv_column_name": "Факт",
+            "model_field_name": "fact"
+        },
+        {
+            "id": 174,
+            "data_type_id": 6,
+            "csv_column_name": "СМО",
+            "model_field_name": "smo"
+        },
+        {
+            "id": 175,
+            "data_type_id": 6,
+            "csv_column_name": "Дата изм./Оператор",
+            "model_field_name": "modification_date_operator"
+        },
+        {
+            "id": 176,
+            "data_type_id": 6,
+            "csv_column_name": "Unnamed: 15",
+            "model_field_name": "column1"
+        },
+        {
+            "id": 118,
+            "data_type_id": 4,
+            "csv_column_name": "CLOSED",
+            "model_field_name": "closed"
+        },
+        {
+            "id": 158,
+            "data_type_id": 5,
+            "csv_column_name": "PlaceW",
+            "model_field_name": "placew"
+        },
+        {
+            "id": 122,
+            "data_type_id": 5,
+            "csv_column_name": "pdwID",
+            "model_field_name": "pdwid"
+        },
+        {
+            "id": 117,
+            "data_type_id": 4,
+            "csv_column_name": "Upd",
+            "model_field_name": "upd"
+        },
+        {
+            "id": 141,
+            "data_type_id": 5,
+            "csv_column_name": "FactDN",
+            "model_field_name": "factdn"
+        },
+        {
+            "id": 133,
+            "data_type_id": 5,
+            "csv_column_name": "IM_D",
+            "model_field_name": "im_d"
+        },
+        {
+            "id": 113,
+            "data_type_id": 4,
+            "csv_column_name": "ENP",
+            "model_field_name": "enp"
+        },
+        {
+            "id": 157,
+            "data_type_id": 5,
+            "csv_column_name": "DatePrev",
+            "model_field_name": "dateprev"
+        },
+        {
+            "id": 130,
+            "data_type_id": 5,
+            "csv_column_name": "PlanMonth",
+            "model_field_name": "planmonth"
+        },
+        {
+            "id": 137,
+            "data_type_id": 5,
+            "csv_column_name": "SpecV015",
+            "model_field_name": "specv015"
+        },
+        {
+            "id": 148,
+            "data_type_id": 5,
+            "csv_column_name": "LPUUCH",
+            "model_field_name": "lpuuch"
+        },
+        {
+            "id": 124,
+            "data_type_id": 5,
+            "csv_column_name": "DR",
+            "model_field_name": "dr"
+        },
+        {
+            "id": 135,
+            "data_type_id": 5,
+            "csv_column_name": "SS_D",
+            "model_field_name": "ss_d"
+        },
+        {
+            "id": 131,
+            "data_type_id": 5,
+            "csv_column_name": "PlanYear",
+            "model_field_name": "planyear"
+        },
+        {
+            "id": 123,
+            "data_type_id": 5,
+            "csv_column_name": "FIO",
+            "model_field_name": "fio"
+        },
+        {
+            "id": 126,
+            "data_type_id": 5,
+            "csv_column_name": "DateBegin",
+            "model_field_name": "datebegin"
+        },
+        {
+            "id": 155,
+            "data_type_id": 5,
+            "csv_column_name": "DateUpdatePlan",
+            "model_field_name": "dateupdateplan"
+        },
+        {
+            "id": 112,
+            "data_type_id": 4,
+            "csv_column_name": "SMO",
+            "model_field_name": "smo"
+        },
+        {
+            "id": 134,
+            "data_type_id": 5,
+            "csv_column_name": "OT_D",
+            "model_field_name": "ot_d"
+        },
+        {
+            "id": 127,
+            "data_type_id": 5,
+            "csv_column_name": "DateEnd",
+            "model_field_name": "dateend"
+        },
+        {
+            "id": 109,
+            "data_type_id": 4,
+            "csv_column_name": "PID",
+            "model_field_name": "pid"
+        },
+        {
+            "id": 136,
+            "data_type_id": 5,
+            "csv_column_name": "SPEC_D",
+            "model_field_name": "spec_d"
+        },
+        {
+            "id": 119,
+            "data_type_id": 4,
+            "csv_column_name": "Unnamed: 10",
+            "model_field_name": "column1"
+        },
+        {
+            "id": 132,
+            "data_type_id": 5,
+            "csv_column_name": "FAM_D",
+            "model_field_name": "fam_d"
+        },
+        {
+            "id": 149,
+            "data_type_id": 5,
+            "csv_column_name": "SMO",
+            "model_field_name": "smo"
+        },
+        {
+            "id": 138,
+            "data_type_id": 5,
+            "csv_column_name": "DateInfo",
+            "model_field_name": "dateinfo"
+        },
+        {
+            "id": 114,
+            "data_type_id": 4,
+            "csv_column_name": "LPU",
+            "model_field_name": "lpu"
+        },
+        {
+            "id": 145,
+            "data_type_id": 5,
+            "csv_column_name": "LPU",
+            "model_field_name": "lpu"
+        },
+        {
+            "id": 116,
+            "data_type_id": 4,
+            "csv_column_name": "LPUUCH",
+            "model_field_name": "lpuuch"
+        },
+        {
+            "id": 128,
+            "data_type_id": 5,
+            "csv_column_name": "idReason",
+            "model_field_name": "idreason"
+        },
+        {
+            "id": 147,
+            "data_type_id": 5,
+            "csv_column_name": "SS_DOCTOR",
+            "model_field_name": "ss_doctor"
+        },
+        {
+            "id": 151,
+            "data_type_id": 5,
+            "csv_column_name": "LPUDT",
+            "model_field_name": "lpudt"
+        },
+        {
+            "id": 152,
+            "data_type_id": 5,
+            "csv_column_name": "UserUpdateList",
+            "model_field_name": "userupdatelist"
+        },
+        {
+            "id": 139,
+            "data_type_id": 5,
+            "csv_column_name": "WayInfo",
+            "model_field_name": "wayinfo"
+        },
+        {
+            "id": 142,
+            "data_type_id": 5,
+            "csv_column_name": "RezultDN",
+            "model_field_name": "rezultdn"
+        },
+        {
+            "id": 121,
+            "data_type_id": 5,
+            "csv_column_name": "ldwID",
+            "model_field_name": "ldwid"
+        },
+        {
+            "id": 125,
+            "data_type_id": 5,
+            "csv_column_name": "DS",
+            "model_field_name": "ds"
+        },
+        {
+            "id": 140,
+            "data_type_id": 5,
+            "csv_column_name": "ResInfo",
+            "model_field_name": "resinfo"
+        },
+        {
+            "id": 143,
+            "data_type_id": 5,
+            "csv_column_name": "ADR",
+            "model_field_name": "adr"
+        },
+        {
+            "id": 146,
+            "data_type_id": 5,
+            "csv_column_name": "FIO_DOCTOR",
+            "model_field_name": "fio_doctor"
+        },
+        {
+            "id": 153,
+            "data_type_id": 5,
+            "csv_column_name": "DateUpdateList",
+            "model_field_name": "dateupdatelist"
+        },
+        {
+            "id": 111,
+            "data_type_id": 4,
+            "csv_column_name": "DR",
+            "model_field_name": "dr"
+        },
+        {
+            "id": 120,
+            "data_type_id": 5,
+            "csv_column_name": "pID",
+            "model_field_name": "pid"
+        },
+        {
+            "id": 129,
+            "data_type_id": 5,
+            "csv_column_name": "nameReason",
+            "model_field_name": "namereason"
+        },
+        {
+            "id": 115,
+            "data_type_id": 4,
+            "csv_column_name": "SS_DOCTOR",
+            "model_field_name": "ss_doctor"
+        },
+        {
+            "id": 150,
+            "data_type_id": 5,
+            "csv_column_name": "LPUAUTO",
+            "model_field_name": "lpuauto"
+        },
+        {
+            "id": 144,
+            "data_type_id": 5,
+            "csv_column_name": "ENP",
+            "model_field_name": "enp"
+        },
+        {
+            "id": 156,
+            "data_type_id": 5,
+            "csv_column_name": "PeriodW",
+            "model_field_name": "periodw"
+        },
+        {
+            "id": 154,
+            "data_type_id": 5,
+            "csv_column_name": "UserUpdatePlan",
+            "model_field_name": "userupdateplan"
+        },
+        {
+            "id": 110,
+            "data_type_id": 4,
+            "csv_column_name": "FIO",
+            "model_field_name": "fio"
+        },
+        {
+            "id": 160,
+            "data_type_id": 5,
+            "csv_column_name": "Unnamed: 40",
+            "model_field_name": "column1"
+        },
+        {
+            "id": 32,
+            "data_type_id": 2,
+            "csv_column_name": "Случай",
+            "model_field_name": "case_code"
+        }
+    ],
+    "DataLoaderConfig": [
+        {
+            "id": 2,
+            "table_name": "data_loader_iszldisnabjob",
+            "column_check": "id_iszl",
+            "columns_for_update": "id_iszl, enp, ds",
+            "encoding": "cp1251",
+            "delimiter": ";",
+            "data_type_id": 6
+        },
+        {
+            "id": 3,
+            "table_name": "data_loader_iszldisnab",
+            "column_check": "pdwid",
+            "columns_for_update": "pdwid",
+            "encoding": "cp1251",
+            "delimiter": ";",
+            "data_type_id": 5
+        },
+        {
+            "id": 4,
+            "table_name": "data_loader_iszlpeople",
+            "column_check": "enp",
+            "columns_for_update": "enp",
+            "encoding": "utf-8",
+            "delimiter": ";",
+            "data_type_id": 4
+        },
+        {
+            "id": 5,
+            "table_name": "data_loader_doctordata",
+            "column_check": "snils",
+            "columns_for_update": "snils, doctor_code",
+            "encoding": "utf-8",
+            "delimiter": ";",
+            "data_type_id": 1
+        },
+        {
+            "id": 6,
+            "table_name": "data_loader_detaileddata",
+            "column_check": "last_name",
+            "columns_for_update": "talon_number",
+            "encoding": "utf-8",
+            "delimiter": ";",
+            "data_type_id": 3
+        },
+        {
+            "id": 1,
+            "table_name": "data_loader_omsdata",
+            "column_check": "patient",
+            "columns_for_update": "talon",
+            "encoding": "utf-8",
+            "delimiter": ";",
+            "data_type_id": 2
+        }
+    ]
+}
