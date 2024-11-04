@@ -71,6 +71,51 @@ class DataLoader:
         self.error_count = 0
         self.message = ''
 
+    def _create_initial_data_import_record(self, csv_file):
+        """
+        Создаем начальную запись в таблице DataImport с минимальной информацией о файле.
+        """
+        sql_query = """
+        INSERT INTO data_loader_dataimport (csv_file, date_added, added_count, updated_count, error_count, data_type_id, message)
+        VALUES (:csv_file, NOW(), 0, 0, 0, :data_type_id, :message) RETURNING id
+        """
+        with self.engine.begin() as connection:
+            data_type_query = "SELECT id FROM data_loader_datatype WHERE name = :data_type_name"
+            data_type_id_result = connection.execute(
+                text(data_type_query),
+                {'data_type_name': self.data_type_name}
+            ).fetchone()
+
+            if data_type_id_result:
+                data_type_id = data_type_id_result[0]
+                result = connection.execute(text(sql_query), {
+                    'csv_file': csv_file,
+                    'data_type_id': data_type_id,
+                    'message': 'Начало загрузки файла.'
+                })
+                self.import_record_id = result.fetchone()[0]  # Сохраняем ID записи для дальнейшего обновления
+
+    def _update_data_import_record(self):
+        """
+        Обновляем существующую запись в таблице DataImport с накопленной информацией.
+        """
+        sql_update = """
+        UPDATE data_loader_dataimport
+        SET added_count = :added_count,
+            updated_count = :updated_count,
+            error_count = :error_count,
+            message = :message
+        WHERE id = :import_record_id
+        """
+        with self.engine.begin() as connection:
+            connection.execute(text(sql_update), {
+                'added_count': self.added_count,
+                'updated_count': self.updated_count,
+                'error_count': self.error_count,
+                'message': self.message,
+                'import_record_id': self.import_record_id
+            })
+
     @time_it("Общее время загрузки данных")
     def load_data(self, file_path):
         """
@@ -79,32 +124,51 @@ class DataLoader:
         """
         total_start_time = datetime.now()
 
-        # Шаг 1: Загрузка данных
-        df = self._load_file_to_df(file_path)
+        # Шаг 1: Создаем начальную запись в DataImport
+        self._create_initial_data_import_record(file_path)
 
-        # Проверка столбцов
-        self._check_columns(df)
+        try:
+            # Шаг 2: Загрузка данных
+            df = self._load_file_to_df(file_path)
+            self.message += f"Шаг 'Загрузка файла в DataFrame' выполнен успешно. Строк: {df.shape[0]}, Столбцов: {df.shape[1]}\n"
+            self._update_data_import_record()  # Обновляем запись после загрузки данных
 
-        # Шаг 2: Переименование столбцов
-        self._rename_columns(df)
+            # Шаг 3: Проверка столбцов
+            self._check_columns(df)
+            self.message += "Шаг 'Проверка столбцов' выполнен успешно.\n"
+            self._update_data_import_record()  # Обновляем запись после проверки столбцов
 
-        # Шаг 3: Обработка DataFrame
-        df = self._process_dataframe(df)
+            # Шаг 4: Переименование столбцов
+            self._rename_columns(df)
+            self.message += "Шаг 'Переименование столбцов' выполнен успешно.\n"
+            self._update_data_import_record()  # Обновляем запись после переименования столбцов
 
-        # self._update_or_insert_data(df)  #
+            # Шаг 5: Обработка DataFrame
+            df = self._process_dataframe(df)
+            self.message += "Шаг 'Обработка DataFrame' выполнен успешно.\n"
+            self._update_data_import_record()  # Обновляем запись после обработки DataFrame
 
-        # # Шаг 4: Удаление существующих строк по уникальному столбцу
-        self._delete_existing_rows(df)
-        #
-        # # Шаг 5: Загрузка данных в базу
-        self._load_data_to_db(df)
+            # Шаг 6: Удаление существующих строк по уникальному столбцу
+            self._delete_existing_rows(df)
+            self.message += "Шаг 'Удаление существующих строк' выполнен успешно.\n"
+            self._update_data_import_record()  # Обновляем запись после удаления строк
 
-        # Шаг 6: Создаем запись в DataImport
-        self._create_data_import_record()
+            # Шаг 7: Загрузка данных в базу
+            self._load_data_to_db(df)
+            self.message += "Шаг 'Загрузка данных в базу' выполнен успешно.\n"
+            self._update_data_import_record()  # Обновляем запись после загрузки в базу
 
-        # Финальное время
+        except Exception as e:
+            self.message += f"Ошибка при выполнении загрузки: {e}\n"
+            self.error_count += 1
+            self._update_data_import_record()  # Сохраняем сообщение об ошибке
+            raise
+
+        # Финальное обновление с общим временем выполнения
         total_end_time = datetime.now()
         elapsed_time = total_end_time - total_start_time
+        self.message += f"Загрузка данных завершена. Общее время: {elapsed_time}\n"
+        self._update_data_import_record()
 
     @time_it("Загрузка списка столбцов из БД")
     def _get_columns_mapping(self):
@@ -303,14 +367,15 @@ class DataLoader:
         except Exception as e:
             self.error_count += 1
             self.message += f" Ошибка при обновлении/вставке данных: {e}\n"
+
     @time_it("Сохранение информации о загрузке в БД")
     def _create_data_import_record(self):
         """
         Создает запись в таблице DataImport с информацией о загрузке через SQL-запрос.
         """
         sql_query = """
-        INSERT INTO data_loader_dataimport (csv_file, date_added, added_count, updated_count, error_count, data_type_id)
-        VALUES (:csv_file, NOW(), :added_count, :updated_count, :error_count, :data_type_id)
+        INSERT INTO data_loader_dataimport (csv_file, date_added, added_count, updated_count, error_count, data_type_id, message)
+        VALUES (:csv_file, NOW(), :added_count, :updated_count, :error_count, :data_type_id, :message)
         """
 
         with self.engine.begin() as connection:
@@ -329,7 +394,8 @@ class DataLoader:
                         'added_count': self.added_count,
                         'updated_count': self.updated_count,
                         'error_count': self.error_count,
-                        'data_type_id': data_type_id
+                        'data_type_id': data_type_id,
+                        'message': self.message
                     })
                     self.message += "Запись в таблице DataImport успешно создана.\n"
                 except Exception as e:

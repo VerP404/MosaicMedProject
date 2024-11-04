@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.apps import apps
@@ -17,9 +20,13 @@ def upload_file(request, data_type_id):
     if request.method == 'POST':
         form = FileUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            file_instance = form.save(commit=False)
-            file_instance.data_type = data_type
-            file_instance.save()
+            uploaded_file = request.FILES['csv_file']
+
+            # Создаем временный файл
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_file:
+                for chunk in uploaded_file.chunks():
+                    temp_file.write(chunk)
+                temp_file_path = temp_file.name
 
             try:
                 loader = DataLoader(
@@ -31,16 +38,14 @@ def upload_file(request, data_type_id):
                     encoding=loader_config.encoding,
                     sep=loader_config.delimiter
                 )
-                loader.load_data(file_instance.csv_file.path)  # Загружаем данные
+                loader.load_data(temp_file_path)  # Загружаем данные
 
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    # Возвращаем JSON для AJAX-запросов
                     return JsonResponse({
                         'success': True,
                         'message': loader.message
                     })
                 else:
-                    # Стандартный рендеринг страницы
                     context = {
                         'organization': organization,
                         'success': True,
@@ -64,6 +69,9 @@ def upload_file(request, data_type_id):
                         'form': form
                     }
                     return render(request, 'data_loader/upload_file.html', context)
+            finally:
+                # Удаляем временный файл после обработки
+                os.remove(temp_file_path)
         else:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
@@ -92,9 +100,10 @@ def data_upload_dashboard(request):
     categories = set(data_type.category for data_type in data_types)  # Собираем все категории
 
     for data_type in data_types:
-        # Получаем дату последней загрузки
+        # Получаем дату последней загрузки и сообщение
         last_import = DataImport.objects.filter(data_type=data_type).order_by('-date_added').first()
         data_type.last_import_date = last_import.date_added if last_import else None
+        data_type.last_import_message = last_import.message if last_import else ""
 
         # Подсчитываем количество строк в таблице, связанной с data_type
         if hasattr(data_type, 'loaderconfig') and data_type.loaderconfig.table_name:
@@ -110,3 +119,9 @@ def data_upload_dashboard(request):
         'categories': categories  # Передаем категории
     })
 
+
+def refresh_message(request, data_type_id):
+    data_type = get_object_or_404(DataType, id=data_type_id)
+    last_import = DataImport.objects.filter(data_type=data_type).order_by('-date_added').first()
+    message = last_import.message if last_import else "Сообщение отсутствует."
+    return JsonResponse({'message': message})

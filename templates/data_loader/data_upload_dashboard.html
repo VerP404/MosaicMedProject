@@ -4,10 +4,9 @@
     <div class="container">
         <div class="d-flex justify-content-between align-items-center my-4">
             <h2 class="mb-0">Управление загрузкой данных</h2>
-            <a href="{% url 'home' %}" class="btn btn-secondary">Назад</a> <!-- Кнопка "Назад" -->
+            <a href="{% url 'home' %}" class="btn btn-secondary">Назад</a>
         </div>
         <div class="row">
-            <!-- Левая колонка с фильтрами -->
             <div class="col-md-4 col-xl-3">
                 <div class="card">
                     <div class="card-header">
@@ -34,9 +33,7 @@
                 </div>
             </div>
 
-            <!-- Правая колонка с таблицей -->
             <div class="col-md-8 col-xl-9">
-
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="card-title mb-0">Загрузка данных</h5>
@@ -49,7 +46,6 @@
                                 <th>Тип данных</th>
                                 <th>Количество</th>
                                 <th>Дата последней загрузки</th>
-                            
                                 <th>Действие</th>
                             </tr>
                             </thead>
@@ -59,7 +55,16 @@
                                     <td>{{ data_type.category.name }}</td>
                                     <td>{{ data_type.name }}</td>
                                     <td>{{ data_type.row_count }}</td>
-                                    <td>{{ data_type.last_import_date|default:"-" }}</td>
+                                    <td>
+                                        {% if data_type.last_import_date %}
+                                            <button type="button" class="btn btn-link"
+                                                    onclick="openModal('{{ data_type.last_import_message|escapejs }}', {{ data_type.id }})">
+                                                {{ data_type.last_import_date }}
+                                            </button>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         <a href="{% url 'data_loader:upload_file' data_type.id %}"
                                            class="btn btn-primary">Загрузить данные</a>
@@ -74,9 +79,55 @@
         </div>
     </div>
 
+    <!-- Модальное окно для отображения сообщений -->
+    <div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="messageModalLabel">Сообщение о последней загрузке</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <pre id="modalMessageContent" style="white-space: pre-wrap;"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                    <button type="button" class="btn btn-primary" onclick="refreshMessage()">Обновить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <script>
+        // Переменные для хранения текущего data_type_id
+        let currentDataTypeId = null;
+
+        // Открытие модального окна с сообщением
+        function openModal(message, dataTypeId) {
+            // Устанавливаем текущий data_type_id для последующего обновления
+            currentDataTypeId = dataTypeId;
+
+            // Устанавливаем текст сообщения в модальное окно
+            document.getElementById('modalMessageContent').textContent = message;
+
+            // Инициализируем и отображаем модальное окно
+            var myModal = new bootstrap.Modal(document.getElementById('messageModal'), {});
+            myModal.show();
+        }
+
+        function refreshMessage() {
+            if (currentDataTypeId) {
+                fetch(`/data_loader/refresh-message/${currentDataTypeId}/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('modalMessageContent').textContent = data.message;
+                    })
+                    .catch(error => console.error('Ошибка при обновлении сообщения:', error));
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
-            // Фильтрация по категориям
             const checkboxes = document.querySelectorAll('.form-check-input');
             const allCheckbox = document.getElementById('filter-all');
             const tableRows = document.querySelectorAll('#data-table-body tr');
@@ -84,12 +135,10 @@
             checkboxes.forEach(function (checkbox) {
                 checkbox.addEventListener('change', function () {
                     if (allCheckbox.checked) {
-                        // Если выбрана категория "Все", показываем все строки
                         tableRows.forEach(function (row) {
                             row.style.display = '';
                         });
                     } else {
-                        // Фильтруем таблицу по выбранным категориям
                         const selectedCategories = Array.from(checkboxes)
                             .filter(checkbox => checkbox.checked && checkbox !== allCheckbox)
                             .map(checkbox => checkbox.value);
@@ -105,7 +154,6 @@
                 });
             });
 
-            // При выборе "Все категории" отключаем остальные чекбоксы
             allCheckbox.addEventListener('change', function () {
                 if (allCheckbox.checked) {
                     checkboxes.forEach(function (checkbox) {
@@ -120,5 +168,4 @@
             });
         });
     </script>
-
 {% endblock %}

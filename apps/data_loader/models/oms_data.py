@@ -199,7 +199,7 @@ class DataImport(models.Model):
     updated_count = models.IntegerField(default=0, verbose_name="Количество обновленных записей")
     error_count = models.IntegerField(default=0, verbose_name="Количество ошибок")
     data_type = models.ForeignKey(DataType, on_delete=models.CASCADE, verbose_name="Тип данных")
-
+    message = models.TextField(verbose_name="Итоговое сообщение", blank=True, null=True)
     def __str__(self):
         return f"Импорт {self.data_type.description} от {self.date_added}"
 

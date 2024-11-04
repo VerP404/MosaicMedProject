@@ -42,7 +42,6 @@ class WODataDownloadForm(forms.Form):
         widget=forms.DateInput(format='%d-%m-%y')
     )
 
-
 class FileUploadForm(forms.ModelForm):
     class Meta:
         model = DataImport
