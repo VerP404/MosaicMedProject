@@ -9,5 +9,5 @@ urlpatterns = [
     path('upload-dashboard/', data_upload_dashboard, name='data_upload_dashboard'),
     path('upload-file/<int:data_type_id>/', upload_file, name='upload_file'),
     path('refresh-message/<int:data_type_id>/', refresh_message, name='refresh_message'),
-
+    path('refresh-data/', refresh_data, name='refresh_data'),
 ]

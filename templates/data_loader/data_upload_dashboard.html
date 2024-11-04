@@ -4,7 +4,8 @@
     <div class="container">
         <div class="d-flex justify-content-between align-items-center my-4">
             <h2 class="mb-0">Управление загрузкой данных</h2>
-            <a href="{% url 'home' %}" class="btn btn-secondary">Назад</a>
+            <button onclick="refreshTable()" class="btn btn-primary">Обновить</button>
+            <a href="{% url 'home' %}" class="btn btn-secondary">Назад</a>            
         </div>
         <div class="row">
             <div class="col-md-4 col-xl-3">
@@ -125,6 +126,31 @@
                     })
                     .catch(error => console.error('Ошибка при обновлении сообщения:', error));
             }
+        }
+
+        function refreshTable() {
+            fetch("{% url 'data_loader:refresh_data' %}")  // URL обновления данных
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('data-table-body');
+                    tableBody.innerHTML = '';  // Очищаем текущую таблицу
+
+                    // Обновляем таблицу новыми данными
+                    data.data_types.forEach(data_type => {
+                        const row = document.createElement('tr');
+                        row.setAttribute('data-category-id', data_type.category_id);
+
+                        row.innerHTML = `
+                        <td>${data_type.category_name}</td>
+                        <td>${data_type.name}</td>
+                        <td>${data_type.row_count}</td>
+                        <td>${data_type.last_import_date || '-'}</td>
+                        <td><a href="/data_loader/upload-file/${data_type.id}" class="btn btn-primary">Загрузить данные</a></td>
+                    `;
+                        tableBody.appendChild(row);
+                    });
+                })
+                .catch(error => console.error('Ошибка при обновлении таблицы:', error));
         }
 
         document.addEventListener('DOMContentLoaded', function () {

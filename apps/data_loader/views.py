@@ -131,3 +131,32 @@ def refresh_message(request, data_type_id):
     last_import = DataImport.objects.filter(data_type=data_type).order_by('-date_added').first()
     message = last_import.message if last_import else "Сообщение отсутствует."
     return JsonResponse({'message': message})
+
+
+def refresh_data(request):
+    data_types = DataType.objects.all()
+    data = []
+
+    for data_type in data_types:
+        last_import = DataImport.objects.filter(data_type=data_type).order_by('-date_added').first()
+
+        row_count = 0
+        if data_type.dataloaderconfig and data_type.dataloaderconfig.table_name:
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute(f'SELECT COUNT(*) FROM {data_type.dataloaderconfig.table_name}')
+                    row_count = cursor.fetchone()[0]
+            except Exception as e:
+                print(f"Ошибка подсчета строк для таблицы {data_type.dataloaderconfig.table_name}: {e}")
+
+        data.append({
+            'id': data_type.id,
+            'name': data_type.name,
+            'category_id': data_type.category.id,
+            'category_name': data_type.category.name,
+            'row_count': row_count,
+            'last_import_date': last_import.date_added if last_import else None,
+            'last_import_message': last_import.message if last_import else ""
+        })
+
+    return JsonResponse({'data_types': data})
