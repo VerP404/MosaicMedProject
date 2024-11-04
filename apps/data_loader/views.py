@@ -4,6 +4,7 @@ import tempfile
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.apps import apps
+from django.db import connection
 
 from .data_loader import DataLoader, engine
 from .forms import FileUploadForm
@@ -104,14 +105,19 @@ def data_upload_dashboard(request):
         last_import = DataImport.objects.filter(data_type=data_type).order_by('-date_added').first()
         data_type.last_import_date = last_import.date_added if last_import else None
         data_type.last_import_message = last_import.message if last_import else ""
-
-        # Подсчитываем количество строк в таблице, связанной с data_type
-        if hasattr(data_type, 'loaderconfig') and data_type.loaderconfig.table_name:
-            # Получаем модель по имени таблицы
-            table_model = apps.get_model('data_loader', data_type.loaderconfig.table_name)
-            data_type.row_count = table_model.objects.count()
-        else:
-            data_type.row_count = 0
+        # Подсчитываем количество строк в таблице, проверяя наличие связанного DataLoaderConfig
+        try:
+            config = data_type.dataloaderconfig  # Проверка на наличие DataLoaderConfig
+            if config and config.table_name:
+                # Используем SQL-запрос для подсчета строк напрямую
+                with connection.cursor() as cursor:
+                    cursor.execute(f'SELECT COUNT(*) FROM {config.table_name}')
+                    data_type.row_count = cursor.fetchone()[0]
+            else:
+                data_type.row_count = 1
+        except DataLoaderConfig.DoesNotExist:
+            # Если DataLoaderConfig для данного типа данных не существует
+            data_type.row_count = 2
 
     return render(request, 'data_loader/data_upload_dashboard.html', {
         'organization': organization,
