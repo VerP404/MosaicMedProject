@@ -43,6 +43,10 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment)
     try:
         # Настройка опций для Firefox
         options = Options()
+        options.headless = True
+        options.add_argument('--disable-gpu')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
         options.add_argument("--headless")  # Используем headless режим для работы на сервере
 
         # Автоматическая установка geckodriver с помощью webdriver-manager
