@@ -1,31 +1,62 @@
-# apps/data_loader/selenium_script.py
+# apps/data_loader/selenium_scripts_auto.py
 import logging
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.firefox import GeckoDriverManager
+import time
+import os
+import glob
+import shutil
+from bs4 import BeautifulSoup
+from django.conf import settings
 
+# Установка уровня логирования для selenium и urllib3
+logging.getLogger("selenium").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)  # Логи уровня INFO и выше будут выводиться
 
 
 def run_selenium_script_auto(username, password, start_date, end_date, start_date_treatment):
-    from selenium import webdriver
-    from selenium.webdriver.firefox.options import Options
-    from selenium.webdriver.support.wait import WebDriverWait
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.common.keys import Keys
-    from selenium.webdriver.support import expected_conditions as EC
-    import time
-    import os
-    import glob
-    import shutil
-    from django.conf import settings
-    from .utils import process_csv_file
-
+    def parse_html():
+        source_data = driver.page_source
+        soup = BeautifulSoup(source_data, 'html.parser')
+        return soup
+    def ojidanie():
+        flag = True
+        while flag:
+            try:
+                soup = parse_html()
+                info = soup.find('h2', {'class': 'jss170 jss176'}).get_text()
+                if info == 'Пожалуйста, подождите...':
+                    flag = True
+                    time.sleep(2)
+                else:
+                    flag = False
+            except AttributeError:
+                flag = False
     logger.info("Начало выполнения скрипта Selenium")
     try:
+        # Настройка опций для Firefox
         options = Options()
-        options.add_argument("--headless")
-        driver = webdriver.Firefox(options=options)
+        options.add_argument("--headless")  # Используем headless режим для работы на сервере
+
+        # Автоматическая установка geckodriver с помощью webdriver-manager
+        service = Service(GeckoDriverManager().install())
+        driver = webdriver.Firefox(service=service, options=options)
         driver.implicitly_wait(10)
         driver.get('http://10.36.0.142:9000/')
         logger.info("Открыт сайт OMS")
+        logger.info(
+            f"ПАРАМЕТРЫ:\n"
+            f"период изменения - начало: {start_date}\n"
+            f"период изменения - окончание: {end_date}\n"
+            f"период окончания лечения начло: {start_date_treatment}")
 
         # Авторизация
         login_input = driver.find_element(By.XPATH, '/html/body/div/form/input[1]')
@@ -36,61 +67,65 @@ def run_selenium_script_auto(username, password, start_date, end_date, start_dat
         password_input.send_keys(password)
         password_input.send_keys(Keys.ENTER)
         logger.info("Авторизация выполнена")
-        time.sleep(5)
-
-        wait = WebDriverWait(driver, 120)  # Ждем до 60 секунд
+        time.sleep(30)
+        wait = WebDriverWait(driver, 120)
         logger.info("Открытие меню")
+
         # Ввод даты начала лечения
         start_date_input_treatment = driver.find_element(By.XPATH,
                                                          '//*[@id="menu"]/div/div[1]/div/div[1]/div/div[2]/div[1]/div[1]/div/div/div/input')
         start_date_input_treatment.clear()
         start_date_input_treatment.send_keys(start_date_treatment)
 
-        # Открытие расширенного фильтра
+        logger.info("Открытие фильтра")
+        # Открытие фильтра
         open_filter_step1 = driver.find_element(By.XPATH,
                                                 '/html/body/div[1]/div/div[2]/div[2]/div[1]/div/div[2]/div/div/div[1]/div[2]')
         open_filter_step1.click()
-        # Открытие фильтра по талону
         open_filter_step2 = driver.find_element(By.XPATH,
                                                 '/html/body/div[1]/div/div[2]/div[2]/div[1]/div/div[2]/div/div/div[2]/div/div/div/div/div[1]/div/div[1]/div[2]')
         open_filter_step2.click()
-
-        # Даты изменения талонов: начало
+        logger.info("Даты изменения талонов")
+        # Даты изменения талонов
         start_date_input = driver.find_element(By.XPATH,
                                                '//*[@id="menu"]/div/div[2]/div/div/div[2]/div/div/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div[1]/div[7]/div/div[2]/div[1]/div/div/div/input')
         start_date_input.clear()
         start_date_input.send_keys(start_date)
-        # Даты изменения талонов: окончание
+
         end_date_input = driver.find_element(By.XPATH,
                                              '//*[@id="menu"]/div/div[2]/div/div/div[2]/div/div/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div[1]/div[7]/div/div[2]/div[2]/div/div/div/input')
         end_date_input.clear()
         end_date_input.send_keys(end_date)
-        # Нажимаем "Найти"
-        find_button = driver.find_element(By.XPATH, '//*[@id="menu"]/div/div[1]/div/div[4]/div/div[4]/div/button')
-        find_button.click()
 
-        # Ожидаем, пока элемент "Пожалуйста, подождите..." не исчезнет
+        logger.info("Загрузка талонов")
+        # Нажимаем "Найти"
+        find_button = driver.find_element(By.XPATH,
+                                          '//*[@id="menu"]/div/div[1]/div/div[4]/div/div[4]/div/button')
+        find_button.click()
+        ojidanie()
+        time.sleep(5)
+        # Ожидание загрузки
         loading_indicator_locator = (By.XPATH,
                                      '//h2[contains(@class, "jss170") and contains(@class, "jss176") and text()="Пожалуйста, подождите..."]')
         wait.until(EC.invisibility_of_element_located(loading_indicator_locator))
+        time.sleep(5)
+        logger.info("Выбираем все результаты")
 
         # Выбираем все результаты
         select_all_checkbox = driver.find_element(By.XPATH,
                                                   '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[2]/table[1]/thead/tr[1]/th[1]/span')
         select_all_checkbox.click()
-
-        time.sleep(5)
-
-        # Скачиваем файл
+        # Скачивание файла
         logger.info("Начинаем скачивание файла")
-
         download_button = driver.find_element(By.XPATH, '//*[@id="menu"]/div/div[3]/div/div/div[5]/a/button')
         download_button.click()
+        time.sleep(5)  # Ожидание завершения загрузки
 
         # Обработка скачанного файла
         download_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
         file_pattern = 'journal_*.csv'
         files = glob.glob(os.path.join(download_folder, file_pattern))
+
         if files:
             latest_file = max(files, key=os.path.getctime)
             destination_folder = os.path.join(settings.BASE_DIR, 'imported_files')
@@ -98,13 +133,14 @@ def run_selenium_script_auto(username, password, start_date, end_date, start_dat
                 os.makedirs(destination_folder)
             new_file_path = os.path.join(destination_folder, 'downloaded_file.csv')
             shutil.move(latest_file, new_file_path)
-
+            logger.info(f"Файл успешно загружен и перемещен в {new_file_path}")
             driver.quit()
-            return True, new_file_path  # Возвращаем путь к загруженному файлу, не обрабатываем CSV здесь
+            return True, new_file_path
         else:
+            logger.error("Файл не был загружен")
             driver.quit()
-            return False, None  # Возвращаем False, если файл не был загружен
+            return False, None
+
     except Exception as e:
-        print(f"An error occurred: {e}")
         logger.error(f"Ошибка при выполнении скрипта Selenium: {e}")
         return False, None

@@ -70,6 +70,7 @@ class DataLoader:
         self.updated_count = 0
         self.error_count = 0
         self.message = ''
+        self.import_record_id = None
 
     def _create_initial_data_import_record(self, csv_file):
         """
@@ -80,6 +81,7 @@ class DataLoader:
         VALUES (:csv_file, NOW(), 0, 0, 0, :data_type_id, :message) RETURNING id
         """
         with self.engine.begin() as connection:
+            # Запрашиваем data_type_id по имени типа данных
             data_type_query = "SELECT id FROM data_loader_datatype WHERE name = :data_type_name"
             data_type_id_result = connection.execute(
                 text(data_type_query),
@@ -88,17 +90,24 @@ class DataLoader:
 
             if data_type_id_result:
                 data_type_id = data_type_id_result[0]
+                # Выполняем запрос для создания записи и возвращаем её ID
                 result = connection.execute(text(sql_query), {
                     'csv_file': csv_file,
                     'data_type_id': data_type_id,
                     'message': 'Начало загрузки файла.'
                 })
                 self.import_record_id = result.fetchone()[0]  # Сохраняем ID записи для дальнейшего обновления
+            else:
+                # Исключение, если тип данных не найден
+                raise ValueError(f"Тип данных '{self.data_type_name}' не найден в таблице DataType.")
 
     def _update_data_import_record(self):
         """
         Обновляем существующую запись в таблице DataImport с накопленной информацией.
         """
+        if not self.import_record_id:
+            raise ValueError("Не удалось обновить запись: import_record_id не установлен.")
+
         sql_update = """
         UPDATE data_loader_dataimport
         SET added_count = :added_count,
