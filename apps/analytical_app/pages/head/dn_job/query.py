@@ -7,7 +7,7 @@ def sql_head_dn_job():
         LOWER(LEFT(main_diagnosis, POSITION(' ' IN main_diagnosis)-1)) AS ds
     FROM data_loader_omsdata
     WHERE main_diagnosis IS NOT NULL
-
+    and goal = '3'
     UNION ALL
 
     SELECT DISTINCT
@@ -16,6 +16,7 @@ def sql_head_dn_job():
         LOWER(LEFT(additional_diagnosis, POSITION(' ' IN additional_diagnosis)-1)) AS ds
     FROM data_loader_omsdata
     WHERE additional_diagnosis IS NOT NULL
+    and goal = '3'
 ),
 
 job_data AS (
@@ -73,6 +74,7 @@ WITH combined_diagnoses AS (
         LOWER(LEFT(main_diagnosis, POSITION(' ' IN main_diagnosis)-1)) AS ds
     FROM data_loader_omsdata
     WHERE main_diagnosis IS NOT NULL
+    and goal = '3'
 
     UNION ALL
 
@@ -82,6 +84,7 @@ WITH combined_diagnoses AS (
         LOWER(LEFT(additional_diagnosis, POSITION(' ' IN additional_diagnosis)-1)) AS ds
     FROM data_loader_omsdata
     WHERE additional_diagnosis IS NOT NULL
+    and goal = '3'
 )
 
 SELECT
