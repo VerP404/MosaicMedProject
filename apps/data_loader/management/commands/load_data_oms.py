@@ -1,8 +1,7 @@
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
 from apps.data_loader.models.oms_data import OMSSettings, DataType, DataLoaderConfig
-from apps.data_loader.selenium_scripts_auto import run_selenium_script_auto
+from apps.data_loader.selenium.oms import selenium_oms
 from apps.data_loader.data_loader import DataLoader, engine
 from datetime import datetime, timedelta
 
@@ -36,7 +35,7 @@ class Command(BaseCommand):
         start_date_treatment = f'01-01-{today.strftime("%y")}'  # 1 января текущего года в формате дд-мм-гг
 
         # Запускаем Selenium для скачивания CSV файла
-        success, file_path = run_selenium_script_auto(username, password, start_date, end_date, start_date_treatment)
+        success, file_path = selenium_oms(username, password, start_date, end_date, start_date_treatment)
 
         if not success:
             self.stdout.write(self.style.ERROR('Ошибка при загрузке файла через Selenium'))

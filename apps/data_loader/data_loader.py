@@ -3,7 +3,7 @@ from datetime import datetime
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-from apps.data_loader.selenium_scripts_auto import run_selenium_script_auto
+from apps.data_loader.selenium.oms import selenium_oms
 from config.settings import DATABASES
 
 # Настройка подключения к базе данных
@@ -414,7 +414,7 @@ class DataLoader:
 
     def load_data_via_selenium(self, username, password, start_date, end_date, start_date_treatment):
         # Запускаем скрипт Selenium для загрузки файла
-        success, file_path = run_selenium_script_auto(username, password, start_date, end_date, start_date_treatment)
+        success, file_path = selenium_oms(username, password, start_date, end_date, start_date_treatment)
 
         if success and file_path:
             # После успешной загрузки файла, передаем его в метод load_data

@@ -1,4 +1,3 @@
-# apps/data_loader/selenium_scripts_auto.py
 import logging
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)  # Логи уровня INFO и выше будут выводиться
 
 
-def run_selenium_script_auto(username, password, start_date, end_date, start_date_treatment):
+def selenium_oms(username, password, start_date, end_date, start_date_treatment):
     def parse_html():
         source_data = driver.page_source
         soup = BeautifulSoup(source_data, 'html.parser')

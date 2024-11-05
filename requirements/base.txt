@@ -25,3 +25,6 @@ xlrd
 
 channels
 daphne
+
+beautifulsoup4
+webdriver-manager
