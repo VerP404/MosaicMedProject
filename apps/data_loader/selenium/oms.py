@@ -15,10 +15,10 @@ from bs4 import BeautifulSoup
 from django.conf import settings
 
 # Установка уровня логирования для selenium и urllib3
-logging.getLogger("selenium").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
+# logging.getLogger("selenium").setLevel(logging.WARNING)
+# logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)  # Логи уровня INFO и выше будут выводиться
+# logger.setLevel(logging.INFO)  # Логи уровня INFO и выше будут выводиться
 
 
 def selenium_oms(username, password, start_date, end_date, start_date_treatment):
