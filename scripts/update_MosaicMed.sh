@@ -12,6 +12,9 @@ source .venv/bin/activate
 # Обновление кода
 git pull
 
+# Установка зависимостей
+pip install -r requirements/base.txt
+
 # Выполнение миграций
 python3.12 manage.py migrate
 
