@@ -22,9 +22,8 @@ requests
 openpyxl
 django-import-export
 xlrd
-
 channels
 daphne
-
 beautifulsoup4
 webdriver-manager
+fdb

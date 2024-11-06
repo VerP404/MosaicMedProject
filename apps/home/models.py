@@ -8,6 +8,11 @@ class MainSettings(models.Model):
     main_app_port = models.PositiveIntegerField(default='8000')
     dash_chief_ip = models.GenericIPAddressField(default='127.0.0.1')
     dash_chief_port = models.PositiveIntegerField(default='5010')
+    kauz_server_ip = models.GenericIPAddressField(default='127.0.0.1', verbose_name="КАУЗ: IP сервера")
+    kauz_database_path = models.CharField(max_length=255, default='-', verbose_name="КАУЗ: Путь к базе данных")
+    kauz_port = models.PositiveIntegerField(default='3050', verbose_name="КАУЗ: Порт")
+    kauz_user = models.CharField(max_length=255, default='-', verbose_name="КАУЗ: Пользователь")
+    kauz_password = models.CharField(max_length=255, default='-', verbose_name="КАУЗ: Пароль")
 
     def get_dash_url(self):
         return f"http://{self.dash_ip}:{self.dash_port}"

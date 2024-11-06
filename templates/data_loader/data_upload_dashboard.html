@@ -5,10 +5,22 @@
         <div class="d-flex justify-content-between align-items-center my-4">
             <h2 class="mb-0">Управление загрузкой данных</h2>
             <button onclick="refreshTable()" class="btn btn-primary">Обновить</button>
-            <a href="{% url 'home' %}" class="btn btn-secondary">Назад</a>            
+            <a href="{% url 'home' %}" class="btn btn-secondary">Назад</a>
         </div>
         <div class="row">
+            <!-- Левая колонка с блоками "Статус базы данных" и "Фильтры" -->
             <div class="col-md-4 col-xl-3">
+                <!-- Статус базы данных Firebird -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Подключение к БД МИС КАУЗ</h5>
+                    </div>
+                    <div class="card-body">
+                        <p id="firebird-status">{{ firebird_status }}</p>
+                    </div>
+                </div>
+                
+                <!-- Секция с фильтрами -->
                 <div class="card">
                     <div class="card-header">
                         <h5 class="card-title mb-0">Фильтры</h5>
@@ -17,23 +29,19 @@
                         <h6>Категория</h6>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" value="all" id="filter-all" checked>
-                            <label class="form-check-label" for="filter-all">
-                                Все категории
-                            </label>
+                            <label class="form-check-label" for="filter-all">Все категории</label>
                         </div>
                         {% for category in categories %}
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" value="{{ category.id }}"
-                                       id="filter-{{ category.id }}">
-                                <label class="form-check-label" for="filter-{{ category.id }}">
-                                    {{ category.name }}
-                                </label>
+                                <input class="form-check-input" type="checkbox" value="{{ category.id }}" id="filter-{{ category.id }}">
+                                <label class="form-check-label" for="filter-{{ category.id }}">{{ category.name }}</label>
                             </div>
                         {% endfor %}
                     </div>
                 </div>
             </div>
-
+            
+            <!-- Правая колонка с таблицей загрузки данных -->
             <div class="col-md-8 col-xl-9">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
@@ -42,36 +50,34 @@
                     <div class="card-body">
                         <table class="table table-bordered">
                             <thead>
-                            <tr>
-                                <th>Категория</th>
-                                <th>Тип данных</th>
-                                <th>Количество</th>
-                                <th>Дата последней загрузки</th>
-                                <th>Действие</th>
-                            </tr>
+                                <tr>
+                                    <th>Категория</th>
+                                    <th>Тип данных</th>
+                                    <th>Количество</th>
+                                    <th>Дата последней загрузки</th>
+                                    <th>Действие</th>
+                                </tr>
                             </thead>
                             <tbody id="data-table-body">
-                            {% for data_type in data_types %}
-                                <tr data-category-id="{{ data_type.category.id }}">
-                                    <td>{{ data_type.category.name }}</td>
-                                    <td>{{ data_type.name }}</td>
-                                    <td>{{ data_type.row_count }}</td>
-                                    <td>
-                                        {% if data_type.last_import_date %}
-                                            <button type="button" class="btn btn-link"
-                                                    onclick="openModal('{{ data_type.last_import_message|escapejs }}', {{ data_type.id }})">
-                                                {{ data_type.last_import_date }}
-                                            </button>
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <a href="{% url 'data_loader:upload_file' data_type.id %}"
-                                           class="btn btn-primary">Загрузить данные</a>
-                                    </td>
-                                </tr>
-                            {% endfor %}
+                                {% for data_type in data_types %}
+                                    <tr data-category-id="{{ data_type.category.id }}">
+                                        <td>{{ data_type.category.name }}</td>
+                                        <td>{{ data_type.name }}</td>
+                                        <td>{{ data_type.row_count }}</td>
+                                        <td>
+                                            {% if data_type.last_import_date %}
+                                                <button type="button" class="btn btn-link" onclick="openModal('{{ data_type.last_import_message|escapejs }}', {{ data_type.id }})">
+                                                    {{ data_type.last_import_date }}
+                                                </button>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'data_loader:upload_file' data_type.id %}" class="btn btn-primary">Загрузить данные</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
@@ -79,6 +85,7 @@
             </div>
         </div>
     </div>
+
 
     <!-- Модальное окно для отображения сообщений -->
     <div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">

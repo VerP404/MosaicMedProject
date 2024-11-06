@@ -1,5 +1,6 @@
 import os
 import tempfile
+import fdb
 
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
@@ -9,6 +10,7 @@ from django.db import connection
 from .data_loader import DataLoader, engine
 from .forms import FileUploadForm
 from .models.oms_data import DataType, DataImport, DataLoaderConfig
+from ..home.models import MainSettings
 from ..organization.models import MedicalOrganization
 from ..peopledash.models import Organization
 
@@ -99,6 +101,7 @@ def data_upload_dashboard(request):
     data_types = DataType.objects.all()
     organization = MedicalOrganization.objects.first()
     categories = set(data_type.category for data_type in data_types)  # Собираем все категории
+    firebird_status = check_kauz_connection()
 
     for data_type in data_types:
         # Получаем дату последней загрузки и сообщение
@@ -122,7 +125,8 @@ def data_upload_dashboard(request):
     return render(request, 'data_loader/data_upload_dashboard.html', {
         'organization': organization,
         'data_types': data_types,
-        'categories': categories  # Передаем категории
+        'categories': categories,
+        'firebird_status': firebird_status
     })
 
 
@@ -160,3 +164,24 @@ def refresh_data(request):
         })
 
     return JsonResponse({'data_types': data})
+
+
+def check_kauz_connection():
+    settings = MainSettings.objects.first()
+    if not settings:
+        return "Настройки не найдены."
+
+    dsn = f"{settings.kauz_server_ip}:{settings.kauz_database_path}"
+
+    try:
+        con = fdb.connect(
+            dsn=dsn,
+            user=settings.kauz_user,
+            password=settings.kauz_password,
+            charset='WIN1251',  # Указание кодировки
+            port=settings.kauz_port
+        )
+        con.close()
+        return "Подключение доступно"
+    except Exception as e:
+        return f"Ошибка подключения: {e}"
