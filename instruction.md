@@ -13,11 +13,14 @@ pg_dump -U postgres -d mosaicmed -F p -b -v -f "mosaicmed_backup.sql"
 ``` sql
 psql -U postgres -d mosaicmed -f "C:\Users\RDN\Downloads\Telegram Desktop\mosaicmed_backup.sql"
 ```
-5. Проверить что версия приложения соответствует базе. 
+
+5. Проверить что версия приложения соответствует базе.
 6. Стянуть все изменения из репозитория
+
 ```
 git pull
 ```
+
 5. Выполняем миграции
 
 ``` python
@@ -94,10 +97,13 @@ sudo -u postgres psql
 ``` cmd
 ALTER USER postgres PASSWORD 'Qaz123';
 ```
+
 Создаем базу данных
+
 ```
 CREATE DATABASE mosaicmed;
 ```
+
 Чтобы закрыть:
 
 ``` cmd
@@ -222,20 +228,93 @@ sudo chmod +x /home/drpay/code/MosaicMedProject
 ```
 
 ## Запуск приложения
+
 # Запуск как фоновой задачи `nohup`
+
 Запуск основного проекта
+
 ``` cmd
 nohup python3.12 manage.py runserver 0.0.0.0:8000 &
 ```
+
 Запуск аналитической системы
+
 ``` cmd
 nohup python3.12 apps/analytical_app/index.py &
 ```
+
 Просмотр работающих процессов
+
 ``` sql
 ps -ef | grep 'python3.12'
 ``` 
+
 Для остановки процесса `kill` и id процесса
+
 ```
 kill
 ```
+
+## Инструкция по настройке Selenium с Chrome на Ubuntu сервере без GUI
+
+### 1. Установка необходимых системных пакетов
+
+``` bash
+sudo apt-get update
+sudo apt-get install -y \
+    wget \
+    unzip \
+    xvfb \
+    libxi6 \
+    libgconf-2-4 \
+    libxrender1 \
+    libxtst6 \
+    libgtk-3-0 \
+    libnss3 \
+    libasound2 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    fonts-liberation
+```
+
+### 2. Установка Google Chrome
+
+``` bash
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo apt-get install -y ./google-chrome-stable_current_amd64.deb
+```
+
+### 3. Запуск скрипта с использованием Xvfb
+
+``` bash
+xvfb-run -a python3.12 manage.py load_data_oms_chrome
+```
+
+### 4. Добавление в crone
+
+```
+crontab -e
+```
+
+Если ошибка, то установить
+
+``` 
+sudo apt update
+sudo apt install cron
+```
+
+Нужно проверить системное время для корректной установки. В примере для UTC (москва +3 часа)
+
+``` 
+0 22 * * * /usr/bin/xvfb-run -a /home/drpay/code/MosaicMedProject/.venv/bin/python /home/drpay/code/MosaicMedProject/manage.py load_data_oms_chrome >> /home/drpay/code/MosaicMedProject/load_data_oms.log 2>&1
+```
+
