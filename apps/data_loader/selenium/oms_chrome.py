@@ -1,12 +1,12 @@
 import logging
 from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.firefox import GeckoDriverManager
+from webdriver_manager.chrome import ChromeDriverManager
 import time
 import os
 import glob
@@ -20,12 +20,12 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)  # Логи уровня INFO и выше будут выводиться
 
-
-def selenium_oms(username, password, start_date, end_date, start_date_treatment):
+def selenium_oms_chrome(username, password, start_date, end_date, start_date_treatment):
     def parse_html():
         source_data = driver.page_source
         soup = BeautifulSoup(source_data, 'html.parser')
         return soup
+
     def ojidanie():
         flag = True
         while flag:
@@ -39,19 +39,36 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment)
                     flag = False
             except AttributeError:
                 flag = False
+
     logger.info("Начало выполнения скрипта Selenium")
     try:
-        # Настройка опций для Firefox
+        # Настройка опций для Chrome
         options = Options()
         options.headless = True
-        options.set_preference('gfx.webrender.all', False)
-        options.set_preference('gfx.webrender.enabled', False)
-        options.set_preference('layers.acceleration.disabled', True)
-        options.set_preference('webgl.disabled', True)
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--disable-webgl")
+        options.add_argument("--disable-accelerated-2d-canvas")
+        options.add_argument("--disable-accelerated-video")
+        options.add_argument("--disable-accelerated-video-decode")
 
-        # Автоматическая установка geckodriver с помощью webdriver-manager
-        service = Service(GeckoDriverManager().install())
-        driver = webdriver.Firefox(service=service, options=options)
+        # Настройка папки загрузки
+        download_folder = os.path.join(settings.BASE_DIR, 'imported_files')
+        if not os.path.exists(download_folder):
+            os.makedirs(download_folder)
+        prefs = {
+            "download.default_directory": download_folder,
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "safebrowsing.enabled": True
+        }
+        options.add_experimental_option("prefs", prefs)
+
+        # Автоматическая установка chromedriver с помощью webdriver-manager
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
         driver.implicitly_wait(10)
         driver.get('http://10.36.0.142:9000/')
         logger.info("Открыт сайт OMS")
@@ -59,7 +76,7 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment)
             f"ПАРАМЕТРЫ:\n"
             f"период изменения - начало: {start_date}\n"
             f"период изменения - окончание: {end_date}\n"
-            f"период окончания лечения начло: {start_date_treatment}")
+            f"период окончания лечения начало: {start_date_treatment}")
 
         # Авторизация
         login_input = driver.find_element(By.XPATH, '/html/body/div/form/input[1]')
@@ -124,18 +141,14 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment)
         download_button.click()
         time.sleep(5)  # Ожидание завершения загрузки
 
-        # Обработка скачанного файла
-        download_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
-        file_pattern = 'journal_*.csv'
-        files = glob.glob(os.path.join(download_folder, file_pattern))
+        # Проверяем, что файл загрузился
+        file_pattern = os.path.join(download_folder, 'journal_*.csv')
+        files = glob.glob(file_pattern)
 
         if files:
             latest_file = max(files, key=os.path.getctime)
-            destination_folder = os.path.join(settings.BASE_DIR, 'imported_files')
-            if not os.path.exists(destination_folder):
-                os.makedirs(destination_folder)
-            new_file_path = os.path.join(destination_folder, 'downloaded_file.csv')
-            shutil.move(latest_file, new_file_path)
+            new_file_path = os.path.join(download_folder, 'downloaded_file.csv')
+            os.rename(latest_file, new_file_path)
             logger.info(f"Файл успешно загружен и перемещен в {new_file_path}")
             driver.quit()
             return True, new_file_path
