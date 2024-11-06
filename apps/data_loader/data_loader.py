@@ -422,3 +422,57 @@ class DataLoader:
         else:
             self.message += "Ошибка при выполнении скрипта Selenium или файл не был загружен."
             return False, 0, 0, 0
+
+    @time_it("Общее время загрузки данных")
+    def load_data_miskauz(self, file_path):
+        """
+        Метод для загрузки данных из МИСКАУЗ в таблицу.
+        :param file_path: Путь к файлу
+        """
+        total_start_time = datetime.now()
+
+        # Шаг 1: Создаем начальную запись в DataImport
+        self._create_initial_data_import_record(file_path)
+
+        try:
+            # Шаг 2: Загрузка данных
+            df = self._load_file_to_df(file_path)
+            self.message += f"Шаг 'Загрузка файла в DataFrame' выполнен успешно. Строк: {df.shape[0]}, Столбцов: {df.shape[1]}\n"
+            self._update_data_import_record()  # Обновляем запись после загрузки данных
+
+            # Шаг 3: Проверка столбцов
+            self._check_columns(df)
+            self.message += "Шаг 'Проверка столбцов' выполнен успешно.\n"
+            self._update_data_import_record()  # Обновляем запись после проверки столбцов
+
+            # Шаг 4: Переименование столбцов
+            self._rename_columns(df)
+            self.message += "Шаг 'Переименование столбцов' выполнен успешно.\n"
+            self._update_data_import_record()  # Обновляем запись после переименования столбцов
+
+            # Шаг 5: Обработка DataFrame
+            df = self._process_dataframe(df)
+            self.message += "Шаг 'Обработка DataFrame' выполнен успешно.\n"
+            self._update_data_import_record()  # Обновляем запись после обработки DataFrame
+
+            # Шаг 6: Удаление существующих строк по уникальному столбцу
+            self._delete_existing_rows(df)
+            self.message += "Шаг 'Удаление существующих строк' выполнен успешно.\n"
+            self._update_data_import_record()  # Обновляем запись после удаления строк
+
+            # Шаг 7: Загрузка данных в базу
+            self._load_data_to_db(df)
+            self.message += "Шаг 'Загрузка данных в базу' выполнен успешно.\n"
+            self._update_data_import_record()  # Обновляем запись после загрузки в базу
+
+        except Exception as e:
+            self.message += f"Ошибка при выполнении загрузки: {e}\n"
+            self.error_count += 1
+            self._update_data_import_record()  # Сохраняем сообщение об ошибке
+            raise
+
+        # Финальное обновление с общим временем выполнения
+        total_end_time = datetime.now()
+        elapsed_time = total_end_time - total_start_time
+        self.message += f"Загрузка данных завершена. Общее время: {elapsed_time}\n"
+        self._update_data_import_record()
