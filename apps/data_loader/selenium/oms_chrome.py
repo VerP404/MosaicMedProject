@@ -45,14 +45,14 @@ def selenium_oms_chrome(username, password, start_date, end_date, start_date_tre
         # Настройка опций для Chrome
         options = Options()
         options.headless = True
-        options.add_argument("--disable-gpu")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-webgl")
-        options.add_argument("--disable-accelerated-2d-canvas")
-        options.add_argument("--disable-accelerated-video")
-        options.add_argument("--disable-accelerated-video-decode")
+        options.add_argument("--disable-setuid-sandbox")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-software-rasterizer")
+        options.add_argument("--remote-debugging-port=9222")
+        options.add_argument("--disable-features=VizDisplayCompositor")
 
         # Настройка папки загрузки
         download_folder = os.path.join(settings.BASE_DIR, 'imported_files')
