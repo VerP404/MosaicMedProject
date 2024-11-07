@@ -179,6 +179,41 @@ class DataLoader:
         self.message += f"Загрузка данных завершена. Общее время: {elapsed_time}\n"
         self._update_data_import_record()
 
+    def load_data_from_db(self, df):
+        """
+        Загружает данные из DataFrame в таблицу базы данных, выполняя проверку и удаление совпадений.
+        :param df: DataFrame с данными из запроса Firebird
+        """
+        # Использование уже существующих шагов загрузки данных
+        self._create_initial_data_import_record('Database Import')  # Параметр для идентификации источника данных
+
+        try:
+            self._check_columns(df)
+            self.message += "Шаг 'Проверка столбцов' выполнен успешно.\n"
+            self._update_data_import_record()
+
+            self._rename_columns(df)
+            self.message += "Шаг 'Переименование столбцов' выполнен успешно.\n"
+            self._update_data_import_record()
+
+            df = self._process_dataframe(df)
+            self.message += "Шаг 'Обработка DataFrame' выполнен успешно.\n"
+            self._update_data_import_record()
+
+            self._delete_existing_rows(df)
+            self.message += "Шаг 'Удаление существующих строк' выполнен успешно.\n"
+            self._update_data_import_record()
+
+            self._load_data_to_db(df)
+            self.message += "Шаг 'Загрузка данных в базу' выполнен успешно.\n"
+            self._update_data_import_record()
+
+        except Exception as e:
+            self.message += f"Ошибка при выполнении загрузки: {e}\n"
+            self.error_count += 1
+            self._update_data_import_record()
+            raise
+
     @time_it("Загрузка списка столбцов из БД")
     def _get_columns_mapping(self):
         """
