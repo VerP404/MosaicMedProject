@@ -9,6 +9,16 @@
             "id": 2,
             "name": "ISZL",
             "description": "ИСЗЛ"
+        },
+        {
+            "id": 3,
+            "name": "Kvazar",
+            "description": "Квазар"
+        },
+        {
+            "id": 4,
+            "name": "МИС КАУЗ",
+            "description": "МИС КАУЗ"
         }
     ],
     "DataType": [
@@ -43,10 +53,40 @@
             "category_id": 2
         },
         {
+            "id": 7,
+            "name": "Recipe",
+            "description": "Рецепты",
+            "category_id": 3
+        },
+        {
+            "id": 8,
+            "name": "EMD",
+            "description": "ЭМД",
+            "category_id": 3
+        },
+        {
+            "id": 9,
+            "name": "Mortality",
+            "description": "Смертность",
+            "category_id": 3
+        },
+        {
+            "id": 10,
+            "name": "MedicalCertificate",
+            "description": "Медицинские справки",
+            "category_id": 3
+        },
+        {
             "id": 2,
             "name": "OMS",
             "description": "Талоны ОМС",
             "category_id": 1
+        },
+        {
+            "id": 11,
+            "name": "KAUZ",
+            "description": "Талоны",
+            "category_id": 4
         }
     ],
     "DataTypeFieldMapping": [
@@ -1101,8 +1141,920 @@
             "model_field_name": "column1"
         },
         {
+            "id": 177,
+            "data_type_id": 7,
+            "csv_column_name": "Номер",
+            "model_field_name": "number"
+        },
+        {
+            "id": 178,
+            "data_type_id": 7,
+            "csv_column_name": "Серия",
+            "model_field_name": "series"
+        },
+        {
+            "id": 179,
+            "data_type_id": 7,
+            "csv_column_name": "Тип рецепта",
+            "model_field_name": "recept_type"
+        },
+        {
+            "id": 180,
+            "data_type_id": 7,
+            "csv_column_name": "Дата",
+            "model_field_name": "date"
+        },
+        {
+            "id": 181,
+            "data_type_id": 7,
+            "csv_column_name": "ЭЦП",
+            "model_field_name": "ecp"
+        },
+        {
+            "id": 182,
+            "data_type_id": 7,
+            "csv_column_name": "Владелец подписи",
+            "model_field_name": "ecp_owner"
+        },
+        {
+            "id": 183,
+            "data_type_id": 7,
+            "csv_column_name": "Организация",
+            "model_field_name": "organization"
+        },
+        {
+            "id": 184,
+            "data_type_id": 7,
+            "csv_column_name": "Подразделение",
+            "model_field_name": "department"
+        },
+        {
+            "id": 185,
+            "data_type_id": 7,
+            "csv_column_name": "Статус",
+            "model_field_name": "status"
+        },
+        {
+            "id": 186,
+            "data_type_id": 7,
+            "csv_column_name": "Дата изменения статуса",
+            "model_field_name": "status_change_date"
+        },
+        {
+            "id": 187,
+            "data_type_id": 7,
+            "csv_column_name": "Автор статуса",
+            "model_field_name": "status_author"
+        },
+        {
+            "id": 188,
+            "data_type_id": 7,
+            "csv_column_name": "Статус отправки в ФАРМ",
+            "model_field_name": "farm_status"
+        },
+        {
+            "id": 189,
+            "data_type_id": 7,
+            "csv_column_name": "Статус отправки в 1ЭР",
+            "model_field_name": "er_status"
+        },
+        {
+            "id": 190,
+            "data_type_id": 7,
+            "csv_column_name": "Дополнительная информация по статусу отправки в 1ЭР",
+            "model_field_name": "er_status_details"
+        },
+        {
+            "id": 191,
+            "data_type_id": 7,
+            "csv_column_name": "Верификация ЭМД",
+            "model_field_name": "emd_verification"
+        },
+        {
+            "id": 192,
+            "data_type_id": 7,
+            "csv_column_name": "Статус отправки в РЭМД",
+            "model_field_name": "remd_status"
+        },
+        {
+            "id": 193,
+            "data_type_id": 7,
+            "csv_column_name": "Дополнительная информация по статусу отправки в РЭМД",
+            "model_field_name": "remd_status_details"
+        },
+        {
+            "id": 194,
+            "data_type_id": 7,
+            "csv_column_name": "Срок действия",
+            "model_field_name": "expiration_date"
+        },
+        {
+            "id": 195,
+            "data_type_id": 7,
+            "csv_column_name": "Ф.И.О. пациента",
+            "model_field_name": "patient_name"
+        },
+        {
+            "id": 196,
+            "data_type_id": 7,
+            "csv_column_name": "Дата рождения пациента",
+            "model_field_name": "patient_birth_date"
+        },
+        {
+            "id": 197,
+            "data_type_id": 7,
+            "csv_column_name": "СНИЛС пациента",
+            "model_field_name": "patient_snils"
+        },
+        {
+            "id": 198,
+            "data_type_id": 7,
+            "csv_column_name": "Код диагноза",
+            "model_field_name": "diagnosis_code"
+        },
+        {
+            "id": 199,
+            "data_type_id": 7,
+            "csv_column_name": "Название диагноза",
+            "model_field_name": "diagnosis_name"
+        },
+        {
+            "id": 200,
+            "data_type_id": 7,
+            "csv_column_name": "Название льготной категории",
+            "model_field_name": "benefit_category_name"
+        },
+        {
+            "id": 201,
+            "data_type_id": 7,
+            "csv_column_name": "Тип льготной категории",
+            "model_field_name": "benefit_category_type"
+        },
+        {
+            "id": 202,
+            "data_type_id": 7,
+            "csv_column_name": "Источник финансирования",
+            "model_field_name": "funding_source"
+        },
+        {
+            "id": 203,
+            "data_type_id": 7,
+            "csv_column_name": "Ф.И.О. врача",
+            "model_field_name": "doctor_name"
+        },
+        {
+            "id": 204,
+            "data_type_id": 7,
+            "csv_column_name": "Должность врача",
+            "model_field_name": "doctor_position"
+        },
+        {
+            "id": 205,
+            "data_type_id": 7,
+            "csv_column_name": "Лекарственный препарат",
+            "model_field_name": "medication_name"
+        },
+        {
+            "id": 206,
+            "data_type_id": 7,
+            "csv_column_name": "ТРН",
+            "model_field_name": "trn"
+        },
+        {
+            "id": 207,
+            "data_type_id": 7,
+            "csv_column_name": "МНН",
+            "model_field_name": "international_nonproprietary_name"
+        },
+        {
+            "id": 208,
+            "data_type_id": 7,
+            "csv_column_name": "Количество",
+            "model_field_name": "quantity"
+        },
+        {
+            "id": 209,
+            "data_type_id": 7,
+            "csv_column_name": "Процент оплаты",
+            "model_field_name": "payment_percentage"
+        },
+        {
+            "id": 211,
+            "data_type_id": 8,
+            "csv_column_name": "ИД исходного ЭПМЗ",
+            "model_field_name": "source_epmz_id"
+        },
+        {
+            "id": 212,
+            "data_type_id": 8,
+            "csv_column_name": "Дата документа",
+            "model_field_name": "document_date"
+        },
+        {
+            "id": 213,
+            "data_type_id": 8,
+            "csv_column_name": "Тип документа",
+            "model_field_name": "document_type"
+        },
+        {
+            "id": 214,
+            "data_type_id": 8,
+            "csv_column_name": "Врач",
+            "model_field_name": "doctor"
+        },
+        {
+            "id": 215,
+            "data_type_id": 8,
+            "csv_column_name": "Обособленное подразделение",
+            "model_field_name": "independent_division"
+        },
+        {
+            "id": 216,
+            "data_type_id": 8,
+            "csv_column_name": "Подразделение",
+            "model_field_name": "department"
+        },
+        {
+            "id": 217,
+            "data_type_id": 8,
+            "csv_column_name": "Пациент",
+            "model_field_name": "patient"
+        },
+        {
+            "id": 218,
+            "data_type_id": 8,
+            "csv_column_name": "Дата формирования электронного документа",
+            "model_field_name": "document_creation_date"
+        },
+        {
+            "id": 219,
+            "data_type_id": 8,
+            "csv_column_name": "Наличие подписи врача",
+            "model_field_name": "doctor_signature"
+        },
+        {
+            "id": 220,
+            "data_type_id": 8,
+            "csv_column_name": "Наличие подписи МО",
+            "model_field_name": "mo_signature"
+        },
+        {
+            "id": 221,
+            "data_type_id": 8,
+            "csv_column_name": "Дата отправки в РИР.РЭМД",
+            "model_field_name": "rir_remd_sent_date"
+        },
+        {
+            "id": 222,
+            "data_type_id": 8,
+            "csv_column_name": "Статус отправки в РИР.РЭМД",
+            "model_field_name": "rir_remd_status"
+        },
+        {
+            "id": 223,
+            "data_type_id": 8,
+            "csv_column_name": "Регистрационный номер",
+            "model_field_name": "registration_number"
+        },
+        {
+            "id": 224,
+            "data_type_id": 8,
+            "csv_column_name": "Детали статуса отправки",
+            "model_field_name": "rir_remd_status_details"
+        },
+        {
+            "id": 210,
+            "data_type_id": 8,
+            "csv_column_name": "ИД",
+            "model_field_name": "id_emd"
+        },
+        {
+            "id": 225,
+            "data_type_id": 9,
+            "csv_column_name": "Серия",
+            "model_field_name": "series"
+        },
+        {
+            "id": 226,
+            "data_type_id": 9,
+            "csv_column_name": "Номер",
+            "model_field_name": "number"
+        },
+        {
+            "id": 227,
+            "data_type_id": 9,
+            "csv_column_name": "ИСПОРЧЕНО",
+            "model_field_name": "spoiled"
+        },
+        {
+            "id": 228,
+            "data_type_id": 9,
+            "csv_column_name": "Дубликат",
+            "model_field_name": "duplicate"
+        },
+        {
+            "id": 229,
+            "data_type_id": 9,
+            "csv_column_name": "Перинатальная",
+            "model_field_name": "perinatal"
+        },
+        {
+            "id": 230,
+            "data_type_id": 9,
+            "csv_column_name": "Дата выдачи",
+            "model_field_name": "issue_date"
+        },
+        {
+            "id": 231,
+            "data_type_id": 9,
+            "csv_column_name": "Тип",
+            "model_field_name": "type"
+        },
+        {
+            "id": 232,
+            "data_type_id": 9,
+            "csv_column_name": "Дата отправки ЭМД",
+            "model_field_name": "emd_sent_date"
+        },
+        {
+            "id": 233,
+            "data_type_id": 9,
+            "csv_column_name": "Статус отправки ЭМД",
+            "model_field_name": "emd_status"
+        },
+        {
+            "id": 234,
+            "data_type_id": 9,
+            "csv_column_name": "ЭМД ошибка",
+            "model_field_name": "emd_error"
+        },
+        {
+            "id": 235,
+            "data_type_id": 9,
+            "csv_column_name": "Создавший",
+            "model_field_name": "creator"
+        },
+        {
+            "id": 236,
+            "data_type_id": 9,
+            "csv_column_name": "Врач",
+            "model_field_name": "doctor"
+        },
+        {
+            "id": 237,
+            "data_type_id": 9,
+            "csv_column_name": "ФИО умершего(ей)",
+            "model_field_name": "deceased_name"
+        },
+        {
+            "id": 238,
+            "data_type_id": 9,
+            "csv_column_name": "Дата рождения",
+            "model_field_name": "deceased_birth_date"
+        },
+        {
+            "id": 239,
+            "data_type_id": 9,
+            "csv_column_name": "Дата смерти",
+            "model_field_name": "death_date"
+        },
+        {
+            "id": 240,
+            "data_type_id": 9,
+            "csv_column_name": "Пол",
+            "model_field_name": "gender"
+        },
+        {
+            "id": 244,
+            "data_type_id": 9,
+            "csv_column_name": "Причина (в)",
+            "model_field_name": "cause_c"
+        },
+        {
+            "id": 241,
+            "data_type_id": 9,
+            "csv_column_name": "Возраст,лет",
+            "model_field_name": "age"
+        },
+        {
+            "id": 242,
+            "data_type_id": 9,
+            "csv_column_name": "Первоначальная (статистика)",
+            "model_field_name": "initial_statistics"
+        },
+        {
+            "id": 243,
+            "data_type_id": 9,
+            "csv_column_name": "Причина (а)",
+            "model_field_name": "cause_a"
+        },
+        {
+            "id": 253,
+            "data_type_id": 9,
+            "csv_column_name": "Прикрепление",
+            "model_field_name": "attachment"
+        },
+        {
+            "id": 247,
+            "data_type_id": 9,
+            "csv_column_name": "Регион",
+            "model_field_name": "region"
+        },
+        {
+            "id": 249,
+            "data_type_id": 9,
+            "csv_column_name": "Город / Населенный пункт",
+            "model_field_name": "city"
+        },
+        {
+            "id": 245,
+            "data_type_id": 9,
+            "csv_column_name": "Причина (б)",
+            "model_field_name": "cause_b"
+        },
+        {
+            "id": 248,
+            "data_type_id": 9,
+            "csv_column_name": "Район",
+            "model_field_name": "district"
+        },
+        {
+            "id": 251,
+            "data_type_id": 9,
+            "csv_column_name": "Дом",
+            "model_field_name": "house"
+        },
+        {
+            "id": 252,
+            "data_type_id": 9,
+            "csv_column_name": "Квартира",
+            "model_field_name": "apartment"
+        },
+        {
+            "id": 246,
+            "data_type_id": 9,
+            "csv_column_name": "Причина (г)",
+            "model_field_name": "cause_d"
+        },
+        {
+            "id": 250,
+            "data_type_id": 9,
+            "csv_column_name": "Улица",
+            "model_field_name": "street"
+        },
+        {
+            "id": 256,
+            "data_type_id": 9,
+            "csv_column_name": "Номер.1",
+            "model_field_name": "number_1"
+        },
+        {
+            "id": 257,
+            "data_type_id": 9,
+            "csv_column_name": "Дата выдачи.1",
+            "model_field_name": "issue_date_1"
+        },
+        {
+            "id": 258,
+            "data_type_id": 9,
+            "csv_column_name": "Первоначальная (статистика).1",
+            "model_field_name": "initial_statistics_1"
+        },
+        {
+            "id": 259,
+            "data_type_id": 10,
+            "csv_column_name": "Серия и номер справки",
+            "model_field_name": "certificate_number"
+        },
+        {
+            "id": 260,
+            "data_type_id": 10,
+            "csv_column_name": "Дата выдачи",
+            "model_field_name": "issue_date"
+        },
+        {
+            "id": 261,
+            "data_type_id": 10,
+            "csv_column_name": "ФИО",
+            "model_field_name": "patient_name"
+        },
+        {
+            "id": 262,
+            "data_type_id": 10,
+            "csv_column_name": "Дата рождения",
+            "model_field_name": "patient_birth_date"
+        },
+        {
+            "id": 263,
+            "data_type_id": 10,
+            "csv_column_name": "Врач",
+            "model_field_name": "doctor"
+        },
+        {
+            "id": 264,
+            "data_type_id": 10,
+            "csv_column_name": "Организация выдавшая документ",
+            "model_field_name": "issuing_organization"
+        },
+        {
+            "id": 265,
+            "data_type_id": 10,
+            "csv_column_name": "Вид справки",
+            "model_field_name": "certificate_type"
+        },
+        {
+            "id": 266,
+            "data_type_id": 10,
+            "csv_column_name": "Заключение",
+            "model_field_name": "conclusion"
+        },
+        {
+            "id": 267,
+            "data_type_id": 10,
+            "csv_column_name": "Статус",
+            "model_field_name": "status"
+        },
+        {
+            "id": 268,
+            "data_type_id": 10,
+            "csv_column_name": "Ошибки по справке",
+            "model_field_name": "errors"
+        },
+        {
             "id": 32,
             "data_type_id": 2,
+            "csv_column_name": "Случай",
+            "model_field_name": "case_code"
+        },
+        {
+            "id": 269,
+            "data_type_id": 11,
+            "csv_column_name": "Талон",
+            "model_field_name": "talon"
+        },
+        {
+            "id": 270,
+            "data_type_id": 11,
+            "csv_column_name": "Источник",
+            "model_field_name": "source"
+        },
+        {
+            "id": 271,
+            "data_type_id": 11,
+            "csv_column_name": "ID источника",
+            "model_field_name": "source_id"
+        },
+        {
+            "id": 272,
+            "data_type_id": 11,
+            "csv_column_name": "Номер счёта",
+            "model_field_name": "account_number"
+        },
+        {
+            "id": 273,
+            "data_type_id": 11,
+            "csv_column_name": "Дата выгрузки",
+            "model_field_name": "upload_date"
+        },
+        {
+            "id": 274,
+            "data_type_id": 11,
+            "csv_column_name": "Причина аннулирования",
+            "model_field_name": "cancellation_reason"
+        },
+        {
+            "id": 275,
+            "data_type_id": 11,
+            "csv_column_name": "Статус",
+            "model_field_name": "status"
+        },
+        {
+            "id": 276,
+            "data_type_id": 11,
+            "csv_column_name": "Тип талона",
+            "model_field_name": "talon_type"
+        },
+        {
+            "id": 277,
+            "data_type_id": 11,
+            "csv_column_name": "Цель",
+            "model_field_name": "goal"
+        },
+        {
+            "id": 278,
+            "data_type_id": 11,
+            "csv_column_name": "Фед. цель",
+            "model_field_name": "federal_goal"
+        },
+        {
+            "id": 279,
+            "data_type_id": 11,
+            "csv_column_name": "Пациент",
+            "model_field_name": "patient"
+        },
+        {
+            "id": 280,
+            "data_type_id": 11,
+            "csv_column_name": "Дата рождения",
+            "model_field_name": "birth_date"
+        },
+        {
+            "id": 281,
+            "data_type_id": 11,
+            "csv_column_name": "Возраст",
+            "model_field_name": "age"
+        },
+        {
+            "id": 282,
+            "data_type_id": 11,
+            "csv_column_name": "Пол",
+            "model_field_name": "gender"
+        },
+        {
+            "id": 283,
+            "data_type_id": 11,
+            "csv_column_name": "Полис",
+            "model_field_name": "policy"
+        },
+        {
+            "id": 284,
+            "data_type_id": 11,
+            "csv_column_name": "Код СМО",
+            "model_field_name": "smo_code"
+        },
+        {
+            "id": 285,
+            "data_type_id": 11,
+            "csv_column_name": "Страховая",
+            "model_field_name": "insurance"
+        },
+        {
+            "id": 286,
+            "data_type_id": 11,
+            "csv_column_name": "ЕНП",
+            "model_field_name": "enp"
+        },
+        {
+            "id": 287,
+            "data_type_id": 11,
+            "csv_column_name": "Начало лечения",
+            "model_field_name": "treatment_start"
+        },
+        {
+            "id": 288,
+            "data_type_id": 11,
+            "csv_column_name": "Окончание лечения",
+            "model_field_name": "treatment_end"
+        },
+        {
+            "id": 289,
+            "data_type_id": 11,
+            "csv_column_name": "Врач",
+            "model_field_name": "doctor"
+        },
+        {
+            "id": 290,
+            "data_type_id": 11,
+            "csv_column_name": "Врач (Профиль МП)",
+            "model_field_name": "doctor_profile"
+        },
+        {
+            "id": 291,
+            "data_type_id": 11,
+            "csv_column_name": "Должность мед.персонала (V021)",
+            "model_field_name": "staff_position"
+        },
+        {
+            "id": 292,
+            "data_type_id": 11,
+            "csv_column_name": "Подразделение",
+            "model_field_name": "department"
+        },
+        {
+            "id": 293,
+            "data_type_id": 11,
+            "csv_column_name": "Условия оказания помощи",
+            "model_field_name": "care_conditions"
+        },
+        {
+            "id": 294,
+            "data_type_id": 11,
+            "csv_column_name": "Вид мед. помощи",
+            "model_field_name": "medical_assistance_type"
+        },
+        {
+            "id": 295,
+            "data_type_id": 11,
+            "csv_column_name": "Тип заболевания",
+            "model_field_name": "disease_type"
+        },
+        {
+            "id": 296,
+            "data_type_id": 11,
+            "csv_column_name": "Характер основного заболевания",
+            "model_field_name": "main_disease_character"
+        },
+        {
+            "id": 297,
+            "data_type_id": 11,
+            "csv_column_name": "Посещения",
+            "model_field_name": "visits"
+        },
+        {
+            "id": 298,
+            "data_type_id": 11,
+            "csv_column_name": "Посещения в МО",
+            "model_field_name": "mo_visits"
+        },
+        {
+            "id": 299,
+            "data_type_id": 11,
+            "csv_column_name": "Посещения на Дому",
+            "model_field_name": "home_visits"
+        },
+        {
+            "id": 300,
+            "data_type_id": 11,
+            "csv_column_name": "Диагноз основной (DS1)",
+            "model_field_name": "main_diagnosis"
+        },
+        {
+            "id": 301,
+            "data_type_id": 11,
+            "csv_column_name": "Сопутствующий диагноз (DS2)",
+            "model_field_name": "additional_diagnosis"
+        },
+        {
+            "id": 302,
+            "data_type_id": 11,
+            "csv_column_name": "Профиль МП",
+            "model_field_name": "mp_profile"
+        },
+        {
+            "id": 303,
+            "data_type_id": 11,
+            "csv_column_name": "Профиль койки",
+            "model_field_name": "bed_profile"
+        },
+        {
+            "id": 304,
+            "data_type_id": 11,
+            "csv_column_name": "Диспансерное наблюдение",
+            "model_field_name": "dispensary_monitoring"
+        },
+        {
+            "id": 305,
+            "data_type_id": 11,
+            "csv_column_name": "Специальность",
+            "model_field_name": "specialty"
+        },
+        {
+            "id": 306,
+            "data_type_id": 11,
+            "csv_column_name": "Исход",
+            "model_field_name": "outcome"
+        },
+        {
+            "id": 307,
+            "data_type_id": 11,
+            "csv_column_name": "Результат",
+            "model_field_name": "result"
+        },
+        {
+            "id": 308,
+            "data_type_id": 11,
+            "csv_column_name": "Оператор",
+            "model_field_name": "operator"
+        },
+        {
+            "id": 309,
+            "data_type_id": 11,
+            "csv_column_name": "Первоначальная дата ввода",
+            "model_field_name": "initial_input_date"
+        },
+        {
+            "id": 310,
+            "data_type_id": 11,
+            "csv_column_name": "Дата последнего изменения",
+            "model_field_name": "last_change_date"
+        },
+        {
+            "id": 311,
+            "data_type_id": 11,
+            "csv_column_name": "Тариф",
+            "model_field_name": "tariff"
+        },
+        {
+            "id": 312,
+            "data_type_id": 11,
+            "csv_column_name": "Сумма",
+            "model_field_name": "amount"
+        },
+        {
+            "id": 313,
+            "data_type_id": 11,
+            "csv_column_name": "Оплачено",
+            "model_field_name": "paid"
+        },
+        {
+            "id": 314,
+            "data_type_id": 11,
+            "csv_column_name": "Тип оплаты",
+            "model_field_name": "payment_type"
+        },
+        {
+            "id": 315,
+            "data_type_id": 11,
+            "csv_column_name": "Санкции",
+            "model_field_name": "sanctions"
+        },
+        {
+            "id": 316,
+            "data_type_id": 11,
+            "csv_column_name": "КСГ",
+            "model_field_name": "ksg"
+        },
+        {
+            "id": 317,
+            "data_type_id": 11,
+            "csv_column_name": "КЗ",
+            "model_field_name": "kz"
+        },
+        {
+            "id": 318,
+            "data_type_id": 11,
+            "csv_column_name": "Код схемы лекарственной терапии",
+            "model_field_name": "therapy_schema_code"
+        },
+        {
+            "id": 319,
+            "data_type_id": 11,
+            "csv_column_name": "УЕТ",
+            "model_field_name": "uet"
+        },
+        {
+            "id": 320,
+            "data_type_id": 11,
+            "csv_column_name": "Классификационный критерий",
+            "model_field_name": "classification_criterion"
+        },
+        {
+            "id": 321,
+            "data_type_id": 11,
+            "csv_column_name": "ШРМ",
+            "model_field_name": "shrm"
+        },
+        {
+            "id": 322,
+            "data_type_id": 11,
+            "csv_column_name": "МО, направившая",
+            "model_field_name": "directing_mo"
+        },
+        {
+            "id": 323,
+            "data_type_id": 11,
+            "csv_column_name": "Код способа оплаты",
+            "model_field_name": "payment_method_code"
+        },
+        {
+            "id": 324,
+            "data_type_id": 11,
+            "csv_column_name": "Новорожденный",
+            "model_field_name": "newborn"
+        },
+        {
+            "id": 325,
+            "data_type_id": 11,
+            "csv_column_name": "Представитель",
+            "model_field_name": "representative"
+        },
+        {
+            "id": 326,
+            "data_type_id": 11,
+            "csv_column_name": "Доп. инф. о статусе талона",
+            "model_field_name": "additional_status_info"
+        },
+        {
+            "id": 327,
+            "data_type_id": 11,
+            "csv_column_name": "КСЛП",
+            "model_field_name": "kslp"
+        },
+        {
+            "id": 328,
+            "data_type_id": 11,
+            "csv_column_name": "Источник оплаты",
+            "model_field_name": "payment_source"
+        },
+        {
+            "id": 329,
+            "data_type_id": 11,
+            "csv_column_name": "Отчетный период выгрузки",
+            "model_field_name": "report_period"
+        },
+        {
+            "id": 330,
+            "data_type_id": 11,
             "csv_column_name": "Случай",
             "model_field_name": "case_code"
         }
@@ -1154,6 +2106,42 @@
             "data_type_id": 3
         },
         {
+            "id": 7,
+            "table_name": "data_loader_kvazarrecipe",
+            "column_check": "number",
+            "columns_for_update": "number, series",
+            "encoding": "cp1251",
+            "delimiter": ";",
+            "data_type_id": 7
+        },
+        {
+            "id": 8,
+            "table_name": "data_loader_kvazaremd",
+            "column_check": "id_emd",
+            "columns_for_update": "id_emd",
+            "encoding": "cp1251",
+            "delimiter": ";",
+            "data_type_id": 8
+        },
+        {
+            "id": 9,
+            "table_name": "data_loader_kvazarmortality",
+            "column_check": "number",
+            "columns_for_update": "series, number",
+            "encoding": "cp1251",
+            "delimiter": ";",
+            "data_type_id": 9
+        },
+        {
+            "id": 10,
+            "table_name": "data_loader_kvazarmedicalcertificate",
+            "column_check": "certificate_number",
+            "columns_for_update": "certificate_number",
+            "encoding": "cp1251",
+            "delimiter": ";",
+            "data_type_id": 10
+        },
+        {
             "id": 1,
             "table_name": "data_loader_omsdata",
             "column_check": "patient",
@@ -1161,6 +2149,15 @@
             "encoding": "utf-8",
             "delimiter": ";",
             "data_type_id": 2
+        },
+        {
+            "id": 11,
+            "table_name": "data_loader_omsdata",
+            "column_check": "patient",
+            "columns_for_update": "talon,source",
+            "encoding": "utf-8",
+            "delimiter": ";",
+            "data_type_id": 11
         }
     ]
 }
