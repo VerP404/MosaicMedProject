@@ -138,16 +138,16 @@ def sql_query_dispensary_amount_group(selected_year, months_placeholder, inogoro
 
 
 def sql_query_dispensary_uniq(selected_year, months_placeholder, inogorod, sanction, amount_null,
-                                      building=None,
-                                      department=None,
-                                      profile=None,
-                                      doctor=None,
-                                      input_start=None,
-                                      input_end=None,
-                                      treatment_start=None,
-                                      treatment_end=None,
-                                      cel_list=None,
-                                      status_list=None):
+                              building=None,
+                              department=None,
+                              profile=None,
+                              doctor=None,
+                              input_start=None,
+                              input_end=None,
+                              treatment_start=None,
+                              treatment_end=None,
+                              cel_list=None,
+                              status_list=None):
     base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
                       doctor,
                       input_start, input_end,
@@ -171,3 +171,96 @@ def sql_query_dispensary_uniq(selected_year, months_placeholder, inogorod, sanct
            group by building, department, goal;
     """
     return query
+
+
+query_download_children_list_not_pn1 = """
+WITH oms AS (
+    SELECT
+        enp,
+        MAX(CASE WHEN goal = 'ПН1' THEN 1 ELSE 0 END) AS has_pn1,
+        MAX(CASE WHEN goal = 'ДС1' THEN 1 ELSE 0 END) AS has_ds1,
+        MAX(CASE WHEN goal = 'ДС2' THEN 1 ELSE 0 END) AS has_ds2,
+        SUM(CASE WHEN goal = 'ПН1' THEN 1 ELSE 0 END) AS count_pn1,
+        SUM(CASE WHEN goal = 'ДС1' THEN 1 ELSE 0 END) AS count_ds1,
+        SUM(CASE WHEN goal = 'ДС2' THEN 1 ELSE 0 END) AS count_ds2
+    FROM data_loader_omsdata
+    WHERE goal IN ('ПН1', 'ДС1', 'ДС2')
+    GROUP BY enp
+),
+age_requirements AS (
+    SELECT unnest(ARRAY[
+        0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 18, 24,
+        36, 48, 60, 72, 84, 96, 108, 120, 132, 144, 156, 168, 180, 192
+    ]) AS required_age_months
+),
+naselenie AS (
+    SELECT
+        DISTINCT
+        fio,
+        dr,
+        CAST(dr AS DATE) AS dr_date,
+        enp,
+        lpuuch,
+        DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) AS age_years,
+        DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE))) AS age_months_raw,
+        (DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) * 12 + DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE))))::INTEGER AS age_in_months,
+        CASE
+            WHEN LOWER("fio") LIKE '%вич%' THEN 'М'
+            WHEN LOWER("fio") LIKE '%вна%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%а' AND LOWER("fio") NOT LIKE '%вич' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%руз' THEN 'М'
+            WHEN LOWER("fio") LIKE '%угли' THEN 'М'
+            WHEN LOWER("fio") LIKE '%дин' THEN 'М'
+            WHEN LOWER("fio") LIKE '%оглы' THEN 'М'
+            WHEN LOWER("fio") LIKE '%кызы' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%ич' THEN 'М'
+            WHEN LOWER("fio") LIKE '%ова%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%ева%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%ода %' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%ов%' AND LOWER("fio") NOT LIKE '%ова%' THEN 'М'
+            WHEN LOWER("fio") LIKE '%ев%' AND LOWER("fio") NOT LIKE '%ева%' THEN 'М'
+            WHEN LOWER("fio") LIKE '%кий' THEN 'М'
+            WHEN LOWER("fio") LIKE '%ль' THEN 'М'
+            WHEN LOWER("fio") LIKE '%й%' AND LOWER("fio") NOT LIKE '%ой' THEN 'М'
+            WHEN LOWER("fio") LIKE '%илья' THEN 'М'
+            WHEN LOWER("fio") LIKE '%ья' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%иа' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%йя' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%инич' THEN 'М'
+            WHEN LOWER("fio") LIKE '%ус' THEN 'М'
+            WHEN LOWER("fio") LIKE '%ия' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%джонзода%' THEN 'М'
+            WHEN LOWER("fio") LIKE '%мохаммед%' THEN 'М'
+            WHEN RIGHT(LOWER("fio"), 1) IN ('а', 'я', 'и', 'е', 'о', 'у', 'э', 'ю') THEN 'Ж'
+            ELSE 'М'
+        END AS gender
+    FROM data_loader_iszlpeople
+    WHERE CAST(dr AS DATE) <= CURRENT_DATE
+      AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
+)
+SELECT
+    n.fio,
+    n.dr,
+    n.enp,
+    n.lpuuch,
+    n.age_years,
+    CASE WHEN n.age_in_months >= 24 THEN 0 ELSE n.age_months_raw END AS age_months,
+    n.gender,
+    CASE WHEN o.has_pn1 = 1 THEN 'да' ELSE 'нет' END AS "ПН1",
+    CASE WHEN o.has_ds1 = 1 THEN 'да' ELSE 'нет' END AS "ДС1",
+    CASE WHEN o.has_ds2 = 1 THEN 'да' ELSE 'нет' END AS "ДС2",
+    COALESCE(o.count_pn1, 0) AS "Количество ПН1",
+    COALESCE(o.count_ds1, 0) AS "Количество ДС1",
+    COALESCE(o.count_ds2, 0) AS "Количество ДС2",
+    (
+        SELECT COUNT(*)
+        FROM age_requirements ar
+        WHERE
+            n.dr_date + (ar.required_age_months || ' months')::INTERVAL <= CURRENT_DATE
+            AND n.dr_date + (ar.required_age_months || ' months')::INTERVAL >= DATE '2024-01-01'
+            AND n.dr_date + (ar.required_age_months || ' months')::INTERVAL >= n.dr_date
+    ) AS "План осмотров на сегодня"
+FROM naselenie n
+LEFT JOIN oms o ON n.enp = o.enp;
+
+"""
