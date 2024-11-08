@@ -10,6 +10,7 @@ from apps.analytical_app.pages.head.dispensary.adults.tab8 import adults_dv8
 from apps.analytical_app.pages.head.dispensary.children.main import head_children_dd_main
 from apps.analytical_app.pages.head.dispensary.children.tab1 import children_dn1
 from apps.analytical_app.pages.head.dispensary.children.tab2 import children_dn2
+from apps.analytical_app.pages.head.dispensary.children.tab3 import children_list_not_pn
 from apps.analytical_app.pages.head.dispensary.reports.page import dispensary_reports
 from apps.analytical_app.pages.head.dispensary.reproductive.main import head_reproductive_main
 from apps.analytical_app.pages.head.dispensary.reproductive.tab1 import reproductive_dr1
@@ -108,6 +109,14 @@ routes_head = {
             {"label": "По возрастам диспансеризация детей", "active": True},
         ]),
         children_dn2
+    ]),
+    "/head/children/pn3": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансеризация детей", "href": "/head/children"},
+            {"label": "Список прикрепленных детей", "active": True},
+        ]),
+        children_list_not_pn
     ]),
 
     "/head/reproductive": html.Div([
