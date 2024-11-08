@@ -259,9 +259,11 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
         start_date_input_formatted, end_date_input_formatted = None, None
         start_date_treatment_formatted, end_date_treatment_formatted = None, None
     elif report_type == 'initial_input':
+        selected_period = (1, 12)
         start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
         end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
     elif report_type == 'treatment':
+        selected_period = (1, 12)
         start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
             '%d-%m-%Y')
         end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
