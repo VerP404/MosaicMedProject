@@ -239,19 +239,21 @@ naselenie AS (
       AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
 )
 SELECT
-    n.fio,
-    n.dr,
-    n.enp,
-    n.lpuuch,
-    n.age_years,
-    CASE WHEN n.age_in_months >= 24 THEN 0 ELSE n.age_months_raw END AS age_months,
-    n.gender,
+    n.fio as "ФИО",
+    n.dr as "ДР",
+    n.enp as "ЕНП",
+    n.lpuuch as "Участок",
+    CAST(n.age_years AS text) AS "Возраст",
+    CAST(CASE WHEN n.age_in_months >= 24 THEN 0 ELSE n.age_months_raw END  AS text) AS "Месяцев",
+    n.gender as "Пол",
+    CASE WHEN EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM n.dr_date) < 2 THEN 'да' ELSE 'нет' END AS "Дети до 2 лет",
     CASE WHEN o.has_pn1 = 1 THEN 'да' ELSE 'нет' END AS "ПН1",
     CASE WHEN o.has_ds1 = 1 THEN 'да' ELSE 'нет' END AS "ДС1",
     CASE WHEN o.has_ds2 = 1 THEN 'да' ELSE 'нет' END AS "ДС2",
-    COALESCE(o.count_pn1, 0) AS "Количество ПН1",
-    COALESCE(o.count_ds1, 0) AS "Количество ДС1",
-    COALESCE(o.count_ds2, 0) AS "Количество ДС2",
+    CAST(COALESCE(o.count_pn1, 0) AS text) AS "К-во ПН1",
+    CAST(COALESCE(o.count_ds1, 0) AS text) AS "К-во ДС1",
+    CAST(COALESCE(o.count_ds2, 0) AS text) AS "К-во ДС2",
+CAST(
     (
         SELECT COUNT(*)
         FROM age_requirements ar
@@ -259,7 +261,8 @@ SELECT
             n.dr_date + (ar.required_age_months || ' months')::INTERVAL <= CURRENT_DATE
             AND n.dr_date + (ar.required_age_months || ' months')::INTERVAL >= DATE '2024-01-01'
             AND n.dr_date + (ar.required_age_months || ' months')::INTERVAL >= n.dr_date
-    ) AS "План осмотров на сегодня"
+    ) AS text
+) AS "План осмотров на сегодня"
 FROM naselenie n
 LEFT JOIN oms o ON n.enp = o.enp;
 
