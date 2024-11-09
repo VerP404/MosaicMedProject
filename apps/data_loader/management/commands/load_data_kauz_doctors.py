@@ -52,7 +52,7 @@ class Command(BaseCommand):
 
             # Получаем конфигурацию DataLoaderConfig для типа данных КАУЗ
             try:
-                data_type = DataType.objects.get(name="KAUZ")
+                data_type = DataType.objects.get(name="KAUZ_DOCTORS")
                 config = DataLoaderConfig.objects.get(data_type=data_type)
             except DataType.DoesNotExist:
                 self.stdout.write(self.style.ERROR('Тип данных КАУЗ не найден'))
