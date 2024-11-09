@@ -167,3 +167,62 @@ FROM CASESAMB AS ca
                                           WHERE sub_a.IDCASEAMB = a.IDCASEAMB)) ACCOUNTS ON ca.ID = ACCOUNTS.IDCASEAMB
 WHERE ca.DATEUPDATE BETWEEN '{date_start}' AND '{date_end}';
 """
+
+query_kauz_doctors = f"""
+WITH LatestDoctorSLPU AS (
+    SELECT D.IDDOCTOR, D.IDLPU, D.DATEINP, D.DATEOUT
+    FROM DOCTORSLPU D
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM DOCTORSLPU D2
+        WHERE D2.IDDOCTOR = D.IDDOCTOR
+          AND (
+              D2.DATEINP > D.DATEINP
+              OR (D2.DATEINP = D.DATEINP AND COALESCE(D2.DATEOUT, DATE '9999-12-31') > COALESCE(D.DATEOUT, DATE '9999-12-31'))
+              OR (D2.DATEINP = D.DATEINP AND COALESCE(D2.DATEOUT, DATE '9999-12-31') = COALESCE(D.DATEOUT, DATE '9999-12-31') AND D2.IDLPU < D.IDLPU)
+          )
+    )
+),
+SpecialitiesAggregated AS (
+    SELECT PRVS, MIN(PROFIL_FED) AS PROFIL_FED
+    FROM SPECIALITIES
+    GROUP BY PRVS
+)
+
+SELECT
+    DOCTORS.SNILS AS "СНИЛС:",
+    DOCTORS.TABN AS "Код врача:",
+    DOCTORS.SURNAME AS "Фамилия:",
+    DOCTORS.FIRSTNAME AS "Имя:",
+    DOCTORS.PATRONYMIC AS "Отчество:",
+    LPAD(CAST(EXTRACT(DAY FROM DOCTORS.DATEBIRTH) AS VARCHAR(2)), 2, '0') || '-' ||
+    LPAD(CAST(EXTRACT(MONTH FROM DOCTORS.DATEBIRTH) AS VARCHAR(2)), 2, '0') || '-' ||
+    CAST(EXTRACT(YEAR FROM DOCTORS.DATEBIRTH) AS VARCHAR(4)) AS "Дата рождения:",
+    DOCTORS.IDSEX AS "Пол",
+    COALESCE(
+        LPAD(CAST(EXTRACT(DAY FROM LATEST.DATEINP) AS VARCHAR(2)), 2, '0') || '-' ||
+        LPAD(CAST(EXTRACT(MONTH FROM LATEST.DATEINP) AS VARCHAR(2)), 2, '0') || '-' ||
+        CAST(EXTRACT(YEAR FROM LATEST.DATEINP) AS VARCHAR(4)),
+        '-'
+    ) AS "Дата начала работы:",
+    COALESCE(
+        LPAD(CAST(EXTRACT(DAY FROM LATEST.DATEOUT) AS VARCHAR(2)), 2, '0') || '-' ||
+        LPAD(CAST(EXTRACT(MONTH FROM LATEST.DATEOUT) AS VARCHAR(2)), 2, '0') || '-' ||
+        CAST(EXTRACT(YEAR FROM LATEST.DATEOUT) AS VARCHAR(4)),
+        '-'
+    ) AS "Дата окончания работы:",
+    COALESCE(LPU.NAME, '-') AS "Структурное подразделение:",
+    SpecialitiesAggregated.PROFIL_FED AS "Код профиля медпомощи:",
+    PRVS.V021CODE AS "Код специальности:",
+    '-' AS "Код отделения:",
+    '-' AS "Комментарий:"
+FROM DOCTORS
+LEFT JOIN LatestDoctorSLPU LATEST ON DOCTORS.ID = LATEST.IDDOCTOR
+LEFT JOIN LPU ON LATEST.IDLPU = LPU.ID
+LEFT JOIN PRVS ON DOCTORS.PRVS = PRVS.CODE
+LEFT JOIN SpecialitiesAggregated ON DOCTORS.PRVS = SpecialitiesAggregated.PRVS
+where SNILS != ''
+and PRVS.V021CODE != ''
+and SpecialitiesAggregated.PROFIL_FED != '0'
+and (SNILS != '0' or SNILS != '')
+"""
