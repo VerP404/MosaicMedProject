@@ -190,7 +190,7 @@ SpecialitiesAggregated AS (
 )
 
 SELECT
-    DOCTORS.SNILS AS "СНИЛС:",
+    REPLACE(REPLACE(DOCTORS.SNILS, '-', ''), ' ', '') AS "СНИЛС:",
     DOCTORS.TABN AS "Код врача:",
     DOCTORS.SURNAME AS "Фамилия:",
     DOCTORS.FIRSTNAME AS "Имя:",
@@ -224,5 +224,6 @@ LEFT JOIN SpecialitiesAggregated ON DOCTORS.PRVS = SpecialitiesAggregated.PRVS
 where SNILS != ''
 and PRVS.V021CODE != ''
 and SpecialitiesAggregated.PROFIL_FED != '0'
-and (SNILS != '0' or SNILS != '')
+and SNILS != '0' 
+and SNILS != ''
 """
