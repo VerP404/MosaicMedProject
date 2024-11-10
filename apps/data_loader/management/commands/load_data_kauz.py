@@ -75,7 +75,8 @@ class Command(BaseCommand):
 
             # Выполнение запроса с подстановкой дат
             cursor = con.cursor()
-            formatted_query = query_kauz_talon.format(date_start=date_start_str, date_end=date_end_str)
+
+            formatted_query = query_kauz_talon(date_start=date_start_str, date_end=date_end_str)
             cursor.execute(formatted_query)
             data = cursor.fetchall()
 

@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta
 
+
 # date_start = (datetime.now() - timedelta(days=1)).strftime('%d.%m.%Y')
 # date_end = datetime.now().strftime('%d.%m.%Y')
 
-query_kauz_talon = f"""
+def query_kauz_talon(date_start, date_end):
+    return f"""
 SELECT ca.ID                            AS "Талон",
        'МИС КАУЗ'                       AS "Источник",
        '-'                              AS "ID источника",
@@ -165,8 +167,9 @@ FROM CASESAMB AS ca
                     WHERE a.DATACCOUNT = (SELECT MAX(sub_a.DATACCOUNT)
                                           FROM ACCOUNTS sub_a
                                           WHERE sub_a.IDCASEAMB = a.IDCASEAMB)) ACCOUNTS ON ca.ID = ACCOUNTS.IDCASEAMB
-WHERE ca.DATEUPDATE BETWEEN '?' AND '?';
+WHERE ca.DATEUPDATE BETWEEN '{date_start}' AND '{date_end}';
 """
+
 
 query_kauz_doctors = f"""
 WITH LatestDoctorSLPU AS (
