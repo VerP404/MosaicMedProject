@@ -95,7 +95,7 @@ economist_dispensary_age = html.Div(
 def update_building_options_and_values(n_clicks):
     with engine.connect() as connection:
         building_query = connection.execute(text("SELECT DISTINCT name_kvazar FROM organization_building"))
-        building_names = [row[0] for row in building_query.fetchall()]
+        building_names = sorted([row[0] for row in building_query.fetchall()])  # Сортируем список имен корпусов
 
     building_options = [{"label": building, "value": building} for building in building_names]
 
