@@ -14,7 +14,15 @@ from apps.home.models import MainSettings
 class Command(BaseCommand):
     help = 'Загрузка данных из базы данных Firebird (КАУЗ) в PostgreSQL'
 
-    def handle(self, *args, **kwargs):
+    def add_arguments(self, parser):
+        parser.add_argument('--date_start', type=str, help='Начальная дата в формате ДД.ММ.ГГГГ')
+        parser.add_argument('--date_end', type=str, help='Конечная дата в формате ДД.ММ.ГГГГ')
+        parser.add_argument('--last-week', action='store_true', help='Загрузить данные за последнюю неделю')
+        parser.add_argument('--last-month', action='store_true', help='Загрузить данные за последний месяц')
+        parser.add_argument('--since-jan1', action='store_true',
+                            help='Загрузить данные с 1 января текущего года по текущую дату')
+
+    def handle(self, *args, **options):
         # Получаем настройки подключения к Firebird из MainSettings
         settings = MainSettings.objects.first()
         if not settings:
@@ -23,8 +31,34 @@ class Command(BaseCommand):
 
         # Устанавливаем параметры подключения и даты
         dsn = f"{settings.kauz_server_ip}:{settings.kauz_database_path}"
-        # date_start = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-        # date_end = datetime.now().strftime('%Y-%m-%d')
+
+        # Определяем диапазон дат
+        date_start = None
+        date_end = None
+        if options['date_start'] and options['date_end']:
+            try:
+                date_start = datetime.strptime(options['date_start'], '%d.%m.%Y')
+                date_end = datetime.strptime(options['date_end'], '%d.%m.%Y')
+            except ValueError:
+                self.stdout.write(self.style.ERROR("Неверный формат даты. Используйте ДД.ММ.ГГГГ"))
+                return
+        elif options['last_week']:
+            date_end = datetime.now()
+            date_start = date_end - timedelta(days=7)
+        elif options['last_month']:
+            date_end = datetime.now()
+            date_start = date_end - timedelta(days=30)
+        elif options['since_jan1']:
+            date_start = datetime(datetime.now().year, 1, 1)
+            date_end = datetime.now()
+        else:
+            # Если параметры не заданы, используем последние 24 часа
+            date_end = datetime.now()
+            date_start = date_end - timedelta(days=1)
+
+        # Форматируем даты для SQL-запроса в формате 'ДД.ММ.ГГГГ'
+        date_start_str = date_start.strftime('%d.%m.%Y')
+        date_end_str = date_end.strftime('%d.%m.%Y')
 
         # Выполняем подключение к Firebird и загрузку данных
         try:
@@ -39,15 +73,14 @@ class Command(BaseCommand):
             except Exception as e:
                 return f"Ошибка подключения: {e}"
 
-
-            # Выполнение запроса
+            # Выполнение запроса с подстановкой дат
             cursor = con.cursor()
-            cursor.execute(query_kauz_talon)
+            formatted_query = query_kauz_talon.format(date_start=date_start_str, date_end=date_end_str)
+            cursor.execute(formatted_query)
             data = cursor.fetchall()
 
             # Преобразуем данные в DataFrame
             columns = [desc[0] for desc in cursor.description]
-
             df = pd.DataFrame(data, columns=columns)
             con.close()
 

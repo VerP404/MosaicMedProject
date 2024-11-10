@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
-date_start = (datetime.now() - timedelta(days=1)).strftime('%d.%m.%Y')
-date_end = datetime.now().strftime('%d.%m.%Y')
+# date_start = (datetime.now() - timedelta(days=1)).strftime('%d.%m.%Y')
+# date_end = datetime.now().strftime('%d.%m.%Y')
 
 query_kauz_talon = f"""
 SELECT ca.ID                            AS "Талон",
