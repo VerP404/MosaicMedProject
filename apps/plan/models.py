@@ -138,6 +138,8 @@ class UnifiedFilterCondition(models.Model):
         ('in', 'В списке (IN)'),
         ('like', 'Похож на (LIKE)'),
         ('not_like', 'Не содержит (NOT LIKE)'),
+        ('<', 'Меньше (<)'),
+        ('>', 'Больше (>)'),
     ]
     OPERATOR_CHOICES = [
         ('AND', 'И'),

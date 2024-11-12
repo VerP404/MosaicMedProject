@@ -26,7 +26,10 @@ def get_dynamic_conditions(year):
             clause = f"{field_name} LIKE {values}"
         elif filter_type == 'not_like':
             clause = f"{field_name} NOT LIKE {values}"
-
+        elif filter_type == '<':
+            clause = f"{field_name} < {values}"
+        elif filter_type == '>':
+            clause = f"{field_name} > {values}"
         operator = operator or "AND"
         conditions.append((type, clause, operator))
 
