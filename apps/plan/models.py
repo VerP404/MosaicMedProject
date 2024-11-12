@@ -83,7 +83,8 @@ class FilterCondition(models.Model):
 
 # models.py
 class MonthlyPlan(models.Model):
-    group = models.ForeignKey(GroupIndicators, on_delete=models.CASCADE, related_name="monthly_plans", verbose_name="Группа")
+    group = models.ForeignKey(GroupIndicators, on_delete=models.CASCADE, related_name="monthly_plans",
+                              verbose_name="Группа")
     month = models.PositiveSmallIntegerField(verbose_name="Месяц")
     quantity = models.PositiveIntegerField(verbose_name="Количество")
     amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Деньги")
@@ -103,3 +104,38 @@ class MonthlyPlan(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValueError("Удаление записей месячного плана запрещено.")
+
+
+class UnifiedFilter(models.Model):
+    year = models.IntegerField(verbose_name="Год")
+    type = models.CharField(max_length=50, verbose_name="Тип")
+
+    class Meta:
+        verbose_name = "Общий фильтр"
+        verbose_name_plural = "Общие фильтры"
+
+    def __str__(self):
+        return f"{self.year} - {self.type}"
+
+
+class UnifiedFilterCondition(models.Model):
+    FILTER_TYPES = [
+        ('exact', 'Точное соответствие (=)'),
+        ('in', 'В списке (IN)'),
+        ('like', 'Похож на (LIKE)'),
+        ('not_like', 'Не содержит (NOT LIKE)'),
+    ]
+
+    filter = models.ForeignKey(UnifiedFilter, on_delete=models.CASCADE, related_name="conditions",
+                               verbose_name="Фильтр")
+    field_name = models.CharField(max_length=100, verbose_name="Поле для фильтрации")
+    filter_type = models.CharField(max_length=10, choices=FILTER_TYPES, verbose_name="Тип фильтра")
+    values = models.TextField(verbose_name="Значения (через запятую)")
+
+    class Meta:
+        verbose_name = "Условие фильтра"
+        verbose_name_plural = "Условия фильтра"
+
+    def __str__(self):
+        return f"{self.field_name} ({self.filter_type}): {self.values}"
+

@@ -4,7 +4,7 @@ from django.contrib import admin, messages
 from django.utils.html import format_html
 from django.urls import reverse
 
-from .models import GroupIndicators, FilterCondition, MonthlyPlan
+from .models import GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition
 from .utils import copy_filters_to_new_year
 
 
@@ -77,3 +77,16 @@ class GroupIndicatorsAdmin(admin.ModelAdmin):
         if obj:
             readonly_fields = list(readonly_fields) + ['view_subgroups']
         return readonly_fields
+
+
+class UnifiedFilterConditionInline(admin.TabularInline):
+    model = UnifiedFilterCondition
+    extra = 1
+    fields = ['field_name', 'filter_type', 'values']
+
+
+@admin.register(UnifiedFilter)
+class UnifiedFilterAdmin(admin.ModelAdmin):
+    list_display = ('year', 'type',)
+    search_fields = ('year', 'type',)
+    inlines = [UnifiedFilterConditionInline]
