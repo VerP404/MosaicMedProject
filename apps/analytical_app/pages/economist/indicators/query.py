@@ -23,9 +23,9 @@ def get_dynamic_conditions(year):
         elif filter_type == 'exact':
             clause = f"{field_name} = '{values}'"
         elif filter_type == 'like':
-            clause = f"{field_name} LIKE '{values}'"
+            clause = f"{field_name} LIKE {values}"
         elif filter_type == 'not_like':
-            clause = f"{field_name} NOT LIKE '{values}'"
+            clause = f"{field_name} NOT LIKE {values}"
 
         operator = operator or "AND"
         conditions.append((type, clause, operator))
