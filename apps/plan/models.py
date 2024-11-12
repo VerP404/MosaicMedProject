@@ -111,13 +111,19 @@ class UnifiedFilter(models.Model):
     type = models.CharField(max_length=50, verbose_name="Тип")
 
     def combined_conditions(self):
-        # Используем self.conditions.all() вместо unifiedfiltercondition_set
+        # Получаем условия с их операторами и объединяем в строку
         conditions = self.conditions.all()
-        return " and ".join([
-            f"{condition.field_name} {condition.filter_type} {condition.values}"
-            for condition in conditions
-        ])
+        combined_query = ""
+        for index, condition in enumerate(conditions):
+            condition_query = f"{condition.field_name} {condition.filter_type} {condition.values}"
+            if index > 0:
+                # Добавляем оператор перед условием, начиная со второго условия
+                combined_query += f" {condition.operator} "
+            combined_query += condition_query
+        return combined_query
+
     combined_conditions.short_description = "Индикаторы"
+
     class Meta:
         verbose_name = "Общий фильтр"
         verbose_name_plural = "Общие фильтры"
@@ -133,12 +139,16 @@ class UnifiedFilterCondition(models.Model):
         ('like', 'Похож на (LIKE)'),
         ('not_like', 'Не содержит (NOT LIKE)'),
     ]
-
+    OPERATOR_CHOICES = [
+        ('AND', 'И'),
+        ('OR', 'ИЛИ'),
+    ]
     filter = models.ForeignKey(UnifiedFilter, on_delete=models.CASCADE, related_name="conditions",
                                verbose_name="Фильтр")
     field_name = models.CharField(max_length=100, verbose_name="Поле для фильтрации")
     filter_type = models.CharField(max_length=10, choices=FILTER_TYPES, verbose_name="Тип фильтра")
     values = models.TextField(verbose_name="Значения (через запятую)")
+    operator = models.CharField(max_length=3, choices=OPERATOR_CHOICES, default='AND', verbose_name="Оператор")
 
     class Meta:
         verbose_name = "Условие фильтра"
@@ -146,4 +156,3 @@ class UnifiedFilterCondition(models.Model):
 
     def __str__(self):
         return f"{self.field_name} ({self.filter_type}): {self.values}"
-

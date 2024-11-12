@@ -82,11 +82,11 @@ class GroupIndicatorsAdmin(admin.ModelAdmin):
 class UnifiedFilterConditionInline(admin.TabularInline):
     model = UnifiedFilterCondition
     extra = 1
-    fields = ['field_name', 'filter_type', 'values']
+    fields = ['operator', 'field_name', 'filter_type', 'values']
 
 
 @admin.register(UnifiedFilter)
 class UnifiedFilterAdmin(admin.ModelAdmin):
-    list_display = ('year', 'type', 'combined_conditions')  # Добавляем combined_conditions для отображения
+    list_display = ('year', 'type', 'combined_conditions')
     search_fields = ('year', 'type',)
     inlines = [UnifiedFilterConditionInline]

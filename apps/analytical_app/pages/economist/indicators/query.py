@@ -5,7 +5,7 @@ from apps.analytical_app.query_executor import engine
 
 def get_dynamic_conditions(year):
     query = text("""
-        SELECT type, field_name, filter_type, values 
+        SELECT type, field_name, filter_type, values, operator
         FROM plan_unifiedfilter uf
         JOIN plan_unifiedfiltercondition ufc ON uf.id = ufc.filter_id
         WHERE uf.year = :year
@@ -15,7 +15,8 @@ def get_dynamic_conditions(year):
 
     conditions = []
     for row in result:
-        type, field_name, filter_type, values = row
+        clause = ''
+        type, field_name, filter_type, values, operator = row
         if filter_type == 'in':
             clause = f"{field_name} IN ({values})"
         elif filter_type == 'exact':
@@ -24,7 +25,9 @@ def get_dynamic_conditions(year):
             clause = f"{field_name} LIKE '{values}'"
         elif filter_type == 'not_like':
             clause = f"{field_name} NOT LIKE '{values}'"
-        conditions.append((type, clause))
+
+        operator = operator or "AND"
+        conditions.append((type, clause, operator))
 
     return conditions
 
@@ -48,25 +51,30 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
 
     # Группируем условия по типу и объединяем их в один WHERE
     conditions_by_type = {}
-    for condition_type, where_clause in dynamic_conditions:
+    for condition_type, where_clause, operator in dynamic_conditions:
         if condition_type not in conditions_by_type:
             conditions_by_type[condition_type] = []
-        conditions_by_type[condition_type].append(where_clause)
+        # Добавляем условие вместе с оператором
+        conditions_by_type[condition_type].append((where_clause, operator))
 
-    # Создаем запрос для каждого типа, объединяя все условия через AND
+    # Создаем запросы с учетом операторов
+    union_queries = []
     for condition_type, conditions in conditions_by_type.items():
-        combined_where_clause = " AND ".join(conditions)
+        combined_where_clause = conditions[0][0]  # Начинаем с первого условия без оператора перед ним
+        for where_clause, operator in conditions[1:]:  # Применяем операторы начиная со второго условия
+            combined_where_clause += f" {operator} {where_clause}"
+
         union_query = f"""
-            SELECT '{condition_type}' AS type,
-                   COUNT(*) AS "К-во",
-                   ROUND(SUM(CAST(amount_numeric AS numeric(10, 2)))::numeric, 2) AS "Сумма"
-            FROM oms
-            WHERE {combined_where_clause}
-            GROUP BY type
-            """
+                SELECT '{condition_type}' AS type,
+                       COUNT(*) AS "К-во",
+                       ROUND(SUM(CAST(amount_numeric AS numeric(10, 2)))::numeric, 2) AS "Сумма"
+                FROM oms
+                WHERE {combined_where_clause}
+                GROUP BY type
+                """
         union_queries.append(union_query)
 
-    # Объединяем все запросы через UNION ALL
-    final_query = base + " UNION ALL ".join(union_queries)
+    # Объединяем основной запрос с динамическими условиями
+    final_query = f"{base} " + " UNION ALL ".join(union_queries)
 
     return final_query
