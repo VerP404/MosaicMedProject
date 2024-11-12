@@ -110,6 +110,14 @@ class UnifiedFilter(models.Model):
     year = models.IntegerField(verbose_name="Год")
     type = models.CharField(max_length=50, verbose_name="Тип")
 
+    def combined_conditions(self):
+        # Используем self.conditions.all() вместо unifiedfiltercondition_set
+        conditions = self.conditions.all()
+        return " and ".join([
+            f"{condition.field_name} {condition.filter_type} {condition.values}"
+            for condition in conditions
+        ])
+    combined_conditions.short_description = "Индикаторы"
     class Meta:
         verbose_name = "Общий фильтр"
         verbose_name_plural = "Общие фильтры"

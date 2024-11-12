@@ -104,7 +104,7 @@ econ_indicators = html.Div(
             style={"margin": "0 auto", "padding": "0rem"}
         ),
         dcc.Loading(id=f'loading-output-{type_page}', type='default'),
-        card_table(f'result-table1-{type_page}', "Индикаторные показатели", page_size=10),
+        card_table(f'result-table1-{type_page}', "Индикаторные показатели", page_size=25),
     ],
     style={"padding": "0rem"}
 )

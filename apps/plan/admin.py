@@ -87,6 +87,6 @@ class UnifiedFilterConditionInline(admin.TabularInline):
 
 @admin.register(UnifiedFilter)
 class UnifiedFilterAdmin(admin.ModelAdmin):
-    list_display = ('year', 'type',)
+    list_display = ('year', 'type', 'combined_conditions')  # Добавляем combined_conditions для отображения
     search_fields = ('year', 'type',)
     inlines = [UnifiedFilterConditionInline]
