@@ -371,17 +371,6 @@ def update_table(n_clicks, value_doctor, value_profile, selected_period, selecte
             start_date_treatment_formatted, end_date_treatment_formatted,
             status_list=selected_status_tuple
         )
-    )
-    print(        sql_query_indicators(
-            selected_year,
-            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
-            inogorodniy, sanction, amount_null,
-            building_ids, department_ids,
-            value_profile,
-            selected_doctor_ids,
-            start_date_input_formatted, end_date_input_formatted,
-            start_date_treatment_formatted, end_date_treatment_formatted,
-            status_list=selected_status_tuple
-        ))
 
+    )
     return columns1, data1, loading_output
