@@ -5,10 +5,11 @@ from apps.analytical_app.query_executor import engine
 
 def get_dynamic_conditions(year):
     query = text("""
-        SELECT type, field_name, filter_type, values, operator
+        SELECT type, field_name, filter_type, values, operator 
         FROM plan_unifiedfilter uf
         JOIN plan_unifiedfiltercondition ufc ON uf.id = ufc.filter_id
         WHERE uf.year = :year
+        ORDER BY ufc.id
     """)
     with engine.connect() as connection:
         result = connection.execute(query, {"year": year}).fetchall()
@@ -60,18 +61,20 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
     # Создаем запросы с учетом операторов
     union_queries = []
     for condition_type, conditions in conditions_by_type.items():
-        combined_where_clause = conditions[0][0]  # Начинаем с первого условия без оператора перед ним
-        for where_clause, operator in conditions[1:]:  # Применяем операторы начиная со второго условия
-            combined_where_clause += f" {operator} {where_clause}"
+        combined_where_clause = ""
+        for i, (where_clause, operator) in enumerate(conditions):
+            if i > 0:
+                combined_where_clause += f" {operator} "
+            combined_where_clause += where_clause
 
         union_query = f"""
-                SELECT '{condition_type}' AS type,
-                       COUNT(*) AS "К-во",
-                       ROUND(SUM(CAST(amount_numeric AS numeric(10, 2)))::numeric, 2) AS "Сумма"
-                FROM oms
-                WHERE {combined_where_clause}
-                GROUP BY type
-                """
+            SELECT '{condition_type}' AS type,
+                   COUNT(*) AS "К-во",
+                   ROUND(SUM(CAST(amount_numeric AS numeric(10, 2)))::numeric, 2) AS "Сумма"
+            FROM oms
+            WHERE {combined_where_clause}
+            GROUP BY type
+        """
         union_queries.append(union_query)
 
     # Объединяем основной запрос с динамическими условиями
