@@ -13,6 +13,8 @@ class MainSettings(models.Model):
     kauz_port = models.PositiveIntegerField(default='3050', verbose_name="КАУЗ: Порт")
     kauz_user = models.CharField(max_length=255, default='-', verbose_name="КАУЗ: Пользователь")
     kauz_password = models.CharField(max_length=255, default='-', verbose_name="КАУЗ: Пароль")
+    api_panel_patients_url = models.URLField(max_length=500, default='',
+                                             verbose_name="URL для обновления панели пациентов")
 
     def get_dash_url(self):
         return f"http://{self.dash_ip}:{self.dash_port}"

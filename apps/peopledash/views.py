@@ -1,13 +1,11 @@
 import pandas as pd
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
+from django.db.models import Sum
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 import io
 from .models import RegisteredPatients, TodayData, FourteenDaysData, Page, Building, Specialty, Organization
 from .forms import UploadDataForm
 from django.contrib import messages
-import datetime
 
 
 def index(request):
@@ -46,27 +44,52 @@ def dynamic_page(request, path):
 
 
 def dynamic_page_get_data(request, path):
-    # Проверка, что объект Page существует для данного path
+    # Получаем объект Page для заданного path
     page = get_object_or_404(Page, path=path)
-    # Извлечение данных из RegisteredPatients
-    data_from_db = RegisteredPatients.objects.filter(subdivision=page.subdivision)
+
+    # Извлекаем первую организацию
+    organization = Organization.objects.first()
+
+    # Получаем все Subdivision, связанные с Building, который указан на странице Page
+    subdivisions = page.building.subdivisions.values_list('name', flat=True)
+
+    # Фильтруем и группируем данные из RegisteredPatients по специальностям
+    data_from_db = (
+        RegisteredPatients.objects.filter(
+            organization=organization.name,
+            subdivision__in=subdivisions
+        )
+        .values('speciality')
+        .annotate(
+            total_slots_today=Sum('slots_today'),
+            total_free_slots_today=Sum('free_slots_today'),
+            total_slots_14_days=Sum('slots_14_days'),
+            total_free_slots_14_days=Sum('free_slots_14_days')
+        )
+    )
+
+    # Подготовка данных для JSON-ответа
     data = [
         {
-            'Наименование должности': row.speciality,
-            'Всего_1': row.slots_today,
-            'Слоты свободные для записи_1': row.free_slots_today,
-            'Слоты свободные для записи_14': row.free_slots_14_days,
+            'Наименование должности': item['speciality'],
+            'Всего_1': item['total_slots_today'],
+            'Слоты свободные для записи_1': item['total_free_slots_today'],
+            'Всего_14': item['total_slots_14_days'],
+            'Слоты свободные для записи_14': item['total_free_slots_14_days'],
         }
-        for row in data_from_db
+        for item in data_from_db
     ]
+
+
     # Возвращаем данные в формате JSON
     return JsonResponse(data, safe=False)
 
 
 def clean_and_validate_data(df):
-    organizations = list(Organization.objects.values_list('name', flat=True))
+    organizations = ['БУЗ ВО \"ВГКП № 3\"', 'БУЗ ВО \"ВГКП № 7\"', 'БУЗ ВО \"ВГКП № 18\"', 'БУЗ ВО \"ВГП № 16\"',
+                     'БУЗ ВО \"Павловская РБ\"', 'БУЗ ВО \"Новоусманская РБ\"', 'БУЗ ВО \"Рамонская РБ\"',
+                     'БУЗ ВО \"Бутурлиновская РБ\"']
     df = df[(df['Наименование МО'].isin(organizations)) & (df['Тип приёма'] == 'Первичный прием')]
-
     df = df.dropna(
         subset=['Всего', 'в т.ч. слоты для ЕПГУ (создано)', 'Слоты свободные для записи', 'в т.ч. свободные для ЕПГУ'])
 
@@ -119,83 +142,48 @@ def save_fourteen_days_data(df, report_dt):
 
 
 def process_transformer_files(report_dt):
-    specialties = list(Specialty.objects.values_list('name', flat=True))
-    organizations = list(Organization.objects.values_list('name', flat=True))
-    corpus_mapping = {}
-    for page in Page.objects.all():
-        filters = list(page.building.subdivisions.values_list('name', flat=True))
-        corpus_mapping[page.subdivision] = filters
+    # Очищаем таблицу RegisteredPatients перед обновлением
+    RegisteredPatients.objects.all().delete()
 
-    def filter_and_group(model):
-        result = []
-        records = model.objects.filter(
-            organization__in=organizations,
-            reception_type='Первичный прием',
-            speciality__in=specialties
+    # Добавляем данные из TodayData
+    for record in TodayData.objects.all():
+        RegisteredPatients.objects.create(
+            organization=record.organization,
+            subdivision=record.subdivision,
+            speciality=record.speciality,
+            slots_today=record.total_slots,
+            free_slots_today=record.free_slots,
+            slots_14_days=0,  # Изначально для данных "сегодня" поле на 14 дней будет пустым
+            free_slots_14_days=0,
+            report_datetime=report_dt.strftime('%H:%M %d.%m.%Y')
         )
-        for record in records:
-            for corpus, filters in corpus_mapping.items():
-                if record.subdivision in filters:
-                    result.append({
-                        'Обособленное подразделение': corpus,
-                        'Наименование должности': record.speciality,
-                        'Всего': record.total_slots,
-                        'Слоты свободные для записи': record.free_slots
-                    })
-        return result
 
-    def aggregate_data(data):
-        aggregated = {}
-        for item in data:
-            key = (item['Обособленное подразделение'], item['Наименование должности'])
-            if key not in aggregated:
-                aggregated[key] = {
-                    'Всего': 0,
-                    'Слоты свободные для записи': 0
-                }
-            aggregated[key]['Всего'] += item['Всего']
-            aggregated[key]['Слоты свободные для записи'] += item['Слоты свободные для записи']
-        return aggregated
+    # Обновляем данные из FourteenDaysData
+    for record in FourteenDaysData.objects.all():
+        # Пытаемся найти совпадение по organization, subdivision и speciality
+        existing_record = RegisteredPatients.objects.filter(
+            organization=record.organization,
+            subdivision=record.subdivision,
+            speciality=record.speciality
+        ).first()
 
-    def merge_data(gr_1, gr_14):
-        merged = {}
-        all_keys = set(gr_1.keys()).union(set(gr_14.keys()))
-        for key in all_keys:
-            merged[key] = {
-                'Всего_1': gr_1.get(key, {}).get('Всего', 0),
-                'Слоты свободные для записи_1': gr_1.get(key, {}).get('Слоты свободные для записи', 0),
-                'Всего_14': gr_14.get(key, {}).get('Всего', 0),
-                'Слоты свободные для записи_14': gr_14.get(key, {}).get('Слоты свободные для записи', 0),
-            }
-        return merged
-
-    def save_registered_patients_from_data(data, report_dt):
-        RegisteredPatients.objects.all().delete()
-        formatted_date = report_dt.strftime('%H:%M %d.%m.%Y')  # Форматируем дату
-        for key, values in data.items():
-            subdivision, speciality = key
+        if existing_record:
+            # Обновляем поля для данных на 14 дней в существующей записи
+            existing_record.slots_14_days = record.total_slots
+            existing_record.free_slots_14_days = record.free_slots
+            existing_record.save()
+        else:
+            # Если записи нет, добавляем новую
             RegisteredPatients.objects.create(
-                subdivision=subdivision,
-                speciality=speciality,
-                slots_today=values['Всего_1'],
-                free_slots_today=values['Слоты свободные для записи_1'],
-                slots_14_days=values['Всего_14'],
-                free_slots_14_days=values['Слоты свободные для записи_14'],
-                report_datetime=formatted_date  # Используем отформатированную дату
+                organization=record.organization,
+                subdivision=record.subdivision,
+                speciality=record.speciality,
+                slots_today=0,  # Для данных на 14 дней слоты на сегодня будут пустыми
+                free_slots_today=0,
+                slots_14_days=record.total_slots,
+                free_slots_14_days=record.free_slots,
+                report_datetime=report_dt.strftime('%H:%M %d.%m.%Y')
             )
-
-    gr_1 = filter_and_group(TodayData)
-    gr_14 = filter_and_group(FourteenDaysData)
-
-    aggregated_gr_1 = aggregate_data(gr_1)
-    aggregated_gr_14 = aggregate_data(gr_14)
-
-    merged_data = merge_data(aggregated_gr_1, aggregated_gr_14)
-
-    if merged_data:
-        save_registered_patients_from_data(merged_data, report_dt)
-    else:
-        print("Нет данных для сохранения.")
 
 
 def upload_data(request):
@@ -241,3 +229,23 @@ def upload_data(request):
         form = UploadDataForm()
 
     return render(request, 'peopledash/upload_data.html', {'form': form, 'organization': organization})
+
+
+def registered_patients_api(request):
+    # Получаем все данные из RegisteredPatients
+    data = RegisteredPatients.objects.values(
+        'organization',
+        'subdivision',
+        'speciality',
+        'slots_today',
+        'free_slots_today',
+        'slots_14_days',
+        'free_slots_14_days',
+        'report_datetime'
+    )
+
+    # Преобразуем данные в список
+    data_list = list(data)
+
+    # Возвращаем данные в формате JSON
+    return JsonResponse(data_list, safe=False)

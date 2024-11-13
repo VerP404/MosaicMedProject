@@ -44,10 +44,11 @@ class PageAdmin(admin.ModelAdmin):
 @admin.register(RegisteredPatients)
 class RegisteredPatientsAdmin(admin.ModelAdmin):
     list_display = (
-        'subdivision', 'speciality', 'slots_today', 'free_slots_today', 'slots_14_days', 'free_slots_14_days',
+        'subdivision', 'organization', 'speciality', 'slots_today', 'free_slots_today', 'slots_14_days', 'free_slots_14_days',
         'report_datetime'
     )
     search_fields = ('subdivision', 'speciality', 'report_datetime')
+    list_filter = ('organization',)
     verbose_name = "Зарегистрированный пациент"
     verbose_name_plural = "Зарегистрированные пациенты"
 
