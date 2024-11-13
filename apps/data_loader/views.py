@@ -185,3 +185,39 @@ def check_kauz_connection():
         return "Подключение доступно"
     except Exception as e:
         return f"Ошибка подключения: {e}"
+
+
+def get_table_row_counts(request):
+    """ Возвращает количество строк для каждой таблицы """
+    data_types = DataType.objects.all()
+    organization = MedicalOrganization.objects.first()
+    organization_name = organization.name if organization else "Не указано"
+    data = []
+
+    for data_type in data_types:
+        row_count = 0
+        if hasattr(data_type, 'dataloaderconfig') and data_type.dataloaderconfig.table_name:
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute(f'SELECT COUNT(*) FROM {data_type.dataloaderconfig.table_name}')
+                    row_count = cursor.fetchone()[0]
+            except Exception as e:
+                row_count = f"Ошибка: {str(e)}"
+
+        # Получение информации о последнем импорте
+        last_import = DataImport.objects.filter(data_type=data_type).order_by('-date_added').first()
+        last_import_date = last_import.date_added if last_import else None
+        last_import_message = last_import.message if last_import else "Сообщение отсутствует."
+
+        data.append({
+            'data_type': data_type.name,
+            'category': data_type.category.name if data_type.category else "Не указано",
+            'row_count': row_count,
+            'last_import_date': last_import_date,
+            'last_import_message': last_import_message
+        })
+
+    return JsonResponse({
+        'organization_name': organization_name,
+        'tables': data
+    })

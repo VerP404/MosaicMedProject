@@ -10,4 +10,6 @@ urlpatterns = [
     path('upload-file/<int:data_type_id>/', upload_file, name='upload_file'),
     path('refresh-message/<int:data_type_id>/', refresh_message, name='refresh_message'),
     path('refresh-data/', refresh_data, name='refresh_data'),
+    path('table-row-counts/', get_table_row_counts, name='get_table_row_counts'),  # Новый путь
+
 ]
