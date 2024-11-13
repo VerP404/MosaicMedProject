@@ -21,7 +21,7 @@ class Command(BaseCommand):
 
             # 1. Проверка доступности API
             try:
-                response = requests.get(api_url, timeout=10)
+                response = requests.get(api_url, timeout=10, proxies={"http": None, "https": None})
                 response.raise_for_status()
             except requests.RequestException as e:
                 self.stdout.write(self.style.ERROR(f"Ошибка при обращении к API: {e}"))
