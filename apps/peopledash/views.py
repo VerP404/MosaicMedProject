@@ -53,11 +53,14 @@ def dynamic_page_get_data(request, path):
     # Получаем все Subdivision, связанные с Building, который указан на странице Page
     subdivisions = page.building.subdivisions.values_list('name', flat=True)
 
+    specialties = Specialty.objects.values_list('name', flat=True)
+
     # Фильтруем и группируем данные из RegisteredPatients по специальностям
     data_from_db = (
         RegisteredPatients.objects.filter(
             organization=organization.name,
-            subdivision__in=subdivisions
+            subdivision__in=subdivisions,
+            speciality__in=specialties
         )
         .values('speciality')
         .annotate(
