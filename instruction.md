@@ -334,4 +334,7 @@ sudo apt install cron
 ``` 
 0 22 * * * /usr/bin/xvfb-run -a /home/drpay/code/MosaicMedProject/.venv/bin/python /home/drpay/code/MosaicMedProject/manage.py load_data_oms_chrome >> /home/drpay/code/MosaicMedProject/load_data_oms.log 2>&1
 ```
-
+Запуск каждый час скрипта для обновления данных панели пациентов
+```
+0 * * * * /home/user/code/MosaicMedProject/.venv/bin/python /home/user/code/MosaicMedProject/manage.py update_panel_patients
+```
