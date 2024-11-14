@@ -213,9 +213,9 @@ class DataLoaderConfig(models.Model):
     table_name = models.CharField(max_length=255, verbose_name="Имя таблицы")
     column_check = models.CharField(max_length=255, verbose_name="Столбец для проверки (после переименования)")
     columns_for_update = models.TextField(verbose_name="Столбцы для обновления", help_text="Перечислите через запятую")
-
     encoding = models.CharField(max_length=50, default='utf-8', verbose_name="Кодировка файла")
     delimiter = models.CharField(max_length=10, default=';', verbose_name="Разделитель")
+    clear_all_rows = models.BooleanField(default=False, verbose_name="Очистить всю таблицу при загрузке")
 
     def __str__(self):
         return f"Настройки для {self.data_type.name}"

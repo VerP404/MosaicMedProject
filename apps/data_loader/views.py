@@ -39,7 +39,8 @@ def upload_file(request, data_type_id):
                     column_check=loader_config.column_check,
                     columns_for_update=loader_config.get_columns_for_update(),
                     encoding=loader_config.encoding,
-                    sep=loader_config.delimiter
+                    sep=loader_config.delimiter,
+                    clear_all_rows=loader_config.clear_all_rows
                 )
                 loader.load_data(temp_file_path)  # Загружаем данные
 

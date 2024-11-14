@@ -14,6 +14,7 @@ urlpatterns = [
     path('sql_manager/', include('apps.sql_manager.urls')),
     path('peopledash/', include('apps.peopledash.urls')),
     path('plan/', include('apps.plan.urls')),
+    path('people/', include('apps.people.urls')),
 ]
 if settings.DEBUG:
     import debug_toolbar

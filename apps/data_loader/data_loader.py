@@ -40,7 +40,8 @@ class DataLoader:
                  sep=';',
                  dtype='str',
                  encoding='utf-8',
-                 filter_column=None
+                 filter_column=None,
+                 clear_all_rows=False
                  ):
         """
         Инициализация загрузчика данных.
@@ -73,6 +74,7 @@ class DataLoader:
         self.message = ''
         self.import_record_id = None
         self.filter_column = filter_column
+        self.clear_all_rows = clear_all_rows
 
     def _create_initial_data_import_record(self, csv_file):
         """
@@ -314,40 +316,48 @@ class DataLoader:
     @time_it("Удаление строк в БД для обновления записей")
     def _delete_existing_rows(self, df):
         """Удаляет строки из базы данных порциями, чтобы избежать переполнения параметров."""
-        total_deleted = 0  # Счетчик удаленных строк
+        if self.clear_all_rows:
+            # Очистка всей таблицы
+            delete_query = text(f"DELETE FROM {self.table_name}")
+            with self.engine.begin() as connection:
+                result = connection.execute(delete_query)
+                total_deleted = result.rowcount
+            self.message += f"Все строки удалены: {total_deleted}.\n"
+        else:
+            total_deleted = 0  # Счетчик удаленных строк
 
-        try:
-            for column in self.columns_for_update:
-                df[column] = df[column].astype(str)
+            try:
+                for column in self.columns_for_update:
+                    df[column] = df[column].astype(str)
 
-            keys_in_df = df[self.columns_for_update].drop_duplicates()
+                keys_in_df = df[self.columns_for_update].drop_duplicates()
 
-            # Разделяем данные на чанки по 500 строк, чтобы не превышать лимит параметров
-            chunk_size = 500
-            chunks = [keys_in_df[i:i + chunk_size] for i in range(0, len(keys_in_df), chunk_size)]
+                # Разделяем данные на чанки по 500 строк, чтобы не превышать лимит параметров
+                chunk_size = 500
+                chunks = [keys_in_df[i:i + chunk_size] for i in range(0, len(keys_in_df), chunk_size)]
 
-            for chunk in chunks:
-                conditions = []
-                params = {}
-                for idx, row in chunk.iterrows():
-                    condition = ' AND '.join([f"{col} = :{col}_{idx}" for col in self.columns_for_update])
-                    conditions.append(f"({condition})")
+                for chunk in chunks:
+                    conditions = []
+                    params = {}
+                    for idx, row in chunk.iterrows():
+                        condition = ' AND '.join([f"{col} = :{col}_{idx}" for col in self.columns_for_update])
+                        conditions.append(f"({condition})")
 
-                    for col in self.columns_for_update:
-                        params[f"{col}_{idx}"] = row[col]
+                        for col in self.columns_for_update:
+                            params[f"{col}_{idx}"] = row[col]
 
-                condition_str = ' OR '.join(conditions)
+                    condition_str = ' OR '.join(conditions)
 
-                if condition_str:
-                    delete_query = text(f"DELETE FROM {self.table_name} WHERE {condition_str}")
-                    with self.engine.begin() as connection:
-                        result = connection.execute(delete_query, params)
-                        total_deleted += result.rowcount  # Увеличиваем счетчик удаленных строк
+                    if condition_str:
+                        delete_query = text(f"DELETE FROM {self.table_name} WHERE {condition_str}")
+                        with self.engine.begin() as connection:
+                            result = connection.execute(delete_query, params)
+                            total_deleted += result.rowcount  # Увеличиваем счетчик удаленных строк
 
-            self.message += f" Всего удалено строк: {total_deleted}.\n"
+                self.message += f" Всего удалено строк: {total_deleted}.\n"
 
-        except Exception as e:
-            self.message += f" Ошибка при удалении существующих строк: {e}\n"
+            except Exception as e:
+                self.message += f" Ошибка при удалении существующих строк: {e}\n"
 
     @time_it("Загрузка данных в БД")
     def _load_data_to_db(self, df):
