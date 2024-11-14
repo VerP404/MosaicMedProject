@@ -7,7 +7,7 @@ rem Добавление пути к модулю dash_apps в PYTHONPATH
 set "PYTHONPATH=%PYTHONPATH%;C:\MosaicMedProject\"
 
 rem Запуск Django-команды
-python "C:\MosaicMedProject\manage.py load_data_oms"
+python "C:\MosaicMedProject\manage.py load_data_oms_chrome"
 
 rem Деактивация виртуального окружения
 python "C:\MosaicMedProject\manage.py" load_data_oms
