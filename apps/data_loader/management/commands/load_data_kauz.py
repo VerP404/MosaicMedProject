@@ -104,7 +104,8 @@ class Command(BaseCommand):
                 column_check=config.column_check,
                 columns_for_update=config.get_columns_for_update(),
                 encoding=config.encoding,
-                sep=config.delimiter
+                sep=config.delimiter,
+                filter_column='treatment_end'
             )
             data_loader.load_data_from_db(df)  # Используем метод для загрузки из DataFrame
             self.stdout.write(self.style.SUCCESS('Загрузка данных из Firebird успешно завершена'))

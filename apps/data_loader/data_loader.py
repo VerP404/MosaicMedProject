@@ -39,7 +39,8 @@ class DataLoader:
                  file_format='csv',
                  sep=';',
                  dtype='str',
-                 encoding='utf-8'
+                 encoding='utf-8',
+                 filter_column=None
                  ):
         """
         Инициализация загрузчика данных.
@@ -71,6 +72,7 @@ class DataLoader:
         self.error_count = 0
         self.message = ''
         self.import_record_id = None
+        self.filter_column = filter_column
 
     def _create_initial_data_import_record(self, csv_file):
         """
@@ -296,6 +298,10 @@ class DataLoader:
 
         # Убираем ` из датафрейма при наличии
         df = df.replace('`', '', regex=True)
+
+        # Если указан столбец для фильтрации, удаляем строки с значением '-'
+        if self.filter_column and self.filter_column in df.columns:
+            df = df[df[self.filter_column] != "-"]
 
         # Удаляем неразрывные пробелы (NBSP) и заменяем их на обычные пробелы
         df.replace('\u00A0', ' ', regex=True, inplace=True)
