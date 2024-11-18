@@ -16,7 +16,7 @@ content = dbc.Container(
             [
                 dbc.Col(create_card("Карточка 3", "Контент карточки 3", "card3"), width=4),
                 dbc.Col(create_card("Карточка 4", "Контент карточки 4", "card4"), width=4),
-                dbc.Col(create_card("Карточка с таблицей", report_months, "card5"), width=4),
+                dbc.Col(create_card("ОМС: суммы помесячно", report_months, "card5"), width=4),
 
             ]
         ),
