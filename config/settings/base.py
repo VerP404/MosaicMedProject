@@ -29,9 +29,11 @@ INSTALLED_APPS = [
     'apps.peopledash',
     'apps.people',
     'apps.plan',
+    'apps.api',
 
     'import_export',
     'channels',
+    'rest_framework',
 
 ]
 

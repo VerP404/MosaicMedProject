@@ -1,19 +1,41 @@
-# # MosaicDashboard/components/cards/cards_utils.py
 import dash_bootstrap_components as dbc
+from dash import html
+from apps.chief_app.settings import COLORS
 
 
-# Создание карт в дашборде
-def create_card(title, card, card_id):
+def create_card(title, content, card_id):
+    """
+    Универсальная функция создания карточки.
+    Контент карточки передаётся через аргумент `content` и может быть любым компонентом Dash.
+    """
     return dbc.Card(
-        id=card_id,
-        children=[
-            dbc.CardHeader(title, className="card-header"),
+        [
+            dbc.CardHeader(
+                html.Div(
+                    [
+                        html.Span(title, style={"color": COLORS["text"]}),
+                        html.Button(
+                            html.I(className="bi bi-arrow-clockwise"),
+                            id=f"update-btn-{card_id}",
+                            className="btn btn-link btn-sm",
+                            style={"float": "right", "color": COLORS["accent_blue"], "padding": "0px"},
+                        ),
+                    ],
+                    style={"display": "flex", "justifyContent": "space-between"},
+                ),
+                style={"backgroundColor": COLORS["card_background"]},
+            ),
             dbc.CardBody(
-                [
-                    card
-                ],
-                className="card-content",
+                html.Div(
+                    content,  # Контент карточки
+                    style={"overflowY": "auto", "height": "200px", "color": COLORS["text"]},
+                )
             ),
         ],
-        className="mb-4"
+        style={
+            "backgroundColor": COLORS["card_background"],
+            "borderRadius": "10px",
+            "boxShadow": "0 4px 6px rgba(0, 0, 0, 0.1)",
+        },
+        className="mb-4 shadow-sm",
     )

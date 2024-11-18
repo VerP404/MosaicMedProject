@@ -14,8 +14,7 @@ app = dash.Dash(__name__,
                 update_title=None,
                 suppress_callback_exceptions=True,
                 external_stylesheets=[dbc.themes.BOOTSTRAP,
-                                      'assets/css/styles.css',
-                                      'assets/css/card.css',
+                                      "https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css"
                                       ])
 
 app.server.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000

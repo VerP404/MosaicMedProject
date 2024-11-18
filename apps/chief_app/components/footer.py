@@ -1,30 +1,20 @@
-# MosaicDashboard/components/footer.py
 from datetime import datetime
 from dash import html
-from apps.chief_app import main_color, name_mo, site_mo
+import dash_bootstrap_components as dbc
+from apps.chief_app.settings import COLORS
 
-# Определяем стиль футера
-footer_style = {
-    'position': 'fixed',
-    'bottom': 0,
-    'margin': 0,
-    'height': '30px',
-    'width': '100%',
-    'background-color': main_color,
-    'color': 'white',
-    'text-align': 'center',
-    'display': 'flex',
-    'justify-content': 'space-between',
-}
-
-# Определяем футер
-footer = html.Footer(children=[
-    html.P(html.A("МозаикаМед", style={'text-decoration': 'none', 'color': 'white'}),
-           style={'margin-left': '8%'}),
-    html.P(id='open-modal', children=f"© МозаикаМед - Родионов ДН 2023—{datetime.now().year}"),
-    html.P(html.A(name_mo, style={'text-decoration': 'none', 'color': 'white'}),
-           style={'margin-right': '8%'}),
-], style=footer_style)
-
-
-
+footer = dbc.Container(
+    dbc.Row(
+        dbc.Col(
+            html.Div(
+                [
+                    html.Span(f"© МозаикаМед. 2023-{datetime.now().year}", style={"color": COLORS["text"]}),
+                ],
+                style={"textAlign": "center", "width": "100%"}
+            )
+        ),
+        style={"backgroundColor": COLORS["header_footer"], "color": COLORS["text"], "textAlign": "center"},
+        className="fixed-bottom"
+    ),
+    fluid=True,
+)

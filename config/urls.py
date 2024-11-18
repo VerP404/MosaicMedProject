@@ -15,6 +15,7 @@ urlpatterns = [
     path('peopledash/', include('apps.peopledash.urls')),
     path('plan/', include('apps.plan.urls')),
     path('people/', include('apps.people.urls')),
+    path('api/', include('apps.api.urls')),
 ]
 if settings.DEBUG:
     import debug_toolbar

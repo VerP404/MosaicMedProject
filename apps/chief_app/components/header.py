@@ -1,30 +1,49 @@
-from dash import html, dcc
+from dash import html
 import dash_bootstrap_components as dbc
+from apps.chief_app.settings import COLORS
 
-from apps.chief_app import main_color
-
-# Определяем заголовок с логотипом и временем
-header = dbc.Row(
-    [
-        dbc.Col(html.Img(src='assets/img/logo.png', height='100px', style={"margin-top": "10px", "margin-left": "10px"})),
-        dbc.Col(
-            html.Div([
-                html.H2("БУЗ ВО ВГП №3", className="text-center text-white", style={"margin-bottom": "0"}),
-                html.H4("Дашборд главного врача", className="text-center text-white", style={"margin-top": "0"})
-            ]),
-            width=8
-        ),
-        dbc.Col(html.Div(id='live-time', className="text-center text-white"), width=2)
-    ],
-    align="center",
-    style={"backgroundColor": main_color, "margin": "0", "padding": "0"}
-)
-
-# Добавляем компонент для обновления времени
-header.children.append(
-    dcc.Interval(
-        id='interval-component',
-        interval=1 * 60000,  # обновление каждую минуту
-        n_intervals=0
-    )
+header = dbc.Container(
+    dbc.Row(
+        [
+            # Логотип слева
+            dbc.Col(
+                html.Div("Логотип", style={"color": COLORS["text"]}),
+                width=2,
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "flex-start",
+                }
+            ),
+            # Заголовок по центру
+            dbc.Col(
+                html.Div("БУЗ ВО ВГКП №3 - Панель главного врача",
+                         style={"color": COLORS["text"], "fontWeight": "bold"}),
+                width=8,
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center"
+                }
+            ),
+            # Время справа
+            dbc.Col(
+                html.Div(id="current-date-output", style={"color": COLORS["text"]}),
+                width=2,
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "flex-end"
+                }
+            ),
+        ],
+        align="center",  # Выравнивание по вертикали
+        className="g-0",  # Убираем горизонтальные отступы
+    ),
+    style={
+        "backgroundColor": COLORS["header_footer"],
+        "padding": "10px",
+    },
+    className="fixed-top shadow-sm",
+    fluid=True
 )
