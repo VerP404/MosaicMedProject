@@ -1,6 +1,5 @@
 # apps/analytical_app/app.py
 import dash
-import dash_bootstrap_components as dbc
 import os
 
 # Получаем абсолютный путь к текущей директории
@@ -16,6 +15,6 @@ app = dash.Dash(__name__,
                 )
 
 app.server.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
-app.title = 'МозаикаМед-Аналитика'
+app.title = 'МозаикаМед: Аналитика'
 
 server = app.server

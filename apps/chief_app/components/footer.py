@@ -1,7 +1,7 @@
+# MosaicDashboard/components/footer.py
 from datetime import datetime
 from dash import html
-
-from apps.chief_app import main_color, name_mo
+from apps.chief_app import main_color, name_mo, site_mo
 
 # Определяем стиль футера
 footer_style = {

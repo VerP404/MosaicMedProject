@@ -16,5 +16,6 @@ def generate_table(dataframe, max_rows=10):
                     for col in dataframe.columns
                 ]) for i in range(min(len(dataframe), max_rows))
             ])
-        ]
+        ],
+        style={'overflow': 'auto'}
     )

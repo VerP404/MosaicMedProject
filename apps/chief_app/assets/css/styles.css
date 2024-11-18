@@ -1,0 +1,33 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.card-content {
+    height: 100%;
+    overflow: auto;
+}
+
+.card-body {
+    font-size: 0.8vw;
+}
+
+@media (max-width: 1200px) {
+    .card-body {
+        font-size: 2vw;
+    }
+}
+
+@media (max-width: 992px) {
+    .card-body {
+        font-size: 2.5vw;
+    }
+}
+
+@media (max-width: 768px) {
+    .card-body {
+        font-size: 3vw;
+    }
+}

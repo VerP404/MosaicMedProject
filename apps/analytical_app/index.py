@@ -2,7 +2,6 @@
 import sys
 import os
 
-
 # Получаем путь к корневой директории проекта
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -40,23 +39,3 @@ app.layout = html.Div(
 register_routes(app)
 if __name__ == "__main__":
     app.run_server(debug=DEBUG_DASH, host='0.0.0.0', port=PORT_DASH)
-
-# MosaicMedProject/
-# └──apps/
-#    └── analytical_app/
-#        └── components/
-#            ├── footer.py
-#            ├── navbar.py
-#            └── sidebar.py
-#        └── assets/
-#            ├── css/
-#            │   ├── styles.css
-#            │   └── bootstrap_icons.css
-#            ├── js/
-#            │   └── custom.js
-#            ├── images/
-#            │   └── logo.png
-#            └── other_assets/
-#                └── ...
-#        ├── app.py
-#        └── index.py

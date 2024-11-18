@@ -6,8 +6,7 @@ from apps.chief_app import main_color
 # Определяем заголовок с логотипом и временем
 header = dbc.Row(
     [
-        dbc.Col(
-            html.Img(src='assets/img/logo.png', height='100px', style={"margin-top": "10px", "margin-left": "10px"})),
+        dbc.Col(html.Img(src='assets/img/logo.png', height='100px', style={"margin-top": "10px", "margin-left": "10px"})),
         dbc.Col(
             html.Div([
                 html.H2("БУЗ ВО ВГП №3", className="text-center text-white", style={"margin-bottom": "0"}),
