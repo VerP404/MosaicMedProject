@@ -1,8 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from apps.data_loader.models.iszl import ISZLSettings
 from apps.data_loader.models.oms_data import OMSSettings, DataType, DataLoaderConfig
-from apps.data_loader.selenium.iszl_people import selenium_iszl_people
 from apps.data_loader.selenium.iszl_people_chrome import selenium_iszl_people_chrome
 from apps.data_loader.selenium.oms import selenium_oms
 from apps.data_loader.data_loader import DataLoader, engine
@@ -15,24 +13,30 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         # Получаем настройки для авторизации
         try:
-            settings = ISZLSettings.objects.first()
-            username = settings.user_people
-            password = settings.password_people
+            settings = OMSSettings.objects.first()
+            username = settings.username
+            password = settings.password
         except OMSSettings.DoesNotExist:
-            self.stdout.write(self.style.ERROR('Настройки ISZLSettings не найдены'))
+            self.stdout.write(self.style.ERROR('Настройки OMSSettings не найдены'))
             return
+        # Получаем конфигурацию для типа данных OMS
         try:
-            data_type = DataType.objects.get(name="people")
+            data_type = DataType.objects.get(name="OMS")
             config = DataLoaderConfig.objects.get(data_type=data_type)
         except DataType.DoesNotExist:
-            self.stdout.write(self.style.ERROR('Тип данных people не найден'))
+            self.stdout.write(self.style.ERROR('Тип данных OMS не найден'))
             return
         except DataLoaderConfig.DoesNotExist:
-            self.stdout.write(self.style.ERROR('Конфигурация для типа данных people не найдена'))
+            self.stdout.write(self.style.ERROR('Конфигурация для типа данных OMS не найдена'))
             return
+        # Устанавливаем даты
+        today = datetime.now()
+        start_date = (today - timedelta(days=1)).strftime('%d-%m-%y')  # Вчерашняя дата в формате дд-мм-гг
+        end_date = (today - timedelta(days=1)).strftime('%d-%m-%y')  # Вчерашняя дата в формате дд-мм-гг
+        start_date_treatment = f'01-01-{today.strftime("%y")}'  # 1 января текущего года в формате дд-мм-гг
 
         # Запускаем Selenium для скачивания CSV файла
-        success, file_path = selenium_iszl_people(username, password)
+        success, file_path = selenium_iszl_people_chrome(username, password)
 
         if not success:
             self.stdout.write(self.style.ERROR('Ошибка при загрузке файла через Selenium'))

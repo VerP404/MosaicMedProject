@@ -2,8 +2,10 @@ from django.db import models
 
 
 class ISZLSettings(models.Model):
-    username = models.CharField(max_length=255)
-    password = models.CharField(max_length=255)
+    username = models.CharField(max_length=255, verbose_name="Пользователь ИСЗЛ")
+    password = models.CharField(max_length=255, verbose_name="Пароль ИСЗЛ")
+    user_people = models.CharField(max_length=255, default='-', verbose_name="Пользователь ИСЗЛ:Население")
+    password_people = models.CharField(max_length=255, default='-', verbose_name="Пароль ИСЗЛ:Население")
 
     def __str__(self):
         return self.username
