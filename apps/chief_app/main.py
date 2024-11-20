@@ -2,6 +2,8 @@
 import os
 import sys
 
+from config.settings import DEBUG_DASH, PORT_DASH_CHIEF
+
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(BASE_DIR)
 
@@ -55,4 +57,4 @@ def update_card3(n_clicks):
 
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run_server(debug=DEBUG_DASH, host='0.0.0.0', port=PORT_DASH_CHIEF)

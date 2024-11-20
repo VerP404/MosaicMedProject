@@ -199,7 +199,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                       LEFT JOIN public.personnel_profile profile ON profile.id = pd.profile_id
                       LEFT JOIN public.personnel_person person ON person.id = pd.person_id
      ),
-            oms as (select *
+            oms as е(select *
                     from oms_data
                      WHERE report_year = '{year}' 
                            AND report_month_number IN ({months})

@@ -6,8 +6,10 @@ header = dbc.Container(
     dbc.Row(
         [
             # Логотип слева
-            dbc.Col(
-                html.Div("Логотип", style={"color": COLORS["text"]}),
+            dbc.Col([
+                html.Img(src="/assets/img/plotly-logomark.png", height="30px"),
+                html.Div("МозаикаМед", style={"color": COLORS["text"]}),
+            ],
                 width=2,
                 style={
                     "display": "flex",
