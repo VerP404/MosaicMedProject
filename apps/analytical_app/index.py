@@ -1,15 +1,10 @@
-# apps/analytical_app/index.py
 import sys
 import os
 
-# Получаем путь к корневой директории проекта
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-# Добавляем корневую директорию проекта в PYTHONPATH
 sys.path.append(BASE_DIR)
 
-from config.settings import DEBUG_DASH
-from config.settings import PORT_DASH
+from config.settings import DEBUG_DASH, PORT_DASH
 
 from dash import dcc, html
 from apps.analytical_app.app import app

@@ -1,11 +1,10 @@
-# Получаем путь к корневой директории проекта
 import os
 import sys
 
-from config.settings import DEBUG_DASH, PORT_DASH_CHIEF
-
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(BASE_DIR)
+
+from config.settings import DEBUG_DASH, PORT_DASH_CHIEF
 
 from dash import html, Input, Output, dcc
 from apps.chief_app.app import app
