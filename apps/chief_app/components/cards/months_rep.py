@@ -5,6 +5,7 @@ import pandas as pd
 import locale
 
 from apps.chief_app.app import app
+from apps.chief_app.query_executor import execute_query
 from apps.chief_app.settings import COLORS
 
 try:
@@ -12,73 +13,165 @@ try:
 except locale.Error:
     locale.setlocale(locale.LC_ALL, "")
 
+def get_api_url(selected_year):
+    query = "SELECT main_app_ip, main_app_port FROM home_mainsettings LIMIT 1"
+    result = execute_query(query)
+    if result:
+        ip, port = result[0]
+        return f"http://{ip}:{port}/api/base_query/?year={selected_year}&months=0"
+    return "#"
 
 # Функция для получения данных через API
-def fetch_api_data():
-    url = "http://127.0.0.1:8000/api/base_query/?year=2024&months=0"
+def fetch_api_data(selected_year):
+    url = get_api_url(selected_year)
     try:
         response = requests.get(url)
         if response.status_code == 200:
             return response.json()
         else:
-            return []  # Возвращаем пустой список, если API недоступен
+            print(f"Ошибка: API вернул код {response.status_code}")
+            return []
     except Exception as e:
         print(f"Ошибка при вызове API: {e}")
         return []
 
+ROWS_PER_PAGE = 3
 
-table_data = fetch_api_data()
-
-# Преобразование в DataFrame
-df = pd.DataFrame(table_data)
-
-# Переименование столбцов
-df.rename(
-    columns={
-        "report_month_number": "Месяц",
-        "Количество пациентов": "Талоны",
-        "Сумма": "Сумма",
-    },
-    inplace=True,
-)
-# Вычисление итоговых значений
-total_sum = locale.format_string("%.2f", df["Сумма"].sum(), grouping=True)
-# Форматирование суммы по разрядам
-df["Сумма"] = df["Сумма"].apply(lambda x: locale.format_string("%.2f", x, grouping=True))
-
-# Количество строк на странице
-ROWS_PER_PAGE = 4
-
-# Генерация компонента DataTable
 report_months = dbc.Container(
     [
-        html.Div(
-            [
-                html.P(f"Сумма нарастающе: {total_sum}", style={"color": COLORS["text"]}),
+        # Новая таблица для отображения сводной информации
+        dash_table.DataTable(
+            id="summary-table",
+            columns=[
+                {"name": "Отчетный месяц", "id": "Отчетный месяц"},
+                {"name": "Среднемесячно", "id": "Среднемесячно"},
+                {"name": "Нарастающе", "id": "Нарастающе"},
             ],
-            style={"marginTop": "10px", "textAlign": "center"},
+            data=[],
+            style_header={
+                "backgroundColor": COLORS["card_background"],
+                "color": COLORS["text"],
+                "border": "none",  # Убираем границы в заголовке
+            },
+            style_cell={
+                "backgroundColor": COLORS["card_background"],
+                "color": COLORS["text"],
+                "textAlign": "center",
+                "border": "none",  # Убираем границы ячеек
+            },
+            style_table={
+                "overflowX": "auto",
+                "border": "none",  # Убираем границы всей таблицы
+            },
+            style_as_list_view=True,
         ),
         dash_table.DataTable(
             id="table-card5",
-            columns=[{"name": col, "id": col} for col in df.columns],
-            data=df[:ROWS_PER_PAGE].to_dict("records"),  # Отображение первых строк
-            style_header={"backgroundColor": COLORS["card_background"], "color": COLORS["text"]},
-            style_cell={"backgroundColor": COLORS["card_background"], "color": COLORS["text"], "textAlign": "center"},
-            style_table={"overflowX": "auto"},
+            columns=[],
+            data=[],
+            style_header={
+                "backgroundColor": COLORS["card_background"],
+                "color": COLORS["text"],
+            },
+            style_cell={
+                "backgroundColor": COLORS["card_background"],
+                "color": COLORS["text"],
+                "textAlign": "center",
+            },
+            style_table={
+                "overflowX": "auto",
+            },
+            style_data_conditional=[],
+            style_as_list_view=True,
         ),
-        dcc.Interval(id="page-interval", interval=5000, n_intervals=0),  # Интервал для переключения страниц
-
+        dcc.Interval(
+            id="page-interval", interval=5000, n_intervals=0
+        ),
+        dcc.Store(id="table-data", data=[]),
     ]
 )
 
-
-# Callback для переключения страниц
 @app.callback(
-    Output("table-card5", "data"),
-    Input("page-interval", "n_intervals"),
+    [
+        Output("summary-table", "data"),
+        Output("table-card5", "columns"),
+        Output("table-data", "data"),
+    ],
+    Input("selected-year-store", "data"),
 )
-def update_table_data(n_intervals):
+def update_data(selected_year):
+    table_data = fetch_api_data(selected_year)
+    df = pd.DataFrame(table_data)
+
+    if df.empty:
+        return [], [], []
+
+    # Переименование столбцов
+    df.rename(
+        columns={
+            "report_month_number": "Месяц",
+            "Количество пациентов": "Талоны",
+            "Сумма": "Сумма",
+        },
+        inplace=True,
+    )
+
+    # Преобразование данных без форматирования для таблицы
+    df["Сумма"] = df["Сумма"].astype(float)
+
+    # Расчёты для отображения в summary-table
+    total_sum = locale.format_string("%.2f", float(df["Сумма"].sum()), grouping=True)
+    average_sum = locale.format_string("%.2f", float(df["Сумма"].mean()), grouping=True)
+    last_month_value = df.loc[df["Месяц"].idxmax(), "Сумма"]
+    last_month_sum = locale.format_string("%.2f", float(last_month_value), grouping=True)
+
+    # Данные для summary-table
+    summary_data = [
+        {
+            "Отчетный месяц": last_month_sum,
+            "Среднемесячно": average_sum,
+            "Нарастающе": total_sum,
+        }
+    ]
+
+    # Колонки основной таблицы
+    columns = [{"name": col, "id": col} for col in df.columns]
+
+    return summary_data, columns, df.to_dict("records")
+
+@app.callback(
+    [
+        Output("table-card5", "data"),
+        Output("table-card5", "style_data_conditional"),
+    ],
+    [Input("page-interval", "n_intervals")],
+    [Input("table-data", "data")],
+)
+def update_table_page(n_intervals, table_data):
+    df = pd.DataFrame(table_data)
+    if df.empty:
+        return [], []
+
     current_page = (n_intervals % ((len(df) + ROWS_PER_PAGE - 1) // ROWS_PER_PAGE))
     start_index = current_page * ROWS_PER_PAGE
     end_index = start_index + ROWS_PER_PAGE
-    return df[start_index:end_index].to_dict("records")
+    page_data = df[start_index:end_index].to_dict("records")
+
+    # Вычисление среднего
+    avg_value = df["Сумма"].mean()
+
+    # Условия форматирования
+    style_data_conditional = [
+        {
+            "if": {"filter_query": f"{{Сумма}} > {avg_value}"},
+            "color": "green",
+            "fontWeight": "bold",
+        },
+        {
+            "if": {"filter_query": f"{{Сумма}} < {avg_value}"},
+            "color": "red",
+            "fontWeight": "bold",
+        },
+    ]
+
+    return page_data, style_data_conditional

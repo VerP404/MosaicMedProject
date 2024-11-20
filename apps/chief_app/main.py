@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import datetime
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(BASE_DIR)
@@ -16,6 +17,7 @@ from apps.chief_app.settings import COLORS
 app.layout = html.Div(
     [
         dcc.Location(id="url"),
+        dcc.Store(id="selected-year-store", data=datetime.now().year),
         header,
         content,
         footer,

@@ -18,7 +18,7 @@ def create_card(title, content, card_id):
                             html.I(className="bi bi-arrow-clockwise"),
                             id=f"update-btn-{card_id}",
                             className="btn btn-link btn-sm",
-                            style={"float": "right", "color": COLORS["accent_blue"], "padding": "0px"},
+                            style={"float": "right", "color": COLORS["accent_blue"], "padding": "1px"},
                         ),
                     ],
                     style={"display": "flex", "justifyContent": "space-between"},
