@@ -86,7 +86,7 @@ report_months = dbc.Container(
             style_as_list_view=True,
         ),
         dcc.Interval(
-            id="page-interval", interval=5000, n_intervals=0
+            id="page-interval", interval=15000, n_intervals=0
         ),
         dcc.Store(id="table-data", data=[]),
     ]
