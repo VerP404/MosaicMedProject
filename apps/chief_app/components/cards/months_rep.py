@@ -24,6 +24,7 @@ def get_api_url(selected_year):
 # Функция для получения данных через API
 def fetch_api_data(selected_year):
     url = get_api_url(selected_year)
+    print(url)
     try:
         response = requests.get(url)
         if response.status_code == 200:
