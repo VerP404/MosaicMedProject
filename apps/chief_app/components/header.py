@@ -1,6 +1,17 @@
 from dash import html
 import dash_bootstrap_components as dbc
+
+from apps.chief_app.query_executor import execute_query
 from apps.chief_app.settings import COLORS
+
+
+def get_organization_name():
+    query = "SELECT name FROM organization_medicalorganization LIMIT 1"
+    result = execute_query(query)
+    if result:
+        return result[0][0]
+    return "Организация не указана"
+
 
 header = dbc.Container(
     dbc.Row(
@@ -19,7 +30,7 @@ header = dbc.Container(
             ),
             # Заголовок по центру
             dbc.Col(
-                html.Div("БУЗ ВО ВГКП №3 - Панель главного врача",
+                html.Div(f"{get_organization_name()} - Панель главного врача",
                          style={"color": COLORS["text"], "fontWeight": "bold"}),
                 width=8,
                 style={

@@ -2,17 +2,34 @@ from datetime import datetime
 from dash import html, Input, Output, ctx, ALL
 import dash_bootstrap_components as dbc
 from apps.chief_app.app import app
+from apps.chief_app.query_executor import execute_query
 from apps.chief_app.settings import COLORS
 
 # Генерация списка годов
 current_year = datetime.now().year
 years = list(range(2023, current_year + 1))
 
+
+def get_main_app_url():
+    query = "SELECT main_app_ip, main_app_port FROM home_mainsettings LIMIT 1"
+    result = execute_query(query)
+    if result:
+        ip, port = result[0]
+        return f"http://{ip}:{port}"
+    return "#"
+
+
 # Футер
 footer = dbc.Container(
     dbc.Row(
         [
-            dbc.Col(width=2),
+            dbc.Col(
+                dbc.NavLink(
+                    html.Span("Главное меню", className="ms-2", id="main-menu-label"),
+                    href=get_main_app_url(),  # Функция возвращает URL
+                ),
+                width=2
+            ),
             # Центрированный текст
             dbc.Col(
                 html.Div(
