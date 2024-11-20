@@ -13,6 +13,7 @@ try:
 except locale.Error:
     locale.setlocale(locale.LC_ALL, "")
 
+
 def get_api_url(selected_year):
     query = "SELECT main_app_ip, main_app_port FROM home_mainsettings LIMIT 1"
     result = execute_query(query)
@@ -21,12 +22,13 @@ def get_api_url(selected_year):
         return f"http://{ip}:{port}/api/base_query/?year={selected_year}&months=0"
     return "#"
 
+
 # Функция для получения данных через API
 def fetch_api_data(selected_year):
     url = get_api_url(selected_year)
-    print(url)
     try:
-        response = requests.get(url)
+        # Отключаем использование прокси
+        response = requests.get(url, proxies={"http": None, "https": None})
         if response.status_code == 200:
             return response.json()
         else:
@@ -35,6 +37,7 @@ def fetch_api_data(selected_year):
     except Exception as e:
         print(f"Ошибка при вызове API: {e}")
         return []
+
 
 ROWS_PER_PAGE = 3
 
@@ -52,17 +55,17 @@ report_months = dbc.Container(
             style_header={
                 "backgroundColor": COLORS["card_background"],
                 "color": COLORS["text"],
-                "border": "none",  # Убираем границы в заголовке
+                "border": "none",
             },
             style_cell={
                 "backgroundColor": COLORS["card_background"],
                 "color": COLORS["text"],
                 "textAlign": "center",
-                "border": "none",  # Убираем границы ячеек
+                "border": "none",
             },
             style_table={
                 "overflowX": "auto",
-                "border": "none",  # Убираем границы всей таблицы
+                "border": "none",
             },
             style_as_list_view=True,
         ),
@@ -88,9 +91,20 @@ report_months = dbc.Container(
         dcc.Interval(
             id="page-interval", interval=15000, n_intervals=0
         ),
+        dcc.Store(id="api-data", data=[]),  # Хранилище для API данных
         dcc.Store(id="table-data", data=[]),
     ]
 )
+
+
+@app.callback(
+    Output("api-data", "data"),  # Сохраняем данные API в dcc.Store
+    Input("selected-year-store", "data"),
+)
+def load_api_data(selected_year):
+    table_data = fetch_api_data(selected_year)
+    return table_data
+
 
 @app.callback(
     [
@@ -98,11 +112,10 @@ report_months = dbc.Container(
         Output("table-card5", "columns"),
         Output("table-data", "data"),
     ],
-    Input("selected-year-store", "data"),
+    Input("api-data", "data"),  # Используем данные из dcc.Store
 )
-def update_data(selected_year):
-    table_data = fetch_api_data(selected_year)
-    df = pd.DataFrame(table_data)
+def update_data(api_data):
+    df = pd.DataFrame(api_data)
 
     if df.empty:
         return [], [], []
@@ -139,6 +152,7 @@ def update_data(selected_year):
     columns = [{"name": col, "id": col} for col in df.columns]
 
     return summary_data, columns, df.to_dict("records")
+
 
 @app.callback(
     [
