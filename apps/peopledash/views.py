@@ -148,43 +148,59 @@ def process_transformer_files(report_dt):
     # Очищаем таблицу RegisteredPatients перед обновлением
     RegisteredPatients.objects.all().delete()
 
-    # Добавляем данные из TodayData
-    for record in TodayData.objects.all():
+    # Суммируем данные из TodayData
+    today_aggregated = (
+        TodayData.objects.values('organization', 'subdivision', 'speciality')
+        .annotate(
+            total_slots_today=Sum('total_slots'),
+            total_free_slots_today=Sum('free_slots')
+        )
+    )
+
+    # Добавляем агрегированные данные за сегодня
+    for record in today_aggregated:
         RegisteredPatients.objects.create(
-            organization=record.organization,
-            subdivision=record.subdivision,
-            speciality=record.speciality,
-            slots_today=record.total_slots,
-            free_slots_today=record.free_slots,
-            slots_14_days=0,  # Изначально для данных "сегодня" поле на 14 дней будет пустым
+            organization=record['organization'],
+            subdivision=record['subdivision'],
+            speciality=record['speciality'],
+            slots_today=record['total_slots_today'],
+            free_slots_today=record['total_free_slots_today'],
+            slots_14_days=0,  # Эти данные добавятся позже
             free_slots_14_days=0,
             report_datetime=report_dt.strftime('%H:%M %d.%m.%Y')
         )
 
-    # Обновляем данные из FourteenDaysData
-    for record in FourteenDaysData.objects.all():
-        # Пытаемся найти совпадение по organization, subdivision и speciality
+    # Суммируем данные из FourteenDaysData
+    fourteen_days_aggregated = (
+        FourteenDaysData.objects.values('organization', 'subdivision', 'speciality')
+        .annotate(
+            total_slots_14_days=Sum('total_slots'),
+            total_free_slots_14_days=Sum('free_slots')
+        )
+    )
+
+    # Обновляем данные из FourteenDaysData в RegisteredPatients
+    for record in fourteen_days_aggregated:
         existing_record = RegisteredPatients.objects.filter(
-            organization=record.organization,
-            subdivision=record.subdivision,
-            speciality=record.speciality
+            organization=record['organization'],
+            subdivision=record['subdivision'],
+            speciality=record['speciality']
         ).first()
 
         if existing_record:
-            # Обновляем поля для данных на 14 дней в существующей записи
-            existing_record.slots_14_days = record.total_slots
-            existing_record.free_slots_14_days = record.free_slots
+            existing_record.slots_14_days = record['total_slots_14_days']
+            existing_record.free_slots_14_days = record['total_free_slots_14_days']
             existing_record.save()
         else:
-            # Если записи нет, добавляем новую
+            # Если записи нет, создаем новую
             RegisteredPatients.objects.create(
-                organization=record.organization,
-                subdivision=record.subdivision,
-                speciality=record.speciality,
-                slots_today=0,  # Для данных на 14 дней слоты на сегодня будут пустыми
+                organization=record['organization'],
+                subdivision=record['subdivision'],
+                speciality=record['speciality'],
+                slots_today=0,  # Для данных на 14 дней слоты на сегодня остаются пустыми
                 free_slots_today=0,
-                slots_14_days=record.total_slots,
-                free_slots_14_days=record.free_slots,
+                slots_14_days=record['total_slots_14_days'],
+                free_slots_14_days=record['total_free_slots_14_days'],
                 report_datetime=report_dt.strftime('%H:%M %d.%m.%Y')
             )
 

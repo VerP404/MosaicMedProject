@@ -53,6 +53,8 @@ def selenium_oms_chrome(username, password, start_date, end_date, start_date_tre
         options.add_argument("--disable-software-rasterizer")
         options.add_argument("--remote-debugging-port=9222")
         options.add_argument("--disable-features=VizDisplayCompositor")
+        options.add_argument('--proxy-server="direct://"')  # Отключить прокси
+        options.add_argument('--proxy-bypass-list=*')  # Исключить все адреса
 
         # Настройка папки загрузки
         download_folder = os.path.join(settings.BASE_DIR, 'imported_files')
