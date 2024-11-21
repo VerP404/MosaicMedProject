@@ -99,7 +99,7 @@ def upload_file(request, data_type_id):
 
 
 def data_upload_dashboard(request):
-    data_types = DataType.objects.all()
+    data_types = DataType.objects.all().order_by('category__name', 'name')
     organization = MedicalOrganization.objects.first()
     categories = set(data_type.category for data_type in data_types)  # Собираем все категории
     firebird_status = check_kauz_connection()

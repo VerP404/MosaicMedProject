@@ -136,6 +136,7 @@ class DataLoader:
         :param file_path: Путь к файлу
         """
         total_start_time = datetime.now()
+        self.message += f"Шаг 'Начало загрузки: {total_start_time}\n"
 
         # Шаг 1: Создаем начальную запись в DataImport
         self._create_initial_data_import_record(file_path)
@@ -481,6 +482,7 @@ class DataLoader:
         :param file_path: Путь к файлу
         """
         total_start_time = datetime.now()
+        self.message += f"Шаг 'Начало загрузки: {total_start_time}\n"
 
         # Шаг 1: Создаем начальную запись в DataImport
         self._create_initial_data_import_record(file_path)
