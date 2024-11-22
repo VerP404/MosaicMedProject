@@ -6,6 +6,7 @@ from apps.analytical_app.pages.administrator.routes import routes_administrator
 from apps.analytical_app.pages.chief.main import chief_main
 from apps.analytical_app.pages.doctor.routes import routes_doctors
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
+from apps.analytical_app.pages.economist.doctor_stac.tab1 import economist_doctor_stac
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
 from apps.analytical_app.pages.economist.indicators.page import econ_indicators
 from apps.analytical_app.pages.economist.main import economist_main
@@ -70,6 +71,13 @@ routes = {
             {"label": "Индикаторы", "active": True},
         ]),
         econ_indicators
+    ]),
+    "/economist/doctor-stac": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "Стационары по врачам", "active": True},
+        ]),
+        economist_doctor_stac
     ]),
 
 

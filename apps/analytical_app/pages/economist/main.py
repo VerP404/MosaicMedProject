@@ -30,6 +30,9 @@ cards_row_2 = dbc.Row(
         dbc.Col(create_card(5, type_page,
                             "Показатели: сводная по индикаторам",
                             "Формирует отчет по выбранным индикаторным показателям.")),
+        dbc.Col(create_card(6, type_page,
+                            "Стационары: по врачам",
+                            "Отчет по стационарным случаям по врачам.")),
     ],
     className="mb-4 align-items-stretch",
 )
@@ -52,10 +55,11 @@ economist_main = html.Div([
      Input(f'open-report-3-{type_page}', 'n_clicks'),
      Input(f'open-report-4-{type_page}', 'n_clicks'),
      Input(f'open-report-5-{type_page}', 'n_clicks'),
+     Input(f'open-report-6-{type_page}', 'n_clicks'),
      ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5):
+def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_6):
     ctx = callback_context
     if not ctx.triggered:
         return no_update, no_update
@@ -80,5 +84,8 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
         elif button_id == f'open-report-5-{type_page}' and open_report_5:
             breadcrumb_items.append({"label": "Стационары", "active": True})
             return f'/{main_link}/indicators', breadcrumb_items
+        elif button_id == f'open-report-6-{type_page}' and open_report_6:
+            breadcrumb_items.append({"label": "Стационары", "active": True})
+            return f'/{main_link}/doctor-stac', breadcrumb_items
 
     return f'/{main_link}', breadcrumb_items
