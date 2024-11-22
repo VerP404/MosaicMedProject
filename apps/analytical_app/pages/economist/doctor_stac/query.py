@@ -70,6 +70,8 @@ def sql_query_doc_stac_v_ds(selected_year, months_placeholder, inogorod, sanctio
         FROM oms
         WHERE goal = 'В дневном стационаре'
         GROUP BY doctor, building, department, profile
+        ORDER BY building
+        
     """
     return query
 
@@ -106,6 +108,8 @@ def sql_query_doc_stac_na_d(selected_year, months_placeholder, inogorod, sanctio
         FROM oms
         WHERE goal = 'На дому'
         GROUP BY doctor, building, department, profile
+        ORDER BY building
+        
     """
     return query
 
@@ -142,5 +146,6 @@ def sql_query_doc_stac(selected_year, months_placeholder, inogorod, sanction, am
         FROM oms
         WHERE goal = 'Стационарно'
         GROUP BY doctor, building, department, profile
+        ORDER BY building
     """
     return query
