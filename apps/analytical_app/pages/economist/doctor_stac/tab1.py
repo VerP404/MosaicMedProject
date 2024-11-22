@@ -8,7 +8,8 @@ from apps.analytical_app.components.filters import filter_years, filter_report_t
     filter_inogorod, filter_sanction, filter_amount_null, filter_months, date_picker, get_current_reporting_month, \
     update_buttons
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.economist.doctor_stac.query import sql_query_doc_stac
+from apps.analytical_app.pages.economist.doctor_stac.query import sql_query_doc_stac_v_ds, sql_query_doc_stac, \
+    sql_query_doc_stac_na_d
 from apps.analytical_app.query_executor import engine
 
 type_page = "economist-doctor-stac"
@@ -76,6 +77,8 @@ economist_doctor_stac = html.Div(
         ),
         dcc.Loading(id=f'loading-output-{type_page}', type='default'),
         card_table(f'result-table1-{type_page}', "В дневном стационаре"),
+        card_table(f'result-table2-{type_page}', "На дому"),
+        card_table(f'result-table3-{type_page}', "Стационарно"),
     ],
     style={"padding": "0rem"}
 )
@@ -156,6 +159,10 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data'),
+    Output(f'result-table2-{type_page}', 'columns'),
+     Output(f'result-table2-{type_page}', 'data'),
+    Output(f'result-table3-{type_page}', 'columns'),
+     Output(f'result-table3-{type_page}', 'data'),
      Output(f'loading-output-{type_page}', 'children')],
     [Input(f'update-button-{type_page}', 'n_clicks')],
     [State(f'range-slider-month-{type_page}', 'value'),
@@ -200,7 +207,7 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
     # Генерация SQL-запроса с учетом всех фильтров
     columns1, data1 = TableUpdater.query_to_df(
         engine,
-        sql_query_doc_stac(
+        sql_query_doc_stac_v_ds(
             selected_year,
             ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
             inogorodniy,
@@ -217,4 +224,41 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
 
     )
 
-    return columns1, data1, loading_output
+    columns2, data2 = TableUpdater.query_to_df(
+        engine,
+        sql_query_doc_stac_na_d(
+            selected_year,
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy,
+            sanction,
+            amount_null,
+            building=None,
+            profile=None,
+            doctor=None,
+            input_start=start_date_input_formatted,
+            input_end=end_date_input_formatted,
+            treatment_start=start_date_treatment_formatted,
+            treatment_end=end_date_treatment_formatted
+        )
+
+    )
+
+    columns3, data3 = TableUpdater.query_to_df(
+        engine,
+        sql_query_doc_stac(
+            selected_year,
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy,
+            sanction,
+            amount_null,
+            building=None,
+            profile=None,
+            doctor=None,
+            input_start=start_date_input_formatted,
+            input_end=end_date_input_formatted,
+            treatment_start=start_date_treatment_formatted,
+            treatment_end=end_date_treatment_formatted
+        )
+
+    )
+    return columns1, data1, columns2, data2, columns3, data3, loading_output
