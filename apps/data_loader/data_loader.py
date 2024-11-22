@@ -136,7 +136,6 @@ class DataLoader:
         :param file_path: Путь к файлу
         """
         total_start_time = datetime.now()
-        self.message += f"Шаг 'Начало загрузки: {total_start_time}\n"
 
         # Шаг 1: Создаем начальную запись в DataImport
         self._create_initial_data_import_record(file_path)
@@ -144,7 +143,7 @@ class DataLoader:
         try:
             # Шаг 2: Загрузка данных
             df = self._load_file_to_df(file_path)
-            self.message += f"Шаг 'Загрузка файла в DataFrame' выполнен успешно. Строк: {df.shape[0]}, Столбцов: {df.shape[1]}\n"
+            self.message += f"Шаг 'Начало загрузки: {total_start_time}. Загрузка файла в DataFrame' выполнен успешно. Строк: {df.shape[0]}, Столбцов: {df.shape[1]}\n"
             self._update_data_import_record()  # Обновляем запись после загрузки данных
 
             # Шаг 3: Проверка столбцов
@@ -482,7 +481,6 @@ class DataLoader:
         :param file_path: Путь к файлу
         """
         total_start_time = datetime.now()
-        self.message += f"Шаг 'Начало загрузки: {total_start_time}\n"
 
         # Шаг 1: Создаем начальную запись в DataImport
         self._create_initial_data_import_record(file_path)
@@ -490,7 +488,7 @@ class DataLoader:
         try:
             # Шаг 2: Загрузка данных
             df = self._load_file_to_df(file_path)
-            self.message += f"Шаг 'Загрузка файла в DataFrame' выполнен успешно. Строк: {df.shape[0]}, Столбцов: {df.shape[1]}\n"
+            self.message += f"Шаг 'Начало загрузки: {total_start_time} Загрузка файла в DataFrame' выполнен успешно. Строк: {df.shape[0]}, Столбцов: {df.shape[1]}\n"
             self._update_data_import_record()  # Обновляем запись после загрузки данных
 
             # Шаг 3: Проверка столбцов
