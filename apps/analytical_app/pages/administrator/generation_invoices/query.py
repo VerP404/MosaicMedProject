@@ -43,7 +43,7 @@ SELECT TO_CHAR(TO_DATE(initial_input_date, 'DD-MM-YYYY'), 'DD-MM-YYYY')         
        COUNT(case when goal = 'ПН1' then 1 end)                                                 as "ПН1 N",
        COUNT(case when goal = 'ДС2' then 1 end)                                                 as "ДС2 S"
 FROM oms
-WHERE status IN ('1', '2', '4', '6', '8')
+WHERE status IN ('1', '4', '6', '8')
 GROUP BY TO_DATE(initial_input_date, 'DD-MM-YYYY')
 ORDER BY TO_DATE(initial_input_date, 'DD-MM-YYYY') DESC
     """
