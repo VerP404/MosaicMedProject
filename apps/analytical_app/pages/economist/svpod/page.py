@@ -261,19 +261,20 @@ def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_l
     # Добавление строки "Нарастающе"
     cumulative_row = {
         "month": "Нарастающе",
-        "План": sum(row["План 1/12"] for row in fact_data),
-        "Факт": sum(row["Факт"] for row in fact_data),
+        "План": sum((row["План 1/12"] or 0) for row in fact_data),
+        "Факт": sum((row["Факт"] or 0) for row in fact_data),
         "Остаток": fact_data[-1]["Остаток"] if fact_data else 0,
         "Входящий остаток": 0,
         "План 1/12": 0,
-        "новые": sum(row["новые"] for row in fact_data),
-        "в_тфомс": sum(row["в_тфомс"] for row in fact_data),
-        "оплачено": sum(row["оплачено"] for row in fact_data),
-        "исправлено": sum(row["исправлено"] for row in fact_data),
-        "отказано": sum(row["отказано"] for row in fact_data),
-        "отменено": sum(row["отменено"] for row in fact_data),
-        "%": round((sum(row["Факт"] for row in fact_data) / sum(row["План 1/12"] for row in fact_data) * 100),
-                   1) if sum(row["План 1/12"] for row in fact_data) > 0 else 0
+        "новые": sum((row["новые"] or 0) for row in fact_data),
+        "в_тфомс": sum((row["в_тфомс"] or 0) for row in fact_data),
+        "оплачено": sum((row["оплачено"] or 0) for row in fact_data),
+        "исправлено": sum((row["исправлено"] or 0) for row in fact_data),
+        "отказано": sum((row["отказано"] or 0) for row in fact_data),
+        "отменено": sum((row["отменено"] or 0) for row in fact_data),
+        "%": round((sum((row["Факт"] or 0) for row in fact_data) /
+                    sum((row["План 1/12"] or 0) for row in fact_data) * 100), 1)
+        if sum((row["План 1/12"] or 0) for row in fact_data) > 0 else 0
     }
 
     fact_data.append(cumulative_row)  # Вставляем строку "Нарастающе" в начало
