@@ -265,7 +265,7 @@ def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_l
         "Факт": sum(row["Факт"] for row in fact_data),
         "Остаток": fact_data[-1]["Остаток"] if fact_data else 0,
         "Входящий остаток": 0,
-        "План 1/12": sum(row["План 1/12"] for row in fact_data),
+        "План 1/12": 0,
         "новые": sum(row["новые"] for row in fact_data),
         "в_тфомс": sum(row["в_тфомс"] for row in fact_data),
         "оплачено": sum(row["оплачено"] for row in fact_data),
@@ -286,7 +286,7 @@ def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_l
         "Факт": cumulative_row["Факт"],
         "Остаток": year_plan - cumulative_row["Факт"],
         "Входящий остаток": 0,  # Всегда 0 для года
-        "План 1/12": year_plan,  # Используем нарастающий план
+        "План 1/12": 0,
         "новые": cumulative_row["новые"],
         "в_тфомс": cumulative_row["в_тфомс"],
         "оплачено": cumulative_row["оплачено"],
