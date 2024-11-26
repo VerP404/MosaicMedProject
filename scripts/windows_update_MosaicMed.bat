@@ -24,12 +24,12 @@ python manage.py data_import
 rem Остановка текущих процессов
 for /f "tokens=5" %%a in ('tasklist /fi "imagename eq python.exe" /fi "windowtitle eq manage.py runserver" /fo csv /nh') do taskkill /pid %%a
 for /f "tokens=5" %%a in ('tasklist /fi "imagename eq python.exe" /fi "windowtitle eq index.py" /fo csv /nh') do taskkill /pid %%a
-for /f "tokens=5" %%a in ('tasklist /fi "imagename eq python.exe" /fi "windowtitle eq app.py" /fo csv /nh') do taskkill /pid %%a
+for /f "tokens=5" %%a in ('tasklist /fi "imagename eq python.exe" /fi "windowtitle eq main.py" /fo csv /nh') do taskkill /pid %%a
 
 rem Перезапуск серверов в фоне
 start "" python manage.py runserver 0.0.0.0:8000
 start "" python apps\analytical_app\index.py
-start "" python apps\chief_app\app.py
+start "" python apps\chief_app\main.py
 
 rem Деактивация виртуального окружения
 deactivate.bat
