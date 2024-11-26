@@ -246,6 +246,7 @@ def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_l
 
         if month < current_month - 1:
             row["Факт"] = row.get("оплачено", 0) or 0
+
         elif month == current_month - 1:
             if current_day <= 10:
                 row["Факт"] = sum(row.get(col, 0) or 0 for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
@@ -256,13 +257,16 @@ def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_l
 
         row["%"] = round((row["Факт"] / row["План"] * 100), 1) if row["План"] != 0 else 0
 
-        incoming_balance = (row["План 1/12"] or 0) - (row.get("оплачено", 0) or 0)
+        row["Остаток"] = (row["План"] or 0) - (row["Факт"] or 0)
+
+        incoming_balance = row["Остаток"]
 
     columns = [
         {"name": ["", "Месяц"], "id": "month"},
         {"name": ["Итог", "План"], "id": "План"},
         {"name": ["Итог", "Факт"], "id": "Факт"},
         {"name": ["Итог", "%"], "id": "%"},
+        {"name": ["Итог", "Остаток"], "id": "Остаток"},
         {"name": ["Факт", "Новые"], "id": "новые"},
         {"name": ["Факт", "В ТФОМС"], "id": "в_тфомс"},
         {"name": ["Факт", "Оплачено"], "id": "оплачено"},
