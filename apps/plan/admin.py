@@ -4,7 +4,7 @@ from django.contrib import admin, messages
 from django.utils.html import format_html
 from django.urls import reverse
 
-from .models import GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition
+from .models import GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition, AnnualPlan
 from .utils import copy_filters_to_new_year
 
 
@@ -15,21 +15,32 @@ class MonthlyPlanInline(admin.TabularInline):
     readonly_fields = ('month',)  # Создает пустые строки для каждого месяца
     fields = ('month', 'quantity', 'amount')
 
+    def has_add_permission(self, request, obj=None):
+        return False
+
 
 class FilterConditionInline(admin.TabularInline):
     model = FilterCondition
     extra = 1
     fields = ['field_name', 'filter_type', 'values', 'year']
+    readonly_fields = ('year',)
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return self.readonly_fields
+        else:
+            # При добавлении новой записи поле 'year' не является только для чтения
+            return []
 
 
 # Кнопка для копирования фильтров в новый год
 def copy_filters_action(modeladmin, request, queryset):
-    new_year = datetime.now().year + 1  # Предположим, что копирование в следующий год
-    copy_filters_to_new_year(new_year)
-    modeladmin.message_user(request, f"Фильтры скопированы на {new_year}", messages.SUCCESS)
+    new_year = datetime.now().year + 1  # Предполагаем, что копируем на следующий год
+    copy_filters_to_new_year(queryset, new_year)
+    modeladmin.message_user(request, f"Фильтры для выбранных групп скопированы на {new_year}", messages.SUCCESS)
 
 
-copy_filters_action.short_description = "Скопировать фильтры на следующий год"
+copy_filters_action.short_description = "Скопировать фильтры на следующий год для выбранных групп"
 
 
 class FilterYearListFilter(admin.SimpleListFilter):
@@ -51,7 +62,7 @@ class GroupIndicatorsAdmin(admin.ModelAdmin):
     list_display = ('name', 'parent', 'level', 'latest_filter_year', 'view_subgroups')
     list_filter = ('level', FilterYearListFilter)
     search_fields = ('name',)
-    inlines = [FilterConditionInline, MonthlyPlanInline]
+    inlines = [FilterConditionInline]
     actions = [copy_filters_action]
 
     def latest_filter_year(self, obj):
@@ -77,6 +88,16 @@ class GroupIndicatorsAdmin(admin.ModelAdmin):
         if obj:
             readonly_fields = list(readonly_fields) + ['view_subgroups']
         return readonly_fields
+
+
+@admin.register(AnnualPlan)
+class AnnualPlanAdmin(admin.ModelAdmin):
+    list_display = ('group', 'year',)
+    search_fields = ('group__name', 'year',)
+    inlines = [MonthlyPlanInline]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
 
 
 class UnifiedFilterConditionInline(admin.TabularInline):

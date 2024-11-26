@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.oms_reference.models import GeneralOMSTarget
@@ -18,10 +19,8 @@ class GroupIndicators(models.Model):
             self.level = 1
         super(GroupIndicators, self).save(*args, **kwargs)
 
-        # Проверка и создание записей для каждого месяца
-        if not self.monthly_plans.exists():
-            for month in range(1, 13):
-                MonthlyPlan.objects.create(group=self, month=month, quantity=0, amount=0.00)
+        current_year = datetime.now().year
+        AnnualPlan.objects.get_or_create(group=self, year=current_year)
 
     def __str__(self):
         return self.name
@@ -80,17 +79,67 @@ class FilterCondition(models.Model):
     def get_values_list(self):
         return [v.strip() for v in self.values.split(",")]
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # После сохранения FilterCondition, убедимся, что AnnualPlan существует
+        annual_plan, created = AnnualPlan.objects.get_or_create(group=self.group, year=self.year)
+        if created:
+            # Если AnnualPlan был создан, MonthlyPlan создадутся автоматически в его методе save()
+            pass
 
-# models.py
-class MonthlyPlan(models.Model):
-    group = models.ForeignKey(GroupIndicators, on_delete=models.CASCADE, related_name="monthly_plans",
-                              verbose_name="Группа")
-    month = models.PositiveSmallIntegerField(verbose_name="Месяц")
-    quantity = models.PositiveIntegerField(verbose_name="Количество")
-    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Деньги")
+    def clean(self):
+        super().clean()
+        # Проверяем, есть ли уже запись с такими же полями
+        existing = FilterCondition.objects.filter(
+            group=self.group,
+            field_name=self.field_name,
+            filter_type=self.filter_type,
+            year=self.year
+        )
+        if self.pk:
+            existing = existing.exclude(pk=self.pk)
+        if existing.exists():
+            raise ValidationError("Условие фильтра с такими параметрами уже существует для данной группы и года.")
 
     class Meta:
-        unique_together = ('group', 'month')
+        unique_together = ('group', 'field_name', 'filter_type', 'year')
+        verbose_name = "Условие фильтра"
+        verbose_name_plural = "Условия фильтра"
+
+
+class AnnualPlan(models.Model):
+    group = models.ForeignKey(GroupIndicators, on_delete=models.CASCADE, related_name="annual_plans",
+                              verbose_name="Группа")
+    year = models.PositiveIntegerField(verbose_name="Год")
+
+    class Meta:
+        unique_together = ('group', 'year')
+        verbose_name = "План на год"
+        verbose_name_plural = "Планы на год"
+
+    def __str__(self):
+        return f"{self.group.name} - {self.year}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Убедимся, что записи MonthlyPlan существуют для каждого месяца
+        for month in range(1, 13):
+            MonthlyPlan.objects.get_or_create(annual_plan=self, month=month, defaults={'quantity': 0, 'amount': 0.00})
+
+
+class MonthlyPlan(models.Model):
+    annual_plan = models.ForeignKey(
+        AnnualPlan,
+        on_delete=models.CASCADE,
+        related_name="monthly_plans",
+        verbose_name="Годовой план"
+    )
+    month = models.PositiveSmallIntegerField(verbose_name="Месяц")
+    quantity = models.PositiveIntegerField(verbose_name="Количество", default=0)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Деньги", default=0.00)
+
+    class Meta:
+        unique_together = ('annual_plan', 'month')
         verbose_name = "План на месяц"
         verbose_name_plural = "Планы на месяц"
 
