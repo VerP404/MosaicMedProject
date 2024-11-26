@@ -100,7 +100,6 @@ class DoctorData(models.Model):
     specialty_code = models.CharField(max_length=255, verbose_name="Код специальности")
     department_code = models.CharField(max_length=255, verbose_name="Код отделения")
     comment = models.CharField(max_length=255, verbose_name="Комментарий")
-    mo = models.CharField(max_length=255, default='-', verbose_name="МО")
 
     def __str__(self):
         return f"{self.last_name} {self.first_name} ({self.doctor_code})"
