@@ -1,10 +1,12 @@
 from datetime import datetime
 
 from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 from django.urls import reverse
 
-from .models import GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition, AnnualPlan
+from .models import GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition, AnnualPlan, \
+    BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan
 from .utils import copy_filters_to_new_year
 
 
@@ -98,6 +100,101 @@ class AnnualPlanAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
+
+
+class MonthlyBuildingPlanInline(admin.TabularInline):
+    model = MonthlyBuildingPlan
+    extra = 0
+    readonly_fields = ('month',
+                       'get_total_with_current_changes',
+                       'get_total_plan_for_month',
+                       'get_current_plan_for_month',
+                       'get_remaining_quantity',
+                       'get_total_financial_plan_for_month',
+                       'get_used_amount_for_month',
+                       'get_remaining_budget',
+                       )
+    fields = ('month',
+              'quantity',
+              'amount',
+              'get_current_plan_for_month',
+              'get_total_plan_for_month',
+              'get_total_with_current_changes',
+              'get_remaining_quantity',
+              'get_total_financial_plan_for_month',
+              'get_used_amount_for_month',
+              'get_remaining_budget',
+
+              )
+    can_delete = False
+
+    def get_total_plan_for_month(self, obj):
+        return obj.get_total_plan_for_month()
+
+    get_total_plan_for_month.short_description = "Общий план"
+
+    def get_current_plan_for_month(self, obj):
+        return obj.get_current_plan_for_month()
+
+    get_current_plan_for_month.short_description = "План"
+
+    def get_total_with_current_changes(self, obj):
+        return obj.get_total_with_current_changes()
+
+    get_total_with_current_changes.short_description = "из него использовано"
+
+    def get_remaining_quantity(self, obj):
+        return obj.get_remaining_quantity()
+
+    get_remaining_quantity.short_description = "Остаток"
+
+    def get_total_financial_plan_for_month(self, obj):
+        return obj.get_total_financial_plan_for_month()
+
+    get_total_financial_plan_for_month.short_description = "Общий бюджет"
+
+    def get_used_amount_for_month(self, obj):
+        return obj.get_used_amount_for_month()
+
+    get_used_amount_for_month.short_description = "из него использовано (фин.)"
+
+    def get_remaining_budget(self, obj):
+        return obj.get_remaining_budget()
+
+    get_remaining_budget.short_description = "Остаток (фин.)"
+
+    def has_add_permission(self, request, obj=None):
+        return False  # Запрещаем добавление новых записей
+
+
+@admin.register(BuildingPlan)
+class BuildingPlanAdmin(admin.ModelAdmin):
+    list_display = ('annual_plan', 'building')
+    inlines = [MonthlyBuildingPlanInline]
+
+    def save_model(self, request, obj, form, change):
+        try:
+            obj.clean()
+        except ValidationError as e:
+            self.message_user(request, f"Ошибка валидации: {e}", level=messages.ERROR)
+            return
+        super().save_model(request, obj, form, change)
+
+
+class MonthlyDepartmentPlanInline(admin.TabularInline):
+    model = MonthlyDepartmentPlan
+    extra = 0
+    readonly_fields = ('month',)  # Поле месяца только для чтения
+    can_delete = False  # Запрещаем удаление записей
+
+    def has_add_permission(self, request, obj=None):
+        return False  # Запрещаем добавление новых записей
+
+
+@admin.register(DepartmentPlan)
+class DepartmentPlanAdmin(admin.ModelAdmin):
+    list_display = ('building_plan', 'department')
+    inlines = [MonthlyDepartmentPlanInline]
 
 
 class UnifiedFilterConditionInline(admin.TabularInline):
