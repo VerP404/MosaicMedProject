@@ -1,13 +1,55 @@
 from datetime import datetime
 
+from dal import autocomplete
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 from django.urls import reverse
+from django import forms
 
 from .models import GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition, AnnualPlan, \
-    BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan
+    BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan, GroupBuildingDepartment
 from .utils import copy_filters_to_new_year
+from ..organization.models import Department
+
+
+class GroupBuildingDepartmentForm(forms.ModelForm):
+    class Meta:
+        model = GroupBuildingDepartment
+        fields = ['year', 'building', 'department']
+        widgets = {
+            'building': autocomplete.ModelSelect2(url='building-autocomplete'),
+            'department': autocomplete.ModelSelect2(
+                url='department-autocomplete',
+                forward=['building', 'year']  # Передача зависимых значений
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'building' in self.data:
+            try:
+                building_id = int(self.data.get('building'))
+                self.fields['department'].queryset = Department.objects.filter(building_id=building_id)
+            except (ValueError, TypeError):
+                pass
+        elif self.instance.pk:
+            self.fields['department'].queryset = self.instance.building.departments.all()
+        else:
+            self.fields['department'].queryset = Department.objects.none()
+
+
+class GroupBuildingDepartmentInline(admin.TabularInline):
+    model = GroupBuildingDepartment
+    form = GroupBuildingDepartmentForm
+    extra = 1
+    fields = ['year', 'building', 'department']
+    readonly_fields = []
+
+
+@admin.register(GroupBuildingDepartment)
+class GroupBuildingDepartmentAdmin(admin.ModelAdmin):
+    form = GroupBuildingDepartmentForm
 
 
 class MonthlyPlanInline(admin.TabularInline):
@@ -59,13 +101,36 @@ class FilterYearListFilter(admin.SimpleListFilter):
         return queryset
 
 
+class GroupBuildingsInline(admin.TabularInline):
+    model = GroupIndicators.buildings.through
+    extra = 0
+    verbose_name = "Связанный корпус"
+    verbose_name_plural = "Связанные корпуса"
+
+
+class GroupDepartmentsInline(admin.TabularInline):
+    model = GroupIndicators.departments.through
+    extra = 0
+    verbose_name = "Связанное отделение"
+    verbose_name_plural = "Связанные отделения"
+
+
 @admin.register(GroupIndicators)
 class GroupIndicatorsAdmin(admin.ModelAdmin):
-    list_display = ('name', 'parent', 'level', 'latest_filter_year', 'view_subgroups')
+    list_display = ('name', 'parent', 'level', 'is_distributable', 'latest_filter_year', 'view_subgroups')
     list_filter = ('level', FilterYearListFilter)
     search_fields = ('name',)
-    inlines = [FilterConditionInline]
+    inlines = [FilterConditionInline, GroupBuildingDepartmentInline]
     actions = [copy_filters_action]
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'parent', 'is_distributable')
+        }),
+        ('Распределение', {
+            'fields': ('buildings', 'departments'),
+            'classes': ('collapse',)
+        }),
+    )
 
     def latest_filter_year(self, obj):
         # Метод для отображения последнего года фильтра
@@ -90,6 +155,22 @@ class GroupIndicatorsAdmin(admin.ModelAdmin):
         if obj:
             readonly_fields = list(readonly_fields) + ['view_subgroups']
         return readonly_fields
+
+
+class DepartmentAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Department.objects.all()
+
+        building = self.forwarded.get('building', None)
+        year = self.forwarded.get('year', None)
+
+        if building:
+            qs = qs.filter(group_building_departments__building_id=building)
+
+        if year:
+            qs = qs.filter(group_building_departments__year=year)
+
+        return qs.distinct()
 
 
 @admin.register(AnnualPlan)
@@ -124,7 +205,6 @@ class MonthlyBuildingPlanInline(admin.TabularInline):
               'get_total_financial_plan_for_month',
               'get_used_amount_for_month',
               'get_remaining_budget',
-
               )
     can_delete = False
 
@@ -151,7 +231,7 @@ class MonthlyBuildingPlanInline(admin.TabularInline):
     def get_total_financial_plan_for_month(self, obj):
         return obj.get_total_financial_plan_for_month()
 
-    get_total_financial_plan_for_month.short_description = "Общий бюджет"
+    get_total_financial_plan_for_month.short_description = "План (фин.)"
 
     def get_used_amount_for_month(self, obj):
         return obj.get_used_amount_for_month()
@@ -184,16 +264,94 @@ class BuildingPlanAdmin(admin.ModelAdmin):
 class MonthlyDepartmentPlanInline(admin.TabularInline):
     model = MonthlyDepartmentPlan
     extra = 0
-    readonly_fields = ('month',)  # Поле месяца только для чтения
-    can_delete = False  # Запрещаем удаление записей
+    readonly_fields = ('month',
+                       'get_current_plan_for_month',
+                       'get_total_plan_for_month',
+                       'get_used_quantity_for_month',
+                       'get_remaining_quantity',
+                       'get_total_financial_plan_for_month',
+                       'get_used_amount_for_month',
+                       'get_remaining_budget')
+    fields = ('month',
+              'quantity',
+              'amount',
+              'get_current_plan_for_month',
+              'get_total_plan_for_month',
+              'get_used_quantity_for_month',
+              'get_remaining_quantity',
+              'get_total_financial_plan_for_month',
+              'get_used_amount_for_month',
+              'get_remaining_budget'
+              )
+    can_delete = False
+
+    def get_total_plan_for_month(self, obj):
+        return obj.get_total_plan_for_month()
+
+    get_total_plan_for_month.short_description = "Общий план"
+
+    def get_current_plan_for_month(self, obj):
+        return obj.get_current_plan_for_month()
+
+    get_current_plan_for_month.short_description = "План"
+
+    def get_used_quantity_for_month(self, obj):
+        return obj.get_used_quantity_for_month()
+
+    get_used_quantity_for_month.short_description = "из него использовано"
+
+    def get_remaining_quantity(self, obj):
+        return obj.get_remaining_quantity()
+
+    get_remaining_quantity.short_description = "Остаток"
+
+    def get_total_financial_plan_for_month(self, obj):
+        return obj.get_total_financial_plan_for_month()
+
+    get_total_financial_plan_for_month.short_description = "План (фин.)"
+
+    def get_used_amount_for_month(self, obj):
+        return obj.get_used_amount_for_month()
+
+    get_used_amount_for_month.short_description = "из него использовано (фин.)"
+
+    def get_remaining_budget(self, obj):
+        return obj.get_remaining_budget()
+
+    get_remaining_budget.short_description = "Остаток (фин.)"
 
     def has_add_permission(self, request, obj=None):
-        return False  # Запрещаем добавление новых записей
+        return False
+
+
+class DepartmentPlanForm(forms.ModelForm):
+    class Meta:
+        model = DepartmentPlan
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Проверяем, есть ли building_plan в данных формы
+        if 'building_plan' in self.initial and self.initial['building_plan']:
+            building_plan = BuildingPlan.objects.get(pk=self.initial['building_plan'])
+            self.fields['department'].queryset = Department.objects.filter(building=building_plan.building)
+        elif self.instance and hasattr(self.instance, 'building_plan') and self.instance.building_plan:
+            # Если instance уже существует и имеет связанный building_plan
+            self.fields['department'].queryset = Department.objects.filter(
+                building=self.instance.building_plan.building
+            )
+        else:
+            # Если ни initial, ни instance не содержат building_plan
+            self.fields['department'].queryset = Department.objects.none()
 
 
 @admin.register(DepartmentPlan)
 class DepartmentPlanAdmin(admin.ModelAdmin):
-    list_display = ('building_plan', 'department')
+    form = DepartmentPlanForm
+    list_display = ('building_plan', 'department', 'get_group_name')
+    fields = ('building_plan', 'department', 'get_group_name')
+    readonly_fields = ('get_group_name',)
     inlines = [MonthlyDepartmentPlanInline]
 
 

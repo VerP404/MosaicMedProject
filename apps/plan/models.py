@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from dal import autocomplete
 
 from apps.oms_reference.models import GeneralOMSTarget
 from apps.organization.models import Department, Building
@@ -11,6 +12,23 @@ class GroupIndicators(models.Model):
     name = models.CharField(max_length=100, verbose_name="Группа")
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subgroups')
     level = models.IntegerField(default=0, verbose_name="Уровень вложенности")
+    is_distributable = models.BooleanField(
+        default=False,
+        verbose_name="Распределяемый план",
+        help_text="Отметьте, если для этой группы требуется распределение по корпусам и отделениям"
+    )
+    buildings = models.ManyToManyField(
+        Building,
+        blank=True,
+        verbose_name="Корпуса",
+        help_text="Укажите корпуса, связанные с этой группой (для распределяемых планов)"
+    )
+    departments = models.ManyToManyField(
+        Department,
+        blank=True,
+        verbose_name="Отделения",
+        help_text="Выберите отделения, доступные для распределения планов"
+    )
 
     def save(self, *args, **kwargs):
         # Устанавливаем уровень вложенности на основе родительской группы
@@ -20,8 +38,9 @@ class GroupIndicators(models.Model):
             self.level = 1
         super(GroupIndicators, self).save(*args, **kwargs)
 
-        current_year = datetime.now().year
-        AnnualPlan.objects.get_or_create(group=self, year=current_year)
+        if self.is_distributable:
+            current_year = datetime.now().year
+            AnnualPlan.objects.get_or_create(group=self, year=current_year)
 
     def __str__(self):
         return self.name
@@ -106,6 +125,39 @@ class FilterCondition(models.Model):
         unique_together = ('group', 'field_name', 'filter_type', 'year')
         verbose_name = "Условие фильтра"
         verbose_name_plural = "Условия фильтра"
+
+
+class GroupBuildingDepartment(models.Model):
+    group = models.ForeignKey(
+        GroupIndicators,
+        on_delete=models.CASCADE,
+        related_name="group_building_departments",
+        verbose_name="Группа"
+    )
+    year = models.PositiveIntegerField(
+        verbose_name="Год",
+        help_text="Укажите год, к которому относится корпус и отделение"
+    )
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.CASCADE,
+        related_name="group_building_departments",
+        verbose_name="Корпус"
+    )
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.CASCADE,
+        related_name="group_building_departments",
+        verbose_name="Отделение"
+    )
+
+    class Meta:
+        unique_together = ('group', 'year', 'building', 'department')
+        verbose_name = "Корпус и отделение группы"
+        verbose_name_plural = "Корпуса и отделения группы"
+
+    def __str__(self):
+        return f"{self.group.name} ({self.year}) - {self.building.name} - {self.department.name}"
 
 
 class AnnualPlan(models.Model):
@@ -360,6 +412,11 @@ class DepartmentPlan(models.Model):
                     defaults={'quantity': 0, 'amount': 0.00}
                 )
 
+    def get_group_name(self):
+        return self.building_plan.annual_plan.group.name
+
+    get_group_name.short_description = "Группа"
+
 
 class MonthlyDepartmentPlan(models.Model):
     department_plan = models.ForeignKey(
@@ -377,15 +434,81 @@ class MonthlyDepartmentPlan(models.Model):
         verbose_name = "Месячный план отделения"
         verbose_name_plural = "Месячные планы отделений"
 
+    def clean(self):
+        department_plan = self.department_plan
+        building_monthly_plan = department_plan.building_plan.monthly_building_plans.filter(month=self.month).first()
+
+        if not building_monthly_plan:
+            raise ValidationError(
+                f"Месячный план корпуса на {self.month}-й месяц отсутствует. Проверьте настройки плана корпуса."
+            )
+
+        if self.quantity > building_monthly_plan.quantity:
+            raise ValidationError(
+                f"План отделения на {self.month}-й месяц ({self.quantity}) превышает план корпуса ({building_monthly_plan.quantity})!"
+            )
+
+        if self.amount > building_monthly_plan.amount:
+            raise ValidationError(
+                f"Бюджет отделения на {self.month}-й месяц ({self.amount}) превышает бюджет корпуса ({building_monthly_plan.amount})!"
+            )
+
     def save(self, *args, **kwargs):
-        if self.pk is not None:
-            original = MonthlyDepartmentPlan.objects.get(pk=self.pk)
-            if original.month != self.month:
-                raise ValidationError("Изменение месяца запрещено.")
+        self.full_clean()  # Запускает метод clean перед сохранением
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Удаление месячных планов запрещено.")
+
+    def get_total_plan_for_month(self):
+        """Возвращает общий план корпуса на месяц"""
+        building_monthly_plan = self.department_plan.building_plan.monthly_building_plans.filter(
+            month=self.month).first()
+        return building_monthly_plan.quantity if building_monthly_plan else 0
+
+    def get_current_plan_for_month(self):
+        """Возвращает текущий сохраненный план для этого отделения и месяца"""
+        return MonthlyDepartmentPlan.objects.filter(pk=self.pk).first().quantity if self.pk else 0
+
+    def get_used_quantity_for_month(self, exclude_current=True):
+        """Возвращает использованное количество для всех отделений в этот месяц"""
+        queryset = MonthlyDepartmentPlan.objects.filter(
+            department_plan__building_plan=self.department_plan.building_plan,
+            month=self.month
+        )
+        if exclude_current and self.pk:
+            queryset = queryset.exclude(pk=self.pk)
+        used_quantity = queryset.aggregate(total=models.Sum('quantity'))['total']
+        return used_quantity or 0
+
+    def get_remaining_quantity(self):
+        """Возвращает остаток количества"""
+        total_plan = self.get_total_plan_for_month()
+        used_quantity = self.get_used_quantity_for_month()
+        return total_plan - used_quantity - self.quantity
+
+    def get_total_financial_plan_for_month(self):
+        """Возвращает общий финансовый план на месяц"""
+        building_monthly_plan = self.department_plan.building_plan.monthly_building_plans.filter(
+            month=self.month).first()
+        return building_monthly_plan.amount if building_monthly_plan else 0
+
+    def get_used_amount_for_month(self, exclude_current=True):
+        """Возвращает использованный бюджет для всех отделений в этот месяц"""
+        queryset = MonthlyDepartmentPlan.objects.filter(
+            department_plan__building_plan=self.department_plan.building_plan,
+            month=self.month
+        )
+        if exclude_current and self.pk:
+            queryset = queryset.exclude(pk=self.pk)
+        used_amount = queryset.aggregate(total=models.Sum('amount'))['total']
+        return used_amount or 0
+
+    def get_remaining_budget(self):
+        """Возвращает остаток бюджета"""
+        total_plan = self.get_total_financial_plan_for_month()
+        used_amount = self.get_used_amount_for_month()
+        return total_plan - used_amount - self.amount
 
 
 class UnifiedFilter(models.Model):
