@@ -184,19 +184,20 @@ def display_dynamic_dropdowns(values):
 
 # Функция для получения данных плана
 def fetch_plan_data(selected_level, year, mode='volumes'):
-    # В зависимости от режима выбираем соответствующее поле для плана
+    # Выбираем поле для данных в зависимости от режима
     plan_field = "quantity" if mode == 'volumes' else "amount"
 
     query = text(f"""
-        SELECT month, SUM({plan_field}) AS plan
-        FROM plan_monthlyplan
-        WHERE group_id = :selected_level AND month BETWEEN 1 AND 12
-        GROUP BY month
-        ORDER BY month
+        SELECT mp.month, SUM(mp.{plan_field}) AS plan
+        FROM plan_monthlyplan AS mp
+        INNER JOIN plan_annualplan AS ap ON mp.annual_plan_id = ap.id
+        WHERE ap.group_id = :selected_level AND ap.year = :year
+        GROUP BY mp.month
+        ORDER BY mp.month
     """)
 
     with engine.connect() as connection:
-        result = connection.execute(query, {"selected_level": selected_level}).mappings()
+        result = connection.execute(query, {"selected_level": selected_level, "year": year}).mappings()
         plan_data = {row["month"]: row["plan"] for row in result}
 
     return plan_data
