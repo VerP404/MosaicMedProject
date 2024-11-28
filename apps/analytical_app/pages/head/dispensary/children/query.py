@@ -19,7 +19,7 @@ def sql_query_dispensary_children(selected_year, months_placeholder, inogorod, s
     {base}
     SELECT goal,
            {columns_by_status_oms()}
-           FROM oms
+           FROM talon
            WHERE target_categories like '%Диспансеризация детей%'
            group by goal;
     """
@@ -44,7 +44,7 @@ def sql_query_dispensary_building_children(selected_year, months_placeholder, in
     SELECT building, 
             goal,
            {columns_by_status_oms()}
-           FROM oms
+           FROM talon
            WHERE target_categories like '%Диспансеризация детей%'
            group by building, goal;
     """
@@ -70,7 +70,7 @@ def sql_query_dispensary_building_department_children(selected_year, months_plac
     SELECT building, department, 
             goal,
            {columns_by_status_oms()}
-           FROM oms
+           FROM talon
            WHERE target_categories like '%Диспансеризация детей%'
            group by building, department, goal;
     """
@@ -98,7 +98,7 @@ def sql_query_dispensary_age_children(selected_year, months_placeholder, inogoro
            COUNT(*)                                                                   AS "Всего",
            SUM(CASE WHEN gender = 'М' THEN 1 ELSE 0 END) AS "М",
            SUM(CASE WHEN gender = 'Ж' THEN 1 ELSE 0 END) AS "Ж"              
-           FROM oms
+           FROM talon
            WHERE target_categories like '%Диспансеризация детей%'
            group by age
            order by age;
@@ -130,7 +130,7 @@ def sql_query_dispensary_amount_group(selected_year, months_placeholder, inogoro
        sum(case when amount_numeric >= 3000 and amount_numeric < 4000 then 1 else 0 end) as "3000-4000",
        sum(case when amount_numeric >= 4000 and amount_numeric < 5000 then 1 else 0 end) as "4000-5000",
        sum(case when amount_numeric >= 5000  then 1 else 0 end) as ">5000"         
-           FROM oms
+           FROM talon
            WHERE target_categories like '%Диспансеризация детей%'
            group by "-";
     """
@@ -157,7 +157,7 @@ def sql_query_dispensary_uniq(selected_year, months_placeholder, inogorod, sanct
     , 
     oms_order_filter as (
         select * 
-        from oms 
+        from talon 
         where target_categories like '%Диспансеризация детей%'
         order by report_month_number, enp),
     oms_distinct_filter as (
@@ -174,7 +174,7 @@ def sql_query_dispensary_uniq(selected_year, months_placeholder, inogorod, sanct
 
 
 query_download_children_list_not_pn1 = """
-WITH oms AS (
+WITH talon AS (
     SELECT
         enp,
         MAX(CASE WHEN goal = 'ПН1' THEN 1 ELSE 0 END) AS has_pn1,
@@ -264,6 +264,6 @@ CAST(
     ) AS text
 ) AS "План осмотров на сегодня"
 FROM naselenie n
-LEFT JOIN oms o ON n.enp = o.enp;
+LEFT JOIN talon o ON n.enp = o.enp;
 
 """

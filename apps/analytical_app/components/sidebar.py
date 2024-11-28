@@ -86,10 +86,10 @@ def create_sidebar():
                     # ),
                     dbc.NavLink(
                         [html.I(className="bi bi-info-circle"),
-                         html.Span(" WEB.ОМС", className="ms-2", id="web-oms-label")],
+                         html.Span(" WEB.ОМС", className="ms-2", id="web-talon-label")],
                         href="/web_oms",
                         active="exact",
-                        id="web-oms-link"
+                        id="web-talon-link"
                     ),
                     dbc.NavLink(
                         [html.I(className="bi bi-list"),
@@ -127,7 +127,7 @@ def create_sidebar():
          Output("economist-label", "style"),
          Output("admin-label", "style"),
          # Output("iszl-label", "style"),
-         Output("web-oms-label", "style"),
+         Output("web-talon-label", "style"),
          Output("main-menu-label", "style")],
         [Input("btn_sidebar", "n_clicks")],
         [State("sidebar-state", "data"),
@@ -162,7 +162,7 @@ def create_sidebar():
          Output("economist-link", "active"),
          Output("admin-link", "active"),
          # Output("iszl-link", "active"),
-         Output("web-oms-link", "active"),
+         Output("web-talon-link", "active"),
          ],
         [Input("url", "pathname")]
     )

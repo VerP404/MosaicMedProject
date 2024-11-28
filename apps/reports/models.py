@@ -1,7 +1,7 @@
 from django.db import models
 
 from apps.data_loader.models.oms_data import OMSData
-from apps.oms_reference.models import MedicalOrganizationOMSTarget
+from apps.oms_reference.models.models import MedicalOrganizationOMSTarget
 from apps.organization.models import MedicalOrganization
 
 

@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'apps.people',
     'apps.plan',
     'apps.api',
+    'apps.data',
 
     'import_export',
     'channels',

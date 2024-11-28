@@ -85,7 +85,7 @@ class DataImportAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('csv-upload/oms/', self.upload_csv_talons, name='oms_talon_csv_upload'),
+            path('csv-upload/talon/', self.upload_csv_talons, name='oms_talon_csv_upload'),
             path('csv-upload/doctors/', self.upload_csv_doctors, name='oms_doctor_csv_upload'),
             path('csv-upload/detailed/', self.upload_csv_detailed, name='oms_detailed_csv_upload'),
 

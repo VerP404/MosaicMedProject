@@ -4,6 +4,7 @@ from django import forms
 from django.db.models import IntegerField, Case, When, Value
 
 from .models import *
+from .models.models import MedicalOrganizationOMSTarget, OMSTargetCategory, StatusWebOMS
 from ..organization.models import MedicalOrganization
 
 
