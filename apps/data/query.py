@@ -70,12 +70,12 @@ SELECT report_data.talon,
                '-'
        )                                                                                AS target_categories,
        report_data.patient,
+CASE
+    WHEN report_data.birth_date ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' THEN TO_DATE(report_data.birth_date, 'DD-MM-YYYY')
+END AS birth_date,
        CASE
-           WHEN report_data.birth_date ~ '^\d{2}-\d{2}-\d{4}$' THEN TO_DATE(report_data.birth_date, 'DD-MM-YYYY')
-           END                                                                          AS birth_date_date,
-       CASE
-           WHEN report_data.treatment_end ~ '^\d{2}-\d{2}-\d{4}$' AND
-                report_data.birth_date ~ '^\d{2}-\d{2}-\d{4}$' THEN
+           WHEN report_data.treatment_end ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' AND
+                report_data.birth_date ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' THEN
                CAST(SUBSTRING(report_data.treatment_end FROM 7 FOR 4) AS INTEGER) -
                CAST(SUBSTRING(report_data.birth_date FROM 7 FOR 4) AS INTEGER)
            END                                                                          AS age,
@@ -90,11 +90,11 @@ SELECT report_data.talon,
            ELSE true
            END                                                                          AS inogorodniy,
        CASE
-           WHEN report_data.treatment_start ~ '^\d{2}-\d{2}-\d{4}$'
+           WHEN report_data.treatment_start ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$'
                THEN TO_DATE(report_data.treatment_start, 'DD-MM-YYYY')
            END                                                                          AS treatment_start,
        CASE
-           WHEN report_data.treatment_end ~ '^\d{2}-\d{2}-\d{4}$' THEN TO_DATE(report_data.treatment_end, 'DD-MM-YYYY')
+           WHEN report_data.treatment_end ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' THEN TO_DATE(report_data.treatment_end, 'DD-MM-YYYY')
            END                                                                          AS treatment_end,
               CASE
            WHEN report_data.visits = '-' AND treatment_start = treatment_end THEN '1'
@@ -121,16 +121,16 @@ SELECT report_data.talon,
                        ARRAY(
                                SELECT SPLIT_PART(TRIM(s), ' ', 1)
                                FROM UNNEST(STRING_TO_ARRAY(report_data.additional_diagnosis, ',')) AS s
-                               WHERE SPLIT_PART(TRIM(s), ' ', 1) ~ '^[A-Z]\\d{2}(\\.\\d)?$'
+                               WHERE SPLIT_PART(TRIM(s), ' ', 1) ~ '^[A-Z]\\d{2}(?:\\.\\d)?$'
                        ),
                        ','
                )
            END                                                                          AS additional_diagnosis_codes,
        CASE
-           WHEN report_data.initial_input_date ~ '^\d{2}-\d{2}-\d{4}$' THEN TO_DATE(report_data.initial_input_date, 'DD-MM-YYYY')
+           WHEN report_data.initial_input_date ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' THEN TO_DATE(report_data.initial_input_date, 'DD-MM-YYYY')
            END                                                                          AS initial_input_date,
        CASE
-           WHEN report_data.last_change_date ~ '^\d{2}-\d{2}-\d{4}$' THEN TO_DATE(report_data.last_change_date, 'DD-MM-YYYY')
+           WHEN report_data.last_change_date ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' THEN TO_DATE(report_data.last_change_date, 'DD-MM-YYYY')
            END                                                                          AS last_change_date,
 
        CASE

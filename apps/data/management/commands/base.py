@@ -30,7 +30,7 @@ class Command(BaseCommand):
 
 
         query = base_query_oms()
-
+        print(query)
         with transaction.atomic():
             try:
                 with connection.cursor() as cursor:
@@ -63,7 +63,6 @@ class Command(BaseCommand):
 
                 for row in rows:
                     try:
-
                         oms_data = {
                             "talon": row[0],
                             "is_update": True,
@@ -78,22 +77,22 @@ class Command(BaseCommand):
                             "target_categories": row[7],
                             "patient_id": '-',
                             "patient": row[8],
-                            "birth_date": parse_date(row[9]),
+                            "birth_date": row[9],
                             "age": row[10],
                             "gender": row[11],
                             "enp": row[12],
                             "smo_code": row[13],
                             "inogorodniy": row[14],
-                            "treatment_start": parse_date(row[15]),
-                            "treatment_end": parse_date(row[16]),
+                            "treatment_start": row[15],
+                            "treatment_end": row[16],
                             "visits": row[17],
                             "mo_visits": row[18],
                             "home_visits": row[19],
                             "diagnosis": '-',
                             "main_diagnosis_code": row[20],
                             "additional_diagnosis_codes": row[21],
-                            "initial_input_date": parse_date(row[22]),
-                            "last_change_date": parse_date(row[23]),
+                            "initial_input_date": row[22],
+                            "last_change_date": row[23],
                             "amount_numeric": row[24],
                             "sanctions": row[25],
                             "ksg": row[26],
