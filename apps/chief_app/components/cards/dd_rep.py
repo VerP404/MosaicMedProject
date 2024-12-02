@@ -92,8 +92,9 @@ def update_dd_table(api_data, n_intervals):
     if df.empty:
         return [], []
 
+    df["%"] = (df["Итого"] / df["План"] * 100).round(2).fillna(0)
     # Изменяем порядок столбцов: goal, Итого, месяцы
-    reordered_columns = ["goal", "Итого"] + [str(i) for i in range(1, 13)]
+    reordered_columns = ["goal", "План", "Итого", "%"] + [str(i) for i in range(1, 13)]
     df = df[reordered_columns]
 
     # Определяем текущую группу
@@ -101,7 +102,7 @@ def update_dd_table(api_data, n_intervals):
     current_group = GROUPS[current_group_index]
 
     # Фильтруем строки по текущей группе
-    filtered_df = df[df["goal"].isin(current_group)]
+    filtered_df = df[df["goal"].isin(current_group)].copy()
     # Переименование столбца 'goal' в 'Цель'
     filtered_df.rename(columns={"goal": "Цель"}, inplace=True)
     # Подготовка данных для таблицы

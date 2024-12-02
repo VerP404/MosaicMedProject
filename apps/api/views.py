@@ -21,7 +21,6 @@ class BaseQueryAPI(APIView):
             query = query_api_month(
                 year, months
             )
-            print(query)
             # Выполнение SQL-запроса
             with connection.cursor() as cursor:
                 cursor.execute(query)
@@ -49,7 +48,6 @@ class DDQueryAPI(APIView):
             query = query_api_dd(
                 year, months
             )
-            print(query)
             # Выполнение SQL-запроса
             with connection.cursor() as cursor:
                 cursor.execute(query)

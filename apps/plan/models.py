@@ -563,3 +563,14 @@ class UnifiedFilterCondition(models.Model):
 
     def __str__(self):
         return f"{self.field_name} ({self.filter_type}): {self.values}"
+
+
+class ChiefDashboard(models.Model):
+    name = models.CharField(verbose_name="Название", max_length=100)
+    goal = models.CharField(verbose_name="Цель", max_length=100)
+    year = models.IntegerField(verbose_name="Год", default=datetime.now().year)
+    plan = models.IntegerField(verbose_name="План", default=0)
+    finance = models.DecimalField(verbose_name="Финансы", max_digits=10, decimal_places=2, default=0.00)
+
+    class Meta:
+        unique_together = ('name', 'goal', 'year')
