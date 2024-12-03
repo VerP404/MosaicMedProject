@@ -399,9 +399,9 @@ class StatusFilter(SimpleListFilter):
 
 @admin.register(DigitalSignature)
 class DigitalSignatureAdmin(admin.ModelAdmin):
-    list_display = ('person', 'valid_from', 'valid_to', 'issued_date', 'revoked_date', 'status')
+    list_display = ('person', 'valid_from', 'valid_to', 'scan', 'scan_uploaded_at', 'added_at', 'status')
     search_fields = ('person__last_name', 'person__first_name')
-    list_filter = ('valid_from', 'valid_to', StatusFilter)  # Добавляем фильтр
+    list_filter = ('valid_from', 'valid_to', 'scan_uploaded_at', StatusFilter)
 
     def status(self, obj):
         today = date.today()
@@ -410,5 +410,4 @@ class DigitalSignatureAdmin(admin.ModelAdmin):
         else:
             return format_html('<span style="color: red;">✘</span>')
 
-    status.short_description = 'Статус'
     status.short_description = 'Статус'

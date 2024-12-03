@@ -138,6 +138,14 @@ class RG014(models.Model):
     def __str__(self):
         return f"{self.person} - {self.spec_name} - {self.post_name}"
 
+def digital_signature_upload_path(instance, filename):
+    """
+    Создает путь для сохранения файлов сканов, привязанный к ID человека.
+    Пример: uploads/digital_signatures/{person_id}/{filename}
+    """
+    return os.path.join(
+        'digital_signatures', str(instance.person.id), filename
+    )
 
 class DigitalSignature(models.Model):
     person = models.ForeignKey('Person', on_delete=models.CASCADE, related_name='digital_signatures')
@@ -145,7 +153,19 @@ class DigitalSignature(models.Model):
     valid_to = models.DateField("Действует по")
     issued_date = models.DateField("Дата передачи врачу", blank=True, null=True)
     revoked_date = models.DateField("Дата аннулирования", blank=True, null=True)
+    scan = models.FileField(
+        "Скан ЭЦП",
+        upload_to=digital_signature_upload_path,
+        blank=True,
+        null=True
+    )
+    scan_uploaded_at = models.DateTimeField(
+        "Дата загрузки скана",
+        blank=True,
+        null=True
+    )
 
+    added_at = models.DateTimeField("Дата добавления", auto_now_add=True)
     class Meta:
         verbose_name = "ЭЦП"
         verbose_name_plural = "ЭЦП"
