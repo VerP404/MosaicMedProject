@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -52,6 +53,17 @@ class Person(models.Model):
     class Meta:
         verbose_name = "Физическое лицо"
         verbose_name_plural = "Врачи"
+
+    @property
+    def is_on_maternity_leave(self):
+        """
+        Проверяет, есть ли активный декретный период для сотрудника.
+        """
+        today = datetime.now().date()
+        return self.maternity_leaves.filter(
+            models.Q(end_date__isnull=True) | models.Q(end_date__gte=today),
+            start_date__lte=today
+        ).exists()
 
     def __str__(self):
         return f"{self.last_name} {self.first_name} {self.patronymic or ''}".strip()
@@ -184,5 +196,34 @@ class DigitalSignature(models.Model):
 
         super().save(*args, **kwargs)
 
+    def clean(self):
+        super().clean()
+        # Проверка, если одно из полей заполнено, а другое — нет
+        if (self.valid_from and not self.valid_to) or (self.valid_to and not self.valid_from):
+            raise ValidationError({
+                'valid_from': 'Если указано одно из полей (Действует с или Действует по), то оба должны быть заполнены.',
+                'valid_to': 'Если указано одно из полей (Действует с или Действует по), то оба должны быть заполнены.',
+            })
+
     def __str__(self):
         return f"ЭЦП для {self.person} (Действует с {self.valid_from} по {self.valid_to})"
+
+
+class MaternityLeave(models.Model):
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.CASCADE,
+        related_name='maternity_leaves',
+        verbose_name="Физическое лицо"
+    )
+    start_date = models.DateField("Дата начала декрета")
+    end_date = models.DateField("Дата окончания декрета", blank=True, null=True)
+    note = models.TextField("Примечание", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Декрет"
+        verbose_name_plural = "Декреты"
+        ordering = ['start_date']
+
+    def __str__(self):
+        return f"Декрет с {self.start_date} по {self.end_date or 'настоящее время'} ({self.person})"

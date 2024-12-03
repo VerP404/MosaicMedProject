@@ -46,6 +46,14 @@ class DigitalSignatureInline(admin.TabularInline):
     verbose_name_plural = "ЭЦП"
 
 
+class MaternityLeaveInline(admin.TabularInline):
+    model = MaternityLeave
+    extra = 0
+    fields = ('start_date', 'end_date', 'note')
+    verbose_name = "Декрет"
+    verbose_name_plural = "Декреты"
+
+
 class DigitalSignatureFilter(admin.SimpleListFilter):
     title = 'ЭЦП'
     parameter_name = 'digital_signature_status'
@@ -64,6 +72,35 @@ class DigitalSignatureFilter(admin.SimpleListFilter):
         elif self.value() == 'inactive':
             return queryset.exclude(digital_signatures__valid_from__lte=today,
                                     digital_signatures__valid_to__gte=today).distinct()
+
+
+class MaternityLeaveFilter(admin.SimpleListFilter):
+    title = "В декрете"
+    parameter_name = "is_on_maternity_leave"
+
+    def lookups(self, request, model_admin):
+        return (
+            ('yes', "Да"),
+            ('no', "Нет"),
+        )
+
+    def queryset(self, request, queryset):
+        today = datetime.now().date()
+        if self.value() == 'yes':
+            return queryset.filter(
+                maternity_leaves__start_date__lte=today
+            ).filter(
+                models.Q(maternity_leaves__end_date__isnull=True) |
+                models.Q(maternity_leaves__end_date__gte=today)
+            ).distinct()
+        elif self.value() == 'no':
+            # Исключаем записи с активными декретами
+            return queryset.exclude(
+                maternity_leaves__start_date__lte=today
+            ).distinct()
+
+
+
 
 
 class DoctorCodeFilter(admin.SimpleListFilter):
@@ -273,9 +310,10 @@ class DoctorRecordAdmin(admin.ModelAdmin):
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
-    list_display = ('last_name', 'first_name', 'snils', 'email', 'phone_number', 'telegram', 'digital_signature_status')
+    list_display = ('last_name', 'first_name', 'snils', 'email', 'phone_number', 'telegram', 'digital_signature_status',
+                    'maternity_leave_status')
     search_fields = ('last_name', 'first_name', 'snils')
-    list_filter = ('citizenship', DigitalSignatureFilter)
+    list_filter = ('citizenship', DigitalSignatureFilter, MaternityLeaveFilter)
     fieldsets = (
         (None, {
             'fields': ('snils', 'last_name', 'first_name', 'patronymic', 'date_of_birth', 'gender', 'citizenship')
@@ -284,7 +322,7 @@ class PersonAdmin(admin.ModelAdmin):
             'fields': ('email', 'phone_number', 'telegram')
         }),
     )
-    inlines = [DoctorRecordInline, RG014Inline, DigitalSignatureInline]
+    inlines = [DoctorRecordInline, RG014Inline, DigitalSignatureInline, MaternityLeaveInline]
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -300,6 +338,13 @@ class PersonAdmin(admin.ModelAdmin):
             return format_html('<span style="color: red;">✘</span>')
 
     digital_signature_status.short_description = 'ЭЦП'
+
+    def maternity_leave_status(self, obj):
+        if obj.is_on_maternity_leave:
+            return format_html('<span style="color: green;">✔</span>')
+        return format_html('<span style="color: red;">✘</span>')
+
+    maternity_leave_status.short_description = "В декрете"
 
 
 @admin.register(RG014)
