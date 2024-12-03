@@ -1,3 +1,6 @@
+import os
+from datetime import datetime
+
 from django.db import models
 
 
@@ -138,6 +141,7 @@ class RG014(models.Model):
     def __str__(self):
         return f"{self.person} - {self.spec_name} - {self.post_name}"
 
+
 def digital_signature_upload_path(instance, filename):
     """
     Создает путь для сохранения файлов сканов, привязанный к ID человека.
@@ -147,10 +151,13 @@ def digital_signature_upload_path(instance, filename):
         'digital_signatures', str(instance.person.id), filename
     )
 
+
 class DigitalSignature(models.Model):
     person = models.ForeignKey('Person', on_delete=models.CASCADE, related_name='digital_signatures')
-    valid_from = models.DateField("Действует с")
-    valid_to = models.DateField("Действует по")
+    application_date = models.DateField("Дата заявления", blank=True, null=True)
+    valid_from = models.DateField("Действует с", blank=True, null=True)
+    valid_to = models.DateField("Действует по", blank=True, null=True)
+
     issued_date = models.DateField("Дата передачи врачу", blank=True, null=True)
     revoked_date = models.DateField("Дата аннулирования", blank=True, null=True)
     scan = models.FileField(
@@ -164,11 +171,18 @@ class DigitalSignature(models.Model):
         blank=True,
         null=True
     )
-
     added_at = models.DateTimeField("Дата добавления", auto_now_add=True)
+
     class Meta:
         verbose_name = "ЭЦП"
         verbose_name_plural = "ЭЦП"
+
+    def save(self, *args, **kwargs):
+        # Устанавливаем дату загрузки скана
+        if self.scan and not self.scan_uploaded_at:
+            self.scan_uploaded_at = datetime.now()
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"ЭЦП для {self.person} (Действует с {self.valid_from} по {self.valid_to})"

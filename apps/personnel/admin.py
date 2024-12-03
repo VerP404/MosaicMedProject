@@ -18,7 +18,7 @@ from ..organization.models import MiskauzDepartment, OMSDepartment
 class DoctorRecordInline(admin.TabularInline):
     model = DoctorRecord
     form = DoctorRecordForm
-    extra = 1  # Количество пустых строк для добавления новых записей врача
+    extra = 0
     fields = (
         'doctor_code', 'start_date', 'end_date', 'department', 'specialty', 'profile',)
     verbose_name = "Запись врача"
@@ -28,7 +28,7 @@ class DoctorRecordInline(admin.TabularInline):
 class RG014Inline(admin.TabularInline):
     model = RG014
     form = RG014Form  # Используем форму с автозаполнением
-    extra = 1
+    extra = 0
     fields = ('spec_issue_date', 'spec_name', 'cert_accred_sign', 'post_name', 'hire_date',
               'dismissal_date')
     verbose_name = "Запись RG014"
@@ -37,9 +37,11 @@ class RG014Inline(admin.TabularInline):
 
 class DigitalSignatureInline(admin.TabularInline):
     model = DigitalSignature
-    form = DigitalSignatureForm
-    extra = 1  # Количество пустых строк для добавления новых записей
-    fields = ('valid_from', 'valid_to', 'issued_date', 'revoked_date')
+    extra = 0
+    fields = (
+        'added_at', 'application_date', 'valid_from', 'valid_to', 'issued_date', 'scan', 'scan_uploaded_at',
+        'revoked_date')
+    readonly_fields = ('scan_uploaded_at', 'added_at')
     verbose_name = "ЭЦП"
     verbose_name_plural = "ЭЦП"
 
