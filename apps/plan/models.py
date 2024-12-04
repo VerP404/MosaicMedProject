@@ -574,3 +574,7 @@ class ChiefDashboard(models.Model):
 
     class Meta:
         unique_together = ('name', 'goal', 'year')
+        verbose_name = "Показатель"
+        verbose_name_plural = "Панель главного врача"
+
+
