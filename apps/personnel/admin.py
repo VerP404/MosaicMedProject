@@ -59,19 +59,36 @@ class DigitalSignatureFilter(admin.SimpleListFilter):
     parameter_name = 'digital_signature_status'
 
     def lookups(self, request, model_admin):
+        queryset = model_admin.get_queryset(request)
         return (
-            ('active', 'С ЭЦП'),
-            ('inactive', 'Без ЭЦП'),
+            ('active', f'С ЭЦП ({self.get_count(queryset, True)})'),
+            ('inactive', f'Без ЭЦП ({self.get_count(queryset, False)})'),
         )
+
+    def get_count(self, queryset, is_active):
+        today = date.today()
+        if is_active:
+            return queryset.filter(
+                digital_signatures__valid_from__lte=today,
+                digital_signatures__valid_to__gte=today
+            ).distinct().count()
+        return queryset.exclude(
+            digital_signatures__valid_from__lte=today,
+            digital_signatures__valid_to__gte=today
+        ).distinct().count()
 
     def queryset(self, request, queryset):
         today = date.today()
         if self.value() == 'active':
-            return queryset.filter(digital_signatures__valid_from__lte=today,
-                                   digital_signatures__valid_to__gte=today).distinct()
+            return queryset.filter(
+                digital_signatures__valid_from__lte=today,
+                digital_signatures__valid_to__gte=today
+            ).distinct()
         elif self.value() == 'inactive':
-            return queryset.exclude(digital_signatures__valid_from__lte=today,
-                                    digital_signatures__valid_to__gte=today).distinct()
+            return queryset.exclude(
+                digital_signatures__valid_from__lte=today,
+                digital_signatures__valid_to__gte=today
+            ).distinct()
 
 
 class MaternityLeaveFilter(admin.SimpleListFilter):
@@ -100,7 +117,29 @@ class MaternityLeaveFilter(admin.SimpleListFilter):
             ).distinct()
 
 
+class DigitalSignatureApplicationFilter(admin.SimpleListFilter):
+    title = 'Состояние заявления'
+    parameter_name = 'application_status'
 
+    def lookups(self, request, model_admin):
+        return (
+            ('no_application', 'Нет заявления'),
+            ('submitted', 'Заявление подано'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'no_application':
+            return queryset.filter(
+                digital_signatures__scan__isnull=False,
+                digital_signatures__application_date__isnull=True,
+                digital_signatures__valid_from__isnull=True
+            ).distinct()
+        elif self.value() == 'submitted':
+            return queryset.filter(
+                digital_signatures__scan__isnull=False,
+                digital_signatures__application_date__isnull=False,
+                digital_signatures__valid_from__isnull=True
+            ).distinct()
 
 
 class DoctorCodeFilter(admin.SimpleListFilter):
@@ -313,7 +352,7 @@ class PersonAdmin(admin.ModelAdmin):
     list_display = ('last_name', 'first_name', 'snils', 'email', 'phone_number', 'telegram', 'digital_signature_status',
                     'maternity_leave_status')
     search_fields = ('last_name', 'first_name', 'snils')
-    list_filter = ('citizenship', DigitalSignatureFilter, MaternityLeaveFilter)
+    list_filter = ('citizenship', DigitalSignatureFilter, MaternityLeaveFilter, DigitalSignatureApplicationFilter)
     fieldsets = (
         (None, {
             'fields': ('snils', 'last_name', 'first_name', 'patronymic', 'date_of_birth', 'gender', 'citizenship')
