@@ -47,12 +47,6 @@ footer = dbc.Container(
                             children=str(current_year),
                             style={"color": COLORS["text"], "cursor": "pointer"}
                         ),
-                        html.Span(
-                            "План",
-                            id="plan-link",
-                            style={"color": COLORS["text"], "marginLeft": "10px", "cursor": "pointer",
-                                   "textDecoration": "underline"},
-                        ),
                         html.Div(
                             id="year-options",
                             children=[
@@ -61,29 +55,30 @@ footer = dbc.Container(
                                     id={"type": "dropdown-year", "year": year},
                                     style={"color": COLORS["text"], "padding": "5px", "cursor": "pointer"},
                                 ) for year in years
+                            ],
+                            style={
+                                "display": "none",  # Скрываем меню по умолчанию
+                                "position": "absolute",
+                                "bottom": "25px",  # Открытие вверх
+                                "backgroundColor": COLORS["header_footer"],
+                                "border": "1px solid white",
+                                "zIndex": "10",
+                                "padding": "5px",
+                            }
+                        ),
+                    ],
+                    style={"textAlign": "right", "position": "relative"}
+                ),
+                width=2,
+            ),
         ],
-        style={
-            "display": "none",  # Скрываем меню по умолчанию
-            "position": "absolute",
-            "bottom": "25px",  # Открытие вверх
-            "backgroundColor": COLORS["header_footer"],
-            "border": "1px solid white",
-            "zIndex": "10",
-            "padding": "5px",
-        }
+        style={"backgroundColor": COLORS["header_footer"], "color": COLORS["text"]},
+        className="fixed-bottom",
+        align="center",
     ),
-],
-style = {"textAlign": "right", "position": "relative"}
-),
-width = 2,
-),
-],
-style = {"backgroundColor": COLORS["header_footer"], "color": COLORS["text"]},
-className = "fixed-bottom",
-align = "center",
-),
-fluid = True,
+    fluid=True,
 )
+
 
 # Callback для обработки выбора года
 @app.callback(
@@ -114,12 +109,3 @@ def update_selected_year(*args):
         }, str(current_year)
 
     return str(current_year), {"display": "none"}, str(current_year)
-
-
-@app.callback(
-    Output("url", "pathname"),
-    Input("plan-link", "n_clicks"),
-    prevent_initial_call=True
-)
-def open_plan_page(n_clicks):
-    return "/plan"  # URL для страницы "План"

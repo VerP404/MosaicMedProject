@@ -8,7 +8,7 @@ from django.urls import reverse
 from django import forms
 
 from .models import GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition, AnnualPlan, \
-    BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan, GroupBuildingDepartment
+    BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan, GroupBuildingDepartment, ChiefDashboard
 from .utils import copy_filters_to_new_year
 from ..organization.models import Department
 
@@ -366,3 +366,10 @@ class UnifiedFilterAdmin(admin.ModelAdmin):
     list_display = ('year', 'type', 'combined_conditions')
     search_fields = ('year', 'type',)
     inlines = [UnifiedFilterConditionInline]
+
+
+@admin.register(ChiefDashboard)
+class ChiefDashboardAdmin(admin.ModelAdmin):
+    list_display = ('name', 'goal', 'year', 'plan', 'finance')
+    search_fields = ('name', 'goal', 'year')
+    list_filter = ('name', 'goal', 'year')

@@ -7,10 +7,14 @@ engine = create_engine(
     f'postgresql://{postgres_settings["USER"]}:{postgres_settings["PASSWORD"]}@{postgres_settings["HOST"]}:{postgres_settings["PORT"]}/{postgres_settings["NAME"]}')
 
 
-def execute_query(sql_query):
+def execute_query(sql_query, params=None):
     with engine.connect() as connection:
-        result = connection.execute(text(sql_query))
-        return result.fetchall()
+        result = connection.execute(text(sql_query), params)
+        if result.returns_rows:
+            return result.fetchall()
+        else:
+            return result.rowcount
+
 
 
 def text_sql_query(query_id):
