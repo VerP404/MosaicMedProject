@@ -59,7 +59,7 @@ AS "Цель",
        LPAD(CAST(EXTRACT(DAY FROM ca.DATEBIRTH) AS VARCHAR(2)), 2, '0') || '-' ||
        LPAD(CAST(EXTRACT(MONTH FROM ca.DATEBIRTH) AS VARCHAR(2)), 2, '0') || '-' ||
        CAST(EXTRACT(YEAR FROM ca.DATEBIRTH) AS VARCHAR(4))                                             AS "Дата рождения",
-       '-'                                                                                             AS "Возраст",
+       CAST(EXTRACT(YEAR FROM ca.DATENDVST) - EXTRACT(YEAR FROM ca.DATEBIRTH) AS VARCHAR(4)) AS "Возраст",
        ca.IDSEX                                                                                        AS "Пол",
        ca.SERNUMPOLICYOMS                                                                              AS "Полис",
        CASE
