@@ -321,8 +321,8 @@ AS "Код СМО",
                '-')                                                                                    AS "Дата последнего изменения",
        '-'                                                                                             AS "Тариф",
        case
-           when ACCOUNTS.SUMSPROMS is null then 0
-           else ACCOUNTS.SUMSPROMS
+           when ca.SUMSPROMS is null then 0
+           else ca.SUMSPROMS
 end
 AS "Сумма",
        '-'                                                                                             AS "Оплачено",
