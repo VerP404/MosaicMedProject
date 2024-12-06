@@ -55,10 +55,10 @@ class Command(BaseCommand):
             # Если параметры не заданы, используем последние 24 часа
             date_end = datetime.now()
             date_start = date_end - timedelta(days=1)
-            year_end = datetime.now().year
         # Форматируем даты для SQL-запроса в формате 'ДД.ММ.ГГГГ'
         date_start_str = date_start.strftime('%d.%m.%Y')
         date_end_str = date_end.strftime('%d.%m.%Y')
+        year_end = datetime.now().year
 
         # Выполняем подключение к Firebird и загрузку данных
         try:

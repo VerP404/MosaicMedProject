@@ -376,5 +376,5 @@ FROM CASESSTAC AS ca
                                           FROM ACCOUNTS sub_a
                                           WHERE sub_a.IDCASEAMB = a.IDCASEAMB)) ACCOUNTS ON ca.ID = ACCOUNTS.IDCASEAMB
 WHERE ca.DATEUPDATE BETWEEN '{date_start}' AND '{date_end}'
-and and ca.DATENDVST like '%2024%';
+and and ca.DATENDVST like '%{year_end}%';
 """
