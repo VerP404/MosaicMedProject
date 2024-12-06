@@ -262,7 +262,7 @@ SELECT ca.ID                            AS "Талон",
 END
 AS "Статус",
        '-'                                                                                             AS "Тип талона",
-       '-' AS "Цель",
+       'Стационарно' AS "Цель",
        '-'                                                                                             AS "Фед. цель",
        ca.SURNAME || ' ' || ca.FIRSTNAME || ' ' || ca.PATRONYMIC                                       AS "Пациент",
        LPAD(CAST(EXTRACT(DAY FROM ca.DATEBIRTH) AS VARCHAR(2)), 2, '0') || '-' ||
