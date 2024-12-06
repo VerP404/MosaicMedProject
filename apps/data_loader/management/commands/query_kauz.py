@@ -261,7 +261,7 @@ SELECT ca.ID                            AS "Талон",
            ELSE ca.IDSTATUSACCOUNT
 END
 AS "Статус",
-       '-'                                                                                             AS "Тип талона",
+       'Стационар'                                                                                          AS "Тип талона",
        'Стационарно' AS "Цель",
        '-'                                                                                             AS "Фед. цель",
        ca.SURNAME || ' ' || ca.FIRSTNAME || ' ' || ca.PATRONYMIC                                       AS "Пациент",
