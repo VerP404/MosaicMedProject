@@ -157,7 +157,7 @@ def sql_query_dispensary_uniq(selected_year, months_placeholder, inogorod, sanct
     , 
     oms_order_filter as (
         select * 
-        from talon 
+        from oms 
         where target_categories like '%Диспансеризация детей%'
         order by report_month_number, enp),
     oms_distinct_filter as (

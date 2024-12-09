@@ -16,3 +16,5 @@ celery_debug.log
 
 *.rar
 *.sql
+/.env_16
+/.env_test
