@@ -222,6 +222,20 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
             treatment_end=end_date_treatment_formatted
         )
     )
+    print(sql_query_dispensary_children(
+            selected_year,
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy,
+            sanction,
+            amount_null,
+            building=None,
+            profile=None,
+            doctor=None,
+            input_start=start_date_input_formatted,
+            input_end=end_date_input_formatted,
+            treatment_start=start_date_treatment_formatted,
+            treatment_end=end_date_treatment_formatted
+        ))
     columns2, data2 = TableUpdater.query_to_df(
         engine,
         sql_query_dispensary_building_children(
