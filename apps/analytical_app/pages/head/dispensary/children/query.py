@@ -19,7 +19,7 @@ def sql_query_dispensary_children(selected_year, months_placeholder, inogorod, s
     {base}
     SELECT goal,
            {columns_by_status_oms()}
-           FROM talon
+           FROM oms
            WHERE target_categories like '%Диспансеризация детей%'
            group by goal;
     """
@@ -44,7 +44,7 @@ def sql_query_dispensary_building_children(selected_year, months_placeholder, in
     SELECT building, 
             goal,
            {columns_by_status_oms()}
-           FROM talon
+           FROM oms
            WHERE target_categories like '%Диспансеризация детей%'
            group by building, goal;
     """
@@ -70,7 +70,7 @@ def sql_query_dispensary_building_department_children(selected_year, months_plac
     SELECT building, department, 
             goal,
            {columns_by_status_oms()}
-           FROM talon
+           FROM oms
            WHERE target_categories like '%Диспансеризация детей%'
            group by building, department, goal;
     """
@@ -98,7 +98,7 @@ def sql_query_dispensary_age_children(selected_year, months_placeholder, inogoro
            COUNT(*)                                                                   AS "Всего",
            SUM(CASE WHEN gender = 'М' THEN 1 ELSE 0 END) AS "М",
            SUM(CASE WHEN gender = 'Ж' THEN 1 ELSE 0 END) AS "Ж"              
-           FROM talon
+           FROM oms
            WHERE target_categories like '%Диспансеризация детей%'
            group by age
            order by age;
@@ -130,7 +130,7 @@ def sql_query_dispensary_amount_group(selected_year, months_placeholder, inogoro
        sum(case when amount_numeric >= 3000 and amount_numeric < 4000 then 1 else 0 end) as "3000-4000",
        sum(case when amount_numeric >= 4000 and amount_numeric < 5000 then 1 else 0 end) as "4000-5000",
        sum(case when amount_numeric >= 5000  then 1 else 0 end) as ">5000"         
-           FROM talon
+           FROM oms
            WHERE target_categories like '%Диспансеризация детей%'
            group by "-";
     """
