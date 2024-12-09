@@ -67,14 +67,16 @@ class MISKAUZLPUAPIView(APIView):
     def get(self, request):
         try:
             from apps.home.models import MainSettings
-
+            from apps.organization.models import MedicalOrganization
             # Подключение к базе данных Firebird
             settings = MainSettings.objects.first()
+            organization = MedicalOrganization.objects.first()
             if not settings:
                 return Response({"error": "Настройки подключения не найдены."},
                                 status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             dsn = f"{settings.kauz_server_ip}:{settings.kauz_database_path}"
+            code = organization.code_mo
             with fdb.connect(
                     dsn=dsn,
                     user=settings.kauz_user,
@@ -83,7 +85,7 @@ class MISKAUZLPUAPIView(APIView):
                     port=settings.kauz_port
             ) as con:
                 cursor = con.cursor()
-                cursor.execute("SELECT NAME FROM LPU")
+                cursor.execute(f"SELECT NAME FROM LPU WHERE CODE = '{code}'")
                 rows = cursor.fetchall()
 
             # Формируем список имен
