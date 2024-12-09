@@ -1,3 +1,4 @@
+import fdb
 from django.db import connection
 from rest_framework import status
 from rest_framework.response import Response
@@ -33,6 +34,7 @@ class BaseQueryAPI(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+
 class DDQueryAPI(APIView):
     def get(self, request):
         try:
@@ -59,3 +61,33 @@ class DDQueryAPI(APIView):
             return Response(data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MISKAUZLPUAPIView(APIView):
+    def get(self, request):
+        try:
+            from apps.home.models import MainSettings
+
+            # Подключение к базе данных Firebird
+            settings = MainSettings.objects.first()
+            if not settings:
+                return Response({"error": "Настройки подключения не найдены."},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            dsn = f"{settings.kauz_server_ip}:{settings.kauz_database_path}"
+            with fdb.connect(
+                    dsn=dsn,
+                    user=settings.kauz_user,
+                    password=settings.kauz_password,
+                    charset='WIN1251',
+                    port=settings.kauz_port
+            ) as con:
+                cursor = con.cursor()
+                cursor.execute("SELECT NAME FROM LPU")
+                rows = cursor.fetchall()
+
+            # Формируем список имен
+            names = [{"name": row[0]} for row in rows]
+            return Response(names, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
