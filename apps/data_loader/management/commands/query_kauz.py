@@ -167,7 +167,7 @@ FROM CASESAMB AS ca
                     WHERE a.DATACCOUNT = (SELECT MAX(sub_a.DATACCOUNT)
                                           FROM ACCOUNTS sub_a
                                           WHERE sub_a.IDCASEAMB = a.IDCASEAMB)) ACCOUNTS ON ca.ID = ACCOUNTS.IDCASEAMB
-WHERE ca.DATEUPDATE BETWEEN '{date_start}' AND '{date_end}';
+WHERE COALESCE(ca.DATEUPDATE, ca.DATEINSERT) BETWEEN '{date_start}' AND '{date_end}';
 """
 
 
