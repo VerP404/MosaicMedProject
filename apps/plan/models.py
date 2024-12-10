@@ -109,7 +109,12 @@ class FilterCondition(models.Model):
 
     def clean(self):
         super().clean()
-        # Проверяем, есть ли уже запись с такими же полями
+
+        # Проверяем, сохранена ли связанная группа
+        if not self.group_id:
+            raise ValidationError("Связанная группа должна быть сохранена перед созданием условий фильтра.")
+
+        # Проверяем наличие дубликатов
         existing = FilterCondition.objects.filter(
             group=self.group,
             field_name=self.field_name,
@@ -118,6 +123,7 @@ class FilterCondition(models.Model):
         )
         if self.pk:
             existing = existing.exclude(pk=self.pk)
+
         if existing.exists():
             raise ValidationError("Условие фильтра с такими параметрами уже существует для данной группы и года.")
 

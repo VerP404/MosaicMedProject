@@ -18,3 +18,4 @@ celery_debug.log
 *.sql
 /.env_16
 /.env_test
+/.env_ram

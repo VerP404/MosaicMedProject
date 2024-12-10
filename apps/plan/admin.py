@@ -132,6 +132,27 @@ class GroupIndicatorsAdmin(admin.ModelAdmin):
         }),
     )
 
+    def save_model(self, request, obj, form, change):
+        """
+        Сохраняем объект группы перед обработкой инлайнов.
+        """
+        if not obj.pk:
+            obj.save()
+        super().save_model(request, obj, form, change)
+
+    def save_formset(self, request, form, formset, change):
+        """
+        Переопределяем сохранение формы, чтобы убедиться, что инлайн-объекты сохраняются только после группы.
+        """
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if isinstance(instance, FilterCondition):
+                # Убедимся, что у FilterCondition есть связанная группа
+                if not instance.group_id:
+                    instance.group = form.instance  # Связываем с группой
+            instance.save()
+        formset.save_m2m()
+
     def latest_filter_year(self, obj):
         # Метод для отображения последнего года фильтра
         latest_filter = obj.filters.order_by('-year').first()
