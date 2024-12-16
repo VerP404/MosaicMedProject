@@ -231,6 +231,7 @@ def columns_by_status_oms():
                SUM(CASE WHEN status = '1' THEN 1 ELSE 0 END)  AS "1",
                SUM(CASE WHEN status = '2' THEN 1 ELSE 0 END)  AS "2",
                SUM(CASE WHEN status = '3' THEN 1 ELSE 0 END)  AS "3",
+               SUM(CASE WHEN status = '4' THEN 1 ELSE 0 END)  AS "4",
                SUM(CASE WHEN status = '5' THEN 1 ELSE 0 END)  AS "5",
                SUM(CASE WHEN status = '6' THEN 1 ELSE 0 END)  AS "6",
                SUM(CASE WHEN status = '7' THEN 1 ELSE 0 END)  AS "7",
