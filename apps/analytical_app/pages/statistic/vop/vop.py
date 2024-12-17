@@ -4,6 +4,7 @@ import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import get_selected_dates, TableUpdater
+from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.statistic.vop.query import sql_query_vop
 from apps.analytical_app.query_executor import engine
 
@@ -84,20 +85,7 @@ statistic_vop = html.Div(
                           style={'padding': '0 0 0 10px'}),
             ]
         ),
-        # Блок 2: Диспансеризация
-        html.Div(
-            [
-                dbc.Alert('Отчет по ВОП', className='label', color="info"),
-                dash_table.DataTable(id=f'result-table-{type_page}',
-                                     columns=[],
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     ),
-            ], className='block'),
+        card_table(f'result-table-{type_page}', "Отчет по ВОП", 15),
     ]
 )
 
