@@ -4,6 +4,7 @@ import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import get_selected_dates, TableUpdater
+from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.statistic.visits.query import sql_query_visits, sql_query_visits_korpus, \
     sql_query_visits_korpus_spec, sql_query_visits_pos_home
 from apps.analytical_app.query_executor import engine
@@ -54,61 +55,18 @@ statistic_visits = html.Div(
                 html.H3('Отчет по количеству посещений пациентами взрослыми и детьми', className='label'),
                 dbc.Alert(dcc.Markdown(alert_text1), color="danger", style={'padding': '0 0 0 10px'}),
                 html.Div(id=f'selected-date1-{type_page}', className='filters-label'),
-                dash_table.DataTable(id=f'result-table1-{type_page}',
-                                     columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     ),
-            ], className='block', style={'width': '800px'}),
+                card_table(f'result-table1-{type_page}', "Посещения пациентов", 15),
+
+            ], className='block', style={'width': '900px'}),
         html.Hr(),
-        html.Div(
-            [
-                html.H3('Отчет по количеству посещений пациентами по корпусам', className='label'),
-                html.Div(id=f'selected-date2-{type_page}', className='filters-label'),
-                dash_table.DataTable(id=f'result-table2-{type_page}',
-                                     columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     ),
-            ], className='block', style={'width': '800px'}),
-        html.Hr(),
-        html.Div(
-            [
-                html.H3('Отчет по количеству посещений пациентами по корпусам и специальностям', className='label'),
-                html.Div(id=f'selected-date3-{type_page}', className='filters-label'),
-                dash_table.DataTable(id=f'result-table3-{type_page}',
-                                     columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     ),
-            ], className='block', style={'width': '1000px'}),
-        html.Hr(),
-        html.Div(
-            [
-                html.H3('Отчет по количеству посещений на дому', className='label'),
-                html.Div(id=f'selected-date4-{type_page}', className='filters-label'),
-                dash_table.DataTable(id=f'result-table4-{type_page}',
-                                     columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     ),
-            ], className='block', style={'width': '350px'}),
+        html.Div(id=f'selected-date2-{type_page}', className='filters-label'),
+        card_table(f'result-table2-{type_page}', "Отчет по количеству посещений пациентами по корпусам", 15),
+        html.Div(id=f'selected-date3-{type_page}', className='filters-label'),
+        card_table(f'result-table3-{type_page}',
+                   "Отчет по количеству посещений пациентами по корпусам и специальностям", 15),
+        html.Div(id=f'selected-date4-{type_page}', className='filters-label'),
+        card_table(f'result-table4-{type_page}',
+                   "Отчет по количеству посещений на дому", 15),
     ]
 )
 

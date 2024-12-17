@@ -3,6 +3,7 @@ from dash import html, dcc, Output, Input, dash_table
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import get_selected_dates, TableUpdater
+from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.statistic.result_pneumonia.query import sql_query_pneumonia_in_talon, \
     sql_query_pneumonia_in_talon_korpus_first, sql_query_pneumonia_in_talon_korpus_second
 from apps.analytical_app.query_executor import engine
@@ -41,48 +42,10 @@ statistic_pneumonia = html.Div(
                 html.Div(id=f'selected-date-{type_page}', className='filters-label'),
 
             ], className='filter'),
-        html.Div(
-            [
-                html.H3('Отчет по пневмониям в талонах ОМС', className='label'),
-                dash_table.DataTable(id=f'result-table-{type_page}',
-                                     columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     ),
-            ], className='block'),
         html.Hr(),
-        html.Div(
-            [
-                html.H3('Первичные по подразделениям', className='label'),
-                dash_table.DataTable(id=f'result-table1-{type_page}',
-                                     columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     ),
-            ], className='block'),
-        html.Hr(),
-        html.Div(
-            [
-                html.H3('Повторные по подразделениям', className='label'),
-                dash_table.DataTable(id=f'result-table2-{type_page}',
-                                     columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     ),
-            ], className='block'),
-        html.Hr(),
+        card_table(f'result-table-{type_page}', "Отчет по пневмониям в талонах ОМС", 15),
+        card_table(f'result-table1-{type_page}', "Первичные по подразделениям", 15),
+        card_table(f'result-table2-{type_page}', "Повторные по подразделениям", 15),
     ]
 )
 

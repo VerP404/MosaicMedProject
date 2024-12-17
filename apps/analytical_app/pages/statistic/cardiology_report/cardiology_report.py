@@ -4,6 +4,7 @@ import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import get_selected_dates, TableUpdater
+from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.statistic.cardiology_report.query import sql_query_cardiology_report
 from apps.analytical_app.query_executor import engine
 
@@ -52,21 +53,7 @@ statistic_cardiology = html.Div(
                 dbc.Alert(dcc.Markdown(alert_text1), color="danger", style={'padding': '0 0 0 10px'}),
             ], className='block'),
         html.Hr(),
-        html.Div(
-            [
-                dash_table.DataTable(id=f'result-table-{type_page}',
-                                     columns=[],
-                                     export_format='xlsx',
-                                     export_headers='display',
-                                     editable=True,
-                                     filter_action="native",
-                                     sort_action="native",
-                                     sort_mode='multi',
-                                     style_data={'width': '800px', "text-align": "left"},
-                                     style_table={'width': '800px'}
-                                     ),
-            ], className='block'),
-
+        card_table(f'result-table-{type_page}', "Кардиологический отчет по талонам ОМС", 15),
     ]
 )
 
