@@ -5,7 +5,7 @@ from apps.analytical_app.components.filters import get_current_reporting_month, 
 
 
 # Функция для создания таблицы с возможностью выбора колонок
-def card_table(id_table, card_header, page_size=None, column_selectable=None):
+def card_table(id_table, card_header, page_size=None, column_selectable=None, show_sum_button=False):
     table_kwargs = {
         'id': id_table,
         'editable': False,
@@ -24,6 +24,12 @@ def card_table(id_table, card_header, page_size=None, column_selectable=None):
     if column_selectable is not None:
         table_kwargs['column_selectable'] = column_selectable
 
+    sum_button_section = dbc.Row([
+        dbc.Col(html.Button("Суммировать", id=f'sum-button-{id_table}',
+                            className="btn btn-primary"), width=4),
+        dbc.Col(html.Div(id=f'sum-result-{id_table}', style={"marginTop": "10px"}), width=4)
+    ]) if show_sum_button else None
+
     return (
         dbc.Row(
             dbc.Col(
@@ -35,11 +41,7 @@ def card_table(id_table, card_header, page_size=None, column_selectable=None):
                                 dash_table.DataTable(**table_kwargs),
                                 style={"maxWidth": "100%", "overflowX": "auto"}
                             ),
-                            dbc.Row([
-                                dbc.Col(html.Button("Суммировать", id=f'sum-button-{id_table}',
-                                                    className="btn btn-primary"), width=4),
-                                dbc.Col(html.Div(id=f'sum-result-{id_table}', style={"marginTop": "10px"}), width=4)
-                            ]),
+                            sum_button_section
                         ]
                     ),
                     style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",

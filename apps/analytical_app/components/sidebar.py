@@ -92,6 +92,13 @@ def create_sidebar():
                         id="web-talon-link"
                     ),
                     dbc.NavLink(
+                        [html.I(className="bi bi-card-list"),
+                         html.Span(" Реестры", className="ms-2", id="registry-label")],
+                        href="/registry",
+                        active="exact",
+                        id="registry-link"
+                    ),
+                    dbc.NavLink(
                         [html.I(className="bi bi-list"),
                          html.Span(" Главное меню", className="ms-2", id="main-menu-label")],
                         href=main_app_url,
@@ -128,6 +135,7 @@ def create_sidebar():
          Output("admin-label", "style"),
          # Output("iszl-label", "style"),
          Output("web-talon-label", "style"),
+         Output("registry-label", "style"),
          Output("main-menu-label", "style")],
         [Input("btn_sidebar", "n_clicks")],
         [State("sidebar-state", "data"),
@@ -143,6 +151,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
+                    {"display": "none"},
                     )
         else:
             # Развернутый вид
@@ -151,6 +160,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
+                    {"display": "inline"},
                     )
 
     @app.callback(
@@ -163,6 +173,7 @@ def create_sidebar():
          Output("admin-link", "active"),
          # Output("iszl-link", "active"),
          Output("web-talon-link", "active"),
+         Output("registry-link", "active"),
          ],
         [Input("url", "pathname")]
     )
@@ -177,6 +188,7 @@ def create_sidebar():
             pathname.startswith("/admin"),  # Для Администратора
             # pathname.startswith("/iszl"),  # Для Помощи
             pathname.startswith("/web_oms"),  # Для Помощи
+            pathname.startswith("/registry"),  # Реестры
         ]
 
     return sidebar

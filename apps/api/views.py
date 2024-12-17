@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.api.query import query_api_month, query_api_dd
+from apps.api.serializers import PatientRegistrySerializer
+from apps.data.models.registry.nothospitalized import PatientRegistry
 from apps.home.models import MainSettings
 from apps.organization.models import MedicalOrganization
 
@@ -101,15 +103,16 @@ class MISKAUZTalonAPIView(APIView):
             # Подключение к Firebird
             settings = MainSettings.objects.first()
             if not settings:
-                return Response({"error": "Настройки подключения не найдены."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response({"error": "Настройки подключения не найдены."},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             dsn = f"{settings.kauz_server_ip}:{settings.kauz_database_path}"
             with fdb.connect(
-                dsn=dsn,
-                user=settings.kauz_user,
-                password=settings.kauz_password,
-                charset='WIN1251',
-                port=settings.kauz_port
+                    dsn=dsn,
+                    user=settings.kauz_user,
+                    password=settings.kauz_password,
+                    charset='WIN1251',
+                    port=settings.kauz_port
             ) as con:
                 cursor = con.cursor()
 
@@ -168,3 +171,18 @@ class MISKAUZTalonAPIView(APIView):
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PatientRegistryAPI(APIView):
+    """
+    API для получения всех записей из PatientRegistry.
+    """
+
+    def get(self, request):
+        try:
+            patients = PatientRegistry.objects.all()
+            serializer = PatientRegistrySerializer(patients, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
