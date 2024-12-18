@@ -11,6 +11,6 @@ urlpatterns = [
     path('mis_kauz_lpu/', MISKAUZLPUAPIView.as_view(), name='mis_kauz_lpu_api'),
     path('mis_kauz_talon/<int:year>/', MISKAUZTalonAPIView.as_view(), name='mis_kauz_talon_api'),
     path('patient_registry/', PatientRegistryAPI.as_view(), name='patient_registry_api'),
-    path('api/update_registry/', UpdateRegistryAPIView.as_view(), name='update_registry'),
+    path('update_registry/', UpdateRegistryAPIView.as_view(), name='update_registry'),
 
 ]

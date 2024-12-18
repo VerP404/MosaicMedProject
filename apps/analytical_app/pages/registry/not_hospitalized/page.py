@@ -72,27 +72,24 @@ not_hospitalized_page = html.Div(
                                 dbc.Col(html.Label("Прикрепление к МО:"), width=2),
                                 dbc.Col(dcc.Dropdown(
                                     id='filter-medical-organization',
-                                    options=[],
                                     placeholder="Выберите МО"
                                 ), width=4),
                                 dbc.Col(html.Label("Наименование стационара:"), width=2),
                                 dbc.Col(dcc.Dropdown(
                                     id='filter-hospital-name',
-                                    options=[],
                                     placeholder="Выберите стационар"
                                 ), width=4),
                             ], className="mb-3"),
+
                             dbc.Row([
                                 dbc.Col(html.Label("Причина отказа:"), width=2),
                                 dbc.Col(dcc.Dropdown(
                                     id='filter-reason',
-                                    options=[],
                                     placeholder="Выберите причину отказа"
                                 ), width=4),
                                 dbc.Col(html.Label("Способ обращения:"), width=2),
                                 dbc.Col(dcc.Dropdown(
                                     id='filter-method',
-                                    options=[],
                                     placeholder="Выберите способ обращения"
                                 ), width=4),
                             ], className="mb-3"),
@@ -134,8 +131,30 @@ not_hospitalized_page = html.Div(
     style={"padding": "20px"}
 )
 
+# Callback для обновления значений фильтров
+@app.callback(
+    Output('filter-medical-organization', 'options'),
+    Output('filter-hospital-name', 'options'),
+    Output('filter-reason', 'options'),
+    Output('filter-method', 'options'),
+    Input('refresh-data', 'n_clicks'),
+    prevent_initial_call=True
+)
+def update_filter_options(refresh_clicks):
+    df = fetch_data()  # Используем текущий DataFrame из fetch_data()
 
-# Callback для кнопки "Обновить данные"
+    if df.empty:
+        return [], [], [], []
+
+    # Генерация уникальных значений для фильтров из загруженного DataFrame
+    medical_organizations = [{"label": val, "value": val} for val in sorted(df['medical_organization'].dropna().unique())]
+    hospital_names = [{"label": val, "value": val} for val in sorted(df['hospital_name'].dropna().unique())]
+    refusal_reasons = [{"label": val, "value": val} for val in sorted(df['refusal_reason'].dropna().unique())]
+    referral_methods = [{"label": val, "value": val} for val in sorted(df['referral_method'].dropna().unique())]
+
+    return medical_organizations, hospital_names, refusal_reasons, referral_methods
+
+
 # Callback для кнопки "Обновить данные"
 @app.callback(
     Output('refresh-status', 'children'),  # Вывод статуса обновления
