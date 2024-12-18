@@ -15,6 +15,9 @@ def get_api_url():
     result = execute_query(query)
     if result:
         ip, port = result[0]
+        # Если IP адрес "локальный", используем localhost
+        if ip in ["127.0.0.1", "localhost", "0.0.0.0"]:
+            return f"http://127.0.0.1:{port}/api/patient_registry/"
         return f"http://{ip}:{port}/api/patient_registry/"
     return "#"
 
