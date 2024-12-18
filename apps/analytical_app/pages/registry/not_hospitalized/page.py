@@ -22,16 +22,22 @@ def get_api_url():
 # Функция для получения данных из API
 def fetch_data():
     try:
-        response = requests.get(get_api_url(), timeout=10)
+        api_url = get_api_url()
+        print(f"Fetching data from API URL: {api_url}")  # Логирование URL
+        response = requests.get(api_url, timeout=10)
         response.raise_for_status()
         data = response.json()
 
         if isinstance(data, list) and data:  # Проверка на непустой список
+            print(f"Data fetched successfully. Number of records: {len(data)}")  # Логирование числа записей
             return pd.DataFrame(data)
         else:
+            print("API returned empty or invalid data.")  # Логирование пустого ответа
             return pd.DataFrame()  # Возвращаем пустой DataFrame
     except Exception as e:
+        print(f"Error fetching data from API: {e}")  # Логирование ошибки
         return pd.DataFrame()  # Возвращаем пустой DataFrame при ошибке
+
 
 
 
@@ -163,31 +169,41 @@ not_hospitalized_page = html.Div(
 def update_table(apply_clicks, clear_clicks, refresh_clicks, medical_org, hospital_name, reason, method,
                  admission_start, admission_end, refusal_start, refusal_end):
     triggered_id = ctx.triggered_id  # Определяем, какая кнопка нажата
+    print(f"Triggered by: {triggered_id}")  # Логирование нажатой кнопки
 
     # Если нажата кнопка "Очистить фильтры", сбрасываем все значения
     if triggered_id == 'clear-filters':
+        print("Clearing filters...")  # Логирование очистки фильтров
         return [], [], None, None, None, None, None, None, None, None
 
     # Если нажата кнопка "Обновить данные", обновляем данные из API
     if triggered_id == 'refresh-data':
-        global_df = fetch_data()  # Загружаем новые данные из API
+        print("Refreshing data from API...")  # Логирование обновления данных
+        global_df = fetch_data()
 
     # В противном случае применяем фильтры
     df = fetch_data()
+    print(f"Number of records after fetching: {len(df)}")  # Логирование числа записей
 
     if not df.empty:
         if medical_org:
             df = df[df['medical_organization'] == medical_org]
+            print(f"Filtered by medical organization. Records remaining: {len(df)}")  # Логирование фильтрации
         if hospital_name:
             df = df[df['hospital_name'] == hospital_name]
+            print(f"Filtered by hospital name. Records remaining: {len(df)}")  # Логирование фильтрации
         if reason:
             df = df[df['refusal_reason'] == reason]
+            print(f"Filtered by reason. Records remaining: {len(df)}")  # Логирование фильтрации
         if method:
             df = df[df['referral_method'] == method]
+            print(f"Filtered by referral method. Records remaining: {len(df)}")  # Логирование фильтрации
         if admission_start and admission_end:
             df = df[(df['admission_date'] >= admission_start) & (df['admission_date'] <= admission_end)]
+            print(f"Filtered by admission date. Records remaining: {len(df)}")  # Логирование фильтрации
         if refusal_start and refusal_end:
             df = df[(df['refusal_date'] >= refusal_start) & (df['refusal_date'] <= refusal_end)]
+            print(f"Filtered by refusal date. Records remaining: {len(df)}")  # Логирование фильтрации
 
         # Переименовываем столбцы
         rename_columns = {
@@ -209,6 +225,7 @@ def update_table(apply_clicks, clear_clicks, refresh_clicks, medical_org, hospit
         df.rename(columns=rename_columns, inplace=True)
 
     columns = [{"name": col, "id": col} for col in df.columns]
+    print(f"Final number of columns: {len(columns)}")  # Логирование числа колонок
     # Возвращаем текущие значения фильтров
     return (
         df.to_dict('records'),
@@ -222,4 +239,3 @@ def update_table(apply_clicks, clear_clicks, refresh_clicks, medical_org, hospit
         refusal_start,
         refusal_end
     )
-
