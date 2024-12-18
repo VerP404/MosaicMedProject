@@ -148,7 +148,7 @@ def refresh_data(n_clicks):
         try:
             # Показываем индикацию загрузки
             update_url = get_update_url()
-            response = requests.get(update_url, timeout=30)
+            response = requests.get(update_url, proxies={"http": None, "https": None})
             response_data = response.json()
 
             if response.status_code == 200 and response_data.get("status") == "success":
