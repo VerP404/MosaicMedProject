@@ -19,3 +19,4 @@ celery_debug.log
 /.env_16
 /.env_test
 /.env_ram
+/.env_usman

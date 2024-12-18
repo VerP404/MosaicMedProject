@@ -4,24 +4,37 @@ import pandas as pd
 import requests
 from apps.analytical_app.app import app
 from apps.analytical_app.elements import card_table
+from apps.analytical_app.query_executor import execute_query
+
 
 # URL API
-API_URL = "http://127.0.0.1:8000/api/patient_registry/"
+
+
+def get_api_url():
+    query = "SELECT main_app_ip, main_app_port FROM home_mainsettings LIMIT 1"
+    result = execute_query(query)
+    if result:
+        ip, port = result[0]
+        return f"http://{ip}:{port}/api/patient_registry/"
+    return "#"
+
 
 # Функция для получения данных из API
 def fetch_data():
     try:
-        response = requests.get(API_URL)
+        response = requests.get(get_api_url())
         response.raise_for_status()
         return pd.DataFrame(response.json())
     except Exception as e:
         print("Ошибка при получении данных:", e)
         return pd.DataFrame()
 
+
 # Функция для получения уникальных значений из столбцов
 def get_unique_values(column_name):
     df = fetch_data()
     return [{"label": val, "value": val} for val in df[column_name].dropna().unique()]
+
 
 # Тип страницы
 type_page = "registry-nothospitalized"
@@ -58,7 +71,8 @@ not_hospitalized_page = html.Div(
                                 dbc.Col(dcc.Dropdown(
                                     id='filter-reason',
                                     options=[
-                                        {"label": "Нет показаний для госпитализации", "value": "Нет показаний для госпитализации"},
+                                        {"label": "Нет показаний для госпитализации",
+                                         "value": "Нет показаний для госпитализации"},
                                         {"label": "Отказ пациента", "value": "Отказ пациента (законного представителя)"}
                                     ],
                                     placeholder="Выберите причину отказа"
