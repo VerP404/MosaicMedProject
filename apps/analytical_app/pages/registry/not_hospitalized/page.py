@@ -23,7 +23,7 @@ def get_api_url():
 def fetch_data():
     try:
         response = requests.get(get_api_url(), timeout=10)
-        response.raise_for_status()  # Проверка успешности запроса
+        response.raise_for_status()
         data = response.json()
 
         if isinstance(data, list) and data:  # Проверка на непустой список
@@ -32,6 +32,7 @@ def fetch_data():
             return pd.DataFrame()  # Возвращаем пустой DataFrame
     except Exception as e:
         return pd.DataFrame()  # Возвращаем пустой DataFrame при ошибке
+
 
 
 # Функция для получения уникальных значений из столбцов
@@ -120,6 +121,8 @@ not_hospitalized_page = html.Div(
                                                     className="btn btn-primary"), width=2),
                                 dbc.Col(html.Button("Очистить фильтры", id='clear-filters', n_clicks=0,
                                                     className="btn btn-secondary"), width=2),
+                                dbc.Col(html.Button("Обновить данные", id='refresh-data', n_clicks=0,
+                                                    className="btn btn-info"), width=2),
                             ], className="mb-3"),
                         ]
                     )
@@ -147,6 +150,7 @@ not_hospitalized_page = html.Div(
     Output('filter-refusal-date', 'end_date'),
     Input('apply-filters', 'n_clicks'),
     Input('clear-filters', 'n_clicks'),
+    Input('refresh-data', 'n_clicks'),
     State('filter-medical-organization', 'value'),
     State('filter-hospital-name', 'value'),
     State('filter-reason', 'value'),
@@ -156,13 +160,17 @@ not_hospitalized_page = html.Div(
     State('filter-refusal-date', 'start_date'),
     State('filter-refusal-date', 'end_date'),
 )
-def update_table(apply_clicks, clear_clicks, medical_org, hospital_name, reason, method,
+def update_table(apply_clicks, clear_clicks, refresh_clicks, medical_org, hospital_name, reason, method,
                  admission_start, admission_end, refusal_start, refusal_end):
     triggered_id = ctx.triggered_id  # Определяем, какая кнопка нажата
 
     # Если нажата кнопка "Очистить фильтры", сбрасываем все значения
     if triggered_id == 'clear-filters':
         return [], [], None, None, None, None, None, None, None, None
+
+    # Если нажата кнопка "Обновить данные", обновляем данные из API
+    if triggered_id == 'refresh-data':
+        global_df = fetch_data()  # Загружаем новые данные из API
 
     # В противном случае применяем фильтры
     df = fetch_data()
@@ -214,3 +222,4 @@ def update_table(apply_clicks, clear_clicks, medical_org, hospital_name, reason,
         refusal_start,
         refusal_end
     )
+
