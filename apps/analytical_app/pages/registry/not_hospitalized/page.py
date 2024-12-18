@@ -24,7 +24,7 @@ def fetch_data():
     try:
         api_url = get_api_url()
         print(f"Fetching data from API URL: {api_url}")  # Логирование URL
-        response = requests.get(api_url, timeout=10)
+        response = requests.get(api_url, timeout=30)
         response.raise_for_status()
         data = response.json()
 
