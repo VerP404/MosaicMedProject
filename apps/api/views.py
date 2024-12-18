@@ -1,3 +1,5 @@
+import subprocess
+
 import fdb
 from django.db import connection
 from rest_framework import status
@@ -186,3 +188,24 @@ class PatientRegistryAPI(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+
+class UpdateRegistryAPIView(APIView):
+    """
+    Вьюха для запуска команды обновления реестра пациентов
+    """
+
+    def get(self, request):
+        try:
+            # Запускаем Django-команду через subprocess
+            result = subprocess.run(
+                ["python", "manage.py", "update_registry_not_hospitalize"],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                return Response({"status": "success", "message": result.stdout}, status=status.HTTP_200_OK)
+            else:
+                return Response({"status": "error", "message": result.stderr},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
