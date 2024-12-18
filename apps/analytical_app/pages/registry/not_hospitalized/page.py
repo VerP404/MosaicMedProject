@@ -22,18 +22,24 @@ def get_api_url():
 # Функция для получения данных из API
 def fetch_data():
     try:
-        response = requests.get(get_api_url())
-        response.raise_for_status()
-        return pd.DataFrame(response.json())
+        response = requests.get(get_api_url(), timeout=10)
+        response.raise_for_status()  # Проверка успешности запроса
+        data = response.json()
+
+        if isinstance(data, list) and data:  # Проверка на непустой список
+            return pd.DataFrame(data)
+        else:
+            return pd.DataFrame()  # Возвращаем пустой DataFrame
     except Exception as e:
-        print("Ошибка при получении данных:", e)
-        return pd.DataFrame()
+        return pd.DataFrame()  # Возвращаем пустой DataFrame при ошибке
 
 
 # Функция для получения уникальных значений из столбцов
 def get_unique_values(column_name):
     df = fetch_data()
-    return [{"label": val, "value": val} for val in df[column_name].dropna().unique()]
+    if column_name in df.columns:  # Проверяем наличие столбца
+        return [{"label": val, "value": val} for val in df[column_name].dropna().unique()]
+    return []  # Возвращаем пустой список, если столбца нет
 
 
 # Тип страницы
