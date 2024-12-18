@@ -9,20 +9,17 @@ from apps.analytical_app.query_executor import execute_query
 
 # URL API
 
-
 def get_api_url():
     query = "SELECT main_app_ip, main_app_port FROM home_mainsettings LIMIT 1"
     result = execute_query(query)
     if result:
         ip, port = result[0]
-        # Если IP адрес "локальный", используем localhost
         if ip in ["127.0.0.1", "localhost", "0.0.0.0"]:
             return f"http://127.0.0.1:{port}/api/patient_registry/"
         return f"http://{ip}:{port}/api/patient_registry/"
     return "#"
 
 
-# URL для запуска обновления данных
 def get_update_url():
     query = "SELECT main_app_ip, main_app_port FROM home_mainsettings LIMIT 1"
     result = execute_query(query)
@@ -32,28 +29,22 @@ def get_update_url():
     return "#"
 
 
-# Функция для получения данных из API
 def fetch_data():
     try:
         api_url = get_api_url()
         response = requests.get(api_url, proxies={"http": None, "https": None})
         response.raise_for_status()
         data = response.json()
-
-        if isinstance(data, list) and data:  # Проверка на непустой список
-            return pd.DataFrame(data)
-        else:
-            return pd.DataFrame()  # Возвращаем пустой DataFrame
-    except Exception as e:
-        return pd.DataFrame()  # Возвращаем пустой DataFrame при ошибке
+        return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
 
 
-# Функция для получения уникальных значений из столбцов
 def get_unique_values(column_name):
     df = fetch_data()
-    if column_name in df.columns:  # Проверяем наличие столбца
+    if column_name in df.columns:
         return [{"label": val, "value": val} for val in df[column_name].dropna().unique()]
-    return []  # Возвращаем пустой список, если столбца нет
+    return []
 
 
 # Тип страницы
@@ -70,45 +61,22 @@ not_hospitalized_page = html.Div(
                             dbc.CardHeader("Фильтры"),
                             dbc.Row([
                                 dbc.Col(html.Label("Прикрепление к МО:"), width=2),
-                                dbc.Col(dcc.Dropdown(
-                                    id='filter-medical-organization',
-                                    placeholder="Выберите МО"
-                                ), width=4),
+                                dbc.Col(dcc.Dropdown(id='filter-medical-organization', placeholder="Выберите МО"),
+                                        width=4),
                                 dbc.Col(html.Label("Наименование стационара:"), width=2),
-                                dbc.Col(dcc.Dropdown(
-                                    id='filter-hospital-name',
-                                    placeholder="Выберите стационар"
-                                ), width=4),
+                                dbc.Col(dcc.Dropdown(id='filter-hospital-name', placeholder="Выберите стационар"),
+                                        width=4),
                             ], className="mb-3"),
 
                             dbc.Row([
                                 dbc.Col(html.Label("Причина отказа:"), width=2),
-                                dbc.Col(dcc.Dropdown(
-                                    id='filter-reason',
-                                    placeholder="Выберите причину отказа"
-                                ), width=4),
+                                dbc.Col(dcc.Dropdown(id='filter-reason', placeholder="Выберите причину отказа"),
+                                        width=4),
                                 dbc.Col(html.Label("Способ обращения:"), width=2),
-                                dbc.Col(dcc.Dropdown(
-                                    id='filter-method',
-                                    placeholder="Выберите способ обращения"
-                                ), width=4),
+                                dbc.Col(dcc.Dropdown(id='filter-method', placeholder="Выберите способ обращения"),
+                                        width=4),
                             ], className="mb-3"),
-                            dbc.Row([
-                                dbc.Col(html.Label("Период поступления:"), width=2),
-                                dbc.Col(dcc.DatePickerRange(
-                                    id='filter-admission-date',
-                                    display_format="YYYY-MM-DD",
-                                    start_date_placeholder_text="Начало",
-                                    end_date_placeholder_text="Конец",
-                                ), width=4),
-                                dbc.Col(html.Label("Период отказа:"), width=2),
-                                dbc.Col(dcc.DatePickerRange(
-                                    id='filter-refusal-date',
-                                    display_format="YYYY-MM-DD",
-                                    start_date_placeholder_text="Начало",
-                                    end_date_placeholder_text="Конец",
-                                ), width=4),
-                            ], className="mb-3"),
+
                             dbc.Row([
                                 dbc.Col(html.Button("Применить фильтры", id='apply-filters', n_clicks=0,
                                                     className="btn btn-primary"), width=2),
@@ -116,79 +84,55 @@ not_hospitalized_page = html.Div(
                                                     className="btn btn-secondary"), width=2),
                                 dbc.Col(html.Button("Обновить данные", id='refresh-data', n_clicks=0,
                                                     className="btn btn-info"), width=2),
-                            ], className="mb-3"),
-                            dbc.Row([
-                                dbc.Col(html.Div(id='refresh-status'), width=12)  # Вывод статуса обновления
+                                dbc.Col(dbc.Alert(id='refresh-status', dismissable=True, is_open=False), width=6),
                             ], className="mb-3"),
                         ]
                     )
                 ), width=12
             )
         ),
+        dcc.Loading(id='loading-nothospitalized', type='circle'),
         card_table(f'result-table-{type_page}', "Регистр не госпитализированных пациентов", page_size=15),
-        dcc.Loading(id='loading-nothospitalized', type='circle'),  # Индикация загрузки
     ],
     style={"padding": "20px"}
 )
 
-# Callback для обновления значений фильтров
+
+# Callback для обновления фильтров при загрузке страницы и обновлении данных
 @app.callback(
     Output('filter-medical-organization', 'options'),
     Output('filter-hospital-name', 'options'),
     Output('filter-reason', 'options'),
     Output('filter-method', 'options'),
+    Output('refresh-status', 'is_open'),
+    Output('refresh-status', 'children'),
     Input('refresh-data', 'n_clicks'),
-    prevent_initial_call=True
+    prevent_initial_call=False
 )
-def update_filter_options(refresh_clicks):
-    df = fetch_data()  # Используем текущий DataFrame из fetch_data()
+def update_filters_and_notification(refresh_clicks):
+    df = fetch_data()
 
-    if df.empty:
-        return [], [], [], []
-
-    # Генерация уникальных значений для фильтров из загруженного DataFrame
     medical_organizations = [{"label": val, "value": val} for val in sorted(df['medical_organization'].dropna().unique())]
     hospital_names = [{"label": val, "value": val} for val in sorted(df['hospital_name'].dropna().unique())]
     refusal_reasons = [{"label": val, "value": val} for val in sorted(df['refusal_reason'].dropna().unique())]
     referral_methods = [{"label": val, "value": val} for val in sorted(df['referral_method'].dropna().unique())]
 
-    return medical_organizations, hospital_names, refusal_reasons, referral_methods
-
-
-# Callback для кнопки "Обновить данные"
-@app.callback(
-    Output('refresh-status', 'children'),  # Вывод статуса обновления
-    Output('loading-nothospitalized', 'children'),  # Индикация загрузки
-    Input('refresh-data', 'n_clicks'),
-    prevent_initial_call=True
-)
-def refresh_data(n_clicks):
-    if n_clicks:
+    if refresh_clicks:
         try:
-            # Показываем индикацию загрузки
             update_url = get_update_url()
             response = requests.get(update_url, proxies={"http": None, "https": None})
             response_data = response.json()
-
             if response.status_code == 200 and response_data.get("status") == "success":
-                return (
-                    dbc.Alert("Данные успешно обновлены!", color="success"),
-                    no_update
-                )
+                return medical_organizations, hospital_names, refusal_reasons, referral_methods, True, "Данные успешно обновлены!"
             else:
-                return (
-                    dbc.Alert(f"Ошибка обновления: {response_data.get('message')}", color="danger"),
-                    no_update
-                )
+                return medical_organizations, hospital_names, refusal_reasons, referral_methods, True, f"Ошибка обновления: {response_data.get('message')}"
         except requests.exceptions.RequestException as e:
-            return (
-                dbc.Alert(f"Ошибка соединения: {str(e)}", color="danger"),
-                no_update
-            )
-    return no_update, no_update
+            return medical_organizations, hospital_names, refusal_reasons, referral_methods, True, f"Ошибка соединения: {str(e)}"
+
+    return medical_organizations, hospital_names, refusal_reasons, referral_methods, False, ""
 
 
-# Callback для обновления таблицы и очистки фильтров
+# Callback для очистки таблицы и применения фильтров
 @app.callback(
     Output(f'result-table-{type_page}', 'data'),
     Output(f'result-table-{type_page}', 'columns'),
@@ -196,32 +140,20 @@ def refresh_data(n_clicks):
     Output('filter-hospital-name', 'value'),
     Output('filter-reason', 'value'),
     Output('filter-method', 'value'),
-    Output('filter-admission-date', 'start_date'),
-    Output('filter-admission-date', 'end_date'),
-    Output('filter-refusal-date', 'start_date'),
-    Output('filter-refusal-date', 'end_date'),
     Input('apply-filters', 'n_clicks'),
     Input('clear-filters', 'n_clicks'),
     State('filter-medical-organization', 'value'),
     State('filter-hospital-name', 'value'),
     State('filter-reason', 'value'),
     State('filter-method', 'value'),
-    State('filter-admission-date', 'start_date'),
-    State('filter-admission-date', 'end_date'),
-    State('filter-refusal-date', 'start_date'),
-    State('filter-refusal-date', 'end_date'),
 )
-def update_table(apply_clicks, clear_clicks,  medical_org, hospital_name, reason, method,
-                 admission_start, admission_end, refusal_start, refusal_end):
-    triggered_id = ctx.triggered_id  # Определяем, какая кнопка нажата
+def update_table(apply_clicks, clear_clicks, medical_org, hospital_name, reason, method):
+    triggered_id = ctx.triggered_id
 
-    # Если нажата кнопка "Очистить фильтры", сбрасываем все значения
     if triggered_id == 'clear-filters':
-        return [], [], None, None, None, None, None, None, None, None
+        return [], [], None, None, None, None
 
-    # В противном случае применяем фильтры
     df = fetch_data()
-
     if not df.empty:
         if medical_org:
             df = df[df['medical_organization'] == medical_org]
@@ -231,41 +163,17 @@ def update_table(apply_clicks, clear_clicks,  medical_org, hospital_name, reason
             df = df[df['refusal_reason'] == reason]
         if method:
             df = df[df['referral_method'] == method]
-        if admission_start and admission_end:
-            df = df[(df['admission_date'] >= admission_start) & (df['admission_date'] <= admission_end)]
-        if refusal_start and refusal_end:
-            df = df[(df['refusal_date'] >= refusal_start) & (df['refusal_date'] <= refusal_end)]
 
-        # Переименовываем столбцы
-        rename_columns = {
-            "number": "№",
-            "full_name": "ФИО",
+        df.rename(columns={
+            "number": "№", "full_name": "ФИО",
             "date_of_birth": "Дата рождения",
-            "address": "Адрес",
-            "phone": "Телефон",
+            "address": "Адрес", "phone": "Телефон",
             "medical_organization": "Прикрепление к МО",
             "hospital_name": "Наименование стационара",
             "admission_date": "Дата обращения",
             "referral_method": "Способ обращения",
-            "admission_diagnosis": "Диагноз при поступлении",
-            "refusal_date": "Дата отказа",
-            "refusal_reason": "Причина отказа",
-        }
-
-        df = df.drop(columns=['id'], errors='ignore')  # Удаляем поле id
-        df.rename(columns=rename_columns, inplace=True)
+            "refusal_reason": "Причина отказа"
+        }, inplace=True)
 
     columns = [{"name": col, "id": col} for col in df.columns]
-    # Возвращаем текущие значения фильтров
-    return (
-        df.to_dict('records'),
-        columns,
-        medical_org,
-        hospital_name,
-        reason,
-        method,
-        admission_start,
-        admission_end,
-        refusal_start,
-        refusal_end
-    )
+    return df.to_dict('records'), columns, medical_org, hospital_name, reason, method
