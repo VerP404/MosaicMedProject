@@ -16,6 +16,10 @@ class MainSettings(models.Model):
     api_panel_patients_url = models.URLField(max_length=500,
                                              default='http://10.37.170.101:8000/peopledash/api/registered_patients/',
                                              verbose_name="URL для обновления панели пациентов")
+    api_update_registry_not_hospitalize_url = models.URLField(max_length=500,
+                                                              default='http://10.37.170.101:8000/api/patient_registry/',
+                                                              verbose_name="URL для обновления реестра не "
+                                                                           "госпитализированных пациентов")
 
     def get_dash_url(self):
         return f"http://{self.dash_ip}:{self.dash_port}"
