@@ -123,7 +123,7 @@
         {
             "id": 6,
             "data_type_id": 2,
-            "csv_column_name": "Причина аннулирования",
+            "csv_column_name": "Тип файла",
             "model_field_name": "cancellation_reason"
         },
         {
