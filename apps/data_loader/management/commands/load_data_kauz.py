@@ -2,10 +2,8 @@ from django.core.management.base import BaseCommand
 
 from apps.data_loader.management.commands.query_kauz import query_kauz_talon
 from apps.data_loader.models.oms_data import DataType, DataLoaderConfig
-from apps.data_loader.data_loader import DataLoader, engine
+from apps.data_loader.data_loader import FirebirdDataLoader, engine
 import fdb
-import pandas as pd
-
 from datetime import datetime, timedelta
 
 from apps.home.models import MainSettings
@@ -29,10 +27,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("Настройки для подключения к КАУЗ не найдены"))
             return
 
-        # Устанавливаем параметры подключения и даты
+        # Устанавливаем параметры подключения и диапазон дат
         dsn = f"{settings.kauz_server_ip}:{settings.kauz_database_path}"
 
-        # Определяем диапазон дат
         date_start = None
         date_end = None
         if options['date_start'] and options['date_end']:
@@ -56,36 +53,23 @@ class Command(BaseCommand):
             date_end = datetime.now()
             date_start = date_end - timedelta(days=1)
 
-        # Форматируем даты для SQL-запроса в формате 'ДД.ММ.ГГГГ'
         date_start_str = date_start.strftime('%d.%m.%Y')
         date_end_str = date_end.strftime('%d.%m.%Y')
 
-        # Выполняем подключение к Firebird и загрузку данных
         try:
-            try:
-                con = fdb.connect(
-                    dsn=dsn,
-                    user=settings.kauz_user,
-                    password=settings.kauz_password,
-                    charset='WIN1251',  # Указание кодировки
-                    port=settings.kauz_port
-                )
-            except Exception as e:
-                return f"Ошибка подключения: {e}"
+            # Подключение к Firebird
+            con = fdb.connect(
+                dsn=dsn,
+                user=settings.kauz_user,
+                password=settings.kauz_password,
+                charset='WIN1251',
+                port=settings.kauz_port
+            )
 
-            # Выполнение запроса с подстановкой дат
             cursor = con.cursor()
-
             formatted_query = query_kauz_talon(date_start=date_start_str, date_end=date_end_str)
-            cursor.execute(formatted_query)
-            data = cursor.fetchall()
 
-            # Преобразуем данные в DataFrame
-            columns = [desc[0] for desc in cursor.description]
-            df = pd.DataFrame(data, columns=columns)
-            con.close()
-
-            # Получаем конфигурацию DataLoaderConfig для типа данных КАУЗ
+            # Получение конфигурации DataLoaderConfig
             try:
                 data_type = DataType.objects.get(name="KAUZ")
                 config = DataLoaderConfig.objects.get(data_type=data_type)
@@ -96,18 +80,49 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR('Конфигурация для типа данных КАУЗ не найдена'))
                 return
 
-            # Инициализируем DataLoader и загружаем данные
-            data_loader = DataLoader(
+            column_mapping = {
+                "Талон": "talon",
+                "Источник": "source",
+                "Статус": "status",
+                "Цель": "goal",
+                "Пациент": "patient",
+                "Дата рождения": "birth_date",
+                "Пол": "gender",
+                "Код СМО": "smo_code",
+                "ЕНП": "enp",
+                "Начало лечения": "treatment_start",
+                "Окончание лечения": "treatment_end",
+                "Врач": "doctor",
+                "Посещения": "visits",
+                "Посещения в МО": "mo_visits",
+                "Посещения на Дому": "home_visits",
+                "Диагноз основной (DS1)": "main_diagnosis",
+                "Сопутствующий диагноз (DS2)": "additional_diagnosis",
+                "Первоначальная дата ввода": "initial_input_date",
+                "Дата последнего изменения": "last_change_date",
+                "Сумма": "amount",
+                "Санкции": "sanctions",
+                "КСГ": "ksg",
+                "Отчетный период выгрузки": "report_period",
+            }
+
+            # Загрузка данных через DataLoader
+            data_loader = FirebirdDataLoader(
                 engine=engine,
                 table_name=config.table_name,
+                table_name_temp=f"temp_{config.table_name}",
+                column_mapping=column_mapping,
                 data_type_name=data_type.name,
                 column_check=config.column_check,
                 columns_for_update=config.get_columns_for_update(),
                 encoding=config.encoding,
                 sep=config.delimiter,
-                filter_column='treatment_end'
+                firebird_dsn=dsn,
+                firebird_user=settings.kauz_user,
+                firebird_password=settings.kauz_password,
+                firebird_port=settings.kauz_port,
             )
-            data_loader.load_data_from_db(df)  # Используем метод для загрузки из DataFrame
+            data_loader.run_etl(formatted_query)
             self.stdout.write(self.style.SUCCESS('Загрузка данных из Firebird успешно завершена'))
 
         except Exception as e:

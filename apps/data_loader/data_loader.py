@@ -1,9 +1,11 @@
+from abc import abstractmethod, ABC
 from datetime import datetime
 
+import fdb
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-from apps.data_loader.selenium.oms import selenium_oms
+from apps.data_loader.selenium.oms import selenium_oms, logger
 from config.settings import DATABASES
 
 # Настройка подключения к базе данных
@@ -13,105 +15,284 @@ engine = create_engine(
 )
 
 
-def time_it(stage_name):
-    def decorator(method):
-        def timed(*args, **kw):
-            start_time = datetime.now()
-            result = method(*args, **kw)
-            end_time = datetime.now()
-            elapsed_time = end_time - start_time
-            if hasattr(args[0], 'message'):
-                args[0].message += f"Этап '{stage_name}' выполнен за: {elapsed_time}\n"
-            return result
+class BaseDataLoader(ABC):
+    """
+    Базовый класс для ETL-процесса. Содержит:
+    - Общие поля для логирования: message, import_record_id, added_count и т.д.
+    - Методы для записи в DataImport: _create_initial_data_import_record, _update_data_import_record
+    - run_etl(), который последовательно вызывает:
+        1) _create_initial_data_import_record()
+        2) extract()
+        3) transform()
+        4) load()
+        5) финальное обновление записи
+    - Общая логика transform() и load() (через временную таблицу и MERGE).
+    """
 
-        return timed
-
-    return decorator
-
-
-class DataLoader:
     def __init__(self,
                  engine,
                  table_name,
+                 table_name_temp,
                  data_type_name,
+                 column_mapping,
                  column_check,
                  columns_for_update,
                  file_format='csv',
                  sep=';',
-                 dtype='str',
+                 dtype=str,
                  encoding='utf-8',
-                 filter_column=None,
-                 clear_all_rows=False
-                 ):
+                 clear_all_rows=False):
         """
-        Инициализация загрузчика данных.
+        :param engine: SQLAlchemy engine для подключения к базе
+        :param table_name: Название основной таблицы (например, data_loader_omsdata)
+        :param table_name_temp: Название временной таблицы (например, temp_oms_data)
+        :param data_type_name: Название типа данных (OMS, Квазар и т.д.) — для записи в DataImport
+        :param column_mapping: dict { 'CSV_колонка': 'DB_поле' } для переименования
+        :param column_check: Название обязательного столбца (убираем NaN)
+        :param columns_for_update: Список полей, по которым делаем MERGE ON CONFLICT
+        :param file_format: Формат входных данных (csv, excel и т.п.) — если надо
+        :param sep: Разделитель для CSV
+        :param dtype: Тип данных (по умолчанию str)
+        :param encoding: Кодировка (utf-8, cp1251 и т.д.)
+        :param clear_all_rows: При True можем очищать основную таблицу, если это нужно (опционально)
+        """
 
-        :param engine: SQLAlchemy engine для подключения к базе данных
-        :param table_name: Название таблицы, в которую будут загружены данные.
-        :param data_type_name: Экземпляр модели DataType, для которого выполняется загрузка данных (ОМС, Квазар и тд).
-                          Смотреть в админке.
-        :param column_check: Название столбца для проверки на null, чтобы убрать ошибки чтения файла
-        :param columns_for_update: Список столбцов для поиска в df и таблице, чтобы обновить строки
-        :param file_format: Формат файла (по умолчанию CSV)
-        :param sep: Разделитель для CSV файлов (по умолчанию ; )
-        :param dtype: Тип данных для чтения (по умолчанию строки)
-        :param encoding: Кодировка для чтения (по умолчанию cp1251)
-        """
+        # -- Параметры и настройки --
         self.engine = engine
         self.table_name = table_name
+        self.table_name_temp = table_name_temp
         self.data_type_name = data_type_name
-        self.columns_mapping = self._get_columns_mapping()
+        self.column_mapping = column_mapping
         self.column_check = column_check
         self.columns_for_update = columns_for_update
         self.file_format = file_format
         self.sep = sep
         self.dtype = dtype
         self.encoding = encoding
-        # Инициализируем переменные для статистики
+        self.clear_all_rows = clear_all_rows
+
+        # -- Поля для логирования / статистики (из старого класса) --
+        self.message = ''
+        self.import_record_id = None
         self.added_count = 0
         self.updated_count = 0
         self.error_count = 0
-        self.message = ''
-        self.import_record_id = None
-        self.filter_column = filter_column
-        self.clear_all_rows = clear_all_rows
 
-    def _create_initial_data_import_record(self, csv_file):
+        # -- Счётчики строк для вывода статистики --
+        self.row_counts = {
+            "before_processing": 0,
+            "after_reading_csv": 0,
+            "to_update": 0,
+            "to_insert": 0,
+            "after_processing": 0,
+        }
+
+    # =========================================================================
+    # Главный метод, который запускает ETL
+    # =========================================================================
+    def run_etl(self, source_name: str):
         """
-        Создаем начальную запись в таблице DataImport с минимальной информацией о файле.
+        Общий «шаблон» процесса:
+          1. Записываем в DataImport (начало)
+          2. extract() – извлечь данные (дочерние классы переопределяют)
+          3. transform() – обработка
+          4. load() – загрузка (через temp + MERGE)
+          5. финальное логирование
+        :param source_name: либо путь к файлу, либо что-то ещё (URL, login, etc.)
+        """
+        start_time = datetime.now()
+        self.message += f"[{start_time}] Начало загрузки данных.\n"
+
+        # 1) Создаём запись DataImport (при желании)
+        self._create_initial_data_import_record(source_name)
+
+        # 2) EXTRACT (дочерние классы будут реализовывать)
+        try:
+            logger.info("Начинается этап EXTRACT")
+            df = self.extract(source_name)
+            self.row_counts["after_reading_csv"] = len(df)
+            self.message += f"EXTRACT: получено {len(df)} строк.\n"
+
+            # 3) TRANSFORM
+            logger.info("Начинается этап TRANSFORM")
+            df = self.transform(df)
+            self.message += f"TRANSFORM: осталось {len(df)} строк после очистки.\n"
+
+            # 4) LOAD
+            logger.info("Начинается этап LOAD")
+            self.load(df)
+
+        except Exception as e:
+            logger.error(f"Ошибка во время выполнения ETL: {e}", exc_info=True)
+            self.error_count += 1
+            self.message += f"ОШИБКА: {e}\n"
+            self._update_data_import_record()
+            raise
+
+        # Финальное обновление
+        end_time = datetime.now()
+        elapsed = end_time - start_time
+        self.message += f"Готово. Общее время: {elapsed}\n"
+        self._update_data_import_record()
+
+    # =========================================================================
+    # Методы, которые будут переопределены или уже в базовом классе
+    # =========================================================================
+    @abstractmethod
+    def extract(self, source_name) -> pd.DataFrame:
+        """
+        Метод извлечения данных. Переопределяется в дочерних классах:
+         - если CSV -> читаем CSV
+         - если Selenium -> запускаем робот и читаем результат
+         - если DB -> запрос к другой БД
+        """
+        pass
+
+    def transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Общая логика для преобразования DataFrame:
+         - выбираем нужные столбцы по column_mapping
+         - переименовываем
+         - dropna по column_check
+         - fillna('-'), убираем лишние символы
+         - удаляем дубликаты по columns_for_update
+        """
+        # Переименование и фильтрация
+        df = df[list(self.column_mapping.keys())].rename(columns=self.column_mapping)
+
+        # Удаляем строки, где нет column_check
+        df.dropna(subset=[self.column_check], inplace=True)
+
+        # Заполняем пустые
+        df.fillna("-", inplace=True)
+        df.replace('`', '', regex=True, inplace=True)
+        df.replace('\u00A0', ' ', regex=True, inplace=True)
+
+        # Приводим к строкам
+        df = df.astype(str)
+
+        # Удаляем дубликаты
+        df.drop_duplicates(subset=self.columns_for_update, inplace=True)
+
+        return df
+
+    def load(self, df: pd.DataFrame):
+        """
+        Новая логика загрузки:
+         - Подсчитать строки "до"
+         - Создать/очистить временную таблицу
+         - to_sql(df) -> temp
+         - создать индексы
+         - посчитать to_update/to_insert
+         - MERGE
+         - посчитать строки "после"
+        """
+        # Подсчёт "до"
+        with self.engine.connect() as conn:
+            q = f"SELECT COUNT(*) FROM {self.table_name};"
+            self.row_counts["before_processing"] = conn.execute(text(q)).scalar()
+            self.message += f"Количество строк до обработки: {self.row_counts['before_processing']}\n"
+        # Очистка временной таблицы
+        with self.engine.connect() as conn:
+            exists = conn.execute(text(f"""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_name = '{self.table_name_temp}'
+                )
+            """)).scalar()
+            if exists:
+                conn.execute(text(f"TRUNCATE TABLE {self.table_name_temp}"))
+            else:
+                self.message += f"Таблица {self.table_name_temp} будет создана автоматически.\n"
+
+        # Загрузка во временную таблицу
+        df.to_sql(self.table_name_temp, self.engine, if_exists="replace", index=False)
+
+        # Создаём индексы
+        self._create_index(self.table_name)
+        self._create_index(self.table_name_temp)
+
+        # Считаем строки на update/insert
+        with self.engine.connect() as conn:
+            rows_to_update_query = f"""
+            SELECT COUNT(*)
+            FROM {self.table_name_temp} AS temp
+            INNER JOIN {self.table_name} AS target
+            ON {' AND '.join([f'temp.{col} = target.{col}' for col in self.columns_for_update])}
+            """
+            self.row_counts["to_update"] = conn.execute(text(rows_to_update_query)).scalar()
+            rows_to_insert_query = f"""
+            SELECT COUNT(*)
+            FROM {self.table_name_temp} AS temp
+            LEFT JOIN {self.table_name} AS target
+            ON {' AND '.join([f'temp.{col} = target.{col}' for col in self.columns_for_update])}
+            WHERE target.{self.columns_for_update[0]} IS NULL
+            """
+            self.row_counts["to_insert"] = conn.execute(text(rows_to_insert_query)).scalar()
+
+        self.message += f"LOAD: для обновления {self.row_counts['to_update']}, для добавления {self.row_counts['to_insert']}.\n"
+
+        # Проверяем недостающие столбцы
+        missing_columns = self._get_missing_columns()
+
+        # Формируем MERGE
+        merge_query = self._build_merge_query(missing_columns)
+
+        # Выполняем MERGE
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(text(merge_query))
+            self.message += f"Данные успешно вставлены/обновлены в {self.table_name}.\n"
+        except Exception as e:
+            self.error_count += 1
+            raise ValueError(f"Ошибка при MERGE: {e}")
+
+        # Подсчёт "после"
+        with self.engine.connect() as conn:
+            after_count = conn.execute(text(q)).scalar()
+            self.row_counts["after_processing"] = after_count
+            self.message += f"Количество строк после обработки: {after_count}\n"
+        # Обновляем счётчики
+        self.added_count += self.row_counts["to_insert"]
+        self.updated_count += self.row_counts["to_update"]
+
+    # =========================================================================
+    # Вспомогательные методы (из старого класса, немного доработанные)
+    # =========================================================================
+    def _create_initial_data_import_record(self, source_name):
+        """
+        Создаём запись в data_loader_dataimport (если нужно).
         """
         sql_query = """
-        INSERT INTO data_loader_dataimport (csv_file, date_added, added_count, updated_count, error_count, data_type_id, message)
-        VALUES (:csv_file, NOW(), 0, 0, 0, :data_type_id, :message) RETURNING id
+        INSERT INTO data_loader_dataimport
+        (csv_file, date_added, added_count, updated_count, error_count,
+         data_type_id, message)
+        VALUES (
+          :csv_file,
+          NOW(),
+          0, 0, 0,
+          (SELECT id FROM data_loader_datatype WHERE name = :data_type_name),
+          :message
+        )
+        RETURNING id
         """
         with self.engine.begin() as connection:
-            # Запрашиваем data_type_id по имени типа данных
-            data_type_query = "SELECT id FROM data_loader_datatype WHERE name = :data_type_name"
-            data_type_id_result = connection.execute(
-                text(data_type_query),
-                {'data_type_name': self.data_type_name}
-            ).fetchone()
-
-            if data_type_id_result:
-                data_type_id = data_type_id_result[0]
-                # Выполняем запрос для создания записи и возвращаем её ID
-                result = connection.execute(text(sql_query), {
-                    'csv_file': csv_file,
-                    'data_type_id': data_type_id,
-                    'message': 'Начало загрузки файла.'
-                })
-                self.import_record_id = result.fetchone()[0]  # Сохраняем ID записи для дальнейшего обновления
-            else:
-                # Исключение, если тип данных не найден
-                raise ValueError(f"Тип данных '{self.data_type_name}' не найден в таблице DataType.")
+            result = connection.execute(
+                text(sql_query),
+                {
+                    'csv_file': source_name[:100],
+                    'data_type_name': self.data_type_name,
+                    'message': 'Начало загрузки.'
+                }
+            )
+            self.import_record_id = result.fetchone()[0]
 
     def _update_data_import_record(self):
         """
-        Обновляем существующую запись в таблице DataImport с накопленной информацией.
+        Обновляем запись в data_loader_dataimport (если нужно).
         """
         if not self.import_record_id:
-            raise ValueError("Не удалось обновить запись: import_record_id не установлен.")
-
+            return
         sql_update = """
         UPDATE data_loader_dataimport
         SET added_count = :added_count,
@@ -129,401 +310,232 @@ class DataLoader:
                 'import_record_id': self.import_record_id
             })
 
-    @time_it("Общее время загрузки данных")
-    def load_data(self, file_path):
+    def _create_index(self, table_name: str):
         """
-        Основной метод для загрузки данных из файла в таблицу.
-        :param file_path: Путь к файлу
+        Создаёт индекс по self.columns_for_update, если не существует.
         """
-        total_start_time = datetime.now()
-
-        # Шаг 1: Создаем начальную запись в DataImport
-        self._create_initial_data_import_record(file_path)
-
-        try:
-            # Шаг 2: Загрузка данных
-            df = self._load_file_to_df(file_path)
-            self.message += f"Шаг 'Начало загрузки: {total_start_time}. Загрузка файла в DataFrame' выполнен успешно. Строк: {df.shape[0]}, Столбцов: {df.shape[1]}\n"
-            self._update_data_import_record()  # Обновляем запись после загрузки данных
-
-            # Шаг 3: Проверка столбцов
-            self._check_columns(df)
-            self.message += "Шаг 'Проверка столбцов' выполнен успешно.\n"
-            self._update_data_import_record()  # Обновляем запись после проверки столбцов
-
-            # Шаг 4: Переименование столбцов
-            self._rename_columns(df)
-            self.message += "Шаг 'Переименование столбцов' выполнен успешно.\n"
-            self._update_data_import_record()  # Обновляем запись после переименования столбцов
-
-            # Шаг 5: Обработка DataFrame
-            df = self._process_dataframe(df)
-            self.message += "Шаг 'Обработка DataFrame' выполнен успешно.\n"
-            self._update_data_import_record()  # Обновляем запись после обработки DataFrame
-
-            # Шаг 6: Удаление существующих строк по уникальному столбцу
-            self._delete_existing_rows(df)
-            self.message += "Шаг 'Удаление существующих строк' выполнен успешно.\n"
-            self._update_data_import_record()  # Обновляем запись после удаления строк
-
-            # Шаг 7: Загрузка данных в базу
-            self._load_data_to_db(df)
-            self.message += "Шаг 'Загрузка данных в базу' выполнен успешно.\n"
-            self._update_data_import_record()  # Обновляем запись после загрузки в базу
-
-        except Exception as e:
-            self.message += f"Ошибка при выполнении загрузки: {e}\n"
-            self.error_count += 1
-            self._update_data_import_record()  # Сохраняем сообщение об ошибке
-            raise
-
-        # Финальное обновление с общим временем выполнения
-        total_end_time = datetime.now()
-        elapsed_time = total_end_time - total_start_time
-        self.message += f"Загрузка данных завершена. Общее время: {elapsed_time}\n"
-        self._update_data_import_record()
-
-    def load_data_from_db(self, df):
+        index_name = f"idx_{table_name}_update"
+        create_index_query = f"""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 
+                FROM pg_indexes 
+                WHERE schemaname = 'public' 
+                  AND tablename = '{table_name}' 
+                  AND indexname = '{index_name}'
+            ) THEN
+                CREATE INDEX {index_name}
+                ON {table_name} ({', '.join(self.columns_for_update)});
+            END IF;
+        END $$;
         """
-        Загружает данные из DataFrame в таблицу базы данных, выполняя проверку и удаление совпадений.
-        :param df: DataFrame с данными из запроса Firebird
+        with self.engine.connect() as conn:
+            conn.execute(text(create_index_query))
+
+    def _get_missing_columns(self):
         """
-        # Использование уже существующих шагов загрузки данных
-        self._create_initial_data_import_record('Database Import')  # Параметр для идентификации источника данных
-
-        try:
-            self._check_columns(df)
-            self.message += "Шаг 'Проверка столбцов' выполнен успешно.\n"
-            self._update_data_import_record()
-
-            self._rename_columns(df)
-            self.message += "Шаг 'Переименование столбцов' выполнен успешно.\n"
-            self._update_data_import_record()
-
-            df = self._process_dataframe(df)
-            self.message += "Шаг 'Обработка DataFrame' выполнен успешно.\n"
-            self._update_data_import_record()
-
-            self._delete_existing_rows(df)
-            self.message += "Шаг 'Удаление существующих строк' выполнен успешно.\n"
-            self._update_data_import_record()
-
-            self._load_data_to_db(df)
-            self.message += "Шаг 'Загрузка данных в базу' выполнен успешно.\n"
-            self._update_data_import_record()
-
-        except Exception as e:
-            self.message += f"Ошибка при выполнении загрузки: {e}\n"
-            self.error_count += 1
-            self._update_data_import_record()
-            raise
-
-    @time_it("Загрузка списка столбцов из БД")
-    def _get_columns_mapping(self):
+        Выясняет, какие столбцы есть в основной таблице, но нет во временной.
         """
-        Загружает соответствия столбцов для типа данных через SQL запрос, основываясь на имени типа данных.
+        with self.engine.connect() as conn:
+            main_cols_q = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{self.table_name}'"
+            main_cols = [r[0] for r in conn.execute(text(main_cols_q)).fetchall()]
+
+            temp_cols_q = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{self.table_name_temp}'"
+            temp_cols = [r[0] for r in conn.execute(text(temp_cols_q)).fetchall()]
+
+        missing = [c for c in main_cols if (c not in temp_cols and c != 'id')]
+        return missing
+
+    def _build_merge_query(self, missing_columns):
         """
-        sql_query = """
-            SELECT fm.csv_column_name, fm.model_field_name
-            FROM data_loader_datatypefieldmapping fm
-            JOIN data_loader_datatype dt ON fm.data_type_id = dt.id
-            WHERE dt.name = :data_type_name
+        Генерируем запрос MERGE:
+        INSERT INTO table_name (...)
+        SELECT ...
+        FROM table_name_temp
+        ON CONFLICT (columns_for_update)
+        DO UPDATE SET ...
         """
+        # Все столбцы, которые вставляем
+        insert_cols = list(self.column_mapping.values()) + missing_columns
+        insert_cols_sql = ", ".join(insert_cols)
 
-        # Выполняем SQL запрос и возвращаем результат как список кортежей
-        with self.engine.connect() as connection:
-            result = connection.execute(text(sql_query), {'data_type_name': self.data_type_name}).fetchall()
+        # Часть SELECT
+        select_cols_sql = ", ".join(self.column_mapping.values())
+        if missing_columns:
+            missing_sql = ", ".join([f"'-' AS {c}" for c in missing_columns])
+            select_all_for_insert = f"{select_cols_sql}, {missing_sql}"
+        else:
+            select_all_for_insert = select_cols_sql
 
-        # Преобразуем результат запроса в словарь {csv_column_name: model_field_name}
-        columns_mapping = {row[0]: row[1] for row in result}  # Используем индексы вместо строк
-        return columns_mapping
+        # ON CONFLICT
+        conflict_sql = ", ".join(self.columns_for_update)
 
-    @time_it("Загрузка файла в DataFrame")
-    def _load_file_to_df(self, file_path):
-        """Загрузка файла в DataFrame."""
-        if self.file_format == 'csv':
-            df = pd.read_csv(file_path, sep=self.sep, low_memory=False, na_values="-", dtype=self.dtype,
-                             encoding=self.encoding, )
+        # DO UPDATE
+        update_parts = []
+        for col in self.column_mapping.values():
+            if col not in self.columns_for_update:
+                update_parts.append(f"{col} = EXCLUDED.{col}")
+        for col in missing_columns:
+            update_parts.append(f"{col} = COALESCE(EXCLUDED.{col}, '-')")
+
+        update_sql = ", ".join(update_parts)
+
+        merge_query = f"""
+        INSERT INTO {self.table_name} ({insert_cols_sql})
+        SELECT {select_all_for_insert}
+        FROM {self.table_name_temp}
+        ON CONFLICT ({conflict_sql})
+        DO UPDATE SET {update_sql};
+        """
+        # Удалим лишние переносы строк
+        merge_query = " ".join(merge_query.split())
+        return merge_query
+
+
+class CsvDataLoader(BaseDataLoader):
+    """
+    Наследник BaseDataLoader, где метод extract()
+    читает CSV-файл из локального пути (source_name).
+    """
+
+    def extract(self, source_name) -> pd.DataFrame:
+        if self.file_format.lower() == 'csv':
+            df = pd.read_csv(
+                source_name,
+                sep=self.sep,
+                dtype=self.dtype,
+                encoding=self.encoding,
+                na_values="-",
+                low_memory=False
+            )
+            # Убираем Unnamed-столбцы, если есть
             df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-        elif self.file_format == 'excel':
-            df = pd.read_excel(file_path)
+            return df
+        elif self.file_format.lower() == 'excel':
+            return pd.read_excel(source_name)
         else:
-            raise ValueError("Неподдерживаемый формат файла")
-        self.message += f" Файл загружен. Строк: {df.shape[0]}, Столбцов: {df.shape[1]}\n"
-        return df
+            raise ValueError(f"Неподдерживаемый формат файла: {self.file_format}")
 
-    @time_it("Проверка столбцов в DataFrame")
-    def _check_columns(self, df):
+
+class SeleniumDataLoader(BaseDataLoader):
+    """
+    Наследник, в котором extract() сначала вызывает selenium_oms,
+    а потом читает скачанный файл как CSV.
+    """
+
+    def __init__(self, engine, table_name, table_name_temp,
+                 data_type_name, column_mapping, column_check, columns_for_update,
+                 username, password, start_date, end_date, start_date_treatment,
+                 file_format='csv', sep=';', dtype=str, encoding='utf-8',
+                 clear_all_rows=False):
+        super().__init__(
+            engine=engine,
+            table_name=table_name,
+            table_name_temp=table_name_temp,
+            data_type_name=data_type_name,
+            column_mapping=column_mapping,
+            column_check=column_check,
+            columns_for_update=columns_for_update,
+            file_format=file_format,
+            sep=sep,
+            dtype=dtype,
+            encoding=encoding,
+            clear_all_rows=clear_all_rows
+        )
+        # Данные для selenium
+        self.username = username
+        self.password = password
+        self.start_date = start_date
+        self.end_date = end_date
+        self.start_date_treatment = start_date_treatment
+
+    def extract(self, source_name) -> pd.DataFrame:
         """
-        Проверяет наличие и соответствие столбцов.
+        1) Вызываем selenium_oms, получаем success, file_path
+        2) Если success, читаем CSV-файл
+        3) Возвращаем DataFrame
         """
-        file_columns = set(df.columns)
-        expected_columns = set(self.columns_mapping.keys())
+        success, downloaded_path = selenium_oms(
+            self.username,
+            self.password,
+            self.start_date,
+            self.end_date,
+            self.start_date_treatment
+        )
+        logger.info("Success: %s, Downloaded path: %s", success, downloaded_path)
 
-        missing_columns = expected_columns - file_columns
-        missing_columns = {col for col in missing_columns if "Unnamed" not in col}
+        if not success or not downloaded_path:
+            raise ValueError("Selenium не смог скачать файл / путь пуст.")
 
-        extra_columns = file_columns - expected_columns
-
-        if missing_columns or extra_columns:
-            if missing_columns:
-                self.message += f" Отсутствующие столбцы: {missing_columns}\n"
-            if extra_columns:
-                self.message += f" Лишние столбцы: {extra_columns}\n"
-            raise ValueError(f"{self.message} \n Структура файла не соответствует ожиданиям.")
-
-    def _rename_columns(self, df):
-        """
-        Переименовывает столбцы DataFrame на основе словаря.
-        """
-        df.rename(columns=self.columns_mapping, inplace=True)
-
-    @time_it("Очистка DataFrame")
-    def _process_dataframe(self, df):
-        """
-        Обрабатывает DataFrame: удаляет NaN и преобразует данные в строки.
-        """
-        try:
-            # Удаляем строки, содержащие NaN на основании столбца column_check
-            df.dropna(subset=[self.column_check], inplace=True)
-        except KeyError as e:
-            self.message += f" Ошибка: столбец '{self.column_check}' не найден в данных. Проверьте наличие столбца в базе.\n"
-            self.message += f" Доступные столбцы: {list(df.columns)}\n"
-            raise e  # Повторное возбуждение исключения для остановки выполнения, если необходимо
-
-        # Проверяем, если в self.columns_mapping.keys() есть "Unnamed" и если в df.columns нет "column1"
-        if any("Unnamed" in col for col in self.columns_mapping.keys()) and "column1" not in df.columns:
-            df["column1"] = '-'  # Добавляем столбец 'column1' и заполняем его значениями '-'
-
-        # Заменяем NaN на '-' в датафрейме
-        df.fillna('-', inplace=True)
-
-        # Убираем ` из датафрейма при наличии
-        df = df.replace('`', '', regex=True)
-
-        # Если указан столбец для фильтрации, удаляем строки с значением '-'
-        if self.filter_column and self.filter_column in df.columns:
-            df = df[df[self.filter_column] != "-"]
-
-        # Удаляем неразрывные пробелы (NBSP) и заменяем их на обычные пробелы
-        df.replace('\u00A0', ' ', regex=True, inplace=True)
-
-        # Проверяем что тип данных у всех столбцов "текстовый"
-        df = df.astype(str)
-
-        return df
-
-    @time_it("Удаление строк в БД для обновления записей")
-    def _delete_existing_rows(self, df):
-        """Удаляет строки из базы данных порциями, чтобы избежать переполнения параметров."""
-        if self.clear_all_rows:
-            # Очистка всей таблицы
-            delete_query = text(f"DELETE FROM {self.table_name}")
-            with self.engine.begin() as connection:
-                result = connection.execute(delete_query)
-                total_deleted = result.rowcount
-            self.message += f"Все строки удалены: {total_deleted}.\n"
+        # Теперь читаем CSV/Excel по логике, аналогичной CsvDataLoader
+        if self.file_format.lower() == 'csv':
+            df = pd.read_csv(
+                downloaded_path,
+                sep=self.sep,
+                dtype=self.dtype,
+                encoding=self.encoding,
+                na_values="-",
+                low_memory=False
+            )
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            return df
+        elif self.file_format.lower() == 'excel':
+            return pd.read_excel(downloaded_path)
         else:
-            total_deleted = 0  # Счетчик удаленных строк
+            raise ValueError(f"Неподдерживаемый формат файла: {self.file_format}")
 
-            try:
-                for column in self.columns_for_update:
-                    df[column] = df[column].astype(str)
 
-                keys_in_df = df[self.columns_for_update].drop_duplicates()
+class FirebirdDataLoader(BaseDataLoader):
+    """
+    Загрузчик данных из Firebird.
+    Использует подключение к базе Firebird для извлечения данных и загрузки в PostgreSQL.
+    """
 
-                # Разделяем данные на чанки по 500 строк, чтобы не превышать лимит параметров
-                chunk_size = 500
-                chunks = [keys_in_df[i:i + chunk_size] for i in range(0, len(keys_in_df), chunk_size)]
+    def __init__(self, engine, table_name, table_name_temp, data_type_name, column_mapping, column_check,
+                 columns_for_update,
+                 firebird_dsn, firebird_user, firebird_password, firebird_charset='WIN1251', firebird_port=3050,
+                 file_format='db', sep=';', dtype=str, encoding='utf-8', clear_all_rows=False):
+        super().__init__(engine, table_name, table_name_temp, data_type_name, column_mapping, column_check,
+                         columns_for_update,
+                         file_format, sep, dtype, encoding, clear_all_rows)
+        # Firebird-specific connection details
+        self.firebird_dsn = firebird_dsn
+        self.firebird_user = firebird_user
+        self.firebird_password = firebird_password
+        self.firebird_charset = firebird_charset
+        self.firebird_port = firebird_port
 
-                for chunk in chunks:
-                    conditions = []
-                    params = {}
-                    for idx, row in chunk.iterrows():
-                        condition = ' AND '.join([f"{col} = :{col}_{idx}" for col in self.columns_for_update])
-                        conditions.append(f"({condition})")
-
-                        for col in self.columns_for_update:
-                            params[f"{col}_{idx}"] = row[col]
-
-                    condition_str = ' OR '.join(conditions)
-
-                    if condition_str:
-                        delete_query = text(f"DELETE FROM {self.table_name} WHERE {condition_str}")
-                        with self.engine.begin() as connection:
-                            result = connection.execute(delete_query, params)
-                            total_deleted += result.rowcount  # Увеличиваем счетчик удаленных строк
-
-                self.message += f" Всего удалено строк: {total_deleted}.\n"
-
-            except Exception as e:
-                self.message += f" Ошибка при удалении существующих строк: {e}\n"
-
-    @time_it("Загрузка данных в БД")
-    def _load_data_to_db(self, df):
+    def extract(self, query: str) -> pd.DataFrame:
         """
-        Загружает данные в базу данных с отслеживанием прогресса и проверкой длины строк.
+        Метод для извлечения данных из Firebird.
+        Выполняет SQL-запрос и преобразует результат в DataFrame.
+        :param query: SQL-запрос для извлечения данных
+        :return: DataFrame с результатами запроса
         """
-        # Удаляем столбец combined_key, который используется только для внутренней обработки
-        if 'combined_key' in df.columns:
-            df.drop(columns=['combined_key'], inplace=True)
-
-        total_rows = df.shape[0]
-        loaded_rows = 0
         try:
-            # Проверка длины данных в столбцах
-            for column in df.columns:
-                if df[column].dtype == 'object':  # Проверяем только текстовые столбцы
-                    max_length_exceeded = df[column].str.len().max()
-                    if max_length_exceeded > 255:
-                        self.message += f"Превышение длины в столбце '{column}'. Максимальная длина: {max_length_exceeded}\n"
-                        # Вы можете обрезать значение или выбросить ошибку
-                        df[column] = df[column].apply(lambda x: x[:255] if isinstance(x, str) else x)
+            # Подключаемся к базе Firebird
+            conn = fdb.connect(
+                dsn=self.firebird_dsn,
+                user=self.firebird_user,
+                password=self.firebird_password,
+                charset=self.firebird_charset,
+                port=self.firebird_port
+            )
+            cursor = conn.cursor()
 
-            for chunk_start in range(0, total_rows, 1000):
-                chunk = df.iloc[chunk_start:chunk_start + 1000]
-                chunk.to_sql(
-                    name=self.table_name,
-                    con=self.engine,
-                    if_exists='append',
-                    index=False,
-                    method='multi'
-                )
-                loaded_rows += chunk.shape[0]
-                self.added_count += chunk.shape[0]
+            # Выполняем запрос
+            cursor.execute(query)
+            data = cursor.fetchall()
 
-            self.message += f"Всего загружено {loaded_rows} строк из {total_rows}.\n"
-        except Exception as e:
-            self.error_count += 1
-            self.message += f" Ошибка при загрузке данных: {e}\n"
+            # Получаем имена столбцов из курсора
+            columns = [desc[0] for desc in cursor.description]
 
-    @time_it("Обновление и добавление записей в БД")
-    def _update_or_insert_data(self, df):
-        try:
-            # Выборка существующих данных из таблицы
-            existing_data_query = f"SELECT {', '.join(self.columns_for_update)} FROM {self.table_name}"
-            existing_data = pd.read_sql(existing_data_query, self.engine)
+            # Закрываем соединение
+            conn.close()
 
-            # Помечаем строки для обновления и добавления
-            df_existing = df[df[self.columns_for_update].isin(existing_data.to_dict('list')).all(axis=1)]
-            df_new = df[~df.index.isin(df_existing.index)]
-
-            # Обновление существующих данных
-            if not df_existing.empty:
-                for _, row in df_existing.iterrows():
-                    update_query = f"UPDATE {self.table_name} SET {', '.join([f'{col} = :{col}' for col in df.columns if col not in self.columns_for_update])} WHERE {' AND '.join([f'{col} = :{col}' for col in self.columns_for_update])}"
-                    params = row.to_dict()
-                    with self.engine.begin() as connection:
-                        connection.execute(text(update_query), params)
-                    self.updated_count += 1
-
-            # Вставка новых данных
-            if not df_new.empty:
-                df_new.to_sql(self.table_name, self.engine, if_exists='append', index=False, method='multi')
-                self.added_count += len(df_new)
-
-            self.message += f"Обновлено записей: {self.updated_count}. Добавлено новых записей: {self.added_count}.\n"
+            # Преобразуем результаты в DataFrame
+            df = pd.DataFrame(data, columns=columns)
+            return df
 
         except Exception as e:
-            self.error_count += 1
-            self.message += f" Ошибка при обновлении/вставке данных: {e}\n"
-
-    @time_it("Сохранение информации о загрузке в БД")
-    def _create_data_import_record(self):
-        """
-        Создает запись в таблице DataImport с информацией о загрузке через SQL-запрос.
-        """
-        sql_query = """
-        INSERT INTO data_loader_dataimport (csv_file, date_added, added_count, updated_count, error_count, data_type_id, message)
-        VALUES (:csv_file, NOW(), :added_count, :updated_count, :error_count, :data_type_id, :message)
-        """
-
-        with self.engine.begin() as connection:
-            data_type_query = "SELECT id FROM data_loader_datatype WHERE name = :data_type_name"
-            data_type_id_result = connection.execute(
-                text(data_type_query),
-                {'data_type_name': self.data_type_name}
-            ).fetchone()
-
-            if data_type_id_result:
-                data_type_id = data_type_id_result[0]
-                try:
-                    # Выполняем основной запрос, используя фактический data_type_id
-                    connection.execute(text(sql_query), {
-                        'csv_file': '-',  # Укажите путь к файлу или значение
-                        'added_count': self.added_count,
-                        'updated_count': self.updated_count,
-                        'error_count': self.error_count,
-                        'data_type_id': data_type_id,
-                        'message': self.message
-                    })
-                    self.message += "Запись в таблице DataImport успешно создана.\n"
-                except Exception as e:
-                    self.message += f" Ошибка при вставке записи в DataImport: {e}\n"
-            else:
-                self.message += f" Ошибка: Тип данных с именем '{self.data_type_name}' не найден.\n"
-
-    def load_data_via_selenium(self, username, password, start_date, end_date, start_date_treatment):
-        # Запускаем скрипт Selenium для загрузки файла
-        success, file_path = selenium_oms(username, password, start_date, end_date, start_date_treatment)
-
-        if success and file_path:
-            # После успешной загрузки файла, передаем его в метод load_data
-            return self.load_data(file_path)  # Метод load_data будет обрабатывать CSV
-        else:
-            self.message += "Ошибка при выполнении скрипта Selenium или файл не был загружен."
-            return False, 0, 0, 0
-
-    @time_it("Общее время загрузки данных")
-    def load_data_miskauz(self, file_path):
-        """
-        Метод для загрузки данных из МИСКАУЗ в таблицу.
-        :param file_path: Путь к файлу
-        """
-        total_start_time = datetime.now()
-
-        # Шаг 1: Создаем начальную запись в DataImport
-        self._create_initial_data_import_record(file_path)
-
-        try:
-            # Шаг 2: Загрузка данных
-            df = self._load_file_to_df(file_path)
-            self.message += f"Шаг 'Начало загрузки: {total_start_time} Загрузка файла в DataFrame' выполнен успешно. Строк: {df.shape[0]}, Столбцов: {df.shape[1]}\n"
-            self._update_data_import_record()  # Обновляем запись после загрузки данных
-
-            # Шаг 3: Проверка столбцов
-            self._check_columns(df)
-            self.message += "Шаг 'Проверка столбцов' выполнен успешно.\n"
-            self._update_data_import_record()  # Обновляем запись после проверки столбцов
-
-            # Шаг 4: Переименование столбцов
-            self._rename_columns(df)
-            self.message += "Шаг 'Переименование столбцов' выполнен успешно.\n"
-            self._update_data_import_record()  # Обновляем запись после переименования столбцов
-
-            # Шаг 5: Обработка DataFrame
-            df = self._process_dataframe(df)
-            self.message += "Шаг 'Обработка DataFrame' выполнен успешно.\n"
-            self._update_data_import_record()  # Обновляем запись после обработки DataFrame
-
-            # Шаг 6: Удаление существующих строк по уникальному столбцу
-            self._delete_existing_rows(df)
-            self.message += "Шаг 'Удаление существующих строк' выполнен успешно.\n"
-            self._update_data_import_record()  # Обновляем запись после удаления строк
-
-            # Шаг 7: Загрузка данных в базу
-            self._load_data_to_db(df)
-            self.message += "Шаг 'Загрузка данных в базу' выполнен успешно.\n"
-            self._update_data_import_record()  # Обновляем запись после загрузки в базу
-
-        except Exception as e:
-            self.message += f"Ошибка при выполнении загрузки: {e}\n"
-            self.error_count += 1
-            self._update_data_import_record()  # Сохраняем сообщение об ошибке
-            raise
-
-        # Финальное обновление с общим временем выполнения
-        total_end_time = datetime.now()
-        elapsed_time = total_end_time - total_start_time
-        self.message += f"Загрузка данных завершена. Общее время: {elapsed_time}\n"
-        self._update_data_import_record()
+            raise ValueError(f"Ошибка при подключении к Firebird или выполнении запроса: {e}")

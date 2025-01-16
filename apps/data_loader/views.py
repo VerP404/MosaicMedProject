@@ -7,7 +7,9 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.apps import apps
 from django.db import connection
 
-from .data_loader import DataLoader, engine
+
+from .data_loader import engine, CsvDataLoader
+from .data_loader2 import DataLoader
 from .forms import FileUploadForm
 from .models.oms_data import DataType, DataImport, DataLoaderConfig
 from ..home.models import MainSettings
@@ -19,7 +21,31 @@ def upload_file(request, data_type_id):
     data_type = get_object_or_404(DataType, id=data_type_id)
     loader_config = get_object_or_404(DataLoaderConfig, data_type=data_type)
     organization = MedicalOrganization.objects.first()
-
+    column_mapping = {
+        "Талон": "talon",
+        "Источник": "source",
+        "Статус": "status",
+        "Цель": "goal",
+        "Пациент": "patient",
+        "Дата рождения": "birth_date",
+        "Пол": "gender",
+        "Код СМО": "smo_code",
+        "ЕНП": "enp",
+        "Начало лечения": "treatment_start",
+        "Окончание лечения": "treatment_end",
+        "Врач": "doctor",
+        "Посещения": "visits",
+        "Посещения в МО": "mo_visits",
+        "Посещения на Дому": "home_visits",
+        "Диагноз основной (DS1)": "main_diagnosis",
+        "Сопутствующий диагноз (DS2)": "additional_diagnosis",
+        "Первоначальная дата ввода": "initial_input_date",
+        "Дата последнего изменения": "last_change_date",
+        "Сумма": "amount",
+        "Санкции": "sanctions",
+        "КСГ": "ksg",
+        "Отчетный период выгрузки": "report_period",
+    }
     if request.method == 'POST':
         form = FileUploadForm(request.POST, request.FILES)
         if form.is_valid():
@@ -32,17 +58,19 @@ def upload_file(request, data_type_id):
                 temp_file_path = temp_file.name
 
             try:
-                loader = DataLoader(
+                loader = CsvDataLoader(
                     engine=engine,
                     table_name=loader_config.table_name,
+                    table_name_temp=f"temp_{loader_config.table_name}",
                     data_type_name=data_type.name,
                     column_check=loader_config.column_check,
                     columns_for_update=loader_config.get_columns_for_update(),
                     encoding=loader_config.encoding,
                     sep=loader_config.delimiter,
-                    clear_all_rows=loader_config.clear_all_rows
+                    clear_all_rows=loader_config.clear_all_rows,
+                    column_mapping=column_mapping,
                 )
-                loader.load_data(temp_file_path)  # Загружаем данные
+                loader.run_etl(temp_file_path)  # Загружаем данные
 
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return JsonResponse({

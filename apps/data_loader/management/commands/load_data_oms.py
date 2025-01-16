@@ -1,8 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from apps.data_loader.models.oms_data import OMSSettings, DataType, DataLoaderConfig
-from apps.data_loader.selenium.oms import selenium_oms
-from apps.data_loader.data_loader import DataLoader, engine
+from apps.data_loader.data_loader import SeleniumDataLoader, engine
 from datetime import datetime, timedelta
 
 
@@ -34,26 +33,53 @@ class Command(BaseCommand):
         end_date = (today - timedelta(days=1)).strftime('%d-%m-%y')  # Вчерашняя дата в формате дд-мм-гг
         start_date_treatment = f'01-01-{today.strftime("%y")}'  # 1 января текущего года в формате дд-мм-гг
 
-        # Запускаем Selenium для скачивания CSV файла
-        success, file_path = selenium_oms(username, password, start_date, end_date, start_date_treatment)
-
-        if not success:
-            self.stdout.write(self.style.ERROR('Ошибка при загрузке файла через Selenium'))
-            return
-
+        column_mapping = {
+            "Талон": "talon",
+            "Источник": "source",
+            "Статус": "status",
+            "Цель": "goal",
+            "Пациент": "patient",
+            "Дата рождения": "birth_date",
+            "Пол": "gender",
+            "Код СМО": "smo_code",
+            "ЕНП": "enp",
+            "Начало лечения": "treatment_start",
+            "Окончание лечения": "treatment_end",
+            "Врач": "doctor",
+            "Посещения": "visits",
+            "Посещения в МО": "mo_visits",
+            "Посещения на Дому": "home_visits",
+            "Диагноз основной (DS1)": "main_diagnosis",
+            "Сопутствующий диагноз (DS2)": "additional_diagnosis",
+            "Первоначальная дата ввода": "initial_input_date",
+            "Дата последнего изменения": "last_change_date",
+            "Сумма": "amount",
+            "Санкции": "sanctions",
+            "КСГ": "ksg",
+            "Отчетный период выгрузки": "report_period",
+        }
         # Инициализируем DataLoader и загружаем данные в базу
-        data_loader = DataLoader(
+        selenium_loader = SeleniumDataLoader(
             engine=engine,
-            table_name=config.table_name,
-            data_type_name=data_type.name,
-            column_check=config.column_check,
-            columns_for_update=config.get_columns_for_update(),
-            encoding=config.encoding,
-            sep=config.delimiter
+            table_name="data_loader_omsdata",
+            table_name_temp=f"temp_data_loader_omsdata",
+            data_type_name="OMS",
+            column_mapping=column_mapping,
+            column_check='patient',
+            columns_for_update=["talon", "source"],
+            username=username,
+            password=password,
+            start_date=start_date,
+            end_date=end_date,
+            start_date_treatment=start_date_treatment,
+            file_format='csv',
+            dtype=str,
+            encoding='utf-8',
+            sep=';',
         )
 
         try:
-            data_loader.load_data(file_path)
+            selenium_loader.run_etl("ignored_source_name")
             self.stdout.write(self.style.SUCCESS('Загрузка данных успешно завершена'))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'Ошибка при загрузке данных: {e}'))

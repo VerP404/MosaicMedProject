@@ -19,13 +19,28 @@ logging.getLogger("selenium").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)  # Логи уровня INFO и выше будут выводиться
+# Устанавливаем файл для записи логов
+LOG_FILE = os.path.join(os.path.dirname(__file__), "selenium_debug.log")
 
+# Настройка логирования
+logging.basicConfig(
+    level=logging.DEBUG,  # Уровень логирования: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    format="%(asctime)s - %(levelname)s - %(message)s",  # Формат вывода
+    handlers=[
+        logging.StreamHandler(),  # Вывод логов в консоль
+        logging.FileHandler(LOG_FILE, mode="w", encoding="utf-8")  # Запись логов в файл
+    ]
+)
+
+# Создаём логгер
+logger = logging.getLogger(__name__)
 
 def selenium_oms(username, password, start_date, end_date, start_date_treatment):
     def parse_html():
         source_data = driver.page_source
         soup = BeautifulSoup(source_data, 'html.parser')
         return soup
+
     def ojidanie():
         flag = True
         while flag:
@@ -39,6 +54,7 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment)
                     flag = False
             except AttributeError:
                 flag = False
+
     logger.info("Начало выполнения скрипта Selenium")
     try:
         # Настройка опций для Firefox
@@ -127,10 +143,12 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment)
         # Обработка скачанного файла
         download_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
         file_pattern = 'journal_*.csv'
+        logger.info(f"Ищем файлы в {download_folder} с шаблоном {file_pattern}")
         files = glob.glob(os.path.join(download_folder, file_pattern))
 
         if files:
             latest_file = max(files, key=os.path.getctime)
+            logger.info(f"Последний файл: {latest_file}")
             destination_folder = os.path.join(settings.BASE_DIR, 'imported_files')
             if not os.path.exists(destination_folder):
                 os.makedirs(destination_folder)
