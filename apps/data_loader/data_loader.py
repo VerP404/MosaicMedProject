@@ -171,6 +171,19 @@ class BaseDataLoader(ABC):
         # Приводим к строкам
         df = df.astype(str)
 
+        # Обрабатываем дубли для "Стационарно"
+        if 'goal' in df.columns and 'talon' in df.columns:
+            # Фильтруем только строки, где goal == "Стационарно"
+            mask = df['goal'] == 'Стационарно'
+            stationary_df = df[mask]
+
+            # Для дубликатов добавляем суффиксы _1, _2 и т.д.
+            stationary_df['talon'] = stationary_df.groupby('talon').cumcount().add(1).astype(str).radd(
+                stationary_df['talon'] + '_')
+
+            # Обновляем исходный DataFrame
+            df.loc[mask, 'talon'] = stationary_df['talon']
+
         # Удаляем дубликаты
         df.drop_duplicates(subset=self.columns_for_update, inplace=True)
 
