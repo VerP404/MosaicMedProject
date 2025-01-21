@@ -382,6 +382,7 @@ class BaseDataLoader(ABC):
 
         # ON CONFLICT
         conflict_sql = ", ".join(self.columns_for_update)
+        print(self.columns_for_update)
 
         # DO UPDATE
         update_parts = []

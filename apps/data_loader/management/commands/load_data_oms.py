@@ -1,5 +1,4 @@
 from django.core.management.base import BaseCommand
-
 from apps.data_loader.models.oms_data import OMSSettings, DataType, DataLoaderConfig
 from apps.data_loader.data_loader import SeleniumDataLoader, engine
 from datetime import datetime, timedelta
@@ -7,6 +6,11 @@ from datetime import datetime, timedelta
 
 class Command(BaseCommand):
     help = 'Загрузка данных в базу данных через Selenium'
+
+    def add_arguments(self, parser):
+        parser.add_argument('--start_date', type=str, help='Начальная дата в формате дд-мм-гг')
+        parser.add_argument('--end_date', type=str, help='Конечная дата в формате дд-мм-гг')
+        parser.add_argument('--start_date_treatment', type=str, help='Дата начала лечения в формате дд-мм-гг')
 
     def handle(self, *args, **kwargs):
         # Получаем настройки для авторизации
@@ -17,6 +21,7 @@ class Command(BaseCommand):
         except OMSSettings.DoesNotExist:
             self.stdout.write(self.style.ERROR('Настройки OMSSettings не найдены'))
             return
+
         # Получаем конфигурацию для типа данных OMS
         try:
             data_type = DataType.objects.get(name="OMS")
@@ -27,11 +32,21 @@ class Command(BaseCommand):
         except DataLoaderConfig.DoesNotExist:
             self.stdout.write(self.style.ERROR('Конфигурация для типа данных OMS не найдена'))
             return
+
         # Устанавливаем даты
         today = datetime.now()
-        start_date = (today - timedelta(days=1)).strftime('%d-%m-%y')  # Вчерашняя дата в формате дд-мм-гг
-        end_date = (today - timedelta(days=1)).strftime('%d-%m-%y')  # Вчерашняя дата в формате дд-мм-гг
-        start_date_treatment = f'01-01-{today.strftime("%y")}'  # 1 января текущего года в формате дд-мм-гг
+        start_date = kwargs.get('start_date', (today - timedelta(days=1)).strftime('%d-%m-%y'))
+        end_date = kwargs.get('end_date', (today - timedelta(days=1)).strftime('%d-%m-%y'))
+        start_date_treatment = kwargs.get('start_date_treatment', f'01-01-{today.strftime("%y")}')
+
+        # Проверяем формат дат
+        try:
+            datetime.strptime(start_date, '%d-%m-%y')
+            datetime.strptime(end_date, '%d-%m-%y')
+            datetime.strptime(start_date_treatment, '%d-%m-%y')
+        except ValueError:
+            self.stdout.write(self.style.ERROR("Неверный формат даты. Используйте дд-мм-гг"))
+            return
 
         column_mapping = {
             "Талон": "talon",
@@ -58,6 +73,7 @@ class Command(BaseCommand):
             "КСГ": "ksg",
             "Отчетный период выгрузки": "report_period",
         }
+
         # Инициализируем DataLoader и загружаем данные в базу
         selenium_loader = SeleniumDataLoader(
             engine=engine,
