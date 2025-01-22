@@ -35,9 +35,9 @@ class Command(BaseCommand):
 
         # Устанавливаем даты
         today = datetime.now()
-        start_date = kwargs.get('start_date', (today - timedelta(days=1)).strftime('%d-%m-%y'))
-        end_date = kwargs.get('end_date', (today - timedelta(days=1)).strftime('%d-%m-%y'))
-        start_date_treatment = kwargs.get('start_date_treatment', f'01-01-{today.strftime("%y")}')
+        start_date = kwargs.get('start_date') or (today - timedelta(days=1)).strftime('%d-%m-%y')
+        end_date = kwargs.get('end_date') or (today - timedelta(days=1)).strftime('%d-%m-%y')
+        start_date_treatment = kwargs.get('start_date_treatment') or f'01-01-{today.strftime("%y")}'
 
         # Проверяем формат дат
         try:
