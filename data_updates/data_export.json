@@ -2145,7 +2145,7 @@
             "id": 1,
             "table_name": "data_loader_omsdata",
             "column_check": "patient",
-            "columns_for_update": "talon",
+            "columns_for_update": "talon,source",
             "encoding": "utf-8",
             "delimiter": ";",
             "data_type_id": 2
