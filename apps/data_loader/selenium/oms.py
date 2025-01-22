@@ -1,12 +1,9 @@
 import logging
 from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.firefox import GeckoDriverManager
 import time
 import os
 import glob
@@ -35,7 +32,13 @@ logging.basicConfig(
 # Создаём логгер
 logger = logging.getLogger(__name__)
 
-def selenium_oms(username, password, start_date, end_date, start_date_treatment):
+
+def selenium_oms(username, password, start_date, end_date, start_date_treatment, browser='firefox'):
+    """
+    Общая функция для запуска Selenium с выбором браузера.
+    :param browser: 'firefox' или 'chrome'
+    """
+
     def parse_html():
         source_data = driver.page_source
         soup = BeautifulSoup(source_data, 'html.parser')
@@ -57,17 +60,58 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment)
 
     logger.info("Начало выполнения скрипта Selenium")
     try:
-        # Настройка опций для Firefox
-        options = Options()
-        options.headless = True
-        options.set_preference('gfx.webrender.all', False)
-        options.set_preference('gfx.webrender.enabled', False)
-        options.set_preference('layers.acceleration.disabled', True)
-        options.set_preference('webgl.disabled', True)
+        if browser == 'firefox':
+            from webdriver_manager.firefox import GeckoDriverManager
+            from selenium.webdriver.firefox.options import Options
+            from selenium.webdriver.firefox.service import Service
 
-        # Автоматическая установка geckodriver с помощью webdriver-manager
-        service = Service(GeckoDriverManager().install())
-        driver = webdriver.Firefox(service=service, options=options)
+            # Настройка опций для Firefox
+            options = Options()
+            options.headless = True
+            options.set_preference('gfx.webrender.all', False)
+            options.set_preference('gfx.webrender.enabled', False)
+            options.set_preference('layers.acceleration.disabled', True)
+            options.set_preference('webgl.disabled', True)
+            # Автоматическая установка geckodriver с помощью webdriver-manager
+            service = Service(GeckoDriverManager().install())
+            driver = webdriver.Firefox(service=service, options=options)
+
+        elif browser == 'chrome':
+            from webdriver_manager.chrome import ChromeDriverManager
+            from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.chrome.service import Service
+            # Настройка опций для Chrome
+            options = Options()
+            options.headless = True
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-setuid-sandbox")
+            options.add_argument("--disable-extensions")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--disable-software-rasterizer")
+            options.add_argument("--remote-debugging-port=9222")
+            options.add_argument("--disable-features=VizDisplayCompositor")
+            options.add_argument('--proxy-server="direct://"')  # Отключить прокси
+            options.add_argument('--proxy-bypass-list=*')  # Исключить все адреса
+
+            # Настройка папки загрузки
+            download_folder = os.path.join(settings.BASE_DIR, 'imported_files')
+            if not os.path.exists(download_folder):
+                os.makedirs(download_folder)
+            prefs = {
+                "download.default_directory": download_folder,
+                "download.prompt_for_download": False,
+                "download.directory_upgrade": True,
+                "safebrowsing.enabled": True
+            }
+            options.add_experimental_option("prefs", prefs)
+            # Автоматическая установка chromedriver с помощью webdriver-manager
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
+
+        else:
+            raise ValueError("Поддерживаются только 'firefox' и 'chrome'")
+
         driver.implicitly_wait(10)
         driver.get('http://10.36.0.142:9000/')
         logger.info("Открыт сайт OMS")
@@ -112,7 +156,7 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment)
         start_date_input.send_keys(start_date)
 
         end_date_input = driver.find_element(By.XPATH,
-                                               '//*[@id="menu"]/div/div[2]/div/div/div[2]/div/div/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div[1]/div[7]/div/div[2]/div[2]/div/div/div/input')
+                                             '//*[@id="menu"]/div/div[2]/div/div/div[2]/div/div/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div[1]/div[7]/div/div[2]/div[2]/div/div/div/input')
         end_date_input.clear()
         end_date_input.send_keys(end_date)
 

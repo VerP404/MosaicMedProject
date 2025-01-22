@@ -11,6 +11,8 @@ class Command(BaseCommand):
         parser.add_argument('--start_date', type=str, help='Начальная дата в формате дд-мм-гг')
         parser.add_argument('--end_date', type=str, help='Конечная дата в формате дд-мм-гг')
         parser.add_argument('--start_date_treatment', type=str, help='Дата начала лечения в формате дд-мм-гг')
+        parser.add_argument('--browser', type=str, choices=['firefox', 'chrome'], default='firefox',
+                            help='Браузер для запуска Selenium')
 
     def handle(self, *args, **kwargs):
         # Получаем настройки для авторизации
@@ -47,6 +49,8 @@ class Command(BaseCommand):
         except ValueError:
             self.stdout.write(self.style.ERROR("Неверный формат даты. Используйте дд-мм-гг"))
             return
+
+        browser = kwargs.get('browser', 'firefox')
 
         column_mapping = {
             "Талон": "talon",
@@ -92,6 +96,7 @@ class Command(BaseCommand):
             dtype=str,
             encoding='utf-8',
             sep=';',
+            browser=browser,
         )
 
         try:

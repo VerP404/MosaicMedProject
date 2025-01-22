@@ -441,7 +441,7 @@ class SeleniumDataLoader(BaseDataLoader):
                  data_type_name, column_mapping, column_check, columns_for_update,
                  username, password, start_date, end_date, start_date_treatment,
                  file_format='csv', sep=';', dtype=str, encoding='utf-8',
-                 clear_all_rows=False):
+                 clear_all_rows=False, browser='firefox'):
         super().__init__(
             engine=engine,
             table_name=table_name,
@@ -455,6 +455,7 @@ class SeleniumDataLoader(BaseDataLoader):
             dtype=dtype,
             encoding=encoding,
             clear_all_rows=clear_all_rows
+
         )
         # Данные для selenium
         self.username = username
@@ -462,6 +463,7 @@ class SeleniumDataLoader(BaseDataLoader):
         self.start_date = start_date
         self.end_date = end_date
         self.start_date_treatment = start_date_treatment
+        self.browser = browser
 
     def extract(self, source_name) -> pd.DataFrame:
         """
@@ -474,7 +476,8 @@ class SeleniumDataLoader(BaseDataLoader):
             self.password,
             self.start_date,
             self.end_date,
-            self.start_date_treatment
+            self.start_date_treatment,
+            self.browser
         )
         logger.info("Success: %s, Downloaded path: %s", success, downloaded_path)
 
