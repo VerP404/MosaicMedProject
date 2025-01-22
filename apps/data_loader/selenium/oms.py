@@ -72,7 +72,6 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment,
             options.set_preference('gfx.webrender.enabled', False)
             options.set_preference('layers.acceleration.disabled', True)
             options.set_preference('webgl.disabled', True)
-            # Автоматическая установка geckodriver с помощью webdriver-manager
             service = Service(GeckoDriverManager().install())
             driver = webdriver.Firefox(service=service, options=options)
 
@@ -80,6 +79,7 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment,
             from webdriver_manager.chrome import ChromeDriverManager
             from selenium.webdriver.chrome.options import Options
             from selenium.webdriver.chrome.service import Service
+
             # Настройка опций для Chrome
             options = Options()
             options.headless = True
@@ -105,7 +105,6 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment,
                 "safebrowsing.enabled": True
             }
             options.add_experimental_option("prefs", prefs)
-            # Автоматическая установка chromedriver с помощью webdriver-manager
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=options)
 
@@ -184,11 +183,23 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment,
         download_button.click()
         time.sleep(5)  # Ожидание завершения загрузки
 
-        # Обработка скачанного файла
-        download_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
+        # # Обработка скачанного файла
+        # download_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
+        # file_pattern = 'journal_*.csv'
+        # logger.info(f"Ищем файлы в {download_folder} с шаблоном {file_pattern}")
+        # files = glob.glob(os.path.join(download_folder, file_pattern))
+
+        # Проверка скачанного файла
         file_pattern = 'journal_*.csv'
-        logger.info(f"Ищем файлы в {download_folder} с шаблоном {file_pattern}")
-        files = glob.glob(os.path.join(download_folder, file_pattern))
+        if browser == 'chrome':
+            # Путь для Chrome
+            file_folder = os.path.join(settings.BASE_DIR, 'imported_files')
+        else:
+            # Путь для Firefox (загрузка по умолчанию в ~/Downloads)
+            file_folder = os.path.expanduser('~/Downloads')
+
+        files = glob.glob(os.path.join(file_folder, file_pattern))
+
 
         if files:
             latest_file = max(files, key=os.path.getctime)
