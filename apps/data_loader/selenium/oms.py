@@ -153,7 +153,7 @@ def selenium_oms(username, password, start_date, end_date, start_date_treatment,
                                                '//*[@id="menu"]/div/div[2]/div/div/div[2]/div/div/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div[1]/div[7]/div/div[2]/div[1]/div/div/div/input')
         start_date_input.clear()
         start_date_input.send_keys(start_date)
-
+        time.sleep(1)
         # end_date_input = driver.find_element(By.XPATH,
         #                                      '//*[@id="menu"]/div/div[2]/div/div/div[2]/div/div/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div[1]/div[7]/div/div[2]/div[2]/div/div/div/input')
         # end_date_input.clear()
