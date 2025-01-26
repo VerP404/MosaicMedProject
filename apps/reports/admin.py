@@ -2,12 +2,10 @@ from datetime import datetime
 
 import openpyxl
 from django.contrib import admin
-from django.contrib.admin.views.main import ChangeList
-from django.http import HttpResponse, JsonResponse
-from django.template.response import TemplateResponse
-from django.urls import path
+from django.http import HttpResponse
 
-from apps.reports.models import DeleteEmd, InvalidationReason, SVOMember, SVOMemberOMSData
+from apps.reports.models import DeleteEmd, InvalidationReason, SVOMember, SVOMemberOMSData, PatientAction, Patient, \
+    Site, ActionType, Group
 
 
 @admin.register(DeleteEmd)
@@ -180,3 +178,62 @@ class SVOMemberAdmin(admin.ModelAdmin):
         """
         super().save_model(request, obj, form, change)
         obj.update_oms_data()  # Вызов метода для обновления данных из OMSData
+
+
+# Новый отчет
+# 1) Inline для ActionType в админке Группы:
+class ActionTypeInline(admin.TabularInline):
+    model = ActionType
+    extra = 1
+    # Если хотите, можно добавить поля, которые будут редактироваться:
+    fields = ('name',)
+
+
+# Регистрируем Group без отдельной регистрации ActionType;
+# теперь действия (ActionType) создаются/редактируются прямо в группе (inline).
+@admin.register(Group)
+class GroupAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
+    inlines = [ActionTypeInline]
+
+
+# 2) Участки: добавить фильтр по корпусам:
+@admin.register(Site)
+class SiteAdmin(admin.ModelAdmin):
+    list_display = ('building', 'site_name')
+    search_fields = ('building', 'site_name')
+    list_filter = ('building',)  # Фильтр по корпусам
+
+
+# 3) Пациент: добавить отображение категорий (групп),
+#    сделать инлайн с действиями (PatientAction),
+#    при этом нужно понимать, к какой группе относится действие.
+class PatientActionInline(admin.TabularInline):
+    model = PatientAction
+    extra = 0
+    # Отобразим поле, чтобы видеть группу действия (только для чтения)
+    readonly_fields = ('action_group',)
+    fields = ('action_group', 'action', 'done', 'done_datetime', 'comment')
+
+    def action_group(self, obj):
+        """
+        Показываем группу, к которой относится выбранный ActionType.
+        """
+        if obj.action:
+            return obj.action.group.name
+        return "-"
+    action_group.short_description = 'Группа действия'
+
+
+@admin.register(Patient)
+class PatientAdmin(admin.ModelAdmin):
+    list_display = ('full_name', 'date_of_birth', 'enp', 'gender', 'phone', 'site', 'get_groups')
+    list_filter = ('gender', 'groups', 'site')
+    search_fields = ('full_name', 'phone', 'address', 'enp')
+    inlines = [PatientActionInline]
+
+    # Специальный метод, чтобы в list_display показать, в каких группах пациент
+    def get_groups(self, obj):
+        return ", ".join([g.name for g in obj.groups.all()])
+    get_groups.short_description = 'Группы'

@@ -95,6 +95,7 @@ class SVOMember(models.Model):
             models.UniqueConstraint(fields=['last_name', 'enp'], name='unique_last_name_enp')
         ]
 
+
 class SVORelative(models.Model):
     svomember = models.ForeignKey(SVOMember, on_delete=models.CASCADE, verbose_name="Участник СВО",
                                   limit_choices_to={'is_active': True})
@@ -130,3 +131,118 @@ class SVOMemberOMSData(models.Model):
 
     def __str__(self):
         return f"Талон {self.talon} - {self.svomember}"
+
+
+class Group(models.Model):
+    """
+    Модель для различных групп пациентов, например:
+    - Ветераны ВОВ
+    - Ликвидаторы аварии на ЧАЭС
+    - и т.д.
+    """
+    name = models.CharField(max_length=200, verbose_name='Название группы')
+
+    class Meta:
+        verbose_name = 'Группа'
+        verbose_name_plural = 'Реестр: группы'
+
+    def __str__(self):
+        return self.name
+
+
+class ActionType(models.Model):
+    """
+    Справочник типов действий, которые администратор может добавлять/редактировать.
+    Примеры:
+    - Обзвон
+    - Приглашение
+    - ДВ4, ДВ2
+    - УД1, УД2
+    - ДР1, ДР2
+    и т.д.
+    """
+    name = models.CharField(max_length=200, verbose_name='Тип действия')
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='actions', verbose_name='Группа')
+
+    class Meta:
+        verbose_name = 'Тип действия'
+        verbose_name_plural = 'Реестр: Типы действий'
+
+    def __str__(self):
+        return f"{self.group.name} – {self.name}"
+
+
+class Site(models.Model):
+    """
+    Справочник участков. Администратор может задать связку:
+    - Корпус (здание)
+    - Номер участка (или название участка)
+    """
+    building = models.CharField(max_length=100, verbose_name='Корпус')
+    site_name = models.CharField(max_length=100, verbose_name='Участок')
+
+    class Meta:
+        verbose_name = 'Участок'
+        verbose_name_plural = 'Реестр: Участки'
+
+    def __str__(self):
+        return f'{self.building} - {self.site_name}'
+
+
+class Patient(models.Model):
+    """
+    Регистр пациентов. Поля:
+    - ФИО
+    - Дата рождения
+    - Дата смерти
+    - Пол
+    - ЕНП
+    - Адрес
+    - Телефон
+    - Участок (ForeignKey -> Site)
+    - Группы (ManyToMany -> Group)
+    """
+    GENDER_CHOICES = [('M', 'Мужской'), ('F', 'Женский'), ]
+
+    full_name = models.CharField(max_length=255, verbose_name='ФИО')
+    date_of_birth = models.DateField(verbose_name='Дата рождения')
+    date_of_death = models.DateField(verbose_name='Дата смерти', null=True, blank=True)
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, verbose_name='Пол')
+    enp = models.CharField(max_length=20, verbose_name='ЕНП', unique=True)
+    address = models.TextField(verbose_name='Адрес')
+    phone = models.CharField(max_length=20, verbose_name='Телефон')
+    site = models.ForeignKey(Site, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Участок')
+    groups = models.ManyToManyField(Group, blank=True, verbose_name='Группы')
+
+    class Meta:
+        verbose_name = 'Пациент'
+        verbose_name_plural = 'Реестр: Пациенты'
+        ordering = ['full_name']
+
+    def __str__(self):
+        return self.full_name
+
+
+class PatientAction(models.Model):
+    """
+    Модель, фиксирующая выполнение определённого действия у пациента.
+    Поля:
+    - patient (ForeignKey -> Patient)
+    - action (ForeignKey -> ActionType)
+    - done (BooleanField) - чекбокс «да/нет»
+    - done_datetime (DateTimeField) - когда действие выполнено
+    - comment (TextField) - комментарий (необязательный)
+    """
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, verbose_name='Пациент')
+    action = models.ForeignKey(ActionType, on_delete=models.CASCADE, verbose_name='Действие')
+    done = models.BooleanField(default=False, verbose_name='Выполнено?')
+    done_datetime = models.DateTimeField(null=True, blank=True, verbose_name='Дата/время выполнения')
+    comment = models.TextField(null=True, blank=True, verbose_name='Комментарий')
+
+    class Meta:
+        verbose_name = 'Выполнение действия'
+        verbose_name_plural = 'Реестр: действия'
+        ordering = ['-done_datetime']
+
+    def __str__(self):
+        return f"{self.patient.full_name} – {self.action.name}"
