@@ -176,69 +176,67 @@ def update_current_month(n_intervals):
         Input(f'dropdown-building-{type_page}', 'value'),
         Input(f'dropdown-department-{type_page}', 'value'),
         Input(f'dropdown-profile-{type_page}', 'value'),
-        Input(f'dropdown-doctor-{type_page}', 'value')
+        Input(f'dropdown-doctor-{type_page}', 'value'),
+        Input(f'dropdown-year-{type_page}', 'value'),
     ]
 )
-def update_filters(building_id, department_id, profile_id, doctor_id):
+def update_filters(building_id, department_id, profile_id, doctor_id, selected_year):
+    # Установим текущий год, если selected_year не передан
+    if not selected_year:
+        selected_year = datetime.now().year
+
     # Получаем доступные корпуса
     buildings = get_available_buildings()
 
     # Определяем доступные отделения
     if doctor_id:
-        # Если выбран врач, фильтруем отделения по врачу
         departments = get_departments_by_doctor(doctor_id)
     elif building_id:
-        # Если выбран корпус, фильтруем по корпусу
         departments = get_available_departments(building_id)
     else:
-        # Если ничего не выбрано, возвращаем все отделения
         departments = get_available_departments()
 
     # Определяем доступные профили
     if building_id or department_id:
-        # Фильтруем профили по корпусу и/или отделению
         profiles = get_available_profiles(building_id, department_id)
     else:
-        # Если фильтры не выбраны, возвращаем все профили
         profiles = get_available_profiles()
 
     # Определяем доступных врачей
-    if department_id or profile_id:
-        # Фильтруем врачей по отделению или профилю
-        doctors = get_available_doctors(building_id, department_id, profile_id)
-    else:
-        # Если фильтры не выбраны, возвращаем всех врачей
-        doctors = get_available_doctors()
+    doctors = get_available_doctors(building_id, department_id, profile_id, selected_year)
 
     return buildings, departments, profiles, doctors
+
 
 
 @app.callback(
     Output(f'selected-filters-{type_page}', 'children'),
     [Input(f'dropdown-doctor-{type_page}', 'value')]
 )
-def update_selected_filters(doctor_id):
-    # Проверяем, выбран ли один врач
-    if isinstance(doctor_id, list) and len(doctor_id) == 1:
-        doctor_id = doctor_id[0]
-    elif isinstance(doctor_id, str) and ',' not in doctor_id:
-        # Если передана строка, и это не список
-        doctor_id = int(doctor_id)
-    else:
-        return []
+def update_selected_filters(doctor_ids):
+    if not doctor_ids:
+        raise exceptions.PreventUpdate
 
-    # Получаем информацию о враче
-    details = get_doctor_details(doctor_id)
-    if details:
-        selected_text = [
+    # Преобразуем строку с идентификаторами в список чисел
+    if isinstance(doctor_ids, str):
+        doctor_ids = [int(id.strip()) for id in doctor_ids.split(',') if id.strip().isdigit()]
+    elif isinstance(doctor_ids, int):
+        doctor_ids = [doctor_ids]
+
+    # Получаем информацию о врачах
+    details_list = get_doctor_details(doctor_ids)
+    selected_text = [
+        html.Div([
             f"Врач: {details['doctor_name']}",
             f"Специальность: {details['specialty']}",
             f"Отделение: {details['department']}",
             f"Корпус: {details['building']}"
-        ]
-        return [html.Div(item) for item in selected_text]
-    else:
-        return []
+        ])
+        for details in details_list
+    ]
+    return selected_text
+
+
 
 
 @app.callback(

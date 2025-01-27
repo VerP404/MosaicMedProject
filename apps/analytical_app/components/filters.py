@@ -132,8 +132,19 @@ def get_available_profiles(building_ids=None, department_ids=None):
     return profiles
 
 
-def get_available_doctors(building_ids=None, department_ids=None, profile_ids=None):
+def get_available_doctors(building_ids=None, department_ids=None, profile_ids=None, selected_year=None):
+    if not selected_year:
+        raise ValueError("Год не передан в фильтр врачей.")
+
+    print(f"Selected Year: {selected_year}")  # Отладочный вывод
+
     filters = build_sql_filters(building_ids=building_ids, department_ids=department_ids, profile_ids=profile_ids)
+
+    year_filter = f"""
+        AND (
+            (EXTRACT(YEAR FROM start_date) <= :selected_year AND (end_date IS NULL OR EXTRACT(YEAR FROM end_date) >= :selected_year))
+        )
+    """
 
     query = f"""
         SELECT ARRAY_AGG(doctor.id) AS doctor_ids,
@@ -149,13 +160,24 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
         JOIN personnel_profile pp ON pp.id = doctor.profile_id
         WHERE 1=1
         {filters}
+        {year_filter}
         GROUP BY person.last_name, person.first_name, person.patronymic, pp.description, department.name
     """
 
     with engine.connect() as connection:
-        result = connection.execute(text(query))
-        doctors = [{'label': row[1], 'value': ','.join(map(str, row[0]))} for row in result.fetchall()]
+        result = connection.execute(text(query), {'selected_year': selected_year})
+
+        # Исправление: использование индексов вместо названий
+        doctors = [
+            {
+                'label': row[1],  # Индекс 1 соответствует 'doctor_info'
+                'value': ','.join(map(str, row[0]))  # Индекс 0 соответствует 'doctor_ids'
+            }
+            for row in result.fetchall()
+        ]
     return doctors
+
+
 
 
 def filter_profile(type_page):
@@ -387,19 +409,25 @@ def date_picker(type_page):
     )
 
 
-def get_departments_by_doctor(doctor_id):
-    # Если doctor_id передан как список, берем первый элемент
-    if isinstance(doctor_id, list) and doctor_id:
-        doctor_id = doctor_id[0]
+def get_departments_by_doctor(doctor_ids):
+    # Преобразуем doctor_ids в список целых чисел
+    if isinstance(doctor_ids, str):
+        doctor_ids = [int(id.strip()) for id in doctor_ids.split(',') if id.strip().isdigit()]
+    elif isinstance(doctor_ids, list):
+        doctor_ids = [int(id) for id in doctor_ids if isinstance(id, (int, str)) and str(id).isdigit()]
 
     query = """
         SELECT DISTINCT department.id, department.name
         FROM organization_department department
         JOIN personnel_doctorrecord doctor ON doctor.department_id = department.id
-        WHERE doctor.id = :doctor_id
+        WHERE doctor.id = ANY(:doctor_ids)
     """
+
     with engine.connect() as connection:
-        result = connection.execute(text(query), {'doctor_id': doctor_id})
+        result = connection.execute(
+            text(query),
+            {'doctor_ids': doctor_ids}  # Передаем список чисел
+        )
         departments = [{'label': row[1], 'value': row[0]} for row in result.fetchall()]
 
     # Добавляем опцию "Все" в начало списка
@@ -407,7 +435,13 @@ def get_departments_by_doctor(doctor_id):
     return departments
 
 
-def get_doctor_details(doctor_id):
+def get_doctor_details(doctor_ids):
+    # Преобразуем doctor_ids в список целых чисел
+    if isinstance(doctor_ids, str):
+        doctor_ids = [int(id.strip()) for id in doctor_ids.split(',') if id.strip().isdigit()]
+    elif isinstance(doctor_ids, list):
+        doctor_ids = [int(id) for id in doctor_ids if isinstance(id, (int, str)) and str(id).isdigit()]
+
     query = """
         SELECT 
             CONCAT(p.last_name, ' ', SUBSTRING(p.first_name FROM 1 FOR 1), '.', SUBSTRING(p.patronymic FROM 1 FOR 1), '.') AS doctor_name,
@@ -419,15 +453,24 @@ def get_doctor_details(doctor_id):
         JOIN personnel_specialty s ON dr.specialty_id = s.id
         JOIN organization_department d ON dr.department_id = d.id
         JOIN organization_building b ON d.building_id = b.id
-        WHERE dr.id = :doctor_id
+        WHERE dr.id = ANY(:doctor_ids)
     """
+
     with engine.connect() as connection:
-        result = connection.execute(text(query), {'doctor_id': doctor_id}).fetchone()
-    if result:
-        return {
-            'doctor_name': result[0],
-            'specialty': result[1],
-            'department': result[2],
-            'building': result[3]
-        }
-    return None
+        result = connection.execute(
+            text(query),
+            {'doctor_ids': doctor_ids}  # Передаем список чисел
+        )
+        details = [
+            {
+                'doctor_name': row[0],
+                'specialty': row[1],
+                'department': row[2],
+                'building': row[3]
+            }
+            for row in result.fetchall()
+        ]
+    return details
+
+
+
