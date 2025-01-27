@@ -178,7 +178,7 @@ class DoctorRecordAdmin(admin.ModelAdmin):
 
     # Настройка поиска по doctor_code (начинается с и содержит)
     search_fields = ('doctor_code',)
-    actions = ['set_department']
+    actions = ['set_department', 'update_work_dates']
 
     def get_urls(self):
         urls = super().get_urls()
@@ -311,6 +311,52 @@ class DoctorRecordAdmin(admin.ModelAdmin):
             messages.warning(request, f"СНИЛС отсутствуют в Person: {', '.join(missing_snils)}")
 
         return redirect('admin:personnel_doctorrecord_changelist')
+
+    def update_work_dates(self, request, queryset):
+        # Получаем все записи DoctorData
+        doctor_data_records = DoctorData.objects.all()
+        updated_count = 0
+
+        for record in queryset:
+            # Ищем записи в DoctorData по doctor_code и snils
+            matching_records = doctor_data_records.filter(
+                doctor_code=record.doctor_code,
+                snils=record.person.snils
+            )
+
+            if not matching_records.exists():
+                continue
+
+            # Берем первую подходящую запись (если их несколько, нужно решить логику выбора)
+            doctor_data = matching_records.first()
+
+            # Обновляем start_date, если он пуст
+            if not record.start_date and doctor_data.start_date != '-':
+                try:
+                    record.start_date = datetime.strptime(doctor_data.start_date, '%d-%m-%Y').date()
+                except ValueError:
+                    # Пропускаем, если формат даты некорректный
+                    self.message_user(request, f"Некорректная дата начала работы для {doctor_data.snils}",
+                                      level="error")
+                    continue
+
+            # Обновляем end_date, если указана дата в DoctorData
+            if doctor_data.end_date != '-' and doctor_data.end_date:
+                try:
+                    record.end_date = datetime.strptime(doctor_data.end_date, '%d-%m-%Y').date()
+                except ValueError:
+                    # Пропускаем, если формат даты некорректный
+                    self.message_user(request, f"Некорректная дата окончания работы для {doctor_data.snils}",
+                                      level="error")
+                    continue
+
+            # Сохраняем обновления
+            record.save()
+            updated_count += 1
+
+        self.message_user(request, f"Обновлено {updated_count} записей.")
+
+    update_work_dates.short_description = "Обновить даты работы"
 
     # Функция для массового присвоения отделений
     def set_department(self, request, queryset):
