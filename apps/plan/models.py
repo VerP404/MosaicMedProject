@@ -128,7 +128,7 @@ class FilterCondition(models.Model):
             raise ValidationError("Условие фильтра с такими параметрами уже существует для данной группы и года.")
 
     class Meta:
-        unique_together = ('group', 'field_name', 'filter_type', 'year')
+        unique_together = ('group', 'field_name', 'filter_type', 'year', 'values')
         verbose_name = "Условие фильтра"
         verbose_name_plural = "Условия фильтра"
 
