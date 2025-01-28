@@ -153,6 +153,10 @@ class GroupIndicatorsAdmin(admin.ModelAdmin):
             instance.save()
         formset.save_m2m()
 
+        # Проверяем удаленные объекты и удаляем их явно
+        for obj in formset.deleted_objects:
+            obj.delete()
+
     def latest_filter_year(self, obj):
         # Метод для отображения последнего года фильтра
         latest_filter = obj.filters.order_by('-year').first()
