@@ -108,38 +108,7 @@ class FilterCondition(models.Model):
         if created:
             pass  # Если AnnualPlan был создан, MonthlyPlan создадутся автоматически
 
-    def clean(self):
-        super().clean()
-
-        # Проверяем, сохранена ли связанная группа
-        if not self.group_id:
-            raise ValidationError("Связанная группа должна быть сохранена перед созданием условий фильтра.")
-
-        # Получаем список значений текущего объекта
-        current_values = sorted([v.strip() for v in self.values.split(",")])
-
-        # Ищем существующие условия с такими же параметрами (без values)
-        existing_conditions = FilterCondition.objects.filter(
-            group=self.group,
-            field_name=self.field_name,
-            filter_type=self.filter_type,
-            year=self.year
-        )
-
-        # Исключаем текущую запись, если она уже существует
-        if self.pk:
-            existing_conditions = existing_conditions.exclude(pk=self.pk)
-
-        # Проверяем совпадение значений вручную
-        for condition in existing_conditions:
-            if sorted(condition.get_values_list()) == current_values:
-                raise ValidationError(
-                    {"values": "Фильтр с такими же параметрами и значениями уже существует."}
-                )
-
-
     class Meta:
-        unique_together = ('group', 'field_name', 'filter_type', 'year')  # УБРАЛ `values`
         verbose_name = "Условие фильтра"
         verbose_name_plural = "Условия фильтра"
 
@@ -593,5 +562,3 @@ class ChiefDashboard(models.Model):
         unique_together = ('name', 'goal', 'year')
         verbose_name = "Показатель"
         verbose_name_plural = "Панель главного врача"
-
-
