@@ -97,15 +97,16 @@ class FilterCondition(models.Model):
         return f"{self.group.name} - {self.field_name} ({self.get_filter_type_display()}) - {self.year}"
 
     def get_values_list(self):
-        return [v.strip() for v in self.values.split(",")]
+        return sorted([v.strip() for v in self.values.split(",")])
 
     def save(self, *args, **kwargs):
+        self.full_clean()  # Проверяем перед сохранением, чтобы не вызвать IntegrityError
         super().save(*args, **kwargs)
+
         # После сохранения FilterCondition, убедимся, что AnnualPlan существует
         annual_plan, created = AnnualPlan.objects.get_or_create(group=self.group, year=self.year)
         if created:
-            # Если AnnualPlan был создан, MonthlyPlan создадутся автоматически в его методе save()
-            pass
+            pass  # Если AnnualPlan был создан, MonthlyPlan создадутся автоматически
 
     def clean(self):
         super().clean()
@@ -115,9 +116,9 @@ class FilterCondition(models.Model):
             raise ValidationError("Связанная группа должна быть сохранена перед созданием условий фильтра.")
 
         # Получаем список значений текущего объекта
-        current_values = sorted([v.strip() for v in self.values.split(",")])
+        current_values = self.get_values_list()
 
-        # Ищем существующие условия с такими же параметрами
+        # Ищем существующие условия с такими же параметрами, но без values (потому что unique_together на values не работает)
         existing_conditions = FilterCondition.objects.filter(
             group=self.group,
             field_name=self.field_name,
@@ -129,14 +130,15 @@ class FilterCondition(models.Model):
         if self.pk:
             existing_conditions = existing_conditions.exclude(pk=self.pk)
 
-        # Проверяем совпадение значений
+        # Проверяем совпадение значений вручную
         for condition in existing_conditions:
-            if sorted([v.strip() for v in condition.values.split(",")]) == current_values:
+            if sorted(condition.get_values_list()) == current_values:
                 raise ValidationError(
-                    "Условие фильтра с такими параметрами и значениями уже существует для данной группы и года.")
+                    "Условие фильтра с такими параметрами и значениями уже существует для данной группы и года."
+                )
 
     class Meta:
-        unique_together = ('group', 'field_name', 'filter_type', 'year', 'values')
+        unique_together = ('group', 'field_name', 'filter_type', 'year')  # УБРАЛ `values`
         verbose_name = "Условие фильтра"
         verbose_name_plural = "Условия фильтра"
 
