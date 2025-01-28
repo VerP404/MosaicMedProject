@@ -114,26 +114,18 @@ class FilterCondition(models.Model):
         if not self.group_id:
             raise ValidationError("Связанная группа должна быть сохранена перед созданием условий фильтра.")
 
-        # Преобразуем значения в список для сравнения
-        current_values = sorted(self.get_values_list())
-
-        # Ищем существующие условия с такими же параметрами
-        existing_conditions = FilterCondition.objects.filter(
+        # Проверяем наличие дубликатов
+        existing = FilterCondition.objects.filter(
             group=self.group,
             field_name=self.field_name,
             filter_type=self.filter_type,
             year=self.year
         )
-
-        # Исключаем текущую запись из проверки
         if self.pk:
-            existing_conditions = existing_conditions.exclude(pk=self.pk)
+            existing = existing.exclude(pk=self.pk)
 
-        # Проверяем совпадение значений
-        for condition in existing_conditions:
-            if sorted(condition.get_values_list()) == current_values:
-                raise ValidationError(
-                    "Условие фильтра с такими параметрами и значениями уже существует для данной группы и года.")
+        if existing.exists():
+            raise ValidationError("Условие фильтра с такими параметрами уже существует для данной группы и года.")
 
     class Meta:
         unique_together = ('group', 'field_name', 'filter_type', 'year')
