@@ -116,9 +116,9 @@ class FilterCondition(models.Model):
             raise ValidationError("Связанная группа должна быть сохранена перед созданием условий фильтра.")
 
         # Получаем список значений текущего объекта
-        current_values = self.get_values_list()
+        current_values = sorted([v.strip() for v in self.values.split(",")])
 
-        # Ищем существующие условия с такими же параметрами, но без values (потому что unique_together на values не работает)
+        # Ищем существующие условия с такими же параметрами (без values)
         existing_conditions = FilterCondition.objects.filter(
             group=self.group,
             field_name=self.field_name,
@@ -134,8 +134,9 @@ class FilterCondition(models.Model):
         for condition in existing_conditions:
             if sorted(condition.get_values_list()) == current_values:
                 raise ValidationError(
-                    "Условие фильтра с такими параметрами и значениями уже существует для данной группы и года."
+                    {"values": "Фильтр с такими же параметрами и значениями уже существует."}
                 )
+
 
     class Meta:
         unique_together = ('group', 'field_name', 'filter_type', 'year')  # УБРАЛ `values`
