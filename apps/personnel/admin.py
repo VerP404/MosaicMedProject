@@ -177,7 +177,7 @@ class DoctorRecordAdmin(admin.ModelAdmin):
     list_editable = ('start_date', 'end_date', 'department')
 
     # Настройка поиска по doctor_code (начинается с и содержит)
-    search_fields = ('doctor_code',)
+    search_fields = ('doctor_code', 'person__last_name', 'person__first_name', 'person__snils')
     actions = ['set_department', 'update_work_dates']
 
     def get_urls(self):
@@ -397,7 +397,7 @@ class DoctorRecordAdmin(admin.ModelAdmin):
 class PersonAdmin(admin.ModelAdmin):
     list_display = ('last_name', 'first_name', 'snils', 'email', 'phone_number', 'telegram', 'digital_signature_status',
                     'maternity_leave_status')
-    search_fields = ('last_name', 'first_name', 'snils')
+    search_fields = ('last_name', 'first_name', 'patronymic', 'snils', 'email', 'phone_number', 'telegram')
     list_filter = ('citizenship', DigitalSignatureFilter, MaternityLeaveFilter, DigitalSignatureApplicationFilter)
     fieldsets = (
         (None, {
