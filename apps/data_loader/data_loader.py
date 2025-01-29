@@ -184,6 +184,19 @@ class BaseDataLoader(ABC):
             # Обновляем исходный DataFrame
             df.loc[mask, 'talon'] = stationary_df['talon']
 
+        # Получаем длины полей (VARCHAR) из БД
+        column_max_lengths = self.get_column_max_lengths()
+
+        # 🔹 Автоматическая обрезка данных по max_length
+        for column, max_length in column_max_lengths.items():
+            if column in df.columns:
+                df[column] = df[column].astype(str).str[:max_length]
+
+        # Очистка данных
+        df.fillna("-", inplace=True)
+        df.replace('`', '', regex=True, inplace=True)
+        df.replace('\u00A0', ' ', regex=True, inplace=True)
+
         # Удаляем дубликаты
         df.drop_duplicates(subset=self.columns_for_update, inplace=True)
 
@@ -404,6 +417,22 @@ class BaseDataLoader(ABC):
         # Удалим лишние переносы строк
         merge_query = " ".join(merge_query.split())
         return merge_query
+
+    def get_column_max_lengths(self):
+        """
+        Автоматически получает максимальные длины (VARCHAR(N)) для всех колонок из PostgreSQL.
+        """
+        query = f"""
+        SELECT column_name, character_maximum_length
+        FROM information_schema.columns
+        WHERE table_name = '{self.table_name}' AND data_type = 'character varying'
+        """
+
+        with self.engine.connect() as conn:
+            result = conn.execute(text(query)).fetchall()
+
+        # Создаем словарь { 'column_name': max_length }
+        return {row[0]: row[1] for row in result if row[1] is not None}
 
 
 class CsvDataLoader(BaseDataLoader):
