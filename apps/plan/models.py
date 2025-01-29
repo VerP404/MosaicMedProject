@@ -78,6 +78,10 @@ class GroupIndicators(models.Model):
 
         return filters
 
+    class Meta:
+        verbose_name = "Объемы"
+        verbose_name_plural = "Объемы"
+
 
 class FilterCondition(models.Model):
     FILTER_TYPES = [
@@ -140,7 +144,7 @@ class GroupBuildingDepartment(models.Model):
     class Meta:
         unique_together = ('group', 'year', 'building', 'department')
         verbose_name = "Корпус и отделение группы"
-        verbose_name_plural = "Корпуса и отделения группы"
+        verbose_name_plural = "Объемы: Корпуса и отделения группы"
 
     def __str__(self):
         return f"{self.group.name} ({self.year}) - {self.building.name} - {self.department.name}"
@@ -153,8 +157,8 @@ class AnnualPlan(models.Model):
 
     class Meta:
         unique_together = ('group', 'year')
-        verbose_name = "План на год"
-        verbose_name_plural = "Планы на год"
+        verbose_name = "Объемы: План на год"
+        verbose_name_plural = "Объемы: Планы на год"
 
     def __str__(self):
         return f"{self.group.name} - {self.year}"
@@ -185,8 +189,8 @@ class MonthlyPlan(models.Model):
 
     class Meta:
         unique_together = ('annual_plan', 'month')
-        verbose_name = "План на месяц"
-        verbose_name_plural = "Планы на месяц"
+        verbose_name = "Объемы: План на месяц"
+        verbose_name_plural = "Объемы: Планы на месяц"
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -215,8 +219,8 @@ class BuildingPlan(models.Model):
 
     class Meta:
         unique_together = ('annual_plan', 'building')
-        verbose_name = "План корпуса"
-        verbose_name_plural = "Планы корпусов"
+        verbose_name = "Объемы: План корпуса"
+        verbose_name_plural = "Объемы: Планы корпусов"
 
     def __str__(self):
         return f"{self.building.name} - {self.annual_plan.year}"
@@ -361,8 +365,8 @@ class DepartmentPlan(models.Model):
 
     class Meta:
         unique_together = ('building_plan', 'department')
-        verbose_name = "План отделения"
-        verbose_name_plural = "Планы отделений"
+        verbose_name = "Объемы: План отделения"
+        verbose_name_plural = "Объемы: Планы отделений"
 
     def __str__(self):
         return f"{self.department.name} - {self.building_plan}"
@@ -516,8 +520,8 @@ class UnifiedFilter(models.Model):
     combined_conditions.short_description = "Индикаторы"
 
     class Meta:
-        verbose_name = "Общий фильтр"
-        verbose_name_plural = "Общие фильтры"
+        verbose_name = "Сверхподушевик"
+        verbose_name_plural = "Сверхподушевик"
 
     def __str__(self):
         return f"{self.year} - {self.type}"
