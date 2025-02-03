@@ -110,6 +110,9 @@ class DoctorData(models.Model):
     class Meta:
         verbose_name = "ОМС: Врач"
         verbose_name_plural = "ОМС: Врачи"
+        constraints = [
+            models.UniqueConstraint(fields=['snils', 'doctor_code'], name='unique_snils_doctor_code')
+        ]
 
 
 class DetailedData(models.Model):
@@ -152,7 +155,9 @@ class DetailedData(models.Model):
     class Meta:
         verbose_name = "ОМС: Детализация"
         verbose_name_plural = "ОМС: Детализация"
-
+        constraints = [
+            models.UniqueConstraint(fields=['talon_number', 'service_code'], name='unique_talon_code')
+        ]
 
 class Category(models.Model):
     name = models.CharField(max_length=255, verbose_name="Категория")

@@ -11,7 +11,7 @@ from django.db import connection
 from .data_loader import engine, CsvDataLoader
 from .data_loader2 import DataLoader
 from .forms import FileUploadForm
-from .models.oms_data import DataType, DataImport, DataLoaderConfig
+from .models.oms_data import DataType, DataImport, DataLoaderConfig, DataTypeFieldMapping
 from ..home.models import MainSettings
 from ..organization.models import MedicalOrganization
 from ..peopledash.models import Organization
@@ -21,34 +21,11 @@ def upload_file(request, data_type_id):
     data_type = get_object_or_404(DataType, id=data_type_id)
     loader_config = get_object_or_404(DataLoaderConfig, data_type=data_type)
     organization = MedicalOrganization.objects.first()
-    column_mapping = {
-        "Талон": "talon",
-        "Источник": "source",
-        "Статус": "status",
-        "Цель": "goal",
-        "Пациент": "patient",
-        "Дата рождения": "birth_date",
-        "Пол": "gender",
-        "Код СМО": "smo_code",
-        "ЕНП": "enp",
-        "Начало лечения": "treatment_start",
-        "Окончание лечения": "treatment_end",
-        "Врач": "doctor",
-        "Врач (Профиль МП)": "doctor_profile",
-        "Специальность": "specialty",
-        "Подразделение": "department",
-        "Посещения": "visits",
-        "Посещения в МО": "mo_visits",
-        "Посещения на Дому": "home_visits",
-        "Диагноз основной (DS1)": "main_diagnosis",
-        "Сопутствующий диагноз (DS2)": "additional_diagnosis",
-        "Первоначальная дата ввода": "initial_input_date",
-        "Дата последнего изменения": "last_change_date",
-        "Сумма": "amount",
-        "Санкции": "sanctions",
-        "КСГ": "ksg",
-        "Отчетный период выгрузки": "report_period",
-    }
+
+    # Автоматическая генерация column_mapping из DataTypeFieldMapping
+    column_mappings = DataTypeFieldMapping.objects.filter(data_type=data_type)
+    column_mapping = {mapping.csv_column_name: mapping.model_field_name for mapping in column_mappings}
+
     if request.method == 'POST':
         form = FileUploadForm(request.POST, request.FILES)
         if form.is_valid():

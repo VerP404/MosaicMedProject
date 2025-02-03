@@ -157,6 +157,11 @@ class BaseDataLoader(ABC):
          - fillna('-'), убираем лишние символы
          - удаляем дубликаты по columns_for_update
         """
+        # Проверка соответствия столбцов
+        missing_columns = [col for col in self.column_mapping.keys() if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Отсутствуют столбцы в CSV: {', '.join(missing_columns)}")
+
         # Переименование и фильтрация
         df = df[list(self.column_mapping.keys())].rename(columns=self.column_mapping)
 
