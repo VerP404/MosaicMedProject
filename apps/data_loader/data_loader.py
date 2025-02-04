@@ -235,6 +235,10 @@ class BaseDataLoader(ABC):
                 conn.execute(text(f"TRUNCATE TABLE {self.table_name_temp}"))
             else:
                 self.message += f"Таблица {self.table_name_temp} будет создана автоматически.\n"
+        if self.clear_all_rows:
+            with self.engine.begin() as conn:
+                conn.execute(text(f"TRUNCATE TABLE {self.table_name} RESTART IDENTITY CASCADE;"))
+                self.message += f"Таблица {self.table_name} очищена.\n"
 
         # Загрузка во временную таблицу
         df.to_sql(self.table_name_temp, self.engine, if_exists="replace", index=False)
