@@ -34,7 +34,9 @@ class ISZLPeople(models.Model):
     class Meta:
         verbose_name = "ИСЗЛ: Прикрепленные"
         verbose_name_plural = "ИСЗЛ: Прикрепленных"
-
+        constraints = [
+            models.UniqueConstraint(fields=['enp'], name='unique_enp_people')
+        ]
 
 class ISZLDisNab(models.Model):
     pid = models.CharField(max_length=255, verbose_name="pid", default='-')
@@ -85,7 +87,9 @@ class ISZLDisNab(models.Model):
     class Meta:
         verbose_name = "ИСЗЛ: ДН"
         verbose_name_plural = "ИСЗЛ: ДН"
-
+        constraints = [
+            models.UniqueConstraint(fields=['pdwid'], name='unique_pdwid_dn')
+        ]
 
 class ISZLDisNabJob(models.Model):
     id_iszl = models.CharField(max_length=255, verbose_name="id")
@@ -111,7 +115,9 @@ class ISZLDisNabJob(models.Model):
     class Meta:
         verbose_name = "ИСЗЛ: ДН работающих"
         verbose_name_plural = "ИСЗЛ: ДН работающих"
-
+        constraints = [
+            models.UniqueConstraint(fields=['id_iszl'], name='unique_id_iszl')
+        ]
 
 class CategoryDN(models.Model):
     name = models.CharField(max_length=250, verbose_name="Категория")
