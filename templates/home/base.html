@@ -34,5 +34,36 @@
 </div>
 
 <script src="{% static 'js/app.js' %}"></script>
+<script>
+    document.getElementById('generate-report-btn').addEventListener('click', function () {
+        if (confirm('Вы уверены, что хотите создать новый отчет?')) {
+            // Показать оверлей загрузки
+            document.getElementById('loading-overlay').style.display = 'block';
+
+            fetch("{% url 'people:generate_iszl_report' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Скрыть оверлей после завершения запроса
+                document.getElementById('loading-overlay').style.display = 'none';
+
+                alert(data.message);
+                if (data.success) {
+                    location.reload();  // Обновление страницы после успешного создания отчета
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                document.getElementById('loading-overlay').style.display = 'none';
+                alert('Произошла ошибка при создании отчета.');
+            });
+        }
+    });
+</script>
 </body>
 </html>

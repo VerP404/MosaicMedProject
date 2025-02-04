@@ -35,12 +35,6 @@
             "category_id": 1
         },
         {
-            "id": 4,
-            "name": "people",
-            "description": "население",
-            "category_id": 2
-        },
-        {
             "id": 5,
             "name": "disnab",
             "description": "диспансерное",
@@ -93,6 +87,12 @@
             "name": "OMS",
             "description": "Талоны ОМС",
             "category_id": 1
+        },
+        {
+            "id": 4,
+            "name": "people",
+            "description": "население",
+            "category_id": 2
         }
     ],
     "DataTypeFieldMapping": [
@@ -965,12 +965,6 @@
             "data_type_id": 5,
             "csv_column_name": "SPEC_D",
             "model_field_name": "spec_d"
-        },
-        {
-            "id": 119,
-            "data_type_id": 4,
-            "csv_column_name": "Unnamed: 10",
-            "model_field_name": "column1"
         },
         {
             "id": 132,
@@ -2226,15 +2220,6 @@
             "data_type_id": 12
         },
         {
-            "id": 4,
-            "table_name": "data_loader_iszlpeople",
-            "column_check": "enp",
-            "columns_for_update": "enp",
-            "encoding": "utf-8",
-            "delimiter": ";",
-            "data_type_id": 4
-        },
-        {
             "id": 1,
             "table_name": "data_loader_omsdata",
             "column_check": "patient",
@@ -2251,6 +2236,15 @@
             "encoding": "utf-8",
             "delimiter": ";",
             "data_type_id": 3
+        },
+        {
+            "id": 4,
+            "table_name": "data_loader_iszlpeople",
+            "column_check": "enp",
+            "columns_for_update": "enp",
+            "encoding": "utf-8",
+            "delimiter": ";",
+            "data_type_id": 4
         }
     ]
 }
