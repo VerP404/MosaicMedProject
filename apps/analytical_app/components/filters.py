@@ -134,9 +134,15 @@ def get_available_profiles(building_ids=None, department_ids=None):
 
 def get_available_doctors(building_ids=None, department_ids=None, profile_ids=None, selected_year=None):
     if not selected_year:
-        raise ValueError("Год не передан в фильтр врачей.")
+        selected_year = datetime.now().year
 
-    print(f"Selected Year: {selected_year}")  # Отладочный вывод
+    # Преобразуем одиночные значения в списки
+    if isinstance(building_ids, int):
+        building_ids = [building_ids]
+    if isinstance(department_ids, int):
+        department_ids = [department_ids]
+    if isinstance(profile_ids, int):
+        profile_ids = [profile_ids]
 
     filters = build_sql_filters(building_ids=building_ids, department_ids=department_ids, profile_ids=profile_ids)
 
@@ -167,7 +173,6 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
     with engine.connect() as connection:
         result = connection.execute(text(query), {'selected_year': selected_year})
 
-        # Исправление: использование индексов вместо названий
         doctors = [
             {
                 'label': row[1],  # Индекс 1 соответствует 'doctor_info'
@@ -176,7 +181,6 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
             for row in result.fetchall()
         ]
     return doctors
-
 
 
 
@@ -471,6 +475,3 @@ def get_doctor_details(doctor_ids):
             for row in result.fetchall()
         ]
     return details
-
-
-

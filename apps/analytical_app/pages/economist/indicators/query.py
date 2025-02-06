@@ -73,10 +73,9 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
         union_query = f"""
             SELECT '{condition_type}' AS type,
                    COUNT(*) AS "К-во",
-                   ROUND(SUM(CAST(amount_numeric AS numeric(10, 2)))::numeric, 2) AS "Сумма"
+                   ROUND(COALESCE(SUM(CAST(amount_numeric AS numeric(10, 2))), 0)::numeric, 2) AS "Сумма"
             FROM oms
             WHERE {combined_where_clause}
-            GROUP BY type
         """
         union_queries.append(union_query)
 
