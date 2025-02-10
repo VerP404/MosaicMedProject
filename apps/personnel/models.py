@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, date
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -104,7 +104,7 @@ class DoctorRecord(models.Model):
         verbose_name_plural = "Журнал врачей"
 
     def __str__(self):
-        return f"Врач {self.person} ({self.specialty})"
+        return f"{self.person} ({self.specialty}) - {self.doctor_code}: {self.structural_unit} {self.start_date}-{self.end_date}"
 
 
 class SpecialtyRG014(models.Model):
@@ -227,3 +227,113 @@ class MaternityLeave(models.Model):
 
     def __str__(self):
         return f"Декрет с {self.start_date} по {self.end_date or 'настоящее время'} ({self.person})"
+
+
+class DoctorReportingRecord(models.Model):
+    """
+    Модель, которая описывает, как "собирать" врача для отчётов:
+    - Кто (person) + в каком отделении (department)
+    - Какие DoctorRecord (M2M), чтобы можно было указать сразу несколько кодов/записей
+      врача для одного и того же Person
+    - Период действия (start_date, end_date) — в какие даты (а значит и месяцы) этот
+      сборный "врач" считается активным для отчётов
+    - Ставка (fte), если нужно учитывать, что врач работает не на 1.0 ставку
+    """
+    person = models.ForeignKey(
+        'personnel.Person',
+        on_delete=models.CASCADE,
+        verbose_name="Физическое лицо"
+    )
+    department = models.ForeignKey(
+        'organization.Department',
+        on_delete=models.CASCADE,
+        verbose_name="Отделение"
+    )
+    # Многие DoctorRecord (M2M), но все должны принадлежать тому же Person
+    doctor_records = models.ManyToManyField(
+        'personnel.DoctorRecord',
+        related_name='reporting_records',
+        verbose_name="Записи врача (DoctorRecord)",
+        blank=True
+    )
+
+    # Период действия (включительно). Если end_date не задана, считаем, что действует
+    # "до бесконечности" или пока аналитик не укажет окончание.
+    start_date = models.DateField("Дата начала включения в отчеты")
+    end_date = models.DateField(
+        "Дата окончания включения в отчеты",
+        blank=True,
+        null=True,
+        help_text="Если не указано, считается без ограничения по дате"
+    )
+
+    # Ставка, если нужно (FTE). Можно вынести в другое место, но для удобства храним здесь.
+    fte = models.DecimalField("Ставка (FTE)", max_digits=3, decimal_places=2, default=1.00)
+
+    class Meta:
+        verbose_name = "Запись для отчётности врача"
+        verbose_name_plural = "Записи для отчётности врачей"
+
+    def __str__(self):
+        end_str = self.end_date.strftime('%Y-%m-%d') if self.end_date else '…'
+        return (
+            f"Отчётная запись: {self.person} ({self.department.name}), "
+            f"{self.start_date} - {end_str}, FTE={self.fte}"
+        )
+
+    def clean(self):
+        super().clean()
+        # 1) Проверяем только если объект уже сохранён (pk != None)
+        if self.pk:
+            doctor_records_qs = self.doctor_records.all()
+            for dr in doctor_records_qs:
+                if dr.person != self.person:
+                    raise ValidationError(
+                        f"DoctorRecord {dr.doctor_code} принадлежит физлицу {dr.person}, "
+                        f"а должно быть {self.person}."
+                    )
+
+        # 2) Если end_date указана, проверяем, что она >= start_date
+        if self.end_date and self.end_date < self.start_date:
+            raise ValidationError("Дата окончания не может быть раньше даты начала.")
+
+    def is_active_for_date(self, check_date: date) -> bool:
+        """
+        Проверить, активна ли эта запись для конкретной календарной даты.
+        """
+        if self.end_date:
+            return self.start_date <= check_date <= self.end_date
+        else:
+            return check_date >= self.start_date
+
+    def active_months(self):
+        """
+        Возвращает список (year, month), в которых эта запись считается активной.
+        Если end_date = None, то до "бесконечности",
+        обычно аналитик сам ограничивает расчёт, например, текущим периодом.
+        """
+        if not self.end_date:
+            # Допустим, условимся возвращать месяцы до текущего?
+            # Или можно вернуть пустой список, или до какого-то максимально разумного года.
+            # Тут уже бизнес-логика, как вы хотите обрабатывать "открытые" периоды.
+            max_date = date.today()
+        else:
+            max_date = self.end_date
+
+        start = self.start_date.replace(day=1)  # начало месяца
+        end = max_date.replace(day=1)  # тоже начало месяца
+        current = start
+
+        results = []
+        while current <= end:
+            results.append((current.year, current.month))
+            # Прибавляем один месяц
+            # Простейший способ: если это декабрь, переносим на январь следующего года
+            year = current.year
+            month = current.month
+            if month == 12:
+                current = date(year + 1, 1, 1)
+            else:
+                current = date(year, month + 1, 1)
+
+        return results

@@ -543,3 +543,59 @@ class DigitalSignatureAdmin(admin.ModelAdmin):
             return format_html('<span style="color: red;">✘</span>')
 
     status.short_description = 'Статус'
+
+
+@admin.register(DoctorReportingRecord)
+class DoctorReportingRecordAdmin(admin.ModelAdmin):
+    list_display = ('person', 'fte', 'get_doctor_codes', 'building_name', 'department', 'start_date', 'end_date')
+    search_fields = (
+        'person__last_name', 'person__first_name',
+        'department__name', 'doctor_records__doctor_code'
+    )
+    filter_horizontal = ['doctor_records']
+    list_filter = ('department__building', 'department',)
+
+    def building_name(self, obj):
+        """
+        Возвращает название корпуса, если у отдела есть связь с Building.
+        """
+        if obj.department and getattr(obj.department, 'building', None):
+            return obj.department.building.name
+        return "-"
+
+    building_name.short_description = "Корпус"
+    building_name.admin_order_field = 'department__building__name'
+
+    def get_doctor_codes(self, obj):
+        return ", ".join(dr.doctor_code for dr in obj.doctor_records.all())
+
+    get_doctor_codes.short_description = "Коды врачей"
+
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        if db_field.name == "doctor_records":
+            object_id = request.resolver_match.kwargs.get('object_id')
+            if object_id:
+                # Редактирование существующей записи
+                instance = self.get_object(request, object_id)
+                person = instance.person
+                # Получаем все doctor_records для этого физлица,
+                # которые уже назначены в других записях (исключая текущую)
+                used_ids = DoctorReportingRecord.objects.filter(person=person) \
+                    .exclude(pk=instance.pk) \
+                    .values_list('doctor_records__pk', flat=True)
+                # Выбираем doctor_records для данного Person, исключая те, что уже задействованы,
+                # но включаем те, что уже выбраны в этой записи (чтобы они не пропали)
+                qs = DoctorRecord.objects.filter(person=person).exclude(pk__in=used_ids) | instance.doctor_records.all()
+                kwargs["queryset"] = qs.distinct()
+            else:
+                # При создании новой записи пытаемся получить идентификатор физлица из POST или GET
+                person_id = request.POST.get('person') or request.GET.get('person')
+                if person_id:
+                    used_ids = DoctorReportingRecord.objects.filter(person_id=person_id) \
+                        .values_list('doctor_records__pk', flat=True)
+                    qs = DoctorRecord.objects.filter(person_id=person_id).exclude(pk__in=used_ids)
+                    kwargs["queryset"] = qs
+                else:
+                    # Если физлицо не выбрано, можно вернуть пустой queryset
+                    kwargs["queryset"] = DoctorRecord.objects.none()
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
