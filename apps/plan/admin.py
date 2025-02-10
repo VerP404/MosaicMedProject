@@ -6,9 +6,11 @@ from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 from django.urls import reverse
 from django import forms
+from django.db import models
 
 from .models import GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition, AnnualPlan, \
-    BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan, GroupBuildingDepartment, ChiefDashboard
+    BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan, GroupBuildingDepartment, ChiefDashboard, \
+    MonthlyDoctorPlan, AnnualDoctorPlan
 from .utils import copy_filters_to_new_year
 from ..organization.models import Department
 
@@ -357,18 +359,26 @@ class DepartmentPlanForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Проверяем, есть ли building_plan в данных формы
-        if 'building_plan' in self.initial and self.initial['building_plan']:
-            building_plan = BuildingPlan.objects.get(pk=self.initial['building_plan'])
-            self.fields['department'].queryset = Department.objects.filter(building=building_plan.building)
-        elif self.instance and hasattr(self.instance, 'building_plan') and self.instance.building_plan:
-            # Если instance уже существует и имеет связанный building_plan
+        # Если значение передано в POST (или GET) данных:
+        if 'building_plan' in self.data:
+            try:
+                building_plan_id = int(self.data.get('building_plan'))
+                building_plan = BuildingPlan.objects.get(pk=building_plan_id)
+                # Фильтруем отделения по зданию, связанному с выбранным планом корпуса
+                self.fields['department'].queryset = Department.objects.filter(
+                    building=building_plan.building
+                )
+            except (ValueError, TypeError, BuildingPlan.DoesNotExist):
+                self.fields['department'].queryset = Department.objects.none()
+        elif self.instance and self.instance.pk and hasattr(self.instance, 'building_plan'):
+            # Если редактируем существующую запись
             self.fields['department'].queryset = Department.objects.filter(
                 building=self.instance.building_plan.building
             )
         else:
-            # Если ни initial, ни instance не содержат building_plan
+            # Если ни self.data, ни instance не содержат building_plan
             self.fields['department'].queryset = Department.objects.none()
+
 
 
 @admin.register(DepartmentPlan)
@@ -398,3 +408,25 @@ class ChiefDashboardAdmin(admin.ModelAdmin):
     list_display = ('name', 'goal', 'year', 'plan', 'finance')
     search_fields = ('name', 'goal', 'year')
     list_filter = ('name', 'goal', 'year')
+
+
+@admin.register(AnnualDoctorPlan)
+class AnnualDoctorPlanAdmin(admin.ModelAdmin):
+    list_display = ('doctor_record', 'year', 'get_total_quantity', 'get_total_amount')
+    search_fields = ('doctor_record__person__last_name', 'doctor_record__doctor_code', 'year')
+
+    def get_total_quantity(self, obj):
+        return obj.monthly_doctor_plans.aggregate(total=models.Sum('quantity'))['total'] or 0
+
+    get_total_quantity.short_description = "Общее количество"
+
+    def get_total_amount(self, obj):
+        return obj.monthly_doctor_plans.aggregate(total=models.Sum('amount'))['total'] or 0
+
+    get_total_amount.short_description = "Общий бюджет"
+
+
+@admin.register(MonthlyDoctorPlan)
+class MonthlyDoctorPlanAdmin(admin.ModelAdmin):
+    list_display = ('annual_doctor_plan', 'month', 'quantity', 'amount')
+    list_filter = ('annual_doctor_plan__doctor_record', 'month')

@@ -6,6 +6,7 @@ from dal import autocomplete
 
 from apps.oms_reference.models import GeneralOMSTarget
 from apps.organization.models import Department, Building
+from apps.personnel.models import DoctorReportingRecord
 
 
 class GroupIndicators(models.Model):
@@ -566,3 +567,72 @@ class ChiefDashboard(models.Model):
         unique_together = ('name', 'goal', 'year')
         verbose_name = "Показатель"
         verbose_name_plural = "Панель главного врача"
+
+
+
+class AnnualDoctorPlan(models.Model):
+    """
+    Годовой план для врача (DoctorReportingRecord).
+    При сохранении автоматически создаются месячные планы на все 12 месяцев.
+    """
+    doctor_record = models.ForeignKey(
+        DoctorReportingRecord,
+        on_delete=models.CASCADE,
+        related_name='annual_doctor_plans',
+        verbose_name="Врач"
+    )
+    year = models.PositiveIntegerField(verbose_name="Год", default=datetime.now().year)
+
+    class Meta:
+        unique_together = ('doctor_record', 'year')
+        verbose_name = "План на год для врача"
+        verbose_name_plural = "Планы на год для врачей"
+
+    def __str__(self):
+        return f"{self.doctor_record} - {self.year}"
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new:
+            # Автоматически создаём месячные планы для каждого месяца
+            for month in range(1, 13):
+                MonthlyDoctorPlan.objects.get_or_create(
+                    annual_doctor_plan=self,
+                    month=month,
+                    defaults={'quantity': 0, 'amount': 0.00}
+                )
+
+
+class MonthlyDoctorPlan(models.Model):
+    """
+    Месячный план для врача.
+    Здесь можно задать, например, плановое количество (выполненных процедур, консультаций и т.д.)
+    и/или бюджет (если планируется финансовое распределение).
+    """
+    annual_doctor_plan = models.ForeignKey(
+        AnnualDoctorPlan,
+        on_delete=models.CASCADE,
+        related_name='monthly_doctor_plans',
+        verbose_name="Годовой план для врача"
+    )
+    month = models.PositiveSmallIntegerField(verbose_name="Месяц")
+    quantity = models.PositiveIntegerField(verbose_name="Количество", default=0)
+    amount = models.DecimalField(verbose_name="Бюджет", max_digits=12, decimal_places=2, default=0.00)
+
+    class Meta:
+        unique_together = ('annual_doctor_plan', 'month')
+        verbose_name = "Месячный план для врача"
+        verbose_name_plural = "Месячные планы для врачей"
+
+    def __str__(self):
+        return f"{self.annual_doctor_plan.doctor_record} - {self.annual_doctor_plan.year} / {self.month:02d}"
+
+    def clean(self):
+        # Здесь можно добавить проверки, например, чтобы суммарное значение по месячным планам не превышало какой-то лимит
+        # или чтобы план на месяц не превышал план отделения/корпуса, если такая бизнес-логика требуется.
+        pass
+
+    def save(self, *args, **kwargs):
+        self.full_clean()  # Запускает clean() перед сохранением
+        super().save(*args, **kwargs)
