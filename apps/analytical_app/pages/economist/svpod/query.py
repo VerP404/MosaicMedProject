@@ -67,7 +67,7 @@ def sql_query_rep(selected_year, group_id, months_placeholder='1, 2, 3, 4, 5, 6,
                             ELSE 99 
                         END
                 ) AS rn
-            FROM oms_data
+            FROM oms
         ),
         oms_unique AS (
             SELECT * FROM ranked_patients WHERE rn = 1
