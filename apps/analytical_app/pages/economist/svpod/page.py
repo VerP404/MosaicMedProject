@@ -68,6 +68,13 @@ economist_sv_pod = html.Div(
                                         inline=True,
                                         labelStyle={'margin-right': '15px'}
                                     ),
+                                    dcc.Checklist(  # Добавляем кнопку "Уникальные пациенты"
+                                        id=f'unique-toggle-{type_page}',
+                                        options=[{"label": "Уникальные пациенты", "value": "unique"}],
+                                        value=[],  # По умолчанию выключено
+                                        inline=True,
+                                        style={"margin-left": "20px"}
+                                    ),
                                 ],
                                 style={'margin-bottom': '10px'}
                             )
@@ -210,10 +217,11 @@ def fetch_plan_data(selected_level, year, mode='volumes'):
      Output(f'loading-output-{type_page}', 'children')],
     Input(f'update-button-{type_page}', 'n_clicks'),  # Кнопка обновления как основной триггер
     State(f'mode-toggle-{type_page}', 'value'),  # Используем `State`, чтобы тип плана обновлялся только при нажатии
+    State(f'unique-toggle-{type_page}', 'value'),
     State(f'dropdown-year-{type_page}', 'value'),
     State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
 )
-def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_levels):
+def update_table_with_plan_and_balance(n_clicks, mode, unique_flag, selected_year, selected_levels):
     if n_clicks is None:
         raise PreventUpdate
 
@@ -225,10 +233,15 @@ def update_table_with_plan_and_balance(n_clicks, mode, selected_year, selected_l
 
     selected_level = selected_levels[-1]
     filter_conditions = get_filter_conditions([selected_level], selected_year)
+
+    # Проверяем включен ли флаг уникальности
+    unique = "unique" in unique_flag
+
     # Передаем `mode` в `sql_query_rep` для переключения между объемами и финансами
     fact_columns, fact_data = TableUpdater.query_to_df(
         engine,
-        sql_query_rep(selected_year, group_id=[selected_level], filter_conditions=filter_conditions, mode=mode)
+        sql_query_rep(selected_year, group_id=[selected_level], filter_conditions=filter_conditions, mode=mode,
+                      unique_flag=unique)
     )
 
     # Получаем данные плана с учетом выбранного режима
