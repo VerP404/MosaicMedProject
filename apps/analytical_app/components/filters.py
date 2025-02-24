@@ -414,11 +414,21 @@ def date_picker(type_page):
 
 
 def get_departments_by_doctor(doctor_ids):
-    # Преобразуем doctor_ids в список целых чисел
+    # Нормализуем doctor_ids: превращаем их в список целых чисел.
     if isinstance(doctor_ids, str):
-        doctor_ids = [int(id.strip()) for id in doctor_ids.split(',') if id.strip().isdigit()]
+        doctor_ids = [int(x.strip()) for x in doctor_ids.split(',') if x.strip().isdigit()]
     elif isinstance(doctor_ids, list):
-        doctor_ids = [int(id) for id in doctor_ids if isinstance(id, (int, str)) and str(id).isdigit()]
+        normalized_ids = []
+        for id_val in doctor_ids:
+            if isinstance(id_val, str):
+                # Если строка содержит запятую – разбиваем её
+                if ',' in id_val:
+                    normalized_ids.extend([int(x.strip()) for x in id_val.split(',') if x.strip().isdigit()])
+                elif id_val.strip().isdigit():
+                    normalized_ids.append(int(id_val))
+            elif isinstance(id_val, int):
+                normalized_ids.append(id_val)
+        doctor_ids = normalized_ids
 
     query = """
         SELECT DISTINCT department.id, department.name
@@ -430,13 +440,14 @@ def get_departments_by_doctor(doctor_ids):
     with engine.connect() as connection:
         result = connection.execute(
             text(query),
-            {'doctor_ids': doctor_ids}  # Передаем список чисел
+            {'doctor_ids': doctor_ids}  # Передаём список чисел
         )
         departments = [{'label': row[1], 'value': row[0]} for row in result.fetchall()]
 
     # Добавляем опцию "Все" в начало списка
     departments.insert(0, {'label': 'Все', 'value': 'all'})
     return departments
+
 
 
 def get_doctor_details(doctor_ids):
@@ -451,7 +462,8 @@ def get_doctor_details(doctor_ids):
             CONCAT(p.last_name, ' ', SUBSTRING(p.first_name FROM 1 FOR 1), '.', SUBSTRING(p.patronymic FROM 1 FOR 1), '.') AS doctor_name,
             s.description AS specialty,
             d.name AS department,
-            b.name AS building
+            b.name AS building,
+            dr.doctor_code AS code
         FROM personnel_person p
         JOIN personnel_doctorrecord dr ON p.id = dr.person_id
         JOIN personnel_specialty s ON dr.specialty_id = s.id
@@ -467,6 +479,7 @@ def get_doctor_details(doctor_ids):
         )
         details = [
             {
+                'code': row[4],
                 'doctor_name': row[0],
                 'specialty': row[1],
                 'department': row[2],
@@ -475,3 +488,24 @@ def get_doctor_details(doctor_ids):
             for row in result.fetchall()
         ]
     return details
+
+
+
+def parse_doctor_ids(doctor_value):
+    """Принимает значение dropdown и возвращает список числовых идентификаторов врачей."""
+    doctor_ids = []
+    if not doctor_value:
+        return doctor_ids
+    if isinstance(doctor_value, list):
+        for item in doctor_value:
+            if isinstance(item, str):
+                # Если строка содержит запятую – разбиваем её
+                if ',' in item:
+                    doctor_ids.extend([int(x.strip()) for x in item.split(',') if x.strip().isdigit()])
+                elif item.strip().isdigit():
+                    doctor_ids.append(int(item))
+            elif isinstance(item, int):
+                doctor_ids.append(item)
+    elif isinstance(doctor_value, str):
+        doctor_ids = [int(x.strip()) for x in doctor_value.split(',') if x.strip().isdigit()]
+    return doctor_ids

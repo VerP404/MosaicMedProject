@@ -18,7 +18,7 @@ def sql_query_amb_def(selected_year, months_placeholder, inogorod, sanction, amo
         when target_categories like '%Дневной стационар, Стационар%' then 'Стационар - дневной'
         when target_categories like '%Стационарно, Стационар%' then 'Стационар - стационарно'
         when target_categories like '%Стационар на дому, Стационар%' then 'Стационар - на дому'
-    else target_categories end as target_categories,
+    else target_categories end as "Группа",
            {columns_by_status_oms()}
            FROM oms
            WHERE target_categories LIKE any(array['Посещения', 'Обращения', 'Неотложка', '%Диспансерное наблюдение%', 
@@ -52,7 +52,7 @@ def sql_query_dd_def(selected_year, months_placeholder, inogorod, sanction, amou
 
 def sql_query_stac_def(months_placeholder):
     return f"""
- SELECT goal,
+ SELECT goal as "Цель",
                COUNT(*)                                       AS Всего,
                SUM(CASE WHEN status = '3' THEN 1 ELSE 0 END)  AS "Оплачен(3)",
                SUM(CASE WHEN status = '1' or status = '2' or status = '3' or status = '6' or status = '8' THEN 1 ELSE 0 END)  AS "В работе(1,2,3,6,8)",

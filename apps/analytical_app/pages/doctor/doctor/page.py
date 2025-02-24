@@ -9,7 +9,7 @@ from apps.analytical_app.components.filters import filter_doctors, filter_years,
     get_current_reporting_month, get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
     get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
-    update_buttons
+    update_buttons, parse_doctor_ids
 from apps.analytical_app.elements import card_table, get_selected_period
 from apps.analytical_app.pages.doctor.doctor.query import sql_query_amb_def, sql_query_dd_def, sql_query_stac_def
 from apps.analytical_app.query_executor import engine
@@ -181,32 +181,61 @@ def update_current_month(n_intervals):
     ]
 )
 def update_filters(building_id, department_id, profile_id, doctor_id, selected_year):
-    # Установим текущий год, если selected_year не передан
+
+
     if not selected_year:
         selected_year = datetime.now().year
 
-    # Получаем доступные корпуса
+    # Получаем список корпусов
     buildings = get_available_buildings()
 
-    # Определяем доступные отделения
+    # Определяем варианты отделений
     if doctor_id:
-        departments = get_departments_by_doctor(doctor_id)
+        # Получаем отделения, связанные с выбранным врачом
+        departments_by_doctor = get_departments_by_doctor(doctor_id)
+
+        # Если уже выбрано отделение, проверяем, присутствует ли оно в списке отделений врача
+        if department_id:
+            # Приводим department_id к списку (на случай, если это одиночное значение)
+            if isinstance(department_id, list):
+                selected_departments = department_id
+            else:
+                selected_departments = [department_id]
+
+            valid = all(
+                any(item['value'] == d for item in departments_by_doctor)
+                for d in selected_departments
+            )
+            if not valid:
+                # Если выбранное отделение не найдено, дополнительно получаем отделения по корпусу
+                if building_id:
+                    departments_by_building = get_available_departments(building_id)
+                else:
+                    departments_by_building = get_available_departments()
+                # Объединяем оба списка, исключая дубликаты
+                merged = {item['value']: item for item in departments_by_doctor}
+                for item in departments_by_building:
+                    merged.setdefault(item['value'], item)
+                departments = list(merged.values())
+            else:
+                departments = departments_by_doctor
+        else:
+            departments = departments_by_doctor
     elif building_id:
         departments = get_available_departments(building_id)
     else:
         departments = get_available_departments()
 
-    # Определяем доступные профили
+    # Обновляем варианты профилей
     if building_id or department_id:
         profiles = get_available_profiles(building_id, department_id)
     else:
         profiles = get_available_profiles()
 
-    # Определяем доступных врачей
+    # Получаем список врачей согласно фильтрам
     doctors = get_available_doctors(building_id, department_id, profile_id, selected_year)
 
     return buildings, departments, profiles, doctors
-
 
 
 @app.callback(
@@ -214,29 +243,26 @@ def update_filters(building_id, department_id, profile_id, doctor_id, selected_y
     [Input(f'dropdown-doctor-{type_page}', 'value')]
 )
 def update_selected_filters(doctor_ids):
-    if not doctor_ids:
+    parsed_ids = parse_doctor_ids(doctor_ids)
+    if not parsed_ids:
         raise exceptions.PreventUpdate
 
-    # Преобразуем строку с идентификаторами в список чисел
-    if isinstance(doctor_ids, str):
-        doctor_ids = [int(id.strip()) for id in doctor_ids.split(',') if id.strip().isdigit()]
-    elif isinstance(doctor_ids, int):
-        doctor_ids = [doctor_ids]
-
-    # Получаем информацию о врачах
-    details_list = get_doctor_details(doctor_ids)
+    # Получаем информацию о врачах по списку ID
+    details_list = get_doctor_details(parsed_ids)
     selected_text = [
         html.Div([
-            f"Врач: {details['doctor_name']}",
-            f"Специальность: {details['specialty']}",
-            f"Отделение: {details['department']}",
-            f"Корпус: {details['building']}"
-        ])
+            html.Ul([
+                html.Li([html.Strong("Код: "), details['code']]),
+                html.Li([html.Strong("Врач: "), details['doctor_name']]),
+                html.Li([html.Strong("Специальность: "), details['specialty']]),
+                html.Li([html.Strong("Отделение: "), details['department']]),
+                html.Li([html.Strong("Корпус: "), details['building']]),
+            ], style={"list-style-type": "none", "margin": 0, "padding": 0})
+        ], style={"border": "1px solid #ccc", "padding": "10px", "margin": "10px", "border-radius": "5px"})
         for details in details_list
     ]
+
     return selected_text
-
-
 
 
 @app.callback(
@@ -272,31 +298,23 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
      State(f'date-picker-range-treatment-{type_page}', 'end_date'),
      State(f'dropdown-report-type-{type_page}', 'value')]
 )
-def update_table(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction, amount_null,
-                 building_ids, department_ids, start_date_input, end_date_input,
+def update_table(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
+                 amount_null, building_ids, department_ids, start_date_input, end_date_input,
                  start_date_treatment, end_date_treatment, report_type):
-    # Если кнопка не была нажата, обновление не происходит
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
 
-    # Проверка и обработка значения value_doctor
-    if value_doctor:
-        if isinstance(value_doctor, str):
-            selected_doctor_ids = [int(id) for id in value_doctor.split(',') if id.strip().isdigit()]
-        else:
-            selected_doctor_ids = [int(id) for id in value_doctor if isinstance(id, (int, str)) and str(id).isdigit()]
-    else:
-        selected_doctor_ids = []
+    # Используем нашу функцию для корректного разбора значения врача
+    selected_doctor_ids = parse_doctor_ids(value_doctor)
 
-    # Определяем используемый период в зависимости от типа отчета
+    # Форматирование дат и определение периода остаются без изменений
     start_date_input_formatted, end_date_input_formatted = None, None
     start_date_treatment_formatted, end_date_treatment_formatted = None, None
 
     if report_type == 'month':
-        start_date_input_formatted, end_date_input_formatted = None, None
-        start_date_treatment_formatted, end_date_treatment_formatted = None, None
+        pass
     elif report_type == 'initial_input':
         selected_period = (1, 12)
         start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
@@ -308,7 +326,7 @@ def update_table(n_clicks, value_doctor, value_profile, selected_period, selecte
         end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
             '%d-%m-%Y')
 
-    # Генерация SQL-запроса с учетом всех фильтров
+    # Передаём корректно разобранный список selected_doctor_ids в SQL-запрос
     columns1, data1 = TableUpdater.query_to_df(
         engine,
         sql_query_amb_def(
@@ -338,3 +356,4 @@ def update_table(n_clicks, value_doctor, value_profile, selected_period, selecte
     )
 
     return columns1, data1, columns2, data2, loading_output
+
