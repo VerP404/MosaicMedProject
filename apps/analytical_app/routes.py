@@ -8,7 +8,6 @@ from apps.analytical_app.pages.doctor.routes import routes_doctors
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.economist.doctor_stac.tab1 import economist_doctor_stac
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
-from apps.analytical_app.pages.economist.grid_data.page import economist_grid_data
 from apps.analytical_app.pages.economist.indicators.page import econ_indicators
 from apps.analytical_app.pages.economist.main import economist_main
 from apps.analytical_app.pages.economist.stationary.page import economist_stationary
@@ -81,14 +80,7 @@ routes = {
         ]),
         economist_doctor_stac
     ]),
-    "/economist/grid_data": html.Div([
-        dbc.Breadcrumb(items=[
-            {"label": "Экономист", "href": "/economist"},
-            {"label": "Сводная", "active": True},
-        ]),
-        economist_grid_data
-        # economist_sv_pod
-    ]),
+
 
 
 
