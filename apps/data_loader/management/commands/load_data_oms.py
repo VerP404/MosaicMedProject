@@ -71,6 +71,7 @@ class Command(BaseCommand):
             "Посещения": "visits",
             "Посещения в МО": "mo_visits",
             "Посещения на Дому": "home_visits",
+            "Случай": "case_code",
             "Диагноз основной (DS1)": "main_diagnosis",
             "Сопутствующий диагноз (DS2)": "additional_diagnosis",
             "Первоначальная дата ввода": "initial_input_date",
