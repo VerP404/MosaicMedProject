@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'apps.plan',
     'apps.api',
     'apps.data',
+    'apps.load_data',
 
     'import_export',
     'channels',

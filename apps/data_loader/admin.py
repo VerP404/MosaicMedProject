@@ -377,7 +377,7 @@ OMS_DATA_CSV_TO_MODEL_MAPPING = {
     "Посещения": "visits",
     "Посещения в МО": "mo_visits",
     "Посещения на Дому": "home_visits",
-    "Случай": "case",
+    "Случай": "case_code",
     "Диагноз основной (DS1)": "main_diagnosis",
     "Сопутствующий диагноз (DS2)": "additional_diagnosis",
     "Профиль МП": "mp_profile",
