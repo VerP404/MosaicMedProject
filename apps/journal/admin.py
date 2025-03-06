@@ -83,10 +83,13 @@ class AppealAdminForm(forms.ModelForm):
         self.fields['responsible'].queryset = Employee.objects.filter(is_responsible=True)
         # Фильтруем исполнителей (только те, у кого is_executor=True)
         self.fields['executors'].queryset = Employee.objects.filter(is_executor=True)
-
+        # Исключаем текущую запись из списка связанных обращений
+        if self.instance.pk:
+            self.fields['related_appeals'].queryset = Appeal.objects.exclude(pk=self.instance.pk)
 
 @admin.register(Appeal)
 class AppealAdmin(admin.ModelAdmin):
+    autocomplete_fields = ['applicant', 'patients']
     form = AppealAdminForm
     """
     Админка для обращений.

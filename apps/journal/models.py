@@ -12,8 +12,8 @@ class Person(models.Model):
     phone_number = models.CharField("Телефон", max_length=11, unique=True, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.last_name} {self.first_name} {self.middle_name or ''}".strip()
-
+        formatted_birth_date = self.birth_date.strftime("%d-%m-%Y") if self.birth_date else ""
+        return f"{self.last_name} {self.first_name} {self.middle_name or ''} {formatted_birth_date}".strip()
     class Meta:
         verbose_name = "Персона"
         verbose_name_plural = "Персоны"
@@ -193,7 +193,9 @@ class Appeal(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Обращение #{self.id} - {self.get_status_display()}"
+        applicant_name = f"{self.applicant.last_name} {self.applicant.first_name[0]}.{self.applicant.middle_name[0] if self.applicant.middle_name else ''}."
+        formatted_date = self.registration_date.strftime("%d.%m.%Y")
+        return f"Обращение #{self.id} - {applicant_name}: {formatted_date}"
 
     class Meta:
         verbose_name = "Обращение"
