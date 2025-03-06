@@ -30,7 +30,8 @@ class Employee(models.Model):
     is_executor = models.BooleanField("Исполнитель", default=False)
 
     def __str__(self):
-        return f"{self.person.last_name} (Сотрудник)"
+        initials = f"{self.person.first_name[0]}.{self.person.middle_name[0]}." if self.person.middle_name else f"{self.person.first_name[0]}."
+        return f"{self.person.last_name} {initials} (Сотрудник)"
 
     class Meta:
         verbose_name = "Сотрудник"

@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.admin import RelatedOnlyFieldListFilter
+from django import forms
 from django.utils import timezone
 from django.utils.html import format_html
 
@@ -7,6 +8,7 @@ from .models import (
     Person, Employee, Article, Source, Category, Corpus,
     Appeal
 )
+
 
 # --- Пользовательское действие --- #
 def check_and_update_deadlines(modeladmin, request, queryset):
@@ -24,6 +26,7 @@ def check_and_update_deadlines(modeladmin, request, queryset):
             appeal.save(update_fields=['status'])
             updated_count += 1
     modeladmin.message_user(request, f"Обновлено статусов: {updated_count}")
+
 
 check_and_update_deadlines.short_description = "Проверить и обновить статусы у выбранных обращений"
 
@@ -69,8 +72,22 @@ class CorpusAdmin(admin.ModelAdmin):
     search_fields = ('name',)
 
 
+class AppealAdminForm(forms.ModelForm):
+    class Meta:
+        model = Appeal
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Фильтруем ответственных (только те, у кого is_responsible=True)
+        self.fields['responsible'].queryset = Employee.objects.filter(is_responsible=True)
+        # Фильтруем исполнителей (только те, у кого is_executor=True)
+        self.fields['executors'].queryset = Employee.objects.filter(is_executor=True)
+
+
 @admin.register(Appeal)
 class AppealAdmin(admin.ModelAdmin):
+    form = AppealAdminForm
     """
     Админка для обращений.
     """
@@ -91,11 +108,13 @@ class AppealAdmin(admin.ModelAdmin):
             color,
             obj.get_status_display()
         )
+
     colored_status.short_description = "Статус"
 
     # Отображаем корпус
     def display_corpus(self, obj):
         return obj.corpus.name if obj.corpus else '-'
+
     display_corpus.short_description = "Корпус"
 
     # Отображаем список ответственных
@@ -104,6 +123,7 @@ class AppealAdmin(admin.ModelAdmin):
             # Список связанных сотрудников
             return ", ".join(str(emp) for emp in obj.responsible.all()) or '-'
         return '-'
+
     display_responsible.short_description = "Ответственные"
 
     # Отображаем список исполнителей
@@ -111,6 +131,7 @@ class AppealAdmin(admin.ModelAdmin):
         if obj.pk:
             return ", ".join(str(emp) for emp in obj.executors.all()) or '-'
         return '-'
+
     display_executors.short_description = "Исполнители"
 
     list_display = (
