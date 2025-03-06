@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'apps.api',
     'apps.data',
     'apps.load_data',
+    'apps.journal',
 
     'import_export',
     'channels',
