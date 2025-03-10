@@ -27,3 +27,4 @@ daphne
 beautifulsoup4
 webdriver-manager
 fdb
+django-unfold==0.51.0
