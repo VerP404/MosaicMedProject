@@ -8,6 +8,7 @@ from django.urls import path, reverse
 from django.contrib import messages
 from django.utils.html import format_html
 from django.shortcuts import render, redirect
+from unfold.admin import TabularInline, ModelAdmin
 
 from .forms import *
 from .models import *
@@ -15,7 +16,7 @@ from ..data_loader.models.oms_data import *
 from ..organization.models import MiskauzDepartment, OMSDepartment
 
 
-class DoctorRecordInline(admin.TabularInline):
+class DoctorRecordInline(TabularInline):
     model = DoctorRecord
     form = DoctorRecordForm
     extra = 0
@@ -25,7 +26,7 @@ class DoctorRecordInline(admin.TabularInline):
     verbose_name_plural = "Записи врача"
 
 
-class RG014Inline(admin.TabularInline):
+class RG014Inline(TabularInline):
     model = RG014
     form = RG014Form  # Используем форму с автозаполнением
     extra = 0
@@ -35,7 +36,7 @@ class RG014Inline(admin.TabularInline):
     verbose_name_plural = "Записи RG014"
 
 
-class DigitalSignatureInline(admin.TabularInline):
+class DigitalSignatureInline(TabularInline):
     model = DigitalSignature
     extra = 0
     fields = (
@@ -46,7 +47,7 @@ class DigitalSignatureInline(admin.TabularInline):
     verbose_name_plural = "ЭЦП"
 
 
-class MaternityLeaveInline(admin.TabularInline):
+class MaternityLeaveInline(TabularInline):
     model = MaternityLeave
     extra = 0
     fields = ('start_date', 'end_date', 'note')
@@ -170,7 +171,7 @@ class DepartmentForm(forms.Form):
 
 
 @admin.register(DoctorRecord)
-class DoctorRecordAdmin(admin.ModelAdmin):
+class DoctorRecordAdmin(ModelAdmin):
     change_list_template = "admin/doctor_change_list.html"
     list_display = ('person', 'doctor_code', 'start_date', 'end_date', 'department',)
     list_filter = ('start_date', 'end_date', 'department', DoctorCodeFilter)
@@ -394,16 +395,23 @@ class DoctorRecordAdmin(admin.ModelAdmin):
 
 
 @admin.register(Person)
-class PersonAdmin(admin.ModelAdmin):
+class PersonAdmin(ModelAdmin):
     list_display = ('last_name', 'first_name', 'snils', 'email', 'phone_number', 'telegram', 'digital_signature_status',
                     'maternity_leave_status')
     search_fields = ('last_name', 'first_name', 'patronymic', 'snils', 'email', 'phone_number', 'telegram')
     list_filter = ('citizenship', DigitalSignatureFilter, MaternityLeaveFilter, DigitalSignatureApplicationFilter)
     fieldsets = (
-        (None, {
-            'fields': ('snils', 'last_name', 'first_name', 'patronymic', 'date_of_birth', 'gender', 'citizenship')
+        ("Персональные данные", {
+            "classes": ("four-columns",),
+            'fields': ('last_name', 'first_name', 'patronymic', 'date_of_birth')
         }),
+        (None, {
+            "classes": ("three-columns",),
+            'fields': ('snils', 'gender', 'citizenship')
+        }),
+
         ('Контакты', {
+            "classes": ("three-columns",),
             'fields': ('email', 'phone_number', 'telegram')
         }),
     )
@@ -433,7 +441,7 @@ class PersonAdmin(admin.ModelAdmin):
 
 
 @admin.register(RG014)
-class RG014Admin(admin.ModelAdmin):
+class RG014Admin(ModelAdmin):
     list_display = (
         'person', 'organization', 'spec_issue_date', 'spec_name', 'cert_accred_sign',
         'post_name',
@@ -462,50 +470,50 @@ class RG014Admin(admin.ModelAdmin):
     export_as_csv.short_description = "Export Selected"
 
 
-class SpecialtyInline(admin.TabularInline):
+class SpecialtyInline(TabularInline):
     model = Specialty
     extra = 1  # Количество пустых строк для добавления новых записей
     fields = ('code', 'description')  # Поля для редактирования
 
 
-class ProfileInline(admin.TabularInline):
+class ProfileInline(TabularInline):
     model = Profile
     extra = 1
     fields = ('code', 'description')
 
 
-class SpecialtyRG014Inline(admin.TabularInline):
+class SpecialtyRG014Inline(TabularInline):
     model = SpecialtyRG014
     extra = 1
     fields = ('code', 'description')
 
 
-class PostRG014Inline(admin.TabularInline):
+class PostRG014Inline(TabularInline):
     model = PostRG014
     extra = 1
     fields = ('code', 'description')
 
 
 @admin.register(Specialty)
-class SpecialtyAdmin(admin.ModelAdmin):
+class SpecialtyAdmin(ModelAdmin):
     list_display = ('code', 'description')
     search_fields = ('code', 'description')
 
 
 @admin.register(Profile)
-class ProfileAdmin(admin.ModelAdmin):
+class ProfileAdmin(ModelAdmin):
     list_display = ('code', 'description')
     search_fields = ('code', 'description')
 
 
 @admin.register(SpecialtyRG014)
-class SpecialtyRG014Admin(admin.ModelAdmin):
+class SpecialtyRG014Admin(ModelAdmin):
     list_display = ('code', 'description')
     search_fields = ('code', 'description')
 
 
 @admin.register(PostRG014)
-class PostRG014Admin(admin.ModelAdmin):
+class PostRG014Admin(ModelAdmin):
     list_display = ('code', 'description')
     search_fields = ('code', 'description')
 
@@ -530,7 +538,7 @@ class StatusFilter(SimpleListFilter):
 
 
 @admin.register(DigitalSignature)
-class DigitalSignatureAdmin(admin.ModelAdmin):
+class DigitalSignatureAdmin(ModelAdmin):
     list_display = ('person', 'valid_from', 'valid_to', 'scan', 'scan_uploaded_at', 'added_at', 'status')
     search_fields = ('person__last_name', 'person__first_name')
     list_filter = ('valid_from', 'valid_to', 'scan_uploaded_at', StatusFilter)
@@ -546,7 +554,7 @@ class DigitalSignatureAdmin(admin.ModelAdmin):
 
 
 @admin.register(DoctorReportingRecord)
-class DoctorReportingRecordAdmin(admin.ModelAdmin):
+class DoctorReportingRecordAdmin(ModelAdmin):
     list_display = ('person', 'fte', 'get_doctor_codes', 'building_name', 'department', 'start_date', 'end_date')
     search_fields = (
         'person__last_name', 'person__first_name',

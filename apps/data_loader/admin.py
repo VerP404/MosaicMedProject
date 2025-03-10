@@ -7,6 +7,7 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.contrib import messages
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from sqlalchemy import text
 
 from apps.analytical_app.query_executor import engine
@@ -34,8 +35,10 @@ def get_organization_name():
 def get_site_header():
     organization = get_organization_name()
     if organization:
-        return f"Административная панель МозаикаМед - {organization}"
-    return "Административная панель МозаикаМед"
+        header = "Панель<br>МозаикаМед<br>{}".format(organization)
+    else:
+        header = "Панель<br>МозаикаМед"
+    return mark_safe(header)
 
 
 # Изменение заголовка и подписи панели администратора с использованием функции

@@ -1,0 +1,61 @@
+/* Стили для многостолбцового оформления */
+
+/* Двухколоночное оформление */
+.two-columns .form-row,
+.two-columns .fieldBox {
+    display: inline-block;
+    vertical-align: top;
+    box-sizing: border-box;
+    width: 48%;
+    margin-right: 2%;
+}
+.two-columns .form-row:nth-child(2n),
+.two-columns .fieldBox:nth-child(2n) {
+    margin-right: 0;
+}
+
+/* Трехколоночное оформление */
+.three-columns .form-row,
+.three-columns .fieldBox {
+    display: inline-block;
+    vertical-align: top;
+    box-sizing: border-box;
+    width: 31%;
+    margin-right: 2%;
+}
+.three-columns .form-row:nth-child(3n),
+.three-columns .fieldBox:nth-child(3n) {
+    margin-right: 0;
+}
+
+/* Четырехколоночное оформление */
+.four-columns .form-row,
+.four-columns .fieldBox {
+    display: inline-block;
+    vertical-align: top;
+    box-sizing: border-box;
+    width: 23%;
+    margin-right: 2%;
+}
+.four-columns .form-row:nth-child(4n),
+.four-columns .fieldBox:nth-child(4n) {
+    margin-right: 0;
+}
+
+/* Стили для подгрупп внутри fieldset */
+.fieldset-description .subgroup {
+    border: 1px dashed #ccc;
+    margin: 10px 0;
+    padding: 5px;
+    background-color: #f9f9f9;
+}
+.fieldset-description .subgroup h3 {
+    margin: 0 0 5px;
+    font-size: 1.1em;
+    color: #333;
+}
+.fieldset-description .subgroup p {
+    margin: 0;
+    font-size: 0.9em;
+    color: #666;
+}

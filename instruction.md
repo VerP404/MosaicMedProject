@@ -1,38 +1,3 @@
-## Перенос данных между разными рабочими машинами
-
-0. бекап базы на проде
-создать папку backup в папке code. перейти в нее и выполнить команду
-```
-sudo -u postgres pg_dump -d mosaicmed -F p -b -v -f "mosaicmed_backup_$(date +%Y%m%d%H%M%S).sql"
-```
-
-1. Создание бекапа базы данных и создание архива
-
-``` sql
-pg_dump -U postgres -d mosaicmed -F p -b -v -f "mosaicmed_backup.sql"
-```
-
-2. Перенести файл на сервер и разархиваировать
-3. Удалить старую базу данных.
-4. Выполнить скрипт
-
-``` sql
-psql -U postgres -d mosaicmed -f "C:\Users\RDN\Downloads\Telegram Desktop\mosaicmed_backup.sql"
-```
-
-5. Проверить что версия приложения соответствует базе.
-6. Стянуть все изменения из репозитория
-
-```
-git pull
-```
-
-5. Выполняем миграции
-
-``` python
-python manage.py migrate
-```
-
 ## Установка и настройка postgres на сервере
 
 Выполнить команду для установки PostgreSQL и дополнительных утилит:
@@ -117,6 +82,41 @@ CREATE DATABASE mosaicmed;
 ```
 
 В системе управления базой данных создаем подключение и базу данных `mosaicmed`
+
+## Перенос данных между разными рабочими машинами
+
+1. бекап базы на проде
+создать папку backup в папке code. перейти в нее и выполнить команду
+```
+sudo -u postgres pg_dump -d mosaicmed -F p -b -v -f "mosaicmed_backup_$(date +%Y%m%d%H%M%S).sql"
+```
+
+2. Создание бекапа базы данных и создание архива
+
+``` sql
+pg_dump -U postgres -d mosaicmed -F p -b -v -f "mosaicmed_backup.sql"
+```
+
+3. Перенести файл на сервер и разархиваировать
+3. Удалить старую базу данных.
+4. Выполнить скрипт
+
+``` sql
+psql -U postgres -d mosaicmed -f "C:\Users\RDN\Downloads\Telegram Desktop\mosaicmed_backup.sql"
+```
+
+5. Проверить что версия приложения соответствует базе.
+6. Стянуть все изменения из репозитория
+
+```
+git pull
+```
+
+5. Выполняем миграции
+
+``` python
+python manage.py migrate
+```
 
 ## Настройка проекта
 
