@@ -382,9 +382,13 @@ def create_or_update_citizen_appeal(sender, instance, created, **kwargs):
     max_number = CitizenAppeal.objects.filter(registration_date__year=year).aggregate(Max('number_pp'))['number_pp__max'] or 0
     new_number = max_number + 1
 
+    # Пример генерации номера обращения учреждения:
+    institution_reg_num = f"{year}-{new_number:04d}"
+
     defaults = {
         'registration_date': instance.registration_date,
         'number_pp': new_number,
+        'institution_registration_number': institution_reg_num,
     }
     try:
         ca, ca_created = CitizenAppeal.objects.update_or_create(
@@ -392,8 +396,8 @@ def create_or_update_citizen_appeal(sender, instance, created, **kwargs):
             defaults=defaults
         )
     except IntegrityError as e:
-        # Логирование ошибки вместо падения приложения.
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Ошибка создания CitizenAppeal для обращения {instance.id}: {e}")
+
 
