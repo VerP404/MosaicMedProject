@@ -110,13 +110,6 @@ class GroupBuildingsInline(admin.TabularInline):
     verbose_name_plural = "Связанные корпуса"
 
 
-class GroupDepartmentsInline(admin.TabularInline):
-    model = GroupIndicators.departments.through
-    extra = 0
-    verbose_name = "Связанное отделение"
-    verbose_name_plural = "Связанные отделения"
-
-
 @admin.register(GroupIndicators)
 class GroupIndicatorsAdmin(admin.ModelAdmin):
     list_display = ('name', 'parent', 'level', 'is_distributable', 'latest_filter_year', 'view_subgroups')
@@ -124,12 +117,13 @@ class GroupIndicatorsAdmin(admin.ModelAdmin):
     search_fields = ('name',)
     inlines = [FilterConditionInline, GroupBuildingDepartmentInline]
     actions = [copy_filters_action]
+    filter_horizontal = ('buildings',)
     fieldsets = (
         (None, {
             'fields': ('name', 'parent', 'is_distributable')
         }),
         ('Распределение', {
-            'fields': ('buildings', 'departments'),
+            'fields': ('buildings',),
             'classes': ('collapse',)
         }),
     )
@@ -378,7 +372,6 @@ class DepartmentPlanForm(forms.ModelForm):
         else:
             # Если ни self.data, ни instance не содержат building_plan
             self.fields['department'].queryset = Department.objects.none()
-
 
 
 @admin.register(DepartmentPlan)

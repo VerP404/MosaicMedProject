@@ -78,7 +78,7 @@ def get_monthly_plan_for_group(request, group_id, year):
         if not FilterCondition.objects.filter(group=group, year=year).exists():
             return JsonResponse({"error": "План не найден для указанного года"}, status=404)
 
-        monthly_plans = MonthlyPlan.objects.filter(group=group)
+        monthly_plans = MonthlyPlan.objects.filter(annual_plan__group=group)
         plans_data = [{"month": plan.month, "quantity": plan.quantity, "amount": plan.amount} for plan in monthly_plans]
 
         return JsonResponse({"group": group.name, "year": year, "monthly_plans": plans_data})

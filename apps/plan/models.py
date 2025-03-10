@@ -24,12 +24,12 @@ class GroupIndicators(models.Model):
         verbose_name="Корпуса",
         help_text="Укажите корпуса, связанные с этой группой (для распределяемых планов)"
     )
-    departments = models.ManyToManyField(
-        Department,
-        blank=True,
-        verbose_name="Отделения",
-        help_text="Выберите отделения, доступные для распределения планов"
-    )
+    # departments = models.ManyToManyField(
+    #     Department,
+    #     blank=True,
+    #     verbose_name="Отделения",
+    #     help_text="Выберите отделения, доступные для распределения планов"
+    # )
 
     def save(self, *args, **kwargs):
         # Устанавливаем уровень вложенности на основе родительской группы
@@ -165,10 +165,28 @@ class AnnualPlan(models.Model):
         return f"{self.group.name} - {self.year}"
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
         super().save(*args, **kwargs)
-        # Убедимся, что записи MonthlyPlan существуют для каждого месяца
+        # Создание месячных планов для группы
         for month in range(1, 13):
             MonthlyPlan.objects.get_or_create(annual_plan=self, month=month, defaults={'quantity': 0, 'amount': 0.00})
+
+        # --- Автоматическая генерация планов для корпусов и отделений ---
+        # Для каждого корпуса, связанного с группой
+        for building in self.group.buildings.all():
+            bp, bp_created = BuildingPlan.objects.get_or_create(annual_plan=self, building=building)
+            if bp_created:
+                for month in range(1, 13):
+                    MonthlyBuildingPlan.objects.get_or_create(building_plan=bp, month=month,
+                                                              defaults={'quantity': 0, 'amount': 0.00})
+            # Если есть явная связь корпуса с отделениями через модель GroupBuildingDepartment
+            gbds = self.group.group_building_departments.filter(building=building)
+            for gbd in gbds:
+                dp, dp_created = DepartmentPlan.objects.get_or_create(building_plan=bp, department=gbd.department)
+                if dp_created:
+                    for month in range(1, 13):
+                        MonthlyDepartmentPlan.objects.get_or_create(department_plan=dp, month=month,
+                                                                    defaults={'quantity': 0, 'amount': 0.00})
 
     def total_quantity(self):
         return self.monthly_plans.aggregate(total=models.Sum("quantity"))["total"] or 0
