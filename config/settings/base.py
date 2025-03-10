@@ -41,8 +41,6 @@ INSTALLED_APPS = [
     'apps.load_data',
     'apps.journal',
 
-    'apps.person',
-
     'import_export',
     'channels',
     'rest_framework',
