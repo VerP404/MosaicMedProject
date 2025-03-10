@@ -20,7 +20,7 @@ class Person(models.Model):
 
     class Meta:
         verbose_name = "Персона"
-        verbose_name_plural = "Персоны"
+        verbose_name_plural = "Справочник: физические лица"
 
 
 class Employee(models.Model):
@@ -42,7 +42,7 @@ class Employee(models.Model):
 
     class Meta:
         verbose_name = "Сотрудник"
-        verbose_name_plural = "Сотрудники"
+        verbose_name_plural = "Справочник: сотрудники"
 
 
 class Article(models.Model):
@@ -55,7 +55,7 @@ class Article(models.Model):
 
     class Meta:
         verbose_name = "Статья"
-        verbose_name_plural = "Статьи"
+        verbose_name_plural = "Справочник: статьи"
 
 
 class Source(models.Model):
@@ -68,7 +68,7 @@ class Source(models.Model):
 
     class Meta:
         verbose_name = "Источник"
-        verbose_name_plural = "Источники"
+        verbose_name_plural = "Справочник: источники"
 
 
 class Category(models.Model):
@@ -81,7 +81,7 @@ class Category(models.Model):
 
     class Meta:
         verbose_name = "Категория"
-        verbose_name_plural = "Категории"
+        verbose_name_plural = "Справочник: категории"
 
 
 class Corpus(models.Model):
@@ -94,7 +94,7 @@ class Corpus(models.Model):
 
     class Meta:
         verbose_name = "Корпус"
-        verbose_name_plural = "Корпуса"
+        verbose_name_plural = "Справочник: корпуса"
 
 
 class Appeal(models.Model):
@@ -206,7 +206,7 @@ class Appeal(models.Model):
 
     class Meta:
         verbose_name = "Обращение"
-        verbose_name_plural = "Обращения"
+        verbose_name_plural = "Журнал обращений"
 
     def save_model(self, request, obj, form, change):
         try:
@@ -239,7 +239,7 @@ class QuestionCode(models.Model):
 
     class Meta:
         verbose_name = "Код вопроса"
-        verbose_name_plural = "Коды вопросов"
+        verbose_name_plural = "Справочник: коды вопросов"
 
 
 class CitizenAppeal(models.Model):
@@ -367,8 +367,8 @@ class CitizenAppeal(models.Model):
         return f"Журнал #{self.number_pp} / {self.institution_registration_number}"
 
     class Meta:
-        verbose_name = "Запись журнала"
-        verbose_name_plural = "Журнал обращений"
+        verbose_name = "Обращение"
+        verbose_name_plural = "Журнал письменных обращений"
     def save_model(self, request, obj, form, change):
         try:
             obj.save()
@@ -387,7 +387,10 @@ def create_or_update_citizen_appeal(sender, instance, created, **kwargs):
         'number_pp': new_number,
     }
     try:
-        ca, ca_created = CitizenAppeal.objects.get_or_create(appeal=instance, defaults=defaults)
+        ca, ca_created = CitizenAppeal.objects.update_or_create(
+            appeal=instance,
+            defaults=defaults
+        )
     except IntegrityError as e:
         # Логирование ошибки вместо падения приложения.
         import logging

@@ -152,6 +152,7 @@ class AppealAdmin(ModelAdmin):
         'answer_date',
         'outgoing_number',
     )
+    list_display_links = ("id", "applicant",)
     list_filter = (
         'status',
         'registration_date',
@@ -260,11 +261,12 @@ class CitizenAppealAdmin(ModelAdmin):
     readonly_fields = ('registration_date',)
     list_display = (
         "number_pp",
+        "appeal",
         "institution_registration_number",
         "registration_date",
-        "appeal",
         "display_selected_responsible",
     )
+    list_display_links = ("number_pp", "appeal",)
     search_fields = ("number_pp", "institution_registration_number")
     actions = [sync_citizen_appeals]
     fieldsets = (
@@ -372,3 +374,6 @@ class CitizenAppealAdmin(ModelAdmin):
         return obj.selected_responsible
 
     display_selected_responsible.short_description = "Должность ответственного"
+
+    def has_add_permission(self, request):
+        return False
