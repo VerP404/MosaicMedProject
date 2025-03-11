@@ -40,6 +40,9 @@ INSTALLED_APPS = [
     'apps.data',
     'apps.load_data',
     'apps.journal',
+    'apps.organizations',
+    'apps.kadry',
+    'apps.person',
 
     'import_export',
     'channels',

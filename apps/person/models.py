@@ -3,7 +3,7 @@ from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 
-from organization.models import Station
+from apps.organizations.models import Station
 
 
 class Insurance(models.Model):

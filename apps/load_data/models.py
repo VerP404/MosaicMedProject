@@ -119,3 +119,42 @@ class ComplexTalon(models.Model):
         verbose_name = "ОМС: Комплексный талон"
         verbose_name_plural = "ОМС: Комплексные талоны"
         unique_together = (("talon", "source", "doctor"),)
+
+
+class SickLeaveSheet(models.Model):
+    number = models.CharField("Номер", max_length=255, unique=True)
+    eln = models.CharField("ЭЛН", max_length=255)
+    duplicate = models.CharField("Дубликат", max_length=255)
+    status = models.CharField("Статус", max_length=255)
+    fss_status = models.CharField("Статус ФСС", max_length=255)
+    issue_date = models.CharField("Дата выдачи", max_length=255)
+    first = models.CharField("Первичный", max_length=255)
+    previous_ln = models.CharField("Предыдущий ЛН", max_length=255)
+    next_ln = models.CharField("Следущий ЛН", max_length=255)
+    patient_last_name = models.CharField("Фамилия пациента", max_length=255)
+    patient_first_name = models.CharField("Имя пациента", max_length=255)
+    patient_middle_name = models.CharField("Отчество пациента", max_length=255)
+    birth_date = models.CharField("Дата рождения", max_length=255)
+    gender = models.CharField("Пол", max_length=255)
+    snils = models.CharField("СНИЛС", max_length=255)
+    age = models.CharField("Возраст", max_length=255)
+    workplace = models.CharField("Место работы", max_length=255)
+    incapacity_reason_code = models.CharField("Код причины нетрудоспособности", max_length=255)
+    mkb = models.CharField("МКБ", max_length=255)
+    incapacity_start_date = models.CharField("Период нетрудоспособности: дата начала", max_length=255)
+    incapacity_end_date = models.CharField("Период нетрудоспособности: дата окончания", max_length=255)
+    days_count = models.CharField("Количество дней", max_length=255)
+    tvsp = models.CharField("ТВСП", max_length=255)
+    issuing_doctor = models.CharField("Выдавший врач", max_length=255)
+    closing_doctor = models.CharField("Закрывший врач", max_length=255)
+    closing_date = models.CharField("Дата закрытия", max_length=255)
+    history_number = models.CharField("№ истории болезни", max_length=255)
+    patient_care = models.CharField("Уход за больными", max_length=255)
+
+    class Meta:
+        db_table = "load_data_sick_leave_sheets"
+        verbose_name = "Лист нетрудоспособности"
+        verbose_name_plural = "Листы нетрудоспособности"
+
+    def __str__(self):
+        return f"{self.number} - {self.patient_last_name} {self.patient_first_name}"
