@@ -167,3 +167,76 @@ class SickLeaveSheet(TimeStampedModel):
 
     def __str__(self):
         return f"{self.number} - {self.patient_last_name} {self.patient_first_name}"
+
+
+class PopulationISZL(TimeStampedModel):
+    pid = models.CharField("PID", max_length=50, unique=True)
+    fio = models.CharField("FIO", max_length=255)
+    dr = models.CharField("DR", max_length=50)
+    smo = models.CharField("SMO", max_length=255, default='-')
+    enp = models.CharField("ENP", max_length=255, unique=True)
+    lpu = models.CharField("LPU", max_length=255, default='-')
+    ss_doctor = models.CharField("SS_DOCTOR", max_length=255, default='-')
+    lpuuch = models.CharField("LPUUCH", max_length=255, default='-')
+    upd = models.CharField("Upd", max_length=255, default='-')
+    closed = models.CharField("CLOSED", max_length=50, default='-')
+
+    def __str__(self):
+        return f"{self.pid} - {self.fio}"
+
+    class Meta:
+        db_table = "load_data_iszl_population"
+        verbose_name = "Население ИСЗЛ"
+        verbose_name_plural = "Население ИСЗЛ"
+
+
+class DispanseryISZL(TimeStampedModel):
+    pid = models.CharField("pID", max_length=50, unique=True)
+    ldwid = models.CharField("ldwID", max_length=50)
+    pdwid = models.CharField("pdwID", max_length=50)
+    fio = models.CharField("FIO", max_length=255)
+    dr = models.CharField("DR", max_length=50)
+    ds = models.CharField("DS", max_length=50)
+    date_begin = models.CharField("DateBegin", max_length=50, default='-')
+    date_end = models.CharField("DateEnd", max_length=50, default='-')
+    id_reason = models.CharField("idReason", max_length=50, default='-')
+    name_reason = models.CharField("nameReason", max_length=255, default='-')
+    plan_month = models.CharField("PlanMonth", max_length=10, default='-')
+    plan_year = models.CharField("PlanYear", max_length=10, default='-')
+    fam_d = models.CharField("FAM_D", max_length=100, default='-')
+    im_d = models.CharField("IM_D", max_length=100, default='-')
+    ot_d = models.CharField("OT_D", max_length=100, default='-')
+    ss_d = models.CharField("SS_D", max_length=50, default='-')
+    spec_d = models.CharField("SPEC_D", max_length=255, default='-')
+    spec_v015 = models.CharField("SpecV015", max_length=50, default='-')
+    date_info = models.CharField("DateInfo", max_length=50, default='-')
+    way_info = models.CharField("WayInfo", max_length=255, default='-')
+    res_info = models.CharField("ResInfo", max_length=255, default='-')
+    fact_dn = models.CharField("FactDN", max_length=255, default='-')
+    rezult_dn = models.CharField("RezultDN", max_length=255, default='-')
+    adr = models.CharField("ADR", max_length=255, default='-')
+    enp = models.CharField("ENP", max_length=255, default='-')
+    lpu = models.CharField("LPU", max_length=255, default='-')
+    fio_doctor = models.CharField("FIO_DOCTOR", max_length=255, default='-')
+    ss_doctor = models.CharField("SS_DOCTOR", max_length=50, default='-')
+    lpuuch = models.CharField("LPUUCH", max_length=255, default='-')
+    smo = models.CharField("SMO", max_length=50, default='-')
+    lpuauto = models.CharField("LPUAUTO", max_length=50, default='-')
+    lpudt = models.CharField("LPUDT", max_length=50, default='-')
+    user_update_list = models.CharField("UserUpdateList", max_length=50, default='-')
+    date_update_list = models.CharField("DateUpdateList", max_length=50, default='-')
+    user_update_plan = models.CharField("UserUpdatePlan", max_length=50, default='-')
+    date_update_plan = models.CharField("DateUpdatePlan", max_length=50, default='-')
+    period_w = models.CharField("PeriodW", max_length=50, default='-')
+    date_prev = models.CharField("DatePrev", max_length=50, default='-')
+    place_w = models.CharField("PlaceW", max_length=50, default='-')
+    w = models.CharField("w", max_length=50, default='-')
+    unemp = models.CharField("UNEMP", max_length=50, default='-')
+
+    def __str__(self):
+        return f"{self.pid} - {self.fio}"
+
+    class Meta:
+        db_table = "load_data_dispansery_iszl"
+        verbose_name = "Диспансерное ИСЗЛ"
+        verbose_name_plural = "Диспансерное ИСЗЛ"
