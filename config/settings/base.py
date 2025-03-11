@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'apps.organizations',
     'apps.kadry',
     'apps.person',
+    'apps.talon',
 
     'import_export',
     'channels',

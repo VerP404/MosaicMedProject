@@ -1,7 +1,16 @@
 from django.db import models
+from django.utils import timezone
 
 
-class Talon(models.Model):
+class TimeStampedModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)  # время создания
+    updated_at = models.DateTimeField(auto_now_add=True)  # время последнего обновления
+
+    class Meta:
+        abstract = True
+
+
+class Talon(TimeStampedModel):
     # Модель для обычных талонов (не комплексных)
     talon = models.CharField(max_length=255)
     report_period = models.CharField(max_length=255, default='-')
@@ -61,7 +70,7 @@ class Talon(models.Model):
         unique_together = (("talon", "source"),)
 
 
-class ComplexTalon(models.Model):
+class ComplexTalon(TimeStampedModel):
     # Модель для комплексных талонов
     talon = models.CharField(max_length=255)
     report_period = models.CharField(max_length=255, default='-')
@@ -121,7 +130,7 @@ class ComplexTalon(models.Model):
         unique_together = (("talon", "source", "doctor"),)
 
 
-class SickLeaveSheet(models.Model):
+class SickLeaveSheet(TimeStampedModel):
     number = models.CharField("Номер", max_length=255, unique=True)
     eln = models.CharField("ЭЛН", max_length=255)
     duplicate = models.CharField("Дубликат", max_length=255)
