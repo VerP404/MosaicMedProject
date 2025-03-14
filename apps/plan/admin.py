@@ -139,7 +139,7 @@ class NullableForeignKeyWidget(ForeignKeyWidget):
             return value
 
 
-from .resources import GroupIndicatorsResource
+from .resources import GroupIndicatorsResource, UnifiedFilterResource
 
 
 @admin.register(GroupIndicators)
@@ -419,6 +419,7 @@ class UnifiedFilterConditionInline(TabularInline):
 # Админка для UnifiedFilter с импортом/экспортом
 @admin.register(UnifiedFilter)
 class UnifiedFilterAdmin(ModelAdmin, ImportExportModelAdmin):
+    resource_class = UnifiedFilterResource
     import_form_class = ImportForm
     export_form_class = ExportForm
     list_display = ('year', 'type', 'combined_conditions')

@@ -1,7 +1,8 @@
 import json
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
-from .models import GroupIndicators, FilterCondition
+from .models import GroupIndicators, FilterCondition, UnifiedFilterCondition, UnifiedFilter
+
 
 class NullableForeignKeyWidget(ForeignKeyWidget):
     def get_queryset(self, value, row=None, **kwargs):
@@ -20,6 +21,7 @@ class NullableForeignKeyWidget(ForeignKeyWidget):
         except self.model.DoesNotExist:
             # Возвращаем "сырое" значение, чтобы сохранить его во временный атрибут
             return value
+
 
 class GroupIndicatorsResource(resources.ModelResource):
     # ВАЖНО: attribute=None, чтобы django-import-export не трогал это поле
@@ -126,3 +128,65 @@ class GroupIndicatorsResource(resources.ModelResource):
                     pass
                 # Удаляем временный атрибут, чтобы не мешался
                 del obj._imported_parent
+
+
+class UnifiedFilterResource(resources.ModelResource):
+    # Поле conditions обрабатывается как виртуальное; его содержимое сохраняется во временном атрибуте _imported_conditions
+    conditions = fields.Field(
+        column_name='conditions',
+        attribute='_imported_conditions'
+    )
+
+    class Meta:
+        model = UnifiedFilter
+        # Если в вашей базе уникальность определяется по id, можно использовать его,
+        # или можно выбрать, например, комбинацию ('year', 'type')
+        import_id_fields = ('year', 'type',)
+        fields = ('id', 'year', 'type', 'conditions')
+        skip_unchanged = False
+        report_skipped = True
+
+    def dehydrate_conditions(self, obj):
+        conds = []
+        for cond in obj.conditions.all():
+            conds.append({
+                'operator': cond.operator,
+                'field_name': cond.field_name,
+                'filter_type': cond.filter_type,
+                'values': cond.values,
+            })
+        return json.dumps(conds, ensure_ascii=False)
+
+    def before_import_row(self, row, **kwargs):
+        # Преобразуем содержимое колонки conditions из строки в JSON
+        if 'conditions' in row and row['conditions']:
+            try:
+                s = row['conditions'].replace('""', '"')
+                row['conditions'] = json.loads(s)
+            except Exception:
+                row['conditions'] = []
+        else:
+            row['conditions'] = []
+        return row
+
+    def import_obj(self, obj, data, dry_run):
+        # Сохраняем значения условий во временном атрибуте,
+        # чтобы потом создать связанные записи
+        obj._imported_conditions = data.get('conditions', [])
+        data['conditions'] = None  # Не даём django-import-export пытаться автоматически обработать поле
+        super().import_obj(obj, data, dry_run)
+
+    def after_save_instance(self, instance, row, **kwargs):
+        if kwargs.get('dry_run'):
+            return
+        # Удаляем существующие условия, чтобы избежать дублирования
+        instance.conditions.all().delete()
+        for cond in getattr(instance, '_imported_conditions', []):
+            if isinstance(cond, dict) and all(k in cond for k in ['operator', 'field_name', 'filter_type', 'values']):
+                UnifiedFilterCondition.objects.create(
+                    filter=instance,
+                    operator=cond['operator'],
+                    field_name=cond['field_name'],
+                    filter_type=cond['filter_type'],
+                    values=cond['values'],
+                )
