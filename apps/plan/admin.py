@@ -151,7 +151,7 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
     resource_class = GroupIndicatorsResource
     import_form_class = ImportForm
     export_form_class = ExportForm
-    ordering = ['parent']
+    ordering = ['parent__name', 'name']
     list_display = ('name', 'parent', 'level', 'is_distributable', 'latest_filter_year', 'view_subgroups')
     list_filter = ('level', FilterYearListFilter)
     search_fields = ['name', 'parent__name', 'parent__parent__name']
@@ -165,7 +165,7 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
 
     def get_search_results(self, request, queryset, search_term):
         # Сначала сортируем
-        queryset = queryset.order_by('name')
+        queryset = queryset.order_by('parent__name', 'name')
 
         if search_term:
             # Допустим, хотим искать в name, parent__name, parent__parent__name
