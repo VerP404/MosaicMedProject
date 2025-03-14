@@ -8,7 +8,7 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django import forms
 from django.db import models
-from import_export.widgets import ManyToManyWidget
+from import_export.widgets import ManyToManyWidget, ForeignKeyWidget
 
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.import_export.forms import ImportForm, ExportForm, SelectableFieldsExportForm
@@ -33,7 +33,7 @@ class GroupBuildingDepartmentForm(forms.ModelForm):
             'building': autocomplete.ModelSelect2(url='building-autocomplete'),
             'department': autocomplete.ModelSelect2(
                 url='department-autocomplete',
-                forward=['building', 'year']  # Передача зависимых значений
+                forward=['building', 'year']
             ),
         }
 
@@ -55,7 +55,7 @@ class GroupBuildingDepartmentForm(forms.ModelForm):
 class GroupBuildingDepartmentInline(TabularInline):
     model = GroupBuildingDepartment
     form = GroupBuildingDepartmentForm
-    extra = 1
+    extra = 0
     fields = ['year', 'building', 'department']
     readonly_fields = []
 
@@ -80,7 +80,7 @@ class MonthlyPlanInline(TabularInline):
 # Инлайн для FilterCondition
 class FilterConditionInline(TabularInline):
     model = FilterCondition
-    extra = 1
+    extra = 0
     fields = ['field_name', 'filter_type', 'values', 'year']
     readonly_fields = ('year',)
 
@@ -97,6 +97,8 @@ def copy_filters_action(modeladmin, request, queryset):
     new_year = datetime.now().year + 1  # Копируем на следующий год
     copy_filters_to_new_year(queryset, new_year)
     modeladmin.message_user(request, f"Фильтры для выбранных групп скопированы на {new_year}", messages.SUCCESS)
+
+
 copy_filters_action.short_description = "Скопировать фильтры на следующий год для выбранных групп"
 
 
@@ -122,101 +124,24 @@ class GroupBuildingsInline(TabularInline):
     verbose_name = "Связанный корпус"
     verbose_name_plural = "Связанные корпуса"
 
-class GroupIndicatorsResource(resources.ModelResource):
-    # Для поля ManyToMany (корпуса) используем виджет, который работает по id
-    buildings = fields.Field(
-        column_name='buildings',
-        attribute='buildings',
-        widget=ManyToManyWidget(Building, field='id')
-    )
-    # Сериализуем связанные объекты FilterCondition в JSON
-    filters = fields.Field(
-        column_name='filters'
-    )
-    # Сериализуем связанные объекты GroupBuildingDepartment в JSON
-    group_building_departments = fields.Field(
-        column_name='group_building_departments'
-    )
 
-    class Meta:
-        model = GroupIndicators
-        # Если хотите импортировать записи с сохранением своих id (и обновлять их), укажите их здесь
-        import_id_fields = ('id',)
-        fields = (
-            'id', 'name', 'parent', 'level', 'is_distributable',
-            'buildings', 'filters', 'group_building_departments'
-        )
-        skip_unchanged = True
-        report_skipped = True
+class NullableForeignKeyWidget(ForeignKeyWidget):
+    def get_queryset(self, value, row=None, **kwargs):
+        return super().get_queryset(value, row=row, **kwargs)
 
-    def dehydrate_filters(self, obj):
-        # Собираем все условия фильтра в список словарей
-        conditions = []
-        for cond in obj.filters.all():
-            conditions.append({
-                'field_name': cond.field_name,
-                'filter_type': cond.filter_type,
-                'values': cond.values,
-                'year': cond.year,
-            })
-        return json.dumps(conditions, ensure_ascii=False)
+    def clean(self, value, row=None, **kwargs):
+        if not value:
+            return None
+        try:
+            qs = self.get_queryset(value, row=row, **kwargs)
+            return qs.get(**{self.field: value})
+        except self.model.DoesNotExist:
+            return value
 
-    def dehydrate_group_building_departments(self, obj):
-        items = []
-        for item in obj.group_building_departments.all():
-            items.append({
-                'year': item.year,
-                'building': item.building.id,  # сохраняем id корпуса
-                'department': item.department.id,  # и id отделения
-            })
-        return json.dumps(items, ensure_ascii=False)
 
-    def before_import_row(self, row, **kwargs):
-        # Преобразуем JSON-строки обратно в объекты (списки словарей)
-        if 'filters' in row:
-            try:
-                row['filters'] = json.loads(row['filters'])
-            except Exception:
-                row['filters'] = []
-        if 'group_building_departments' in row:
-            try:
-                row['group_building_departments'] = json.loads(row['group_building_departments'])
-            except Exception:
-                row['group_building_departments'] = []
-        return row
+from .resources import GroupIndicatorsResource
 
-    def import_obj(self, obj, data, dry_run):
-        # Основной импорт объекта (без связанных записей)
-        super().import_obj(obj, data, dry_run)
-        # Сохраняем импортированные данные во временные атрибуты, чтобы потом использовать при сохранении
-        obj._imported_filters = data.get('filters', [])
-        obj._imported_group_building_departments = data.get('group_building_departments', [])
 
-    def after_save_instance(self, instance, using_transactions, dry_run):
-        if dry_run:
-            return
-        # Если требуется сохранить связи «с нуля», можно удалить старые связанные записи
-        instance.filters.all().delete()
-        instance.group_building_departments.all().delete()
-        # Создаём новые FilterCondition на основе импортированных данных
-        for cond in getattr(instance, '_imported_filters', []):
-            FilterCondition.objects.create(
-                group=instance,
-                field_name=cond.get('field_name'),
-                filter_type=cond.get('filter_type'),
-                values=cond.get('values'),
-                year=cond.get('year'),
-            )
-        # Создаём GroupBuildingDepartment записи
-        for item in getattr(instance, '_imported_group_building_departments', []):
-            GroupBuildingDepartment.objects.create(
-                group=instance,
-                year=item.get('year'),
-                building_id=item.get('building'),
-                department_id=item.get('department')
-            )
-
-# Админка для GroupIndicators с интеграцией импорта/экспорта
 @admin.register(GroupIndicators)
 class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
     resource_class = GroupIndicatorsResource
@@ -229,28 +154,20 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
     actions = [copy_filters_action]
     filter_horizontal = ('buildings',)
     fieldsets = (
-        (None, {
-            'fields': ('name', 'parent', 'is_distributable')
-        }),
-        ('Распределение', {
-            'fields': ('buildings',),
-            'classes': ('collapse',)
-        }),
+        (None, {'fields': ('name', 'parent', 'is_distributable')}),
+        ('Распределение', {'fields': ('buildings',), 'classes': ('collapse',)}),
     )
 
     def save_model(self, request, obj, form, change):
-        # Сохраняем объект группы перед обработкой инлайнов
         if not obj.pk:
             obj.save()
         super().save_model(request, obj, form, change)
 
     def save_formset(self, request, form, formset, change):
-        # Сохраняем инлайн-объекты после группы
         instances = formset.save(commit=False)
         for instance in instances:
-            if isinstance(instance, FilterCondition):
-                if not instance.group_id:
-                    instance.group = form.instance
+            if isinstance(instance, FilterCondition) and not instance.group_id:
+                instance.group = form.instance
             instance.save()
         formset.save_m2m()
         for obj in formset.deleted_objects:
@@ -261,7 +178,6 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
         return latest_filter.year if latest_filter else "Нет фильтров"
 
     def view_subgroups(self, obj):
-        """Отображает ссылки на подгруппы в виде ссылок"""
         subgroups = obj.subgroups.all()
         if subgroups:
             links = [format_html('<a href="{}">{}</a>',
@@ -269,6 +185,7 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
                      for sub in subgroups]
             return format_html(", ".join(links))
         return "-"
+
     view_subgroups.short_description = "Вложенные группы"
 
     def get_readonly_fields(self, request, obj=None):
@@ -334,30 +251,37 @@ class MonthlyBuildingPlanInline(TabularInline):
 
     def get_total_plan_for_month(self, obj):
         return obj.get_total_plan_for_month()
+
     get_total_plan_for_month.short_description = "Общий план"
 
     def get_current_plan_for_month(self, obj):
         return obj.get_current_plan_for_month()
+
     get_current_plan_for_month.short_description = "План"
 
     def get_total_with_current_changes(self, obj):
         return obj.get_total_with_current_changes()
+
     get_total_with_current_changes.short_description = "из него использовано"
 
     def get_remaining_quantity(self, obj):
         return obj.get_remaining_quantity()
+
     get_remaining_quantity.short_description = "Остаток"
 
     def get_total_financial_plan_for_month(self, obj):
         return obj.get_total_financial_plan_for_month()
+
     get_total_financial_plan_for_month.short_description = "План (фин.)"
 
     def get_used_amount_for_month(self, obj):
         return obj.get_used_amount_for_month()
+
     get_used_amount_for_month.short_description = "из него использовано (фин.)"
 
     def get_remaining_budget(self, obj):
         return obj.get_remaining_budget()
+
     get_remaining_budget.short_description = "Остаток (фин.)"
 
     def has_add_permission(self, request, obj=None):
@@ -411,30 +335,37 @@ class MonthlyDepartmentPlanInline(TabularInline):
 
     def get_total_plan_for_month(self, obj):
         return obj.get_total_plan_for_month()
+
     get_total_plan_for_month.short_description = "Общий план"
 
     def get_current_plan_for_month(self, obj):
         return obj.get_current_plan_for_month()
+
     get_current_plan_for_month.short_description = "План"
 
     def get_used_quantity_for_month(self, obj):
         return obj.get_used_quantity_for_month()
+
     get_used_quantity_for_month.short_description = "из него использовано"
 
     def get_remaining_quantity(self, obj):
         return obj.get_remaining_quantity()
+
     get_remaining_quantity.short_description = "Остаток"
 
     def get_total_financial_plan_for_month(self, obj):
         return obj.get_total_financial_plan_for_month()
+
     get_total_financial_plan_for_month.short_description = "План (фин.)"
 
     def get_used_amount_for_month(self, obj):
         return obj.get_used_amount_for_month()
+
     get_used_amount_for_month.short_description = "из него использовано (фин.)"
 
     def get_remaining_budget(self, obj):
         return obj.get_remaining_budget()
+
     get_remaining_budget.short_description = "Остаток (фин.)"
 
     def has_add_permission(self, request, obj=None):
@@ -515,10 +446,12 @@ class AnnualDoctorPlanAdmin(ModelAdmin, ImportExportModelAdmin):
 
     def get_total_quantity(self, obj):
         return obj.monthly_doctor_plans.aggregate(total=models.Sum('quantity'))['total'] or 0
+
     get_total_quantity.short_description = "Общее количество"
 
     def get_total_amount(self, obj):
         return obj.monthly_doctor_plans.aggregate(total=models.Sum('amount'))['total'] or 0
+
     get_total_amount.short_description = "Общий бюджет"
 
 
