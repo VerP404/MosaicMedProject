@@ -46,16 +46,19 @@ class GroupIndicators(models.Model):
 
     def get_hierarchy_display(self):
         """
-        Рекурсивно строит строку вида:
-        'Амбулаторка - Неотложка - На дому'
-        если у объекта есть родитель.
+        Рекурсивно формируем строку вида
+        "Амбулаторная помощь - Неотложка - На дому"
         """
         if self.parent:
             return f"{self.parent.get_hierarchy_display()} - {self.name}"
         return self.name
 
     def __str__(self):
-        return self.name
+        """
+        Чтобы autocomplete использовал полный путь,
+        возвращаем get_hierarchy_display.
+        """
+        return self.get_hierarchy_display()
 
     @classmethod
     def get_groups_for_year(cls, year):

@@ -4,6 +4,7 @@ from datetime import datetime
 from dal import autocomplete
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils.html import format_html
 from django.urls import reverse
 from django import forms
@@ -146,12 +147,14 @@ from .resources import GroupIndicatorsResource, UnifiedFilterResource
 @admin.register(GroupIndicators)
 class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
     form = GroupIndicatorsForm
+    autocomplete_fields = ['parent']
     resource_class = GroupIndicatorsResource
     import_form_class = ImportForm
     export_form_class = ExportForm
+    ordering = ['parent']
     list_display = ('name', 'parent', 'level', 'is_distributable', 'latest_filter_year', 'view_subgroups')
     list_filter = ('level', FilterYearListFilter)
-    search_fields = ('name',)
+    search_fields = ['name', 'parent__name', 'parent__parent__name']
     inlines = [FilterConditionInline, GroupBuildingDepartmentInline]
     actions = [copy_filters_action]
     filter_horizontal = ('buildings',)
@@ -160,6 +163,20 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
         ('Распределение', {'fields': ('buildings',), 'classes': ('collapse',)}),
     )
 
+    def get_search_results(self, request, queryset, search_term):
+        # Сначала сортируем
+        queryset = queryset.order_by('name')
+
+        if search_term:
+            # Допустим, хотим искать в name, parent__name, parent__parent__name
+            # Можно ещё глубже, если нужно
+            queryset = queryset.filter(
+                Q(name__icontains=search_term) |
+                Q(parent__name__icontains=search_term) |
+                Q(parent__parent__name__icontains=search_term)
+                # ... и так далее ...
+            )
+        return queryset, False
     def save_model(self, request, obj, form, change):
         if not obj.pk:
             obj.save()
