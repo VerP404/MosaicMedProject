@@ -24,6 +24,7 @@ class GroupIndicators(models.Model):
         verbose_name="Корпуса",
         help_text="Укажите корпуса, связанные с этой группой (для распределяемых планов)"
     )
+
     # departments = models.ManyToManyField(
     #     Department,
     #     blank=True,
@@ -42,6 +43,16 @@ class GroupIndicators(models.Model):
         if self.is_distributable:
             current_year = datetime.now().year
             AnnualPlan.objects.get_or_create(group=self, year=current_year)
+
+    def get_hierarchy_display(self):
+        """
+        Рекурсивно строит строку вида:
+        'Амбулаторка - Неотложка - На дому'
+        если у объекта есть родитель.
+        """
+        if self.parent:
+            return f"{self.parent.get_hierarchy_display()} - {self.name}"
+        return self.name
 
     def __str__(self):
         return self.name
@@ -585,7 +596,6 @@ class ChiefDashboard(models.Model):
         unique_together = ('name', 'goal', 'year')
         verbose_name = "Показатель"
         verbose_name_plural = "Панель главного врача"
-
 
 
 class AnnualDoctorPlan(models.Model):

@@ -15,6 +15,7 @@ from unfold.contrib.import_export.forms import ImportForm, ExportForm, Selectabl
 from import_export import resources, fields
 from import_export.admin import ImportExportModelAdmin
 
+from .forms import GroupIndicatorsForm
 from .models import (
     GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition,
     AnnualPlan, BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan,
@@ -144,6 +145,7 @@ from .resources import GroupIndicatorsResource, UnifiedFilterResource
 
 @admin.register(GroupIndicators)
 class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
+    form = GroupIndicatorsForm
     resource_class = GroupIndicatorsResource
     import_form_class = ImportForm
     export_form_class = ExportForm
