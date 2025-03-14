@@ -57,7 +57,6 @@ class GroupIndicatorsResource(resources.ModelResource):
                 row['filters'] = []
         else:
             row['filters'] = []
-        print("DEBUG: before_import_row -> row['filters'] =", row['filters'])
         return row
 
     def import_obj(self, obj, data, dry_run):
@@ -67,13 +66,10 @@ class GroupIndicatorsResource(resources.ModelResource):
             data['parent'] = None
         super().import_obj(obj, data, dry_run)
         obj._imported_filters = data.get('filters', [])
-        print("DEBUG: import_obj -> _imported_filters =", obj._imported_filters)
 
     def after_save_instance(self, instance, row, **kwargs):
         if kwargs.get('dry_run'):
             return
-        print("DEBUG: after_save_instance called for instance id =", instance.id)
-        print("DEBUG: _imported_filters =", getattr(instance, '_imported_filters', None))
         if hasattr(instance, '_imported_parent'):
             try:
                 parent_instance = GroupIndicators.objects.get(pk=instance._imported_parent)
@@ -91,4 +87,3 @@ class GroupIndicatorsResource(resources.ModelResource):
                     values=cond['values'],
                     year=cond['year'],
                 )
-                print("DEBUG: Created FilterCondition id =", fc.id, "->", cond)
