@@ -17,11 +17,8 @@ type_page = "eln"
 
 # --- 1) Загружаем из БД списки уникальных значений для ТВСП, Статуса и Причины --- #
 with engine.connect() as conn:
-    # ТВСП
     tvsp_rows = conn.execute(text("SELECT DISTINCT tvsp FROM load_data_sick_leave_sheets ORDER BY tvsp")).fetchall()
-    # Статус
     status_rows = conn.execute(text("SELECT DISTINCT status FROM load_data_sick_leave_sheets ORDER BY status")).fetchall()
-    # Код причины (заменяем пустые на 'По уходу')
     reason_rows = conn.execute(text("""
         SELECT DISTINCT coalesce(incapacity_reason_code, '') as reason
         FROM load_data_sick_leave_sheets
@@ -54,7 +51,22 @@ eln_layout = html.Div(
     [
         dbc.Card(
             [
-                dbc.CardHeader("Фильтры"),
+                dbc.CardHeader(
+                    dbc.Row(
+                        [
+                            dbc.Col(html.H5("Фильтры", className="mb-0"), width="auto"),
+                            dbc.Col(
+                                html.Div(
+                                    id=f"last-updated-{type_page}",
+                                    style={"textAlign": "right", "fontWeight": "normal"}
+                                ),
+                                width=True
+                            )
+                        ],
+                        align="center",
+                        justify="between"
+                    )
+                ),
                 dbc.CardBody(
                     [
                         # Одна строка, в которой ТРИ подкарточки: Период | Первичный/Статус/Причина | ТВСП
@@ -252,7 +264,7 @@ eln_layout = html.Div(
     Input(f"interval-component-{type_page}", "n_intervals")
 )
 def update_date_picker(n_intervals):
-    return datetime.now().date() - timedelta(days=1)
+    return datetime.now().date() - timedelta(days=7)
 
 # --- 5) Отображаем выбранные даты --- #
 @app.callback(
@@ -305,6 +317,7 @@ def enforce_mutually_exclusive_reason(selected_values):
         Output(f"result-table1-{type_page}", "data"),
         Output(f"result-table2-{type_page}", "columns"),
         Output(f"result-table2-{type_page}", "data"),
+        Output(f"last-updated-{type_page}", "children"),  # Новый Output для даты обновления
     ],
     [
         Input(f"date-picker-start-{type_page}", "date"),
@@ -317,9 +330,9 @@ def enforce_mutually_exclusive_reason(selected_values):
 )
 def update_tables(start_date, end_date, tvsp_values, status_values, first_value, reason_values):
     if (start_date is None) or (end_date is None):
-        return [], [], [], [], [], []
+        return [], [], [], [], [], [], ""
 
-    # Обработка поля "Первичный" (RadioItems всегда возвращает одно значение: "all", "Да" или "Нет")
+    # Логика фильтров (без изменений)
     if first_value == "all":
         first_filter = []
         first_all = True
@@ -327,7 +340,6 @@ def update_tables(start_date, end_date, tvsp_values, status_values, first_value,
         first_filter = [first_value]
         first_all = False
 
-    # Для ТВСП
     if not tvsp_values or "all" in tvsp_values:
         tvsp_filter = []
         tvsp_all = True
@@ -335,7 +347,6 @@ def update_tables(start_date, end_date, tvsp_values, status_values, first_value,
         tvsp_filter = tvsp_values
         tvsp_all = False
 
-    # Для статуса
     if not status_values or "all" in status_values:
         status_filter = []
         status_all = True
@@ -343,7 +354,6 @@ def update_tables(start_date, end_date, tvsp_values, status_values, first_value,
         status_filter = status_values
         status_all = False
 
-    # Для причины
     if not reason_values or "all" in reason_values:
         reason_filter = []
         reason_all = True
@@ -351,7 +361,6 @@ def update_tables(start_date, end_date, tvsp_values, status_values, first_value,
         reason_filter = reason_values
         reason_all = False
 
-    # Формируем параметры для запроса sql_eln (отчёт по статусам) – без фильтра по статусу
     bind_params_eln = {
         'start_date': start_date,
         'end_date': end_date,
@@ -362,7 +371,6 @@ def update_tables(start_date, end_date, tvsp_values, status_values, first_value,
         'reason_list': reason_filter,
         'reason_all': reason_all
     }
-    # Для остальных запросов включаем фильтр по статусу
     bind_params_others = {
         'start_date': start_date,
         'end_date': end_date,
@@ -376,9 +384,20 @@ def update_tables(start_date, end_date, tvsp_values, status_values, first_value,
         'reason_all': reason_all
     }
 
-    # Выполнение запросов
+    # Выполняем запросы
     columns, data = TableUpdater.query_to_df(engine, sql_eln, bind_params_eln)
     columns1, data1 = TableUpdater.query_to_df(engine, sql_query_eln_doctors, bind_params_others)
     columns2, data2 = TableUpdater.query_to_df(engine, sql_query_eln_patients, bind_params_others)
-    return columns, data, columns1, data1, columns2, data2
+
+    # --- Получаем MAX(updated_at) из базы ---
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT MAX(updated_at) FROM load_data_sick_leave_sheets")).fetchone()
+
+    if row and row[0]:
+        # row[0] – это datetime
+        last_updated_str = row[0].strftime("Дата обновления: %d.%m.%Y %H:%M")
+    else:
+        last_updated_str = "Дата обновления: Нет данных"
+
+    return columns, data, columns1, data1, columns2, data2, last_updated_str
 
