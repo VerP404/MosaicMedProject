@@ -1,11 +1,8 @@
 import csv
-from datetime import date, datetime
-
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
-from django.http import HttpResponse, HttpResponseRedirect
-from django.template.response import TemplateResponse
-from django.urls import path, reverse
+from django.http import HttpResponse
+from django.urls import path
 from django.contrib import messages
 from django.utils.html import format_html
 from django.shortcuts import render, redirect
@@ -632,33 +629,6 @@ class DigitalSignatureAdmin(ImportExportModelAdmin, ModelAdmin):
             "fields": ('scan', 'scan_uploaded_at', 'added_at'),
         }),
     )
-
-    def get_export_form(self):
-        return ExportFilterForm
-
-    def get_export_queryset(self, request):
-        qs = super().get_export_queryset(request)
-
-        export_all = request.POST.get('export_all') or request.GET.get('export_all')
-        export_date_str = request.POST.get('export_date') or request.GET.get('export_date')
-
-        if export_all:
-            # Пользователь отметил «Экспортировать все записи»
-            return qs
-
-        if export_date_str:
-            from datetime import date
-            try:
-                chosen_date = date.fromisoformat(export_date_str)
-            except ValueError:
-                chosen_date = date.today()
-
-            qs = qs.filter(
-                valid_from__lte=chosen_date,
-                valid_to__gte=chosen_date,
-                revoked_date__isnull=True
-            )
-        return qs
 
     def has_import_permission(self, request):
         return False

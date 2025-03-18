@@ -1,9 +1,7 @@
-# resource.py
-
-from datetime import date
 from import_export import resources, fields
 from import_export.widgets import DateWidget
 from .models import DigitalSignature
+
 
 class DigitalSignatureResource(resources.ModelResource):
     full_name = fields.Field(column_name='ФИО')

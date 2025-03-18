@@ -1,10 +1,9 @@
 from dal import autocomplete
 from django import forms
-from import_export.forms import ExportForm
 
 from .models import *
 from ..organization.models import Department
-from datetime import date
+
 
 class RG014Form(forms.ModelForm):
     class Meta:
@@ -41,25 +40,3 @@ class DigitalSignatureForm(forms.ModelForm):
 
 class DepartmentActionForm(forms.Form):
     department = forms.ModelChoiceField(queryset=Department.objects.all(), label="Выберите отделение")
-
-
-class ExportFilterForm(ExportForm):
-    export_all = forms.BooleanField(
-        label="Экспортировать все записи",
-        required=False,
-        initial=False
-    )
-    export_date = forms.DateField(
-        label="Экспортировать записи, действующие на дату",
-        widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-        required=False,
-        initial=date.today
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Добавляем наши дополнительные поля в словарь полей
-        self.fields.update({
-            'export_all': ExportFilterForm.base_fields['export_all'],
-            'export_date': ExportFilterForm.base_fields['export_date'],
-        })
