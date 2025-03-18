@@ -23,6 +23,7 @@ from apps.analytical_app.pages.statistic.cardiology_report.cardiology_report imp
 from apps.analytical_app.pages.statistic.dispensary_visits.dispensary_visits import statistic_dd_visits
 from apps.analytical_app.pages.statistic.eln.eln import eln_layout
 from apps.analytical_app.pages.statistic.main import statistic_main
+from apps.analytical_app.pages.statistic.remd500.remd500_report import layout_remd500
 from apps.analytical_app.pages.statistic.result_pneumonia.result_pneumonia import statistic_pneumonia
 from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapova
 from apps.analytical_app.pages.statistic.visits.visits import statistic_visits
@@ -135,6 +136,13 @@ routes = {
             {"label": "ЭЛН", "active": True},
         ]),
         eln_layout
+    ]),
+    "/statistic/remd500": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Статистик", "href": "/statistic"},
+            {"label": "РЭМД500", "active": True},
+        ]),
+        layout_remd500
     ]),
 
 
