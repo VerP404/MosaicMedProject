@@ -1,5 +1,4 @@
 from django.db import models
-from django.utils import timezone
 
 
 class TimeStampedModel(models.Model):
@@ -240,3 +239,135 @@ class DispanseryISZL(TimeStampedModel):
         db_table = "load_data_dispansery_iszl"
         verbose_name = "Диспансерное ИСЗЛ"
         verbose_name_plural = "Диспансерное ИСЗЛ"
+
+
+class ElectronicMedicalDocument(TimeStampedModel):
+    epmd_id = models.CharField('ИД', max_length=255, unique=True)
+    original_epmz_id = models.CharField('ИД исходного ЭПМЗ', max_length=255, default='-')
+    document_date = models.CharField('Дата документа', max_length=255, default='-')
+    document_type = models.CharField('Тип документа', max_length=255, default='-')
+    doctor = models.CharField('Врач', max_length=255, default='-')
+    branch = models.CharField('Обособленное подразделение', max_length=255, default='-')
+    subdivision = models.CharField('Подразделение', max_length=255, default='-')
+    patient = models.CharField('Пациент', max_length=255, default='-')
+    formation_date = models.CharField('Дата формирования электронного документа', max_length=255, default='-')
+    doctor_signature = models.CharField('Наличие подписи врача', max_length=50, default='-')
+    organization_signature = models.CharField('Наличие подписи МО', max_length=50, default='-')
+    sending_date = models.CharField('Дата отправки в РИР.РЭМД', max_length=255, default='-')
+    sending_status = models.CharField('Статус отправки в РИР.РЭМД', max_length=255, default='-')
+    registration_number = models.CharField('Регистрационный номер', max_length=255, default='-')
+    status_details = models.TextField('Детали статуса отправки', default='-')
+
+    def __str__(self):
+        return f"{self.epmd_id} - {self.patient}"
+
+    class Meta:
+        db_table = 'load_data_emd'
+        verbose_name = 'Электронный медицинский документ'
+        verbose_name_plural = 'Электронные медицинские документы'
+
+
+class Recipe(TimeStampedModel):
+    number = models.CharField("Номер", max_length=255, unique=True)
+    series = models.CharField("Серия", max_length=255, default="-")
+    recipe_type = models.CharField("Тип рецепта", max_length=255, default="-")
+    date = models.CharField("Дата", max_length=255, default="-")  # можно заменить на DateField при необходимости
+    digital_signature = models.CharField("ЭЦП", max_length=255, default="-")
+    signature_owner = models.CharField("Владелец подписи", max_length=255, default="-")
+    organization = models.CharField("Организация", max_length=255, default="-")
+    subdivision = models.CharField("Подразделение", max_length=255, default="-")
+    sending_status_rir_farm = models.CharField("Статус отправки РИР/ФАРМ", max_length=255, default="-")
+    additional_status_info_rir = models.TextField("Дополнительная информация по статусу отправки в РИР", default="-")
+    status = models.CharField("Статус", max_length=255, default="-")
+    status_change_date = models.CharField("Дата изменения статуса", max_length=255, default="-")
+    status_author = models.CharField("Автор статуса", max_length=255, default="-")
+    first_er_status = models.CharField("1ЭР (статус отправки)", max_length=255, default="-")
+    emd_verification = models.CharField("Верификация ЭМД", max_length=255, default="-")
+    sending_status_remd = models.CharField("Статус отправки в РЭМД", max_length=255, default="-")
+    additional_status_info_remd = models.TextField("Дополнительная информация по статусу отправки в РЭМД", default="-")
+    validity_period = models.CharField("Срок действия", max_length=255, default="-")
+    patient_full_name = models.CharField("Ф.И.О. пациента", max_length=255, default="-")
+    patient_birth_date = models.CharField("Дата рождения пациента", max_length=255, default="-")
+    patient_snils = models.CharField("СНИЛС пациента", max_length=255, default="-")
+    diagnosis_code = models.CharField("Код диагноза", max_length=255, default="-")
+    diagnosis_name = models.CharField("Название диагноза", max_length=255, default="-")
+    benefit_category_name = models.CharField("Название льготной категории", max_length=255, default="-")
+    benefit_category_type = models.CharField("Тип льготной категории", max_length=255, default="-")
+    financing_source = models.CharField("Источник финансирования", max_length=255, default="-")
+    doctor_full_name = models.CharField("Ф.И.О. врача", max_length=255, default="-")
+    doctor_position = models.CharField("Должность врача", max_length=255, default="-")
+    medicinal_product = models.TextField("Лекарственный препарат", default="-")
+    trn = models.TextField("ТРН", default="-")
+    inn = models.TextField("МНН", default="-")
+    quantity_total_prescribed = models.CharField("Кол-во/Всего назначено", max_length=255, default="-")
+    payment_percentage = models.CharField("Процент оплаты", max_length=255, default="-")
+
+    def __str__(self):
+        return f"{self.number} - {self.patient_full_name}"
+
+    class Meta:
+        db_table = "load_data_recipes"
+        verbose_name = "Рецепт"
+        verbose_name_plural = "Рецепты"
+
+
+class MortalityRecord(TimeStampedModel):
+    series = models.CharField("Серия", max_length=255, default="-")
+    number = models.CharField("Номер", max_length=255, default="-")
+    damaged = models.CharField("ИСПОРЧЕНО", max_length=255, default="-")
+    duplicate = models.CharField("Дубликат", max_length=255, default="-")
+    perinatal = models.CharField("Перинатальная", max_length=255, default="-")
+    issue_date = models.CharField("Дата выдачи", max_length=255, default="-")
+    mortality_type = models.CharField("Тип", max_length=255, default="-")
+    emd_sending_date = models.CharField("Дата отправки ЭМД", max_length=255, default="-")
+    emd_sending_status = models.CharField("Статус отправки ЭМД", max_length=255, default="-")
+    emd_error = models.TextField("ЭМД ошибка", default="-")
+    creator = models.CharField("Создавший", max_length=255, default="-")
+    doctor = models.CharField("Врач", max_length=255, default="-")
+    deceased_full_name = models.CharField("ФИО умершего(ей)", max_length=255, default="-")
+    birth_date = models.CharField("Дата рождения", max_length=255, default="-")
+    death_date = models.CharField("Дата смерти", max_length=255, default="-")
+    gender = models.CharField("Пол", max_length=255, default="-")
+    age = models.CharField("Возраст, лет", max_length=255, default="-")
+    initial_statistic = models.CharField("Первоначальная (статистика)", max_length=255, default="-")
+    reason_a = models.CharField("Причина (а)", max_length=255, default="-")
+    reason_b = models.CharField("Причина (б)", max_length=255, default="-")
+    reason_c = models.CharField("Причина (в)", max_length=255, default="-")
+    reason_d = models.CharField("Причина (г)", max_length=255, default="-")
+    region = models.CharField("Регион", max_length=255, default="-")
+    district = models.CharField("Район", max_length=255, default="-")
+    city_or_locality = models.CharField("Город / Населенный пункт", max_length=255, default="-")
+    street = models.CharField("Улица", max_length=255, default="-")
+    house = models.CharField("Дом", max_length=255, default="-")
+    apartment = models.CharField("Квартира", max_length=255, default="-")
+    attachment = models.CharField("Прикрепление", max_length=255, default="-")
+
+    def __str__(self):
+        return f"{self.number} - {self.deceased_full_name}"
+
+    class Meta:
+        db_table = "load_data_death"
+        verbose_name = "Смертность"
+        verbose_name_plural = "Смертность"
+        unique_together = (("series", "number"),)
+
+
+class Reference(TimeStampedModel):
+    series_number = models.CharField("Серия и номер справки", max_length=255, unique=True)
+    issue_date = models.CharField("Дата выдачи", max_length=255, default="-")
+    full_name = models.CharField("ФИО", max_length=255, default="-")
+    birth_date = models.CharField("Дата рождения", max_length=255, default="-")
+    doctor = models.CharField("Врач", max_length=255, default="-")
+    organization = models.CharField("Организация выдавшая документ", max_length=255, default="-")
+    reference_type = models.CharField("Вид справки", max_length=255, default="-")
+    conclusion = models.CharField("Заключение", max_length=255, default="-")
+    status = models.CharField("Статус", max_length=255, default="-")
+    errors = models.TextField("Ошибки по справке", default="-")
+
+    def __str__(self):
+        return f"{self.series_number} - {self.full_name}"
+
+    class Meta:
+        db_table = 'load_data_reference'
+        verbose_name = 'Справка'
+        verbose_name_plural = 'Справки'
