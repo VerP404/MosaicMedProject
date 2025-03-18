@@ -614,7 +614,7 @@ class DigitalSignatureAdmin(ImportExportModelAdmin, ModelAdmin):
         'has_scan'
     )
     list_filter = ('valid_from', 'valid_to', DigitalSignatureStatusFilter)
-
+    search_fields = ('person__last_name', 'person__first_name', 'person__patronymic', 'person__snils')
     fieldsets = (
         ("Основные данные", {
             "classes": ("two-columns",),

@@ -14,7 +14,7 @@ selenium==4.25.0
 SQLAlchemy==2.0.35
 celery
 django-debug-toolbar
-django-import-export
+django-import-export==4.3.7
 django-autocomplete-light
 django-environ
 setuptools
