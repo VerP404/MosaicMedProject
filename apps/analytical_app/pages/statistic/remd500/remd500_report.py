@@ -29,6 +29,7 @@ layout_remd500 = html.Div(
                 ),
                 dbc.CardBody(
                     [
+                        # ------ Блок фильтров (дата начала, дата окончания, кнопка) ------
                         dbc.Row(
                             [
                                 dbc.Col(
@@ -71,13 +72,197 @@ layout_remd500 = html.Div(
                             ],
                             className="mb-3"
                         ),
-                        # Блок с датами последнего обновления по каждой таблице
+
+                        # ------ ВМЕСТО старой строки с html.Div(...) -> 4 карточки в одной строке ------
                         dbc.Row(
                             [
-                                dbc.Col(html.Div(id=f"last-updated-emd-{type_page}"), width=3),
-                                dbc.Col(html.Div(id=f"last-updated-recipes-{type_page}"), width=3),
-                                dbc.Col(html.Div(id=f"last-updated-reference-{type_page}"), width=3),
-                                dbc.Col(html.Div(id=f"last-updated-death-{type_page}"), width=3)
+                                dbc.Col(
+                                    dbc.Card(
+                                        [
+                                            dbc.CardHeader(
+                                                dbc.Row(
+                                                    [
+                                                        dbc.Col(html.H5("ЭМД", className="mb-0"), width="auto"),
+                                                        dbc.Col(
+                                                            html.Div(
+                                                                id=f"last-updated-emd-{type_page}",
+                                                                style={"textAlign": "right", "fontWeight": "normal"}
+                                                            ),
+                                                            width=True
+                                                        )
+                                                    ],
+                                                    align="center",
+                                                    justify="between"
+                                                )
+                                            ),
+                                            dbc.CardBody([
+                                                html.Div([
+                                                    dcc.Dropdown(
+                                                        id=f"emd-date-type-dropdown-{type_page}",
+                                                        options=[
+                                                            {"label": "По дате исходного документа",
+                                                             "value": "document_date"},
+                                                            {"label": "По дате формирования ЭМД",
+                                                             "value": "formation_date"},
+                                                            {"label": "По дате последней отправки в РИР",
+                                                             "value": "sending_date"}
+                                                        ],
+                                                        value="formation_date",  # Значение по умолчанию
+                                                        clearable=False,
+                                                        style={"marginBottom": "10px"}
+                                                    ),
+                                                    dcc.Dropdown(
+                                                        id=f"emd-status-dropdown-{type_page}",
+                                                        options=[
+                                                            {"label": "Все", "value": "all"},
+                                                            {"label": "Ошибка отправки", "value": "Ошибка отправки"},
+                                                            {"label": "Ошибка регистрации документа",
+                                                             "value": "Ошибка регистрации документа"},
+                                                            {"label": "Документ успешно зарегистрирован",
+                                                             "value": "Документ успешно зарегистрирован"},
+                                                            {"label": "Не отправлено", "value": "-"},
+                                                            {"label": "Отправлен в РИР", "value": "Отправлен в РИР"},
+                                                            {"label": "Прочие", "value": "other"}
+                                                        ],
+                                                        value=["Документ успешно зарегистрирован"],
+                                                        # По умолчанию выбираем "Все"
+                                                        multi=True,  # Включаем мультивыбор
+                                                        clearable=False,
+                                                        style={"marginBottom": "10px"}
+                                                    ),
+                                                    html.Div(
+                                                        id=f"emd-count-{type_page}",
+                                                        style={"fontSize": "16px", "marginTop": "10px",
+                                                               "fontWeight": "bold"}
+                                                    )
+                                                ])
+                                            ])
+                                        ],
+                                        className="h-100"
+                                    ),
+                                    width=3
+                                ),
+                                dbc.Col(
+                                    dbc.Card(
+                                        [
+                                            dbc.CardHeader(
+                                                dbc.Row(
+                                                    [
+                                                        dbc.Col(html.H5("Рецепты", className="mb-0"), width="auto"),
+                                                        dbc.Col(
+                                                            html.Div(
+                                                                id=f"last-updated-recipes-{type_page}",
+                                                                style={"textAlign": "right", "fontWeight": "normal"}
+                                                            ),
+                                                            width=True
+                                                        )
+                                                    ],
+                                                    align="center",
+                                                    justify="between"
+                                                )
+                                            ),
+                                            dbc.CardBody([
+                                                html.Div(
+                                                    [
+                                                        dcc.Dropdown(
+                                                            id=f"recipe-verification-dropdown-{type_page}",
+                                                            options=[
+                                                                {"label": "Все", "value": "all"},
+                                                                {"label": "2 из 2", "value": "2 из 2"},
+                                                                {"label": "Не подлежит отправке в РЭМД",
+                                                                 "value": "Не подлежит отправке в РЭМД"},
+                                                                {"label": "0 из 2", "value": "0 из 2"},
+                                                                {"label": "1 из 2", "value": "1 из 2"},
+                                                                {"label": "-", "value": "-"},
+                                                                {"label": "Прочие", "value": "other"}
+                                                            ],
+                                                            value=["2 из 2"],
+                                                            multi=True,
+                                                            clearable=False,
+                                                            style={"marginBottom": "10px"}
+                                                        ),
+                                                        dcc.Dropdown(
+                                                            id=f"recipe-status-dropdown-{type_page}",
+                                                            options=[
+                                                                {"label": "Все", "value": "all"},
+                                                                {"label": "Отправлен", "value": "Отправлен"},
+                                                                {"label": "Зарегистрирован",
+                                                                 "value": "Зарегистрирован"},
+                                                                {"label": "Ошибка регистрации",
+                                                                 "value": "Ошибка регистрации"},
+                                                                {"label": "Не подлежит отправке",
+                                                                 "value": "Не подлежит отправке"},
+                                                                {"label": "-", "value": "-"},
+                                                                {"label": "Прочие", "value": "other"}
+                                                            ],
+                                                            value=["Зарегистрирован"],
+                                                            multi=True,
+                                                            clearable=False,
+                                                            style={"marginBottom": "10px"}
+                                                        ),
+                                                        html.Div(
+                                                            id=f"recipe-count-{type_page}",
+                                                            style={"fontSize": "16px", "marginTop": "10px",
+                                                                   "fontWeight": "bold"}
+                                                        )
+                                                    ]
+                                                )
+                                            ])
+                                        ],
+                                        className="h-100"
+                                    ),
+                                    width=3
+                                ),
+                                dbc.Col(
+                                    dbc.Card(
+                                        [
+                                            dbc.CardHeader(
+                                                dbc.Row(
+                                                    [
+                                                        dbc.Col(html.H5("Справки", className="mb-0"), width="auto"),
+                                                        dbc.Col(
+                                                            html.Div(
+                                                                id=f"last-updated-reference-{type_page}",
+                                                                style={"textAlign": "right", "fontWeight": "normal"}
+                                                            ),
+                                                            width=True
+                                                        )
+                                                    ],
+                                                    align="center",
+                                                    justify="between"
+                                                )
+                                            ),
+                                            dbc.CardBody([])
+                                        ],
+                                        className="h-100"
+                                    ),
+                                    width=3
+                                ),
+                                dbc.Col(
+                                    dbc.Card(
+                                        [
+                                            dbc.CardHeader(
+                                                dbc.Row(
+                                                    [
+                                                        dbc.Col(html.H5("Смертность", className="mb-0"), width="auto"),
+                                                        dbc.Col(
+                                                            html.Div(
+                                                                id=f"last-updated-death-{type_page}",
+                                                                style={"textAlign": "right", "fontWeight": "normal"}
+                                                            ),
+                                                            width=True
+                                                        )
+                                                    ],
+                                                    align="center",
+                                                    justify="between"
+                                                )
+                                            ),
+                                            dbc.CardBody([])
+                                        ],
+                                        className="h-100"
+                                    ),
+                                    width=3
+                                ),
                             ],
                             className="mb-3"
                         ),
@@ -146,17 +331,24 @@ layout_remd500 = html.Div(
         Output(f"last-updated-reference-{type_page}", "children"),
         Output(f"last-updated-death-{type_page}", "children"),
         Output(f"report-status-{type_page}", "children"),
+        Output(f"emd-count-{type_page}", "children"),
+        Output(f"recipe-count-{type_page}", "children"),
     ],
     Input(f"generate-report-button-{type_page}", "n_clicks"),
     State(f"date-picker-start-{type_page}", "date"),
-    State(f"date-picker-end-{type_page}", "date")
+    State(f"date-picker-end-{type_page}", "date"),
+    State(f"emd-date-type-dropdown-{type_page}", "value"),
+    State(f"emd-status-dropdown-{type_page}", "value"),
+    State(f"recipe-verification-dropdown-{type_page}", "value"),
+    State(f"recipe-status-dropdown-{type_page}", "value"),
 )
-def generate_remd500_report(n_clicks, start_date, end_date):
+def generate_remd500_report(n_clicks, start_date, end_date, emd_date_type, emd_selected_statuses, recipe_verification,
+                            recipe_status):
     if not n_clicks:
-        return [], [], [], [], "", "", "", "", ""
+        return [], [], [], [], "", "", "", "", "", "итого: 0", "итого: 0"
 
     if not start_date or not end_date:
-        return [], [], [], [], "", "", "", "", "Не выбраны даты!"
+        return [], [], [], [], "", "", "", "", "Не выбраны даты!", "итого: 0", "итого: 0"
 
     try:
         start_date_str = pd.to_datetime(start_date).strftime("%Y-%m-%d")
@@ -169,6 +361,37 @@ def generate_remd500_report(n_clicks, start_date, end_date):
             "Зарегистрировано"
         ]
 
+        emd_known_statuses = [
+            "Ошибка отправки",
+            "Ошибка регистрации документа",
+            "Документ успешно зарегистрирован",
+            "-",
+            "Отправлен в РИР"
+        ]
+        # Получаем все возможные статусы из базы данных
+        with engine.connect() as conn:
+            result = conn.execute(text(f"""
+                SELECT DISTINCT sending_status
+                FROM load_data_emd
+            """)).fetchall()
+        emd_all_statuses = [row[0] for row in result]  # Все статусы в базе
+        emd_unknown_statuses = [status for status in emd_all_statuses if
+                                status not in emd_known_statuses]  # Неизвестные статусы
+
+        # ✅ Если список пуст или None — также выбираем все статусы
+        if not emd_selected_statuses or len(emd_selected_statuses) == 0:
+            emd_selected_statuses = emd_known_statuses + emd_unknown_statuses
+
+        # ✅ Если выбрано "Прочие" — добавляем только неизвестные статусы
+        if "other" in emd_selected_statuses:
+            emd_selected_statuses.remove("other")
+            emd_selected_statuses += emd_unknown_statuses
+
+        # ✅ Если выбрано "Все" — добавляем все статусы (известные + неизвестные)
+        if "all" in emd_selected_statuses:
+            emd_selected_statuses.remove("all")
+            emd_selected_statuses = emd_known_statuses + emd_unknown_statuses
+
         # Получаем данные по каждой таблице с учетом форматов даты
         # 1) ЭМД (формат "DD.MM.YYYY HH24:MI")
         query_emd = f"""
@@ -176,15 +399,77 @@ def generate_remd500_report(n_clicks, start_date, end_date):
                 doctor,
                 sending_status AS status,
                 'ЭМД' AS type,
-                document_date
+                {emd_date_type} AS document_date
             FROM load_data_emd
-            WHERE to_date(document_date, 'DD.MM.YYYY HH24:MI')
-                  BETWEEN to_date('{start_date_str}', 'YYYY-MM-DD')
-                      AND to_date('{end_date_str}', 'YYYY-MM-DD')
+            WHERE NULLIF({emd_date_type}, '-') IS NOT NULL
+                  AND {emd_date_type} ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}} [0-9]{{2}}:[0-9]{{2}}$'
+                  AND to_date({emd_date_type}, 'DD.MM.YYYY HH24:MI')
+                      BETWEEN to_date('{start_date}', 'YYYY-MM-DD')
+                          AND to_date('{end_date}', 'YYYY-MM-DD')
+                  AND sending_status IN ({",".join(f"'{status}'" for status in emd_selected_statuses)})
         """
-        df_emd = pd.read_sql(query_emd, con=engine)
+        if not emd_selected_statuses:
+            df_emd = pd.DataFrame()
+        else:
+            df_emd = pd.read_sql(query_emd, con=engine)
+        # 2) Рецепты
+        # Получаем все возможные статусы из базы данных
+        recipe_known_verifications = [
+            "2 из 2",
+            "Не подлежит отправке в РЭМД",
+            "0 из 2",
+            "1 из 2",
+            "-"
+        ]
+        with engine.connect() as conn:
+            result = conn.execute(text(f"""
+                SELECT distinct emd_verification
+                FROM load_data_recipes
+            """)).fetchall()
+        recipe_all_verifications = [row[0] for row in result]
+        recipe_unknown_verifications = [status for status in recipe_all_verifications if
+                                        status not in recipe_known_verifications]
 
-        # 2) Рецепты (формат "DD.MM.YYYY")
+        # ✅ Если список пуст или None — также выбираем все статусы
+        if not recipe_verification or len(recipe_verification) == 0:
+            recipe_verification = recipe_known_verifications + recipe_unknown_verifications
+        # ✅ Если выбрано "Прочие" — добавляем только неизвестные статусы
+        if "other" in recipe_verification:
+            recipe_verification.remove("other")
+            recipe_verification += recipe_unknown_verifications
+        # ✅ Если выбрано "Все" — добавляем все статусы (известные + неизвестные)
+        if "all" in recipe_verification:
+            recipe_verification.remove("all")
+            recipe_verification = recipe_known_verifications + recipe_unknown_verifications
+
+        recipe_known_status = [
+            "Отправлен",
+            "Зарегистрирован",
+            "Ошибка регистрации",
+            "Не подлежит отправке",
+            "-"]
+
+        with engine.connect() as conn:
+            result = conn.execute(text(f"""
+                SELECT distinct sending_status_remd
+                FROM load_data_recipes
+            """)).fetchall()
+
+        recipe_all_status = [row[0] for row in result]
+        recipe_unknown_status = [status for status in recipe_all_status if
+                                        status not in recipe_known_status]
+        # ✅ Если список пуст или None — также выбираем все статусы
+        if not recipe_status or len(recipe_status) == 0:
+            recipe_status = recipe_known_status + recipe_unknown_status
+        # ✅ Если выбрано "Прочие" — добавляем только неизвестные статусы
+        if "other" in recipe_status:
+            recipe_status.remove("other")
+            recipe_status += recipe_unknown_status
+        # ✅ Если выбрано "Все" — добавляем все статусы (известные + неизвестные)
+        if "all" in recipe_status:
+            recipe_status.remove("all")
+            recipe_status = recipe_known_status + recipe_unknown_status
+
         query_recipes = f"""
             SELECT
                 doctor_full_name AS doctor,
@@ -193,8 +478,10 @@ def generate_remd500_report(n_clicks, start_date, end_date):
                 date AS document_date
             FROM load_data_recipes
             WHERE to_date(date, 'DD.MM.YYYY')
-                  BETWEEN to_date('{start_date_str}', 'YYYY-MM-DD')
-                      AND to_date('{end_date_str}', 'YYYY-MM-DD')
+                      BETWEEN to_date('{start_date_str}', 'YYYY-MM-DD')
+                          AND to_date('{end_date_str}', 'YYYY-MM-DD')
+                      AND emd_verification IN ({",".join(f"'{v}'" for v in recipe_verification)})
+                      AND sending_status_remd IN ({",".join(f"'{s}'" for s in recipe_status)})
         """
         df_recipes = pd.read_sql(query_recipes, con=engine)
 
@@ -244,7 +531,7 @@ def generate_remd500_report(n_clicks, start_date, end_date):
         # Формируем отчет по врачам: группировка по (doctor, specialty, type)
         doctor_pivot = (
             filtered_df
-            .groupby(['doctor', 'specialty', 'type'])
+            .groupby(['doctor', 'specialty', 'type'], observed=False)
             .size()
             .reset_index(name='count')
         )
@@ -252,7 +539,7 @@ def generate_remd500_report(n_clicks, start_date, end_date):
         # Формируем групповой отчет: группировка по специальности
         group_pivot = (
             filtered_df
-            .groupby('specialty')
+            .groupby('specialty', observed=False)
             .size()
             .reset_index(name='total')
         )
@@ -260,7 +547,7 @@ def generate_remd500_report(n_clicks, start_date, end_date):
         bins = [0, 99, 499, float('inf')]
         labels = ['до 100', '100-499', '>500']
         group_pivot['Категория'] = pd.cut(group_pivot['total'], bins=bins, labels=labels)
-        group_summary = group_pivot.groupby('Категория')['total'].sum().reset_index()
+        group_summary = group_pivot.groupby('Категория', observed=False)['total'].sum().reset_index()
 
         group_columns = [{"name": col, "id": col} for col in group_summary.columns]
         doctor_columns = [{"name": col, "id": col} for col in doctor_pivot.columns]
@@ -284,12 +571,14 @@ def generate_remd500_report(n_clicks, start_date, end_date):
             group_columns,
             doctor_pivot.to_dict('records'),
             doctor_columns,
-            f"ЭМД: {last_updated_emd}",
-            f"Рецепты: {last_updated_recipes}",
-            f"Справки: {last_updated_reference}",
-            f"Смертность: {last_updated_death}",
-            "Отчет сформирован успешно."
+            f"{last_updated_emd}",
+            f"{last_updated_recipes}",
+            f"{last_updated_reference}",
+            f"{last_updated_death}",
+            "",
+            f"итого: {len(df_emd)}",
+            f"итого: {len(df_recipes)}"
         )
 
     except Exception as e:
-        return [], [], [], [], "", "", "", "", f"Ошибка при формировании отчета: {str(e)}"
+        return [], [], [], [], "", "", "", "", f"Ошибка при формировании отчета: {str(e)}", "итого: 0", "итого: 0"
