@@ -140,3 +140,8 @@ CHANNEL_LAYERS = {
     }
 }
 
+# Для того чтобы при экспорте выводились чекбоксы полей
+EXPORT_RESOURCE_FIELDS = True
+
+# При импорте/экспорте в транзакции
+IMPORT_EXPORT_USE_TRANSACTIONS = True
