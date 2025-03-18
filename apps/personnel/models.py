@@ -53,6 +53,7 @@ class Person(models.Model):
     class Meta:
         verbose_name = "Физическое лицо"
         verbose_name_plural = "Врачи"
+        ordering = ['last_name', 'first_name']
 
     @property
     def is_on_maternity_leave(self):
@@ -126,7 +127,7 @@ class PostRG014(models.Model):
     class Meta:
         verbose_name = "Должность RG014"
         verbose_name_plural = "Справочник: Должности RG014"
-
+        ordering = ["description"]
     def __str__(self):
         return f"{self.code} - {self.description}"
 
@@ -173,7 +174,7 @@ class DigitalSignature(models.Model):
     issued_date = models.DateField("Дата передачи врачу", blank=True, null=True)
     revoked_date = models.DateField("Дата аннулирования", blank=True, null=True)
     scan = models.FileField(
-        "Скан ЭЦП",
+        "Скан выписки",
         upload_to=digital_signature_upload_path,
         blank=True,
         null=True
@@ -184,21 +185,32 @@ class DigitalSignature(models.Model):
         null=True
     )
     added_at = models.DateTimeField("Дата добавления", auto_now_add=True)
+    certificate_serial = models.CharField("Серийный номер сертификата", max_length=50, blank=True, default='')
+    position = models.ForeignKey('PostRG014', on_delete=models.PROTECT, verbose_name="Должность")
 
     class Meta:
         verbose_name = "ЭЦП"
         verbose_name_plural = "ЭЦП"
 
     def save(self, *args, **kwargs):
-        # Устанавливаем дату загрузки скана
+        # Если загружен скан, но поле scan_uploaded_at ещё не заполнено – заполняем его
         if self.scan and not self.scan_uploaded_at:
             self.scan_uploaded_at = datetime.now()
+
+        # Если valid_from заполнено и серийный номер ещё пуст, генерируем его по шаблону YY-MM-XXX
+        if self.valid_from and not self.certificate_serial:
+            # Двухзначный год и месяц
+            year = self.valid_from.year % 100
+            month = self.valid_from.month
+            # Подсчитываем, сколько уже существует записей с таким же valid_from (исключая текущую, если обновляем)
+            count = DigitalSignature.objects.filter(valid_from=self.valid_from).exclude(pk=self.pk).count() + 1
+            self.certificate_serial = f"{year:02d}-{month:02d}-{count:03d}"
 
         super().save(*args, **kwargs)
 
     def clean(self):
         super().clean()
-        # Проверка, если одно из полей заполнено, а другое — нет
+        # Если одно из полей valid_from/valid_to заполнено, оба должны быть
         if (self.valid_from and not self.valid_to) or (self.valid_to and not self.valid_from):
             raise ValidationError({
                 'valid_from': 'Если указано одно из полей (Действует с или Действует по), то оба должны быть заполнены.',

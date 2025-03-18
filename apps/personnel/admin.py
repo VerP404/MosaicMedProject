@@ -4,14 +4,17 @@ from datetime import date, datetime
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
 from django.http import HttpResponse, HttpResponseRedirect
+from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.contrib import messages
 from django.utils.html import format_html
 from django.shortcuts import render, redirect
+from import_export.admin import ImportExportModelAdmin
 from unfold.admin import TabularInline, ModelAdmin
 
 from .forms import *
 from .models import *
+from .resource import DigitalSignatureResource
 from ..data_loader.models.oms_data import *
 from ..organization.models import MiskauzDepartment, OMSDepartment
 
@@ -40,7 +43,8 @@ class DigitalSignatureInline(TabularInline):
     model = DigitalSignature
     extra = 0
     fields = (
-        'added_at', 'application_date', 'valid_from', 'valid_to', 'issued_date', 'scan', 'scan_uploaded_at',
+        'added_at', 'application_date', 'valid_from', 'valid_to', 'issued_date', 'certificate_serial', 'position',
+        'scan', 'scan_uploaded_at',
         'revoked_date')
     readonly_fields = ('scan_uploaded_at', 'added_at')
     verbose_name = "ЭЦП"
@@ -537,20 +541,151 @@ class StatusFilter(SimpleListFilter):
             return queryset.exclude(valid_from__lte=today, valid_to__gte=today)
 
 
+class DigitalSignatureAdminForm(forms.ModelForm):
+    class Meta:
+        model = DigitalSignature
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super(DigitalSignatureAdminForm, self).__init__(*args, **kwargs)
+        # Переопределяем ярлык для поля person на "Сотрудник"
+        if 'person' in self.fields:
+            self.fields['person'].label = "Сотрудник"
+        # Отключаем редактирование для полей, отвечающих за дату загрузки и дату добавления, если они есть в форме
+        if 'scan_uploaded_at' in self.fields:
+            self.fields['scan_uploaded_at'].disabled = True
+        if 'added_at' in self.fields:
+            self.fields['added_at'].disabled = True
+
+
+class DigitalSignatureStatusFilter(SimpleListFilter):
+    title = 'Статус ЭЦП'  # Заголовок фильтра в админке
+    parameter_name = 'ds_status'  # Параметр, по которому Django будет фильтровать
+
+    def lookups(self, request, model_admin):
+        """
+        Возвращает кортежи (value, verbose_name),
+        которые будут отображены в выпадающем списке фильтра.
+        """
+        return (
+            ('active', 'Действующий'),
+            ('revoked', 'Аннулирован'),
+            ('expired', 'Истёк'),
+            ('other', 'Прочие'),
+        )
+
+    def queryset(self, request, queryset):
+        """
+        Возвращает отфильтрованный queryset в зависимости от выбранного значения.
+        """
+        today = date.today()
+        if self.value() == 'active':
+            return queryset.filter(
+                valid_from__lte=today,
+                valid_to__gte=today,
+                revoked_date__isnull=True
+            )
+        elif self.value() == 'revoked':
+            return queryset.filter(revoked_date__isnull=False)
+        elif self.value() == 'expired':
+            return queryset.filter(
+                valid_to__lt=today,
+                revoked_date__isnull=True
+            )
+        elif self.value() == 'other':
+            # Например, если valid_from или valid_to не заданы,
+            # или любая другая нестандартная ситуация
+            return queryset.filter(
+                models.Q(valid_from__isnull=True) | models.Q(valid_to__isnull=True)
+            )
+        return queryset
+
+
 @admin.register(DigitalSignature)
-class DigitalSignatureAdmin(ModelAdmin):
-    list_display = ('person', 'valid_from', 'valid_to', 'scan', 'scan_uploaded_at', 'added_at', 'status')
-    search_fields = ('person__last_name', 'person__first_name')
-    list_filter = ('valid_from', 'valid_to', 'scan_uploaded_at', StatusFilter)
+class DigitalSignatureAdmin(ImportExportModelAdmin, ModelAdmin):
+    form = DigitalSignatureAdminForm
+    resource_class = DigitalSignatureResource
+    autocomplete_fields = ['person', 'position']
+    readonly_fields = ('scan_uploaded_at', 'added_at')
+    list_display = (
+        'person',
+        'valid_from',
+        'valid_to',
+        'certificate_serial',
+        'position',
+        'status',
+        'has_scan'
+    )
+    list_filter = ('valid_from', 'valid_to', DigitalSignatureStatusFilter)
+
+    fieldsets = (
+        ("Основные данные", {
+            "classes": ("two-columns",),
+            "fields": ('person', 'certificate_serial', 'position'),
+        }),
+        ("Даты", {
+            "classes": ("two-columns",),
+            "fields": ('application_date', 'valid_from', 'valid_to', 'issued_date', 'revoked_date'),
+        }),
+        ("Файл выписки для получения ЭЦП", {
+            "classes": ("two-columns",),
+            "fields": ('scan', 'scan_uploaded_at', 'added_at'),
+        }),
+    )
+
+    def get_export_form(self):
+        return ExportFilterForm
+
+    def get_export_queryset(self, request):
+        qs = super().get_export_queryset(request)
+
+        export_all = request.POST.get('export_all') or request.GET.get('export_all')
+        export_date_str = request.POST.get('export_date') or request.GET.get('export_date')
+
+        if export_all:
+            # Пользователь отметил «Экспортировать все записи»
+            return qs
+
+        if export_date_str:
+            from datetime import date
+            try:
+                chosen_date = date.fromisoformat(export_date_str)
+            except ValueError:
+                chosen_date = date.today()
+
+            qs = qs.filter(
+                valid_from__lte=chosen_date,
+                valid_to__gte=chosen_date,
+                revoked_date__isnull=True
+            )
+        return qs
+
+    def has_import_permission(self, request):
+        return False
+
+    def get_import_formats(self):
+        return []
 
     def status(self, obj):
         today = date.today()
-        if obj.valid_from <= today <= obj.valid_to:
+        # 1) Если сертификат аннулирован или срок действия истёк:
+        if obj.revoked_date or (obj.valid_to and obj.valid_to < today):
+            return format_html('<span style="color: blue;">—</span>')
+        # 2) Если действующий (сегодняшняя дата в пределах valid_from и valid_to):
+        if obj.valid_from and obj.valid_to and obj.valid_from <= today <= obj.valid_to:
+            return format_html('<span style="color: green;">✔</span>')
+        # 3) Иначе считаем недействующим
+        return format_html('<span style="color: red;">✘</span>')
+
+    status.short_description = 'Статус'
+
+    def has_scan(self, obj):
+        if obj.scan:
             return format_html('<span style="color: green;">✔</span>')
         else:
             return format_html('<span style="color: red;">✘</span>')
 
-    status.short_description = 'Статус'
+    has_scan.short_description = 'Скан'
 
 
 @admin.register(DoctorReportingRecord)

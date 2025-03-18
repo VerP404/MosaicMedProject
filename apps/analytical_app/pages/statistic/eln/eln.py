@@ -100,7 +100,7 @@ eln_layout = html.Div(
                                                                     dcc.DatePickerSingle(
                                                                         id=f"date-picker-end-{type_page}",
                                                                         first_day_of_week=1,
-                                                                        date=datetime.now().date() - timedelta(days=1),
+                                                                        date=datetime.now().date(),
                                                                         display_format="DD.MM.YYYY",
                                                                         className="mt-1"
                                                                     )
@@ -395,9 +395,9 @@ def update_tables(start_date, end_date, tvsp_values, status_values, first_value,
 
     if row and row[0]:
         # row[0] – это datetime
-        last_updated_str = row[0].strftime("Дата обновления: %d.%m.%Y %H:%M")
+        last_updated_str = row[0].strftime("Обновлено: %d.%m.%Y %H:%M")
     else:
-        last_updated_str = "Дата обновления: Нет данных"
+        last_updated_str = "Обновлено: Нет данных"
 
     return columns, data, columns1, data1, columns2, data2, last_updated_str
 
