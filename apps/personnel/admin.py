@@ -6,12 +6,13 @@ from django.urls import path
 from django.contrib import messages
 from django.utils.html import format_html
 from django.shortcuts import render, redirect
+from import_export import resources
 from import_export.admin import ImportExportModelAdmin
 from unfold.admin import TabularInline, ModelAdmin
 
 from .forms import *
 from .models import *
-from .resource import DigitalSignatureResource
+from .resource import DigitalSignatureResource, PostRG014Resource
 from ..data_loader.models.oms_data import *
 from ..organization.models import MiskauzDepartment, OMSDepartment
 
@@ -514,9 +515,15 @@ class SpecialtyRG014Admin(ModelAdmin):
 
 
 @admin.register(PostRG014)
-class PostRG014Admin(ModelAdmin):
+class PostRG014Admin(ImportExportModelAdmin, ModelAdmin):
+    resource_class = PostRG014Resource
     list_display = ('code', 'description')
     search_fields = ('code', 'description')
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['title'] = "Должности медицинских и фармацевтических работников (1.2.643.5.1.13.13.11.1002)"
+        return super().changelist_view(request, extra_context=extra_context)
 
 
 # Определяем кастомный фильтр

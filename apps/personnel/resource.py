@@ -1,6 +1,6 @@
 from import_export import resources, fields
-from import_export.widgets import DateWidget
-from .models import DigitalSignature
+from import_export.widgets import DateWidget, CharWidget
+from .models import DigitalSignature, PostRG014
 
 
 class DigitalSignatureResource(resources.ModelResource):
@@ -54,3 +54,25 @@ class DigitalSignatureResource(resources.ModelResource):
 
     def dehydrate_usage_purpose(self, obj):
         return getattr(obj, 'usage_purpose', None) or "Работа в МИС - подписание ЭМД"
+
+
+class PostRG014Resource(resources.ModelResource):
+    code = fields.Field(
+        column_name='code',
+        attribute='code',
+        widget=CharWidget()
+    )
+    description = fields.Field(
+        column_name='description',
+        attribute='description',
+        widget=CharWidget()
+    )
+
+    class Meta:
+        model = PostRG014
+        # именно 'code' используем в качестве поля-идентификатора
+        import_id_fields = ('code',)
+        # указываем, какие поля хотим импортировать/экспортировать
+        fields = ('code', 'description')
+        skip_unchanged = True
+        report_skipped = True
