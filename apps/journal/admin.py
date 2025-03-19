@@ -192,6 +192,7 @@ class AppealAdmin(ModelAdmin):
             'сегодня срок ответа': 'blue',
             'просрочено': 'red',
             'отработано': 'green',
+            'отработано с просрочкой': 'purple',
         }
         color = color_map.get(obj.status, 'black')
         return format_html(

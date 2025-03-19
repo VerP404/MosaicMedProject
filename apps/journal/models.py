@@ -104,6 +104,7 @@ class Appeal(models.Model):
         ('сегодня срок ответа', 'Сегодня срок ответа'),
         ('просрочено', 'Просрочено'),
         ('отработано', 'Отработано'),
+        ('отработано с просрочкой', 'Отработано с просрочкой'),
     ]
     applicant = models.ForeignKey(
         Person,
@@ -120,7 +121,7 @@ class Appeal(models.Model):
     # Статус вычисляется автоматически и не редактируется вручную
     status = models.CharField(
         "Статус",
-        max_length=20,
+        max_length=30,
         choices=STATUS_CHOICES,
         editable=False,
         default='не распределено'
@@ -182,6 +183,11 @@ class Appeal(models.Model):
           - В остальных случаях – 'в работе'
         """
         today = timezone.now().date()
+        if self.answer_date:
+            # Если дата ответа позже дедлайна, возвращаем "отработано с просрочкой"
+            if self.response_deadline and self.answer_date > self.response_deadline:
+                return "отработано с просрочкой"
+            return "отработано"
         if self.answer_date:
             return "отработано"
         # Проверка наличия обязательных параметров

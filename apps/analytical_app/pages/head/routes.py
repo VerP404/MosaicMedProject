@@ -16,6 +16,7 @@ from apps.analytical_app.pages.head.dispensary.reproductive.main import head_rep
 from apps.analytical_app.pages.head.dispensary.reproductive.tab1 import reproductive_dr1
 from apps.analytical_app.pages.head.dispensary.reproductive.tab2 import reproductive_dr2
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
+from apps.analytical_app.pages.head.journal.journal import layout_journal
 from apps.analytical_app.pages.head.main import head_main
 from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapova
 
@@ -55,6 +56,13 @@ routes_head = {
             {"label": "131 форма", "active": True},
         ]),
         dispensary_reports
+    ]),
+    "/head/journal": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Журнал обращений", "active": True},
+        ]),
+        layout_journal
     ]),
     "/head/adults": html.Div([
         dbc.Breadcrumb(items=[

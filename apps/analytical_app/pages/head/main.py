@@ -35,6 +35,9 @@ cards_2 = dbc.Row(
         dbc.Col(create_card(7, type_page,
                             "- Диспансерное наблюдение",
                             "-")),
+        dbc.Col(create_card(8, type_page,
+                            "Обращения граждан",
+                            "Дашборд обращений граждан")),
     ],
     className="mb-4 align-items-stretch",
 )
@@ -59,10 +62,12 @@ head_main = html.Div([
      Input(f'open-report-5-{type_page}', 'n_clicks'),
      Input(f'open-report-6-{type_page}', 'n_clicks'),
      Input(f'open-report-7-{type_page}', 'n_clicks'),
+     Input(f'open-report-8-{type_page}', 'n_clicks'),
      ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_6, open_report_7):
+def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_6,
+                   open_report_7, open_report_8):
     ctx = callback_context
     if not ctx.triggered:
         return no_update, no_update
@@ -88,7 +93,8 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
             new_segment = "dispensary-reports"
         elif button_id == f'open-report-7-{type_page}' and open_report_7:
             new_segment = "dispensary-reports"
-
+        elif button_id == f'open-report-8-{type_page}' and open_report_8:
+            new_segment = "journal"
         if new_segment:
             # Добавляем новый сегмент к текущему маршруту
             new_path = f'{current_path}/{new_segment}'
@@ -96,4 +102,3 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, o
             return new_path, breadcrumb_items
 
     return no_update, no_update
-
