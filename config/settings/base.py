@@ -153,3 +153,5 @@ relative_dagster_home = os.getenv('DAGSTER_HOME', 'mosaic_conductor/dagster_home
 absolute_dagster_home = BASE_DIR / relative_dagster_home
 # Обновляем переменную окружения
 os.environ['DAGSTER_HOME'] = str(absolute_dagster_home)
+# для работы с дагстером загрузки в базу данных
+ORGANIZATIONS = os.environ.get('ORGANIZATIONS', 'МозаикаМед')
