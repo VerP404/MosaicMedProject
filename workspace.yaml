@@ -1,0 +1,4 @@
+load_from:
+  - python_package: mosaic_conductor.etl.definitions
+  - python_package: mosaic_conductor.update.definitions
+  - python_package: mosaic_conductor.mosaic_conductor.definitions

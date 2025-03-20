@@ -1,3 +1,3 @@
-from mosaic_conductor import assets
+from mosaic_conductor.update import assets
 
 defs = assets.defs
