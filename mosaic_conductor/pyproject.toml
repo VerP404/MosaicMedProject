@@ -1,0 +1,27 @@
+[project]
+name = "mosaic_conductor"
+version = "0.1.0"
+description = "МозаикаМед"
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+    "dagster",
+    "dagster-cloud",
+]
+
+[project.optional-dependencies]
+dev = [
+    "dagster-webserver", 
+    "pytest",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.dagster]
+module_name = "mosaic_conductor.definitions"
+code_location_name = "mosaic_conductor"
+
+[tool.setuptools.packages.find]
+exclude=["mosaic_conductor_tests"]
