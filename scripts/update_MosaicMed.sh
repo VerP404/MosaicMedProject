@@ -25,8 +25,10 @@ python3.12 manage.py data_import
 pkill -f 'python3.12 manage.py runserver'
 pkill -f 'python3.12 apps/analytical_app/index.py'
 pkill -f 'python3.12 apps/chief_app/main.py'
+pkill -f 'python3.12 start_dagster.py --host 0.0.0.0 --port 3000'
 
 # Перезапуск серверов в фоне
 nohup python3.12 manage.py runserver 0.0.0.0:8000 &
 nohup python3.12 apps/analytical_app/index.py &
 nohup python3.12 apps/chief_app/main.py &
+nohup python3.12 start_dagster.py --host 0.0.0.0 --port 3000 &

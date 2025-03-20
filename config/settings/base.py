@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'channels',
     'rest_framework',
 
-
 ]
 
 MIDDLEWARE = [
@@ -146,3 +145,11 @@ EXPORT_RESOURCE_FIELDS = True
 
 # При импорте/экспорте в транзакции
 IMPORT_EXPORT_USE_TRANSACTIONS = True
+
+# Настройка Дагстер.
+# Получаем значение из .env (относительный путь)
+relative_dagster_home = os.getenv('DAGSTER_HOME', 'mosaic_conductor/dagster_home')
+# Преобразуем его в абсолютный путь
+absolute_dagster_home = BASE_DIR / relative_dagster_home
+# Обновляем переменную окружения
+os.environ['DAGSTER_HOME'] = str(absolute_dagster_home)
