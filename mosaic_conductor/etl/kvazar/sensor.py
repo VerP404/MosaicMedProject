@@ -7,7 +7,7 @@ from dagster import sensor, RunRequest, SkipReason
 
 from config.settings import ORGANIZATIONS
 from mosaic_conductor.etl.kvazar import kvazar_job_eln, kvazar_job_emd, kvazar_job_recipes, kvazar_job_death, \
-    kvazar_job_reference
+    kvazar_job_reference, iszl_job_dn
 
 MIN_FILE_AGE_SECONDS = 60
 
@@ -162,7 +162,7 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
 kvazar_sensor_eln = create_sensor(
     kvazar_job_eln,
     "kvazar_sensor_eln",
-    "Листки нетрудоспособности",
+    "Квазар: Листки нетрудоспособности",
     "mosaic_conductor/etl/data/kvazar/eln",
     "load_data_sick_leave_sheets",
     "mosaic_conductor/etl/config/mapping.json"
@@ -171,7 +171,7 @@ kvazar_sensor_eln = create_sensor(
 kvazar_sensor_emd = create_sensor(
     kvazar_job_emd,
     "kvazar_sensor_emd",
-    "Журнал ЭМД",
+    "Квазар: Журнал ЭМД",
     "mosaic_conductor/etl/data/kvazar/emd",
     "load_data_emd",
     "mosaic_conductor/etl/config/mapping.json"
@@ -180,7 +180,7 @@ kvazar_sensor_emd = create_sensor(
 kvazar_sensor_recipes = create_sensor(
     kvazar_job_recipes,
     "kvazar_sensor_recipes",
-    "Выписка рецептов",
+    "Квазар: Выписка рецептов",
     "mosaic_conductor/etl/data/kvazar/recipe",
     "load_data_recipes",
     "mosaic_conductor/etl/config/mapping.json"
@@ -189,7 +189,7 @@ kvazar_sensor_recipes = create_sensor(
 kvazar_sensor_death = create_sensor(
     kvazar_job_death,
     "kvazar_sensor_death",
-    "Смертность",
+    "Квазар: Смертность",
     "mosaic_conductor/etl/data/kvazar/death",
     "load_data_death",
     "mosaic_conductor/etl/config/mapping.json"
@@ -198,8 +198,17 @@ kvazar_sensor_death = create_sensor(
 kvazar_sensor_reference = create_sensor(
     kvazar_job_reference,
     "kvazar_sensor_reference",
-    "Справки",
+    "Квазар: Справки",
     "mosaic_conductor/etl/data/kvazar/reference",
     "load_data_reference",
+    "mosaic_conductor/etl/config/mapping.json"
+)
+
+iszl_sensor_dn = create_sensor(
+    iszl_job_dn,
+    "iszl_sensor_dn",
+    "ИСЗЛ: Население",
+    "mosaic_conductor/etl/data/iszl/dn",
+    "load_data_dispansery_iszl",
     "mosaic_conductor/etl/config/mapping.json"
 )

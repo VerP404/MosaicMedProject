@@ -28,7 +28,7 @@ def create_job(job_name, table_name, data_folder):
                 "kvazar_extract": {
                     "config": {
                         "mapping_file": "mosaic_conductor/etl/config/mapping.json",
-                        "data_folder": f"mosaic_conductor/etl/data/kvazar/{data_folder}",
+                        "data_folder": f"mosaic_conductor/etl/data/{data_folder}",
                         "table_name": table_name
                     }
                 },
@@ -41,7 +41,7 @@ def create_job(job_name, table_name, data_folder):
                 "kvazar_load": {
                     "config": {
                         "table_name": table_name,
-                        "data_folder": f"mosaic_conductor/etl/data/kvazar/{data_folder}",
+                        "data_folder": f"mosaic_conductor/etl/data/{data_folder}",
                         "mapping_file": "mosaic_conductor/etl/config/mapping.json"
                     }
                 }
@@ -58,8 +58,10 @@ def create_job(job_name, table_name, data_folder):
 
 
 # Создание джобов с помощью конструктора
-kvazar_job_eln = create_job("kvazar_job_eln", "load_data_sick_leave_sheets", "eln")
-kvazar_job_emd = create_job("kvazar_job_emd", "load_data_emd", "emd")
-kvazar_job_recipes = create_job("kvazar_job_recipes", "load_data_recipes", "recipe")
-kvazar_job_death = create_job("kvazar_job_death", "load_data_death", "death")
-kvazar_job_reference = create_job("kvazar_job_reference", "load_data_reference", "reference")
+kvazar_job_eln = create_job("kvazar_job_eln", "load_data_sick_leave_sheets", "kvazar/eln")
+kvazar_job_emd = create_job("kvazar_job_emd", "load_data_emd", "kvazar/emd")
+kvazar_job_recipes = create_job("kvazar_job_recipes", "load_data_recipes", "kvazar/recipe")
+kvazar_job_death = create_job("kvazar_job_death", "load_data_death", "kvazar/death")
+kvazar_job_reference = create_job("kvazar_job_reference", "load_data_reference", "kvazar/reference")
+
+iszl_job_dn = create_job("iszl_job_dn", "load_data_dispansery_iszl", "iszl/dn")

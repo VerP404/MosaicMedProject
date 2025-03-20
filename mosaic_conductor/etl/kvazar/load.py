@@ -7,14 +7,20 @@ from mosaic_conductor.etl.common.universal_load import load_dataframe
 
 
 def clear_data_folder(data_folder):
-    # Получаем список всех файлов в папке
-    files = glob.glob(os.path.join(data_folder, '*'))
-    for file in files:
+    # Получаем список всех элементов в папке
+    items = os.listdir(data_folder)
+    for item in items:
+        path = os.path.join(data_folder, item)
+        # Пропускаем подкаталоги (включая error_files)
+        if os.path.isdir(path):
+            continue
+
+        # Пытаемся удалить файл
         try:
-            os.remove(file)
-            print(f"Удалён файл: {file}")
+            os.remove(path)
+            print(f"Удалён файл: {path}")
         except Exception as e:
-            print(f"Не удалось удалить {file}: {e}")
+            print(f"Не удалось удалить {path}: {e}")
 
 
 def kvazar_sql_generator(data, table_name, mapping_file):

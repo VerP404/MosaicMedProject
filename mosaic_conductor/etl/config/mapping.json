@@ -370,6 +370,60 @@
       ],
       "encoding": "cp1251",
       "delimiter": ";"
+    },
+    "load_data_dispansery_iszl": {
+      "file": {
+        "file_pattern": "Report*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "pID": "pid",
+        "ldwID": "ldwid",
+        "pdwID": "pdwid",
+        "FIO": "fio",
+        "DR": "dr",
+        "DS": "ds",
+        "DateBegin": "date_begin",
+        "DateEnd": "date_end",
+        "idReason": "id_reason",
+        "nameReason": "name_reason",
+        "PlanMonth": "plan_month",
+        "PlanYear": "plan_year",
+        "FAM_D": "fam_d",
+        "IM_D": "im_d",
+        "OT_D": "ot_d",
+        "SS_D": "ss_d",
+        "SPEC_D": "spec_d",
+        "SpecV015": "spec_v015",
+        "DateInfo": "date_info",
+        "WayInfo": "way_info",
+        "ResInfo": "res_info",
+        "FactDN": "fact_dn",
+        "RezultDN": "rezult_dn",
+        "ADR": "adr",
+        "ENP": "enp",
+        "LPU": "lpu",
+        "FIO_DOCTOR": "fio_doctor",
+        "SS_DOCTOR": "ss_doctor",
+        "LPUUCH": "lpuuch",
+        "SMO": "smo",
+        "LPUAUTO": "lpuauto",
+        "LPUDT": "lpudt",
+        "UserUpdateList": "user_update_list",
+        "DateUpdateList": "date_update_list",
+        "UserUpdatePlan": "user_update_plan",
+        "DateUpdatePlan": "date_update_plan",
+        "PeriodW": "period_w",
+        "DatePrev": "date_prev",
+        "PlaceW": "place_w",
+        "w": "w",
+        "UNEMP": "unemp"
+      },
+      "column_check": [
+        "pid"
+      ],
+      "encoding": "cp1251",
+      "delimiter": ";"
     }
   }
 }

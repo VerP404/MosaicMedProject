@@ -28,5 +28,10 @@ def create_folders():
                 print(f"Папка уже существует: {subfolder_path}")
 
 
+def pr():
+    os.path.join(os.getcwd(), 'data')
+
+
 if __name__ == "__main__":
     create_folders()
+    # pr()

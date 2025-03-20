@@ -1,3 +1,4 @@
+import datetime
 import os
 import json
 import fnmatch
@@ -70,12 +71,27 @@ def universal_extract(
     # Читаем CSV с использованием параметров из маппинга
     encoding = table_config.get("encoding", "utf-8")
     delimiter = table_config.get("delimiter", ",")
-    df = pd.read_csv(
-        file_path,
-        encoding=encoding,
-        delimiter=delimiter,
-        dtype=str
-    )
+    try:
+        df = pd.read_csv(file_path, encoding=encoding, delimiter=delimiter, dtype=str)
+    except pd.errors.ParserError as e:
+        # Если CSV битый — переносим в папку ошибок
+        context.log.error(f"Файл {file_path} битый (ParserError): {e}")
+
+        # Формируем название с датой/временем
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+        error_file_name = f"{now_str}_{matched_file}"
+
+        # Создаём папку "error_files" (или "error") внутри data_folder
+        error_folder = os.path.join(data_folder, "error_files")
+        if not os.path.exists(error_folder):
+            os.makedirs(error_folder)
+
+        error_file_path = os.path.join(error_folder, error_file_name)
+        os.rename(file_path, error_file_path)
+
+        context.log.info(f"Файл перемещён в {error_file_path}")
+        # Останавливаем шаг (если хотим зафейлить)
+        raise
 
     text_value = f"📥 Загружено {len(df)} строк из {matched_file}"
     context.log.info(text_value)
