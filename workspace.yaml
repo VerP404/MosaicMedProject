@@ -1,4 +1,10 @@
 load_from:
-  - python_package: mosaic_conductor.etl.definitions
-  - python_package: mosaic_conductor.update.definitions
-  - python_package: mosaic_conductor.mosaic_conductor.definitions
+  - python_package:
+      package_name: mosaic_conductor.etl.definitions
+      location_name: "ETL: Загрузка данных"
+  - python_package:
+      package_name: mosaic_conductor.update.definitions
+      location_name: "Обновления"
+  - python_package:
+      package_name: mosaic_conductor.mosaic_conductor.definitions
+      location_name: "Основное приложение"
