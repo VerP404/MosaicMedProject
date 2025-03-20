@@ -18,6 +18,9 @@ pip install -r requirements\base.txt
 rem Выполнение миграций
 python manage.py migrate
 
+rem Создание папок для файлов с данными
+python manage.py mosaic_conductor\etl\create_folders.py
+
 rem Импорт данных из JSON
 python manage.py data_import
 

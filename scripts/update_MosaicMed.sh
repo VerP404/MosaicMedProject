@@ -21,6 +21,9 @@ python3.12 manage.py migrate
 # Импорт данных из JSON
 python3.12 manage.py data_import
 
+#Создание папок для файлов с данными
+python3.12 mosaic_conductor/etl/create_folders.py
+
 # Остановка текущих процессов
 pkill -f 'python3.12 manage.py runserver'
 pkill -f 'python3.12 apps/analytical_app/index.py'

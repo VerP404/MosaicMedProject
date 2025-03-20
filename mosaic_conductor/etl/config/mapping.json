@@ -1,0 +1,375 @@
+{
+  "tables": {
+    "load_data_talons": {
+      "file": {
+        "file_pattern": "journal_20*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "Талон": "talon",
+        "Источник": "source",
+        "Статус": "status",
+        "Цель": "goal",
+        "Пациент": "patient",
+        "Дата рождения": "birth_date",
+        "Пол": "gender",
+        "Код СМО": "smo_code",
+        "ЕНП": "enp",
+        "Начало лечения": "treatment_start",
+        "Окончание лечения": "treatment_end",
+        "Врач": "doctor",
+        "Врач (Профиль МП)": "doctor_profile",
+        "Специальность": "specialty",
+        "Подразделение": "department",
+        "Посещения": "visits",
+        "Посещения в МО": "mo_visits",
+        "Посещения на Дому": "home_visits",
+        "Диагноз основной (DS1)": "main_diagnosis",
+        "Сопутствующий диагноз (DS2)": "additional_diagnosis",
+        "Первоначальная дата ввода": "initial_input_date",
+        "Дата последнего изменения": "last_change_date",
+        "Сумма": "amount",
+        "Санкции": "sanctions",
+        "КСГ": "ksg",
+        "Отчетный период выгрузки": "report_period"
+      },
+      "column_check": [
+        "talon",
+        "source"
+      ],
+      "encoding": "utf-8",
+      "delimiter": ";"
+    },
+    "load_data_doctordata": {
+      "file": {
+        "file_pattern": "journal_doctor*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "СНИЛС": "snils",
+        "Код врача": "doctor_code",
+        "Фамилия": "last_name",
+        "Имя": "first_name",
+        "Отчество": "middle_name",
+        "Дата рождения": "birth_date",
+        "Пол": "gender",
+        "Дата начала работы": "start_date",
+        "Дата окончания работы": "end_date",
+        "Структурное подразделение": "department",
+        "Код профиля медпомощи": "medical_profile_code",
+        "Код специальности": "specialty_code",
+        "Код отделения": "department_code",
+        "Комментарий": "comment"
+      },
+      "column_check": [
+        "snils",
+        "doctor_code"
+      ],
+      "encoding": "utf-8",
+      "delimiter": ";"
+    },
+    "load_data_detaileddata": {
+      "file": {
+        "file_pattern": "journal_deta*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "Номер талона": "talon_number",
+        "Счет": "account_number",
+        "Дата выгрузки": "upload_date",
+        "Статус": "status",
+        "МО": "mo",
+        "Дата начала": "start_date",
+        "Дата окончания": "end_date",
+        "Серия полиса": "policy_series",
+        "Номер полиса": "policy_number",
+        "ЕНП": "enp",
+        "Фамилия": "last_name",
+        "Имя": "first_name",
+        "Отчество": "middle_name",
+        "Страховая организация": "insurance_org",
+        "Пол": "gender",
+        "Дата рождения": "birth_date",
+        "Тип талона": "talon_type",
+        "Основной диагноз": "main_diagnosis",
+        "Сопутствующий диагноз": "additional_diagnosis",
+        "Группа здоровья": "health_group",
+        "Доктор (Код)": "doctor_code",
+        "Доктор (ФИО)": "doctor_name",
+        "Стоимость": "cost",
+        "Название услуги": "service_name",
+        "Номенклатурный код услуги": "service_code",
+        "Доктор-Услуги (Код)": "service_doctor_code",
+        "Доктор-Услуги (ФИО)": "service_doctor_name",
+        "Дата-Услуги": "service_date",
+        "Статус-Услуги": "service_status",
+        "Маршрут": "route",
+        "Подразделение врача-Услуги": "service_department",
+        "Код МО (при оказ.услуги в другой МО)": "external_mo_code"
+      },
+      "column_check": [
+        "talon_number",
+        "service_code"
+      ],
+      "encoding": "utf-8",
+      "delimiter": ";"
+    },
+    "load_data_sick_leave_sheets": {
+      "file": {
+        "file_pattern": "ЛН_*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "Номер": "number",
+        "ЭЛН": "eln",
+        "Дубликат": "duplicate",
+        "Статус": "status",
+        "Статус ФСС": "fss_status",
+        "Дата выдачи": "issue_date",
+        "Первичный": "first",
+        "Предыдущий ЛН": "previous_ln",
+        "Следущий ЛН": "next_ln",
+        "Фамилия пациента": "patient_last_name",
+        "Имя пациента": "patient_first_name",
+        "Отчество пациента": "patient_middle_name",
+        "Дата рождения": "birth_date",
+        "Пол": "gender",
+        "СНИЛС": "snils",
+        "Возраст": "age",
+        "Место работы": "workplace",
+        "Код причины нетрудоспособности": "incapacity_reason_code",
+        "МКБ": "mkb",
+        "Период нетрудоспособности: дата начала": "incapacity_start_date",
+        "Период нетрудоспособности: дата окончания": "incapacity_end_date",
+        "Количество дней": "days_count",
+        "ТВСП": "tvsp",
+        "Выдавший врач": "issuing_doctor",
+        "Закрывший врач": "closing_doctor",
+        "Дата закрытия": "closing_date",
+        "№ истории болезни": "history_number",
+        "Уход за больными": "patient_care"
+      },
+      "column_check": [
+        "number"
+      ],
+      "encoding": "cp1251",
+      "delimiter": ";"
+    },
+    "data_loader_omsdata": {
+      "file": {
+        "file_pattern": "journal_20*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "Талон": "talon",
+        "Источник": "source",
+        "ID источника": "source_id",
+        "Номер счёта": "account_number",
+        "Дата выгрузки": "upload_date",
+        "Тип файла": "cancellation_reason",
+        "Статус": "status",
+        "Тип талона": "talon_type",
+        "Цель": "goal",
+        "Фед. цель": "federal_goal",
+        "Пациент": "patient",
+        "Дата рождения": "birth_date",
+        "Возраст": "age",
+        "Пол": "gender",
+        "Полис": "policy",
+        "Код СМО": "smo_code",
+        "Страховая": "insurance",
+        "ЕНП": "enp",
+        "Начало лечения": "treatment_start",
+        "Окончание лечения": "treatment_end",
+        "Врач": "doctor",
+        "Врач (Профиль МП)": "doctor_profile",
+        "Должность мед.персонала (V021)": "staff_position",
+        "Подразделение": "department",
+        "Условия оказания помощи": "care_conditions",
+        "Вид мед. помощи": "medical_assistance_type",
+        "Тип заболевания": "disease_type",
+        "Характер основного заболевания": "main_disease_character",
+        "Посещения": "visits",
+        "Посещения в МО": "mo_visits",
+        "Посещения на Дому": "home_visits",
+        "Случай": "case_code",
+        "Диагноз основной (DS1)": "main_diagnosis",
+        "Сопутствующий диагноз (DS2)": "additional_diagnosis",
+        "Профиль МП": "mp_profile",
+        "Профиль койки": "bed_profile",
+        "Диспансерное наблюдение": "dispensary_monitoring",
+        "Специальность": "specialty",
+        "Исход": "outcome",
+        "Результат": "result",
+        "Оператор": "operator",
+        "Первоначальная дата ввода": "initial_input_date",
+        "Дата последнего изменения": "last_change_date",
+        "Тариф": "tariff",
+        "Сумма": "amount",
+        "Оплачено": "paid",
+        "Тип оплаты": "payment_type",
+        "Санкции": "sanctions",
+        "КСГ": "ksg",
+        "КЗ": "kz",
+        "Код схемы лекарственной терапии": "therapy_schema_code",
+        "УЕТ": "uet",
+        "Классификационный критерий": "classification_criterion",
+        "ШРМ": "shrm",
+        "МО, направившая": "directing_mo",
+        "Код способа оплаты": "payment_method_code",
+        "Новорожденный": "newborn",
+        "Представитель": "representative",
+        "Доп. инф. о статусе талона": "additional_status_info",
+        "КСЛП": "kslp",
+        "Источник оплаты": "payment_source",
+        "Отчетный период выгрузки": "report_period"
+      },
+      "column_check": [
+        "talon",
+        "source"
+      ],
+      "encoding": "utf-8",
+      "delimiter": ";"
+    },
+    "load_data_emd": {
+      "file": {
+        "file_pattern": "Журнал ЭМД*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "ИД": "epmd_id",
+        "ИД исходного ЭПМЗ": "original_epmz_id",
+        "Дата документа": "document_date",
+        "Тип документа": "document_type",
+        "Врач": "doctor",
+        "Обособленное подразделение": "branch",
+        "Подразделение": "subdivision",
+        "Пациент": "patient",
+        "Дата формирования электронного документа": "formation_date",
+        "Наличие подписи врача": "doctor_signature",
+        "Наличие подписи МО": "organization_signature",
+        "Дата отправки в РИР.РЭМД": "sending_date",
+        "Статус отправки в РИР.РЭМД": "sending_status",
+        "Регистрационный номер": "registration_number",
+        "Детали статуса отправки": "status_details"
+      },
+      "column_check": [
+        "epmd_id"
+      ],
+      "encoding": "cp1251",
+      "delimiter": ";"
+    },
+    "load_data_recipes": {
+      "file": {
+        "file_pattern": "Рецепты *",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "Номер": "number",
+        "Серия": "series",
+        "Тип рецепта": "recipe_type",
+        "Дата": "date",
+        "ЭЦП": "digital_signature",
+        "Владелец подписи": "signature_owner",
+        "Организация": "organization",
+        "Подразделение": "subdivision",
+        "статус отправки РИР/ФАРМ": "sending_status_rir_farm",
+        "Дополнительная информация по статусу отправки в РИР": "additional_status_info_rir",
+        "Статус": "status",
+        "Дата изменения статуса": "status_change_date",
+        "Автор статуса": "status_author",
+        "1ЭР (статус отправки)": "first_er_status",
+        "Верификация ЭМД": "emd_verification",
+        "Статус отправки в РЭМД": "sending_status_remd",
+        "Дополнительная информация по статусу отправки в РЭМД": "additional_status_info_remd",
+        "Срок действия": "validity_period",
+        "Ф.И.О. пациента": "patient_full_name",
+        "Дата рождения пациента": "patient_birth_date",
+        "СНИЛС пациента": "patient_snils",
+        "Код диагноза": "diagnosis_code",
+        "Название диагноза": "diagnosis_name",
+        "Название льготной категории": "benefit_category_name",
+        "Тип льготной категории": "benefit_category_type",
+        "Источник финансирования": "financing_source",
+        "Ф.И.О. врача": "doctor_full_name",
+        "Должность врача": "doctor_position",
+        "Лекарственный препарат": "medicinal_product",
+        "ТРН": "trn",
+        "МНН": "inn",
+        "Кол-во/Всего назначено": "quantity_total_prescribed",
+        "Процент оплаты": "payment_percentage"
+      },
+      "column_check": [
+        "number"
+      ],
+      "encoding": "cp1251",
+      "delimiter": ";"
+    },
+    "load_data_death": {
+      "file": {
+        "file_pattern": "Смертность*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "Серия": "series",
+        "Номер": "number",
+        "ИСПОРЧЕНО": "damaged",
+        "Дубликат": "duplicate",
+        "Перинатальная": "perinatal",
+        "Дата выдачи": "issue_date",
+        "Тип": "mortality_type",
+        "Дата отправки ЭМД": "emd_sending_date",
+        "Статус отправки ЭМД": "emd_sending_status",
+        "ЭМД ошибка": "emd_error",
+        "Создавший": "creator",
+        "Врач": "doctor",
+        "ФИО умершего(ей)": "deceased_full_name",
+        "Дата рождения": "birth_date",
+        "Дата смерти": "death_date",
+        "Пол": "gender",
+        "Возраст,лет": "age",
+        "Первоначальная (статистика)": "initial_statistic",
+        "Причина (а)": "reason_a",
+        "Причина (б)": "reason_b",
+        "Причина (в)": "reason_c",
+        "Причина (г)": "reason_d",
+        "Регион": "region",
+        "Район": "district",
+        "Город / Населенный пункт": "city_or_locality",
+        "Улица": "street",
+        "Дом": "house",
+        "Квартира": "apartment",
+        "Прикрепление": "attachment"
+      },
+      "column_check": [
+        "series",
+        "number"
+      ],
+      "encoding": "cp1251",
+      "delimiter": ";"
+    },
+    "load_data_reference": {
+      "file": {
+        "file_pattern": "Справки*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "Серия и номер справки": "series_number",
+        "Дата выдачи": "issue_date",
+        "ФИО": "full_name",
+        "Дата рождения": "birth_date",
+        "Врач": "doctor",
+        "Организация выдавшая документ": "organization",
+        "Вид справки": "reference_type",
+        "Заключение": "conclusion",
+        "Статус": "status",
+        "Ошибки по справке": "errors"
+      },
+      "column_check": [
+        "series_number"
+      ],
+      "encoding": "cp1251",
+      "delimiter": ";"
+    }
+  }
+}
