@@ -3,8 +3,8 @@ from dagster import job
 from config.settings import ORGANIZATIONS
 from .db_check import kvazar_db_check
 from .extract import kvazar_extract
-from .transform import kvazar_transform
 from .load import kvazar_load
+from .transform import kvazar_transform
 
 kvazar_assets = [
     kvazar_db_check,
@@ -12,10 +12,6 @@ kvazar_assets = [
     kvazar_transform,
     kvazar_load
 ]
-
-
-def kvazar_load(transform_result):
-    pass
 
 
 def create_job(job_name, table_name, data_folder, mapping_file="mapping.json"):
