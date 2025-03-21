@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 from dash import html, dcc, Output, Input, State
 import dash_bootstrap_components as dbc
+import pandas as pd
 from sqlalchemy import text
-
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import get_selected_dates, TableUpdater
 from apps.analytical_app.elements import card_table
@@ -252,6 +252,14 @@ eln_layout = html.Div(
                     card_table(f"result-table2-{type_page}", "По пациентам", 15),
                     label="По пациентам"
                 ),
+                dbc.Tab(
+                    html.Div([
+                        card_table(f"result-table3-{type_page}", "Годовой анализ первичных больничных", 15),
+                        html.Br(),
+                        card_table(f"result-table4-{type_page}", "Помесячный анализ первичных больничных", 15)
+                    ]),
+                    label="Анализ по периодам"
+                ),
             ]
         ),
     ],
@@ -317,7 +325,11 @@ def enforce_mutually_exclusive_reason(selected_values):
         Output(f"result-table1-{type_page}", "data"),
         Output(f"result-table2-{type_page}", "columns"),
         Output(f"result-table2-{type_page}", "data"),
-        Output(f"last-updated-{type_page}", "children"),  # Новый Output для даты обновления
+        Output(f"result-table3-{type_page}", "columns"),
+        Output(f"result-table3-{type_page}", "data"),
+        Output(f"result-table4-{type_page}", "columns"),
+        Output(f"result-table4-{type_page}", "data"),
+        Output(f"last-updated-{type_page}", "children"),  # Вывод даты обновления
     ],
     [
         Input(f"date-picker-start-{type_page}", "date"),
@@ -330,7 +342,7 @@ def enforce_mutually_exclusive_reason(selected_values):
 )
 def update_tables(start_date, end_date, tvsp_values, status_values, first_value, reason_values):
     if (start_date is None) or (end_date is None):
-        return [], [], [], [], [], [], ""
+        return [], [], [], [], [], [], [], [], [], [], ""
 
     # Логика фильтров (без изменений)
     if first_value == "all":
@@ -384,20 +396,86 @@ def update_tables(start_date, end_date, tvsp_values, status_values, first_value,
         'reason_all': reason_all
     }
 
-    # Выполняем запросы
+    # Выполняем запросы для первых 3 вкладок
     columns, data = TableUpdater.query_to_df(engine, sql_eln, bind_params_eln)
     columns1, data1 = TableUpdater.query_to_df(engine, sql_query_eln_doctors, bind_params_others)
     columns2, data2 = TableUpdater.query_to_df(engine, sql_query_eln_patients, bind_params_others)
 
-    # --- Получаем MAX(updated_at) из базы ---
+    # --- Получаем MAX(updated_at) из базы --- #
     with engine.connect() as conn:
         row = conn.execute(text("SELECT MAX(updated_at) FROM load_data_sick_leave_sheets")).fetchone()
 
     if row and row[0]:
-        # row[0] – это datetime
         last_updated_str = row[0].strftime("Обновлено: %d.%m.%Y %H:%M")
     else:
         last_updated_str = "Обновлено: Нет данных"
 
-    return columns, data, columns1, data1, columns2, data2, last_updated_str
+    # --- Новый расчет: Анализ первичных больничных (для года и месяца) --- #
+    # Загружаем данные всей таблицы и фильтруем локально
+    query_all = "SELECT * FROM load_data_sick_leave_sheets"
+    df_all = pd.read_sql(query_all, engine)
+    df_all = df_all[df_all["duplicate"] == "нет"].copy()
 
+    # Приводим days_count к числовому типу
+    df_all["days_count"] = pd.to_numeric(df_all["days_count"], errors="coerce")
+    # Преобразуем issue_date в datetime
+    df_all["issue_date_dt"] = pd.to_datetime(df_all["issue_date"], errors="coerce")
+    # Фильтрация по дате
+    start_dt = pd.to_datetime(start_date)
+    end_dt = pd.to_datetime(end_date)
+    df_all = df_all[(df_all["issue_date_dt"] >= start_dt) & (df_all["issue_date_dt"] <= end_dt)]
+    # Отбираем первичные больничные
+    df_primary = df_all[df_all["first"].str.lower() == "да"].copy()
+    # Применяем фильтр по ТВСП, если задан
+    if not tvsp_all:
+        df_primary = df_primary[df_primary["tvsp"].isin(tvsp_filter)]
+    # Применяем фильтр по причине, если задан
+    if not reason_all:
+        df_primary["incapacity_reason_code"] = df_primary["incapacity_reason_code"].replace("", "По уходу")
+        df_primary = df_primary[df_primary["incapacity_reason_code"].isin(reason_filter)]
+    # Группировка для годового анализа
+    df_primary["year"] = df_primary["issue_date_dt"].dt.year
+    yearly = df_primary.groupby("year").agg(
+        count_episodes=("number", "count"),
+        total_days=("days_count", "sum"),
+        avg_days=("days_count", "mean"),
+        unique_patients=("snils", "nunique")
+    ).reset_index().sort_values("year", ascending=False)
+    # Группировка для помесячного анализа
+    df_primary["month"] = df_primary["issue_date_dt"].dt.to_period("M")
+    monthly = df_primary.groupby("month").agg(
+        count_episodes=("number", "count"),
+        total_days=("days_count", "sum"),
+        avg_days=("days_count", "mean"),
+        unique_patients=("snils", "nunique")
+    ).reset_index()
+    monthly["month"] = monthly["month"].astype(str)
+
+    yearly = yearly.rename(columns={
+        "year": "Год",
+        "count_episodes": "Количество эпизодов",
+        "total_days": "Сумма дней",
+        "avg_days": "Среднее дней",
+        "unique_patients": "Уникальных пациентов"
+    })
+
+    monthly = monthly.rename(columns={
+        "month": "Месяц",
+        "count_episodes": "Количество эпизодов",
+        "total_days": "Сумма дней",
+        "avg_days": "Среднее дней",
+        "unique_patients": "Уникальных пациентов"
+    })
+
+    yearly_columns = [{"name": col, "id": col} for col in yearly.columns]
+    yearly_data = yearly.to_dict("records")
+
+    monthly_columns = [{"name": col, "id": col} for col in monthly.columns]
+    monthly_data = monthly.to_dict("records")
+
+    return (columns, data,
+            columns1, data1,
+            columns2, data2,
+            yearly_columns, yearly_data,
+            monthly_columns, monthly_data,
+            last_updated_str)
