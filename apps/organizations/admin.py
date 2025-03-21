@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.admin import RelatedOnlyFieldListFilter
+from unfold.admin import TabularInline, ModelAdmin  # импорт из unfold вместо стандартных классов
 from .models import (
     Organization,
     ActiveOrganization,
@@ -7,23 +8,24 @@ from .models import (
     Department,
     Station,
     SourceSystem,
-    RelatedDepartment, StationDoctorAssignment
+    RelatedDepartment,
+    StationDoctorAssignment
 )
 
 
-# Inline для отделений внутри корпуса
-class DepartmentInline(admin.TabularInline):
+# Inline для отделений внутри корпуса с использованием unfold TabularInline
+class DepartmentInline(TabularInline):
     model = Department
     extra = 1
 
 
 # Inline для записи связи с внешними системами внутри отделения
-class RelatedDepartmentInline(admin.TabularInline):
+class RelatedDepartmentInline(TabularInline):
     model = RelatedDepartment
     extra = 1
 
 
-class StationDoctorAssignmentInline(admin.TabularInline):
+class StationDoctorAssignmentInline(TabularInline):
     model = StationDoctorAssignment
     extra = 0
     fields = ('doctor', 'appointment_date', 'removal_date')
@@ -43,7 +45,7 @@ def get_active_organization():
 
 
 @admin.register(Organization)
-class OrganizationAdmin(admin.ModelAdmin):
+class OrganizationAdmin(ModelAdmin):
     list_display = ('name', 'code_mo', 'oid_mo', 'region')
     list_filter = ('region',)
 
@@ -56,8 +58,7 @@ class OrganizationAdmin(admin.ModelAdmin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """
-        Если вдруг понадобится выбрать организацию в форме (например, в related inlines),
-        то здесь ограничим выбор только активной организацией.
+        Ограничиваем выбор организации в форме только активной организацией.
         """
         if db_field.name == "organization":
             active_org = get_active_organization()
@@ -68,10 +69,10 @@ class OrganizationAdmin(admin.ModelAdmin):
 
 
 @admin.register(ActiveOrganization)
-class ActiveOrganizationAdmin(admin.ModelAdmin):
+class ActiveOrganizationAdmin(ModelAdmin):
     list_display = ('organization', 'is_active')
     list_editable = ('is_active',)
-    list_display_links = ('organization',)  # organization остаётся ссылкой для перехода в форму редактирования
+    list_display_links = ('organization',)
 
     def has_add_permission(self, request):
         # Если уже существует запись, добавление новых запрещено.
@@ -80,7 +81,7 @@ class ActiveOrganizationAdmin(admin.ModelAdmin):
 
 
 @admin.register(Building)
-class BuildingAdmin(admin.ModelAdmin):
+class BuildingAdmin(ModelAdmin):
     list_display = ('name', 'organization')
     list_filter = (('organization', RelatedOnlyFieldListFilter),)
     inlines = [DepartmentInline]
@@ -105,7 +106,7 @@ class BuildingAdmin(admin.ModelAdmin):
 
 
 @admin.register(Department)
-class DepartmentAdmin(admin.ModelAdmin):
+class DepartmentAdmin(ModelAdmin):
     list_display = ('name', 'building')
     list_filter = (('building', RelatedOnlyFieldListFilter),)
     inlines = [RelatedDepartmentInline]
@@ -129,7 +130,7 @@ class DepartmentAdmin(admin.ModelAdmin):
 
 
 @admin.register(Station)
-class StationAdmin(admin.ModelAdmin):
+class StationAdmin(ModelAdmin):
     list_display = ('code', 'name', 'department')
     search_fields = ('name', 'code')
     list_filter = (('department__building', RelatedOnlyFieldListFilter),)
@@ -154,6 +155,6 @@ class StationAdmin(admin.ModelAdmin):
 
 
 @admin.register(SourceSystem)
-class SourceSystemAdmin(admin.ModelAdmin):
+class SourceSystemAdmin(ModelAdmin):
     list_display = ('name', 'region')
     list_filter = ('region',)

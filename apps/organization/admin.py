@@ -1,11 +1,12 @@
 from django.contrib import admin
 from import_export.admin import ImportExportModelAdmin
+from unfold.admin import TabularInline, ModelAdmin
 
 from .models import *
 from import_export import resources
 
 
-class DoctorAssignmentInline(admin.TabularInline):
+class DoctorAssignmentInline(TabularInline):
     model = DoctorAssignment
     extra = 0  # Убираем лишние пустые строки для добавления
     fields = ('doctor', 'start_date', 'end_date', 'reason_for_transfer')
@@ -14,7 +15,7 @@ class DoctorAssignmentInline(admin.TabularInline):
 
 
 @admin.register(Station)
-class StationAdmin(admin.ModelAdmin):
+class StationAdmin(ModelAdmin):
     list_display = ('name', 'code', 'department', 'doctor', 'open_date', 'close_date')
     list_filter = ('department',)
     search_fields = ('name', 'code')
@@ -31,7 +32,7 @@ class StationAdmin(admin.ModelAdmin):
 
 
 @admin.register(MedicalOrganization)
-class MedicalOrganizationAdmin(admin.ModelAdmin):
+class MedicalOrganizationAdmin(ModelAdmin):
     list_display = ('name', 'code_mo', 'name_kvazar', 'name_miskauz', 'address', 'phone_number', 'email')
     search_fields = ('name', 'address')
     ordering = ('name',)
@@ -46,14 +47,14 @@ class MedicalOrganizationAdmin(admin.ModelAdmin):
 
 
 @admin.register(Building)
-class BuildingAdmin(admin.ModelAdmin):
+class BuildingAdmin(ModelAdmin):
     list_display = ('name', 'additional_name', 'organization', 'address', 'name_kvazar', 'name_miskauz')
     list_filter = ('organization',)
     search_fields = ('name', 'additional_name', 'address')
     list_editable = ('additional_name', 'name_kvazar', 'name_miskauz')
 
 
-class OMSDepartmentInline(admin.TabularInline):
+class OMSDepartmentInline(TabularInline):
     formfield_overrides = {
         models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
     }
@@ -61,7 +62,7 @@ class OMSDepartmentInline(admin.TabularInline):
     extra = 1
 
 
-class KvazarDepartmentInline(admin.TabularInline):
+class KvazarDepartmentInline(TabularInline):
     formfield_overrides = {
         models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
     }
@@ -69,7 +70,7 @@ class KvazarDepartmentInline(admin.TabularInline):
     extra = 1
 
 
-class MiskauzDepartmentInline(admin.TabularInline):
+class MiskauzDepartmentInline(TabularInline):
     formfield_overrides = {
         models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
     }
