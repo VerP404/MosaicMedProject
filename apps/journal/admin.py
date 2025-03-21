@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.db.models import Q, Count
 from unfold.admin import ModelAdmin
+from import_export.admin import ImportExportModelAdmin
 
 from .models import (
     Person, Employee, Article, Source, Category, Corpus,
@@ -66,7 +67,7 @@ class EmployeeAdmin(ModelAdmin):
 
 
 @admin.register(Article)
-class ArticleAdmin(ModelAdmin):
+class ArticleAdmin(ImportExportModelAdmin, ModelAdmin):
     icon_name = "fa-file-text"
     list_display = ('name', 'is_active')
     list_filter = ('is_active',)
@@ -81,7 +82,7 @@ class ArticleAdmin(ModelAdmin):
 
 
 @admin.register(Source)
-class SourceAdmin(ModelAdmin):
+class SourceAdmin(ImportExportModelAdmin, ModelAdmin):
     icon_name = "fa-link"
     list_display = ('name', 'is_active')
     list_filter = ('is_active',)
@@ -89,7 +90,7 @@ class SourceAdmin(ModelAdmin):
 
 
 @admin.register(Category)
-class CategoryAdmin(ModelAdmin):
+class CategoryAdmin(ImportExportModelAdmin, ModelAdmin):
     icon_name = "fa-tags"
     list_display = ('name', 'is_active')
     list_filter = ('is_active',)
@@ -105,7 +106,7 @@ class CorpusAdmin(ModelAdmin):
 
 
 @admin.register(QuestionCode)
-class QuestionCodeAdmin(ModelAdmin):
+class QuestionCodeAdmin(ImportExportModelAdmin, ModelAdmin):
     icon_name = "fa-question-circle"
     list_display = ('code', 'title', 'is_active')
     list_filter = ('is_active',)
