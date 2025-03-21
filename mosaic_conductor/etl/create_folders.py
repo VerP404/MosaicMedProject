@@ -2,7 +2,7 @@ import os
 
 
 def create_folders():
-    base_dir = os.path.join(os.getcwd(), 'data')
+    base_dir = os.path.join(os.getcwd(), 'mosaic_conductor', 'etl', 'data')
 
     # Структура папок
     folder_structure = {

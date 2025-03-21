@@ -104,7 +104,10 @@ pg_dump -U postgres -d mosaicmed -F p -b -v -f "mosaicmed_backup.sql"
 ``` sql
 psql -U postgres -d mosaicmed -f "C:\Users\RDN\Downloads\Telegram Desktop\mosaicmed_backup.sql"
 ```
-
+или в ubuntu
+``` sql
+psql -h localhost -U postgres -d mosaicmed -f "/home/mosaic/code/MosaicMedProject/mosaic_conductor/etl/data/mosaicmed_backup.sql"
+```
 5. Проверить что версия приложения соответствует базе.
 6. Стянуть все изменения из репозитория
 
