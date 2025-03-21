@@ -219,7 +219,7 @@ wo_old_sensor_talon = create_sensor(
     "ОМС: Талоны. Старая версия",
     "mosaic_conductor/etl/data/weboms/talon",
     "data_loader_omsdata",
-    "mosaic_conductor/etl/config/oms_old_mapping"
+    "mosaic_conductor/etl/config/oms_old_mapping.json"
 )
 
 wo_old_sensor_doctors = create_sensor(
@@ -228,5 +228,5 @@ wo_old_sensor_doctors = create_sensor(
     "ОМС: Врачи. Старая версия",
     "mosaic_conductor/etl/data/weboms/doctor",
     "data_loader_doctordata",
-    "mosaic_conductor/etl/config/oms_old_mapping"
+    "mosaic_conductor/etl/config/oms_old_mapping.json"
 )
