@@ -35,21 +35,35 @@ def kvazar_sql_generator(data, table_name, mapping_file):
         raise ValueError(f"Conflict columns (column_check) not specified for table {table_name}.")
     conflict_columns_str = ", ".join(conflict_columns)
 
-    # Исключаем автоматически генерируемые столбцы
-    cols = [col for col in data.columns if col.lower() not in ("created_at", "updated_at")]
-    # Формируем список столбцов для вставки: добавляем created_at и updated_at
-    insert_columns = cols + ["created_at", "updated_at"]
+    # Определяем, нужно ли использовать поля created_at и updated_at.
+    # Можно добавить соответствующий параметр в mapping (например, "use_timestamps": true/false)
+    use_timestamps = table_config.get("use_timestamps", True)
 
-    # Генерируем SQL-запросы с использованием конфликтных столбцов из маппинга
+    # Если timestamps используются, исключаем их из списка колонок исходных данных
+    if use_timestamps:
+        cols = [col for col in data.columns if col.lower() not in ("created_at", "updated_at")]
+        insert_columns = cols + ["created_at", "updated_at"]
+    else:
+        cols = list(data.columns)
+        insert_columns = cols
+
+    # Генерируем часть запроса для обновления
+    update_clause = ", ".join([f"{col} = EXCLUDED.{col}" for col in cols if col not in conflict_columns])
+
+    # Генерируем SQL-запросы для каждой строки DataFrame
     for _, row in data.iterrows():
-        update_clause = ", ".join([f"{col} = EXCLUDED.{col}" for col in cols if col not in conflict_columns])
+        if use_timestamps:
+            placeholders = ", ".join(["%s"] * len(cols)) + ", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP"
+        else:
+            placeholders = ", ".join(["%s"] * len(cols))
         sql = f"""
         INSERT INTO {table_name} ({', '.join(insert_columns)})
-        VALUES ({', '.join(['%s'] * len(cols))}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES ({placeholders})
         ON CONFLICT ({conflict_columns_str})
         DO UPDATE SET {update_clause};
         """
         yield sql, tuple(row[col] for col in cols)
+
 
 
 @asset(
