@@ -431,7 +431,7 @@ class DepartmentPlanAdmin(ModelAdmin, ImportExportModelAdmin):
 # Инлайн для UnifiedFilterCondition
 class UnifiedFilterConditionInline(TabularInline):
     model = UnifiedFilterCondition
-    extra = 1
+    extra = 0
     fields = ['operator', 'field_name', 'filter_type', 'values']
 
 
