@@ -1,6 +1,5 @@
 import json
 from dagster import asset, Field, String, OpExecutionContext, AssetIn
-
 from config.settings import ORGANIZATIONS
 from mosaic_conductor.etl.common.connect_db import connect_to_db
 
@@ -16,9 +15,10 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
     Универсальная трансформация данных:
       1. Загружает настройки маппинга из mapping.json и переименовывает столбцы.
       2. Сравнивает ожидаемые и фактические столбцы в CSV.
-      3. Выводит в лог список проблем (если обнаружены несоответствия) с использованием эмодзи.
-      4. Добавляет отсутствующие обязательные столбцы со значением "-" по умолчанию.
-      5. Возвращает словарь с ключами "table_name" и "data".
+         Если в CSV присутствуют лишние поля – они игнорируются (выводится предупреждение).
+         Если отсутствуют ожидаемые – выбрасывается ошибка с подробностями.
+      3. Добавляет отсутствующие обязательные столбцы со значением "-" по умолчанию.
+      4. Возвращает словарь с ключами "table_name" и "data".
     """
     # Получаем конфигурацию
     config = context.op_config
@@ -45,17 +45,20 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
     problems = []
     missing_in_csv = set(expected_original_cols) - set(actual_cols)
     if missing_in_csv:
-        problems.append(f"\n❌ Отсутствуют следующие столбцы в CSV: {missing_in_csv}")
+        problems.append(f"❌ Отсутствуют следующие столбцы в CSV: {missing_in_csv}")
     extra_in_csv = set(actual_cols) - set(expected_original_cols)
     if extra_in_csv:
-        problems.append(f"\n⚠️ Лишние столбцы в CSV: {extra_in_csv}")
+        context.log.info(f"⚠️ Лишние столбцы в CSV обнаружены и будут проигнорированы: {extra_in_csv}")
 
     if problems:
         context.log.info(
-            f"❗ Проблемы с исходными столбцами. Ожидалось: {expected_original_cols}, "
-            f"обнаружено: {actual_cols}. Подробности: {'; '.join(problems)}"
+            f"❗ Проблемы с исходными столбцами. Ожидалось: {expected_original_cols}, обнаружено: {actual_cols}. "
+            f"Подробности: {'; '.join(problems)}"
         )
         raise KeyError(f"Несоответствие столбцов в CSV: {'; '.join(problems)}")
+
+    # Ограничиваем DataFrame только столбцами, указанными в маппинге (лишние игнорируем)
+    df = df[expected_original_cols]
 
     # Переименовываем столбцы согласно маппингу
     df = df.rename(columns=column_mapping)
@@ -67,15 +70,15 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
     problems = []
     missing_after_rename = set(expected_cols) - set(actual_transformed_cols)
     if missing_after_rename:
-        problems.append(f"\n❌ Отсутствуют после переименования: {missing_after_rename}")
+        problems.append(f"❌ Отсутствуют после переименования: {missing_after_rename}")
     extra_after_rename = set(actual_transformed_cols) - set(expected_cols)
     if extra_after_rename:
-        problems.append(f"\n⚠️ Лишние после переименования: {extra_after_rename}")
+        context.log.info(f"⚠️ Лишние столбцы после переименования обнаружены: {extra_after_rename}")
 
     if problems:
         context.log.info(
-            f"❗ Проблемы с переименованными столбцами. Ожидалось: {expected_cols}, "
-            f"обнаружено: {actual_transformed_cols}. \n Подробности: {'; '.join(problems)}"
+            f"❗ Проблемы с переименованными столбцами. Ожидалось: {expected_cols}, обнаружено: {actual_transformed_cols}. "
+            f"Подробности: {'; '.join(problems)}"
         )
         raise KeyError(f"Несоответствие столбцов после переименования: {'; '.join(problems)}")
 

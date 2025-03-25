@@ -2,6 +2,24 @@ from django.contrib import admin
 
 from django import forms
 from apps.home.models import *
+from django.contrib.auth.models import User, Group
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin, GroupAdmin as BaseGroupAdmin
+from unfold.admin import ModelAdmin
+
+# Отменяем стандартную регистрацию
+admin.site.unregister(User)
+admin.site.unregister(Group)
+
+
+# Регистрируем заново, используя чистый unfold
+@admin.register(User)
+class CustomUserAdmin(ModelAdmin, BaseUserAdmin):
+    pass
+
+
+@admin.register(Group)
+class CustomGroupAdmin(ModelAdmin, BaseGroupAdmin):
+    pass
 
 
 class MainSettingsForm(forms.ModelForm):
@@ -19,7 +37,7 @@ class MainSettingsForm(forms.ModelForm):
 
 
 @admin.register(MainSettings)
-class MainSettingsAdmin(admin.ModelAdmin):
+class MainSettingsAdmin(ModelAdmin):
     form = MainSettingsForm
     list_display = ('__str__',)
 

@@ -28,7 +28,6 @@ where to_date(issue_date::text, 'YYYY-MM-DD')
       and ( :reason_all OR coalesce(incapacity_reason_code, 'По уходу') = ANY(:reason_list) )
 group by issuing_doctor, tvsp
 order by count(*) desc;
-
 """
 
 sql_query_eln_patients = """
@@ -49,8 +48,6 @@ where to_date(issue_date::text, 'YYYY-MM-DD')
       and ( :reason_all OR coalesce(incapacity_reason_code, 'По уходу') = ANY(:reason_list) )
 group by patient_last_name, patient_first_name, patient_middle_name, birth_date, gender
 order by count(*) desc;
-
-
 """
 
 

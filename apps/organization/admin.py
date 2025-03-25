@@ -55,25 +55,16 @@ class BuildingAdmin(ModelAdmin):
 
 
 class OMSDepartmentInline(TabularInline):
-    formfield_overrides = {
-        models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
-    }
     model = OMSDepartment
     extra = 1
 
 
 class KvazarDepartmentInline(TabularInline):
-    formfield_overrides = {
-        models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
-    }
     model = KvazarDepartment
     extra = 1
 
 
 class MiskauzDepartmentInline(TabularInline):
-    formfield_overrides = {
-        models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
-    }
     model = MiskauzDepartment
     extra = 1
 
@@ -84,14 +75,10 @@ class DepartmentResource(resources.ModelResource):
 
 
 @admin.register(Department)
-class DepartmentAdmin(ImportExportModelAdmin):
+class DepartmentAdmin(ImportExportModelAdmin, ModelAdmin):
     list_display = ('name', 'additional_name', 'building')
     list_filter = ('building',)
     search_fields = ('name',)
     resource_class = DepartmentResource
 
     inlines = [OMSDepartmentInline, KvazarDepartmentInline, MiskauzDepartmentInline]
-
-    formfield_overrides = {
-        models.CharField: {'widget': admin.widgets.AdminTextInputWidget(attrs={'style': 'width: 100%;'})},
-    }

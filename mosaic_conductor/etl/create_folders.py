@@ -7,6 +7,8 @@ def create_folders():
     # Структура папок
     folder_structure = {
         'kvazar': ['eln', 'emd', 'recipe', 'death', 'reference'],
+        'iszl': ['dn', 'people'],
+        'weboms': ['doctor', 'talon'],
     }
 
     for parent_folder, subfolders in folder_structure.items():

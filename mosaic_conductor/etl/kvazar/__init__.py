@@ -78,6 +78,10 @@ iszl_job_dn = create_job("iszl_job_dn",
                          "load_data_dispansery_iszl",
                          "iszl/dn")
 
+iszl_job_people = create_job("iszl_job_people",
+                             "load_data_iszl_population",
+                             "iszl/people")
+
 wo_old_job_talon = create_job("wo_old_job_talon",
                               "data_loader_omsdata",
                               "weboms/talon",
