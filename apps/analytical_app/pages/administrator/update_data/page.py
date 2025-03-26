@@ -68,7 +68,8 @@ admin_update_data = html.Div(
                                                         end_date=date.today().isoformat(),
                                                         display_format="DD.MM.YYYY",
                                                     ),
-                                                    dbc.Button("Выполнить", id=f'update-button-{type_page}', n_clicks=0),
+                                                    dbc.Button("Выполнить", id=f'update-button-{type_page}',
+                                                               n_clicks=0),
                                                 ]
                                             )
                                         ),
@@ -79,8 +80,10 @@ admin_update_data = html.Div(
                                             dbc.CardBody(
                                                 [
                                                     html.H5("Система автоматизации", className="card-title"),
-                                                    html.P("Система для контроля работы автоматизации и уведомлений о проблемах"),
-                                                    dbc.Button("Открыть", color="success", href="http://127.0.0.1:3000", target="_blank"),
+                                                    html.P(
+                                                        "Система для контроля работы автоматизации и уведомлений о проблемах"),
+                                                    dbc.Button("Открыть", color="success", href=dagster_url,
+                                                               target="_blank"),
                                                 ]
                                             )
                                         ),
@@ -92,7 +95,8 @@ admin_update_data = html.Div(
                                                 [
                                                     html.H5("Файловый браузер", className="card-title"),
                                                     html.P("Пользователь и пароль: admin"),
-                                                    dbc.Button("Открыть", color="warning", href="http://127.0.0.1:8080", target="_blank"),
+                                                    dbc.Button("Открыть", color="warning", href=filebrowser_url,
+                                                               target="_blank"),
                                                 ]
                                             )
                                         ),
