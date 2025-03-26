@@ -41,7 +41,7 @@ routes_administrator = {
     "/admin/admin_update_data": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Администратор", "href": "/admin"},
-            {"label": "Сборка счетов", "active": True},
+            {"label": "Обновление данных", "active": True},
         ]),
         admin_update_data
     ]),

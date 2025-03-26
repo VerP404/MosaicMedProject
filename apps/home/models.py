@@ -26,6 +26,9 @@ class MainSettings(models.Model):
     # Поля для Dagster
     dagster_ip = models.GenericIPAddressField(default='127.0.0.1', verbose_name="Dagster IP")
     dagster_port = models.PositiveIntegerField(default=3000, verbose_name="Dagster Port")
+    # Поля для FileBrowser
+    filebrowser_ip = models.GenericIPAddressField(default='127.0.0.1', verbose_name="FileBrowser IP")
+    filebrowser_port = models.PositiveIntegerField(default=8080, verbose_name="FileBrowser Port")
 
     def get_dash_url(self):
         return f"http://{self.dash_ip}:{self.dash_port}"
@@ -33,14 +36,15 @@ class MainSettings(models.Model):
     def get_dash_chief_url(self):
         return f"http://{self.dash_chief_ip}:{self.dash_chief_port}"
 
-    def get_dagster_url(self):
-        return f"http://{self.dagster_ip}:{self.dagster_port}"
+    def get_filebrowser_url(self):
+        return f"http://{self.filebrowser_ip}:{self.filebrowser_port}"
 
     def __str__(self):
         return (f"Аналитическая система - {self.dash_ip}:{self.dash_port}, "
                 f"Основное приложение - {self.main_app_ip}:{self.main_app_port}, "
                 f"Панель главного врача - {self.dash_chief_ip}:{self.dash_chief_port}, "
-                f"Dagster - {self.dagster_ip}:{self.dagster_port}")
+                f"Dagster - {self.dagster_ip}:{self.dagster_port}, "
+                f"FileBrowser - {self.filebrowser_ip}:{self.filebrowser_port}")
 
     class Meta:
         verbose_name = "Настройка"
