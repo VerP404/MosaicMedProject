@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from dagster import asset, Field, String, OpExecutionContext, AssetIn
 from config.settings import ORGANIZATIONS
 from mosaic_conductor.etl.common.connect_db import connect_to_db
@@ -6,110 +7,129 @@ from mosaic_conductor.etl.common.connect_db import connect_to_db
 @asset(
     config_schema={
         "mapping_file": Field(String),
-        "table_name": Field(String)
+        "table_name": Field(String),
+        "is_talon": Field(bool, default_value=False)
     },
     ins={"kvazar_extract": AssetIn()}
 )
 def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
     """
-    Универсальная трансформация данных:
-      1. Загружает настройки маппинга из mapping.json и переименовывает столбцы.
-      2. Сравнивает ожидаемые и фактические столбцы в CSV.
-         Если в CSV присутствуют лишние поля – они игнорируются (выводится предупреждение).
-         Если отсутствуют ожидаемые – выбрасывается ошибка с подробностями.
-      3. Добавляет отсутствующие обязательные столбцы со значением "-" по умолчанию.
-      4. Возвращает словарь с ключами "table_name" и "data".
+    Трансформация данных:
+      1. Загружает маппинг из mapping.json, переименовывает столбцы согласно mapping_fields.
+      2. Проверяет наличие обязательных столбцов.
+      3. Ограничивает DataFrame только ожидаемыми столбцами.
+      4. Заполняет отсутствующие столбцы из БД дефолтным значением "-".
+      5. Если данные талонов (is_talon=True или table_name в talonных таблицах),
+         то гарантированно добавляет столбец is_complex с булевым значением,
+         а затем, на основе группировки по (talon, source), для групп с более чем одной записью
+         устанавливает is_complex = True.
+      6. Если обрабатываются талоны, дополнительно вычисляются report_year и report_month.
+      7. Возвращает либо единый DataFrame, либо словарь с ветками "normal" и "complex".
     """
-    # Получаем конфигурацию
     config = context.op_config
     mapping_file = config["mapping_file"]
     table_name = config["table_name"]
 
-    # Извлекаем DataFrame из предыдущего этапа
     df = kvazar_extract.get("data")
     if df is None:
         context.log.info("⚠️ Нет данных для трансформации!")
         raise ValueError("❌ Нет данных для трансформации.")
 
-    # Загружаем маппинг
+    # Загружаем маппинг и переименовываем столбцы
     with open(mapping_file, "r", encoding="utf-8") as f:
         mappings = json.load(f)
     table_config = mappings.get("tables", {}).get(table_name, {})
     column_mapping = table_config.get("mapping_fields", {})
 
-    # Ожидаемые столбцы до переименования (ключи маппинга)
     expected_original_cols = list(column_mapping.keys())
-    # Фактические столбцы в CSV
     actual_cols = list(df.columns)
 
-    problems = []
+    # Проверка обязательных столбцов в исходном CSV
     missing_in_csv = set(expected_original_cols) - set(actual_cols)
     if missing_in_csv:
-        problems.append(f"❌ Отсутствуют следующие столбцы в CSV: {missing_in_csv}")
+        context.log.info(f"❌ Отсутствуют следующие столбцы в CSV: {missing_in_csv}")
+        raise KeyError(f"Отсутствуют обязательные столбцы в CSV: {missing_in_csv}")
     extra_in_csv = set(actual_cols) - set(expected_original_cols)
     if extra_in_csv:
-        context.log.info(f"⚠️ Лишние столбцы в CSV обнаружены и будут проигнорированы: {extra_in_csv}")
+        context.log.info(f"⚠️ Лишние столбцы в CSV: {extra_in_csv}. Они будут проигнорированы.")
 
-    if problems:
-        context.log.info(
-            f"❗ Проблемы с исходными столбцами. Ожидалось: {expected_original_cols}, обнаружено: {actual_cols}. "
-            f"Подробности: {'; '.join(problems)}"
-        )
-        raise KeyError(f"Несоответствие столбцов в CSV: {'; '.join(problems)}")
-
-    # Ограничиваем DataFrame только столбцами, указанными в маппинге (лишние игнорируем)
-    df = df[expected_original_cols]
-
-    # Переименовываем столбцы согласно маппингу
     df = df.rename(columns=column_mapping)
-
-    # Теперь ожидаемые столбцы после переименования
     expected_cols = list(column_mapping.values())
     actual_transformed_cols = list(df.columns)
-
-    problems = []
     missing_after_rename = set(expected_cols) - set(actual_transformed_cols)
     if missing_after_rename:
-        problems.append(f"❌ Отсутствуют после переименования: {missing_after_rename}")
+        context.log.info(f"❌ Отсутствуют после переименования: {missing_after_rename}")
+        raise KeyError(f"Отсутствуют обязательные столбцы после переименования: {missing_after_rename}")
     extra_after_rename = set(actual_transformed_cols) - set(expected_cols)
     if extra_after_rename:
-        context.log.info(f"⚠️ Лишние столбцы после переименования обнаружены: {extra_after_rename}")
-
-    if problems:
-        context.log.info(
-            f"❗ Проблемы с переименованными столбцами. Ожидалось: {expected_cols}, обнаружено: {actual_transformed_cols}. "
-            f"Подробности: {'; '.join(problems)}"
-        )
-        raise KeyError(f"Несоответствие столбцов после переименования: {'; '.join(problems)}")
-
-    # Ограничиваем DataFrame только ожидаемыми столбцами
+        context.log.info(f"⚠️ Лишние после переименования: {extra_after_rename}. Они будут проигнорированы.")
     df = df[expected_cols]
 
-    # Получаем обязательные столбцы (varchar) из схемы таблицы в базе данных
+    # Заполнение отсутствующих столбцов из БД дефолтным значением "-"
     engine, conn = connect_to_db(organization=ORGANIZATIONS, context=context)
     sql = f"""
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = '{table_name}' 
-        AND data_type = 'character varying';
-    """
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = '{table_name}' 
+            AND data_type = 'character varying';
+        """
     with conn.cursor() as cursor:
         cursor.execute(sql)
         db_columns = [row[0] for row in cursor.fetchall()]
     conn.close()
-
     if not db_columns:
         context.log.info(f"❌ Не удалось получить список обязательных столбцов для таблицы {table_name}.")
         raise ValueError(f"❌ Нет обязательных столбцов для таблицы {table_name}.")
-
-    use_timestamps = table_config.get("use_timestamps", True)
-    context.log.info(f"ℹ️ Обязательные столбцы из БД (обновление дат: {use_timestamps}): {db_columns}")
-
-    # Заполняем отсутствующие обязательные столбцы дефолтным значением "-"
     for col in db_columns:
         if col not in df.columns:
             context.log.info(f"⚠️ Добавляем отсутствующий столбец '{col}' со значением '-' по умолчанию.")
             df[col] = "-"
 
-    context.log.info(f"✅ Трансформация для {table_name} завершена. Всего строк: {len(df)}")
-    return {"table_name": table_name, "data": df}
+    # Если обрабатываются талоны, гарантируем заполнение столбца is_complex булевым значением.
+    # Это либо если is_talon=True, либо если таблица соответствует талонным данным.
+    if config.get("is_talon", False) or table_name in ["load_data_talons", "load_data_complex_talons"]:
+        context.log.info("ℹ️ Обработка данных талонов – гарантируем наличие столбца is_complex как boolean.")
+        # Переопределяем столбец is_complex (если он добавлен из БД) на значение False
+        df["is_complex"] = False
+
+        # Вычисляем report_year и report_month
+        def compute_report_year(report_period, treatment_end):
+            return treatment_end[-4:] if report_period == '-' else report_period[-4:]
+        def compute_report_month(report_period, treatment_end):
+            current_date = date.today()
+            if report_period == '-':
+                if current_date.day <= 4:
+                    month_from_treatment = int(treatment_end[3:5]) if len(treatment_end) >= 6 else current_date.month
+                    return current_date.month if month_from_treatment == current_date.month else (12 if current_date.month == 1 else current_date.month - 1)
+                else:
+                    return current_date.month
+            else:
+                month_mapping = {
+                    'Января': 1, 'Февраля': 2, 'Марта': 3, 'Апреля': 4,
+                    'Мая': 5, 'Июня': 6, 'Июля': 7, 'Августа': 8,
+                    'Сентября': 9, 'Октября': 10, 'Ноября': 11, 'Декабря': 12
+                }
+                month_str = report_period.split()[0].strip()
+                return month_mapping.get(month_str, None)
+        df['report_year'] = df.apply(lambda row: compute_report_year(row['report_period'], row['treatment_end']), axis=1)
+        df['report_month'] = df.apply(lambda row: compute_report_month(row['report_period'], row['treatment_end']), axis=1)
+
+        # Группируем по (talon, source) и помечаем строки как комплексные, если группа больше одной записи
+        grouped = df.groupby(["talon", "source"])
+        for (talon, source), group in grouped:
+            if len(group) > 1:
+                df.loc[group.index, "is_complex"] = True
+        # Гарантируем, что столбец is_complex заполнен и имеет тип bool
+        df["is_complex"] = df["is_complex"].fillna(False).astype(bool)
+
+        # Разбиваем данные на две группы: нормальные и комплексные
+        normal_df = df[df["is_complex"] == False].copy()
+        complex_df = df[df["is_complex"] == True].copy()
+        context.log.info(f"🔄 Трансформация завершена. Всего строк: {len(df)}. Нормальных: {len(normal_df)}, Комплексных: {len(complex_df)}.")
+        return {
+            "normal": {"table_name": "load_data_talons", "data": normal_df},
+            "complex": {"table_name": "load_data_complex_talons", "data": complex_df}
+        }
+    else:
+        context.log.info(f"✅ Трансформация для {table_name} завершена. Всего строк: {len(df)}")
+        return {"table_name": table_name, "data": df}

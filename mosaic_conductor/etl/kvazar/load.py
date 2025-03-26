@@ -1,30 +1,24 @@
-import glob
 import os
 import json
 from dagster import asset, OpExecutionContext, Field, StringSource, AssetIn, String
+from django.utils import timezone
 
-from mosaic_conductor.etl.common.universal_load import load_dataframe
+from mosaic_conductor.etl.common.universal_load import load_dataframe, save_load_log_pg
 
 
 def clear_data_folder(data_folder):
-    # Получаем список всех элементов в папке
     items = os.listdir(data_folder)
     for item in items:
         path = os.path.join(data_folder, item)
-        # Пропускаем подкаталоги (включая error_files)
         if os.path.isdir(path):
             continue
-
-        # Пытаемся удалить файл
         try:
             os.remove(path)
             print(f"Удалён файл: {path}")
         except Exception as e:
             print(f"Не удалось удалить {path}: {e}")
 
-
 def kvazar_sql_generator(data, table_name, mapping_file):
-    # Загружаем настройки маппинга из mapping_file
     if not os.path.exists(mapping_file):
         raise FileNotFoundError(f"Mapping file {mapping_file} not found.")
     with open(mapping_file, "r", encoding="utf-8") as f:
@@ -34,23 +28,14 @@ def kvazar_sql_generator(data, table_name, mapping_file):
     if not conflict_columns:
         raise ValueError(f"Conflict columns (column_check) not specified for table {table_name}.")
     conflict_columns_str = ", ".join(conflict_columns)
-
-    # Определяем, нужно ли использовать поля created_at и updated_at.
-    # Можно добавить соответствующий параметр в mapping (например, "use_timestamps": true/false)
     use_timestamps = table_config.get("use_timestamps", True)
-
-    # Если timestamps используются, исключаем их из списка колонок исходных данных
     if use_timestamps:
         cols = [col for col in data.columns if col.lower() not in ("created_at", "updated_at")]
         insert_columns = cols + ["created_at", "updated_at"]
     else:
         cols = list(data.columns)
         insert_columns = cols
-
-    # Генерируем часть запроса для обновления
     update_clause = ", ".join([f"{col} = EXCLUDED.{col}" for col in cols if col not in conflict_columns])
-
-    # Генерируем SQL-запросы для каждой строки DataFrame
     for _, row in data.iterrows():
         if use_timestamps:
             placeholders = ", ".join(["%s"] * len(cols)) + ", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP"
@@ -64,8 +49,6 @@ def kvazar_sql_generator(data, table_name, mapping_file):
         """
         yield sql, tuple(row[col] for col in cols)
 
-
-
 @asset(
     config_schema={
         "table_name": Field(StringSource, is_required=True, description="Имя таблицы для загрузки"),
@@ -75,32 +58,91 @@ def kvazar_sql_generator(data, table_name, mapping_file):
     ins={"kvazar_transform": AssetIn()}
 )
 def kvazar_load(context: OpExecutionContext, kvazar_transform: dict):
-    """
-    Загружает данные для указанной таблицы.
-    Все параметры (table_name, data_folder, mapping_file) передаются через op config.
-    При формировании SQL используется список конфликтных столбцов из mapping.json (ключ column_check).
-    """
     table_name = context.op_config["table_name"]
     data_folder = context.op_config["data_folder"]
     mapping_file = context.op_config["mapping_file"]
-    data = kvazar_transform.get("data")
+    enable_logging = context.op_config.get("enable_logging", True)
 
-    if data is None or data.empty:
-        context.log.info(f"ℹ️ Нет данных для загрузки в таблицу {table_name}.")
-        return {"table_name": table_name, "status": "skipped"}
+    # Замер времени начала загрузки
+    start_time = timezone.now()
+    result = None
+    error_occurred = False
+    error_code = None
 
-    # Вызываем универсальную функцию загрузки, передавая наш генератор SQL с mapping_file
-    result = load_dataframe(
-        context,
-        table_name,
-        data,
-        db_alias="default",
-        mapping_file=mapping_file,
-        sql_generator=lambda d, t: kvazar_sql_generator(d, t, mapping_file)
-    )
-
-    if result.get("status") == "success":
+    try:
+        if "normal" in kvazar_transform and "complex" in kvazar_transform:
+            normal_payload = kvazar_transform["normal"]
+            complex_payload = kvazar_transform["complex"]
+            context.log.info("ℹ️ Загружаются данные для нормальных и комплексных талонов")
+            result_normal = load_dataframe(
+                context,
+                normal_payload["table_name"],
+                normal_payload["data"],
+                db_alias="default",
+                mapping_file=mapping_file,
+                sql_generator=lambda d, t: kvazar_sql_generator(d, t, mapping_file)
+            )
+            result_complex = load_dataframe(
+                context,
+                complex_payload["table_name"],
+                complex_payload["data"],
+                db_alias="default",
+                mapping_file=mapping_file,
+                sql_generator=lambda d, t: kvazar_sql_generator(d, t, mapping_file)
+            )
+            result = {"normal": result_normal, "complex": result_complex}
+        else:
+            data = kvazar_transform.get("data")
+            if data is None or data.empty:
+                context.log.info(f"ℹ️ Нет данных для загрузки в таблицу {table_name}.")
+                result = {"table_name": table_name, "status": "skipped"}
+            else:
+                result = load_dataframe(
+                    context,
+                    table_name,
+                    data,
+                    db_alias="default",
+                    mapping_file=mapping_file,
+                    sql_generator=lambda d, t: kvazar_sql_generator(d, t, mapping_file)
+                )
         clear_data_folder(data_folder)
         context.log.info(f"✅ Папка {data_folder} очищена")
+    except Exception as exc:
+        error_occurred = True
+        error_code = str(exc)
+        raise
+    finally:
+        end_time = timezone.now()
+        duration = (end_time - start_time).total_seconds()
+        if result and not error_occurred:
+            if "normal" in result and "complex" in result:
+                count_after = result["normal"].get("final_count", 0) + result["complex"].get("final_count", 0)
+            else:
+                count_after = result.get("final_count", 0)
+        else:
+            count_after = 0
+        count_before = 0  # При необходимости можно получить из БД до загрузки
 
+        # Формируем run_url, используя run_id из context и базовый URL для Dagster.
+        run_id = context.run_id if hasattr(context, "run_id") else "unknown"
+        dagster_base_url = "http://127.0.0.1:3000"  # Можно заменить или получить из конфигурации
+        run_url = f"{dagster_base_url}/runs/{run_id}"
+
+        log_data = {
+            "table_name": table_name,
+            "start_time": start_time,
+            "end_time": end_time,
+            "count_before": count_before,
+            "count_after": count_after,
+            "duration": duration,
+            "error_occurred": error_occurred,
+            "error_code": error_code,
+            "run_url": run_url,
+        }
+        if enable_logging:
+            try:
+                save_load_log_pg(context, log_data)
+                context.log.info("ℹ️ Лог загрузки сохранен в Postgres")
+            except Exception as log_exc:
+                context.log.error(f"Ошибка сохранения лога загрузки: {log_exc}")
     return result

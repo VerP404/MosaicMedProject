@@ -9,6 +9,43 @@ from config.settings import ORGANIZATIONS
 from mosaic_conductor.etl.common.connect_db import connect_to_db
 
 
+def save_load_log_pg(context, log_data: dict):
+    """
+    Сохраняет лог загрузки напрямую в таблицу load_data_loadlog в Postgres.
+    log_data должен содержать следующие ключи:
+      - table_name
+      - start_time (datetime)
+      - end_time (datetime)
+      - count_before (int)
+      - count_after (int)
+      - duration (float, секунд)
+      - error_occurred (bool)
+      - error_code (str или None)
+      - run_url (str или None)
+    """
+    sql = """
+        INSERT INTO load_data_loadlog
+        (table_name, start_time, end_time, count_before, count_after, duration, error_occurred, error_code, run_url)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    # Получаем подключение (используется функция connect_to_db, как и для загрузки)
+    engine, conn = connect_to_db(db_alias="default", organization=ORGANIZATIONS, context=context)
+    with conn.cursor() as cursor:
+        cursor.execute(sql, (
+            log_data.get("table_name"),
+            log_data.get("start_time"),
+            log_data.get("end_time"),
+            log_data.get("count_before"),
+            log_data.get("count_after"),
+            log_data.get("duration"),
+            log_data.get("error_occurred"),
+            log_data.get("error_code"),
+            log_data.get("run_url")
+        ))
+    conn.commit()
+    conn.close()
+
+
 def load_dataframe(context: OpExecutionContext, table_name: str, data, db_alias: str, mapping_file: str,
                    sql_generator) -> dict:
     """

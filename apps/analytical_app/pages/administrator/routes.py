@@ -4,6 +4,7 @@ import dash_bootstrap_components as dbc
 from apps.analytical_app.pages.administrator.delete_emd.page import admin_delete_emd
 from apps.analytical_app.pages.administrator.generation_invoices.page import admin_gen_inv
 from apps.analytical_app.pages.administrator.main import admin_main
+from apps.analytical_app.pages.administrator.update_data.page import admin_update_data
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
 from apps.analytical_app.pages.head.dispensary.adults.main import head_adults_dd_main
@@ -37,6 +38,16 @@ routes_administrator = {
         ]),
         admin_gen_inv
     ]),
+    "/admin/admin_update_data": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Администратор", "href": "/admin"},
+            {"label": "Сборка счетов", "active": True},
+        ]),
+        admin_update_data
+    ]),
+
+
+
     "/admin/disp_by_ages": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Администратор", "href": "/admin"},

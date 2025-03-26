@@ -9,6 +9,25 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
+class LoadLog(models.Model):
+    table_name = models.CharField(max_length=255, verbose_name="Таблица")
+    start_time = models.DateTimeField(verbose_name="Время старта")
+    end_time = models.DateTimeField(verbose_name="Время окончания")
+    count_before = models.IntegerField(verbose_name="Количество до обновления")
+    count_after = models.IntegerField(verbose_name="Количество после обновления")
+    duration = models.FloatField(help_text="Длительность в секундах", verbose_name="Длительность")
+    error_occurred = models.BooleanField(default=False, verbose_name="Ошибка")
+    error_code = models.CharField(max_length=255, null=True, blank=True, verbose_name="Код ошибки")
+    run_url = models.URLField(null=True, blank=True, verbose_name="Ссылка на запуск")
+
+    def __str__(self):
+        return f"{self.table_name} ({self.start_time.strftime('%Y-%m-%d %H:%M:%S')})"
+
+    class Meta:
+        verbose_name = "Лог загрузки"
+        verbose_name_plural = "Логи загрузок"
+
+
 class Talon(TimeStampedModel):
     # Модель для обычных талонов (не комплексных)
     talon = models.CharField(max_length=255)
@@ -58,6 +77,9 @@ class Talon(TimeStampedModel):
 
     # Поле is_complex всегда False для этой модели
     is_complex = models.BooleanField(default=False)
+    # Отчетный период
+    report_year = models.CharField(max_length=4, default='-')
+    report_month = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.talon} - {self.patient}"
@@ -118,6 +140,9 @@ class ComplexTalon(TimeStampedModel):
 
     # Поле is_complex всегда True для этой модели
     is_complex = models.BooleanField(default=True)
+    # Отчетный период
+    report_year = models.CharField(max_length=4, default='-')
+    report_month = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return f"Complex: {self.talon} - {self.patient}"

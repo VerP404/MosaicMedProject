@@ -1,10 +1,9 @@
 from django.contrib import admin
 
-from django import forms
 from apps.home.models import *
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin, GroupAdmin as BaseGroupAdmin
-from unfold.admin import ModelAdmin
+from unfold.admin import ModelAdmin, forms
 
 # Отменяем стандартную регистрацию
 admin.site.unregister(User)
@@ -33,6 +32,8 @@ class MainSettingsForm(forms.ModelForm):
             'main_app_port': forms.NumberInput(attrs={'placeholder': 'Введите порт основного приложения'}),
             'dash_chief_ip': forms.TextInput(attrs={'placeholder': 'Введите IP панели главного врача'}),
             'dash_chief_port': forms.NumberInput(attrs={'placeholder': 'Введите порт панели главного врача'}),
+            'dagster_ip': forms.TextInput(attrs={'placeholder': 'Введите IP для Dagster'}),
+            'dagster_port': forms.NumberInput(attrs={'placeholder': 'Введите порт для Dagster'}),
         }
 
 

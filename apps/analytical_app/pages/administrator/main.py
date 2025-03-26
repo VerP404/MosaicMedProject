@@ -15,6 +15,9 @@ cards_row_1 = dbc.Row(
         dbc.Col(create_card(2, type_page,
                             "Аннулирование ЭМД",
                             "В разработке! Ввод данных для формирования запроса на аннулирование ЭМД")),
+        dbc.Col(create_card(3, type_page,
+                            "Обновление данных",
+                            "Страница обновления данных в базе данных.")),
     ],
     className="mb-4 align-items-stretch",
 )
@@ -34,10 +37,11 @@ admin_main = html.Div([
      ],
     [Input(f'open-report-1-{type_page}', 'n_clicks'),
      Input(f'open-report-2-{type_page}', 'n_clicks'),
+     Input(f'open-report-3-{type_page}', 'n_clicks'),
      ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2):
+def navigate_pages(open_report_1, open_report_2, open_report_3):
     ctx = callback_context
     if not ctx.triggered:
         return no_update, no_update
@@ -53,5 +57,7 @@ def navigate_pages(open_report_1, open_report_2):
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
             breadcrumb_items.append({"active": True})
             return f'/{main_link}/admin_delete_emd', breadcrumb_items
-
+        elif button_id == f'open-report-3-{type_page}' and open_report_3:
+            breadcrumb_items.append({"active": True})
+            return f'/{main_link}/admin_update_data', breadcrumb_items
     return f'/{main_link}', breadcrumb_items

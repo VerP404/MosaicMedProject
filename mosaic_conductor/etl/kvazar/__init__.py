@@ -14,6 +14,7 @@ kvazar_assets = [
 ]
 
 
+
 def create_job(job_name, table_name, data_folder, mapping_file="mapping.json"):
     @job(
         name=job_name,
@@ -35,7 +36,8 @@ def create_job(job_name, table_name, data_folder, mapping_file="mapping.json"):
                 "kvazar_transform": {
                     "config": {
                         "mapping_file": f"mosaic_conductor/etl/config/{mapping_file}",
-                        "table_name": table_name
+                        "table_name": table_name,
+                        "is_talon": True
                     }
                 },
                 "kvazar_load": {
@@ -84,10 +86,28 @@ iszl_job_people = create_job("iszl_job_people",
 
 wo_old_job_talon = create_job("wo_old_job_talon",
                               "data_loader_omsdata",
-                              "weboms/talon",
+                              "weboms/talon/old",
                               "oms_old_mapping.json")
 
 wo_old_job_doctors = create_job("wo_old_job_doctors",
                                 "data_loader_doctordata",
                                 "weboms/doctor",
                                 "oms_old_mapping.json")
+
+wo_job_talon = create_job("wo_job_talon",
+                          "load_data_talons",
+                          "weboms/talon/new",
+                          "oms_mapping.json")
+
+
+kvazar_jobs = [
+    kvazar_job_eln,
+    kvazar_job_emd,
+    kvazar_job_recipes,
+    kvazar_job_death,
+    kvazar_job_reference,
+    iszl_job_dn,
+    wo_old_job_talon,
+    wo_old_job_doctors,
+    wo_job_talon
+]

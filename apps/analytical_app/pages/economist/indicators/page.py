@@ -373,7 +373,7 @@ def update_table(n_clicks, value_doctor, value_profile, selected_period, selecte
         )
 
     )
-    print(        sql_query_indicators(
+    print(sql_query_indicators(
             selected_year,
             ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
             inogorodniy, sanction, amount_null,
