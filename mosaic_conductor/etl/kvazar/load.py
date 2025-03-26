@@ -130,8 +130,10 @@ def kvazar_load(context: OpExecutionContext, kvazar_transform: dict):
         with engine.connect() as connection:
             result = connection.execute(text("SELECT dagster_ip, dagster_port FROM home_mainsettings LIMIT 1"))
             row = result.fetchone()
+            # Преобразуем результат в список или dict, чтобы сделать его сериализуемым:
             if row:
-                dagster_base_url = f"http://{row[0]}:{row[1]}"
+                row = dict(row._mapping)  # преобразуем в dict
+                dagster_base_url = f"http://{row['dagster_ip']}:{row['dagster_port']}"
             else:
                 dagster_base_url = "http://127.0.0.1:3000"
         run_url = f"{dagster_base_url}/runs/{run_id}"
