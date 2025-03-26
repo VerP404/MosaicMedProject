@@ -17,7 +17,7 @@ type_page = "admin-update-data"
 # Словарь для отображения table_name
 table_name_map = {
     "load_data_talons": "Талоны из web-ОМС",
-    "some_other_table": "Другая таблица",
+    "data_loader_omsdata": "Талоны из web-ОМС. старая версия",
 }
 col_rename = {
     "table_name": "Название таблицы",
@@ -173,6 +173,7 @@ def update_table(n_clicks, start_date, end_date):
             run_url
         FROM load_data_loadlog
         WHERE DATE(start_time) BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY start_time DESC
     """
     columns, data = TableUpdater.query_to_df(engine, query)
 

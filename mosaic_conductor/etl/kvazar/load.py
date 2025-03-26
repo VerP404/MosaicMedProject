@@ -2,7 +2,9 @@ import os
 import json
 from dagster import asset, OpExecutionContext, Field, StringSource, AssetIn, String
 from django.utils import timezone
+from sqlalchemy import text
 
+from apps.analytical_app.query_executor import engine
 from mosaic_conductor.etl.common.universal_load import load_dataframe, save_load_log_pg
 
 
@@ -125,7 +127,13 @@ def kvazar_load(context: OpExecutionContext, kvazar_transform: dict):
 
         # Формируем run_url, используя run_id из context и базовый URL для Dagster.
         run_id = context.run_id if hasattr(context, "run_id") else "unknown"
-        dagster_base_url = "http://127.0.0.1:3000"  # Можно заменить или получить из конфигурации
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT dagster_ip, dagster_port FROM home_mainsettings LIMIT 1"))
+            row = result.fetchone()
+            if row:
+                dagster_base_url = f"http://{row[0]}:{row[1]}"
+            else:
+                dagster_base_url = "http://127.0.0.1:3000"
         run_url = f"{dagster_base_url}/runs/{run_id}"
 
         log_data = {
