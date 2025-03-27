@@ -2,25 +2,25 @@
 
 # Определение директории, в которой находится скрипт
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Переход в корневую директорию проекта (предполагается, что scripts находится в корне проекта)
+# Переход в корневую директорию проекта (предполагается, что скрипт находится в корне проекта)
 cd "$SCRIPT_DIR/.." || exit
 
-# Активация виртуального окружения
+echo "Активируем виртуальное окружение..."
 source .venv/bin/activate
 
-# Обновление кода
+echo "Обновляем код..."
 git pull
 
-# Установка зависимостей
+echo "Устанавливаем зависимости..."
 pip install -r requirements/base.txt
 
-# Выполнение миграций
+echo "Применяем миграции..."
 python3.12 manage.py migrate
 
-# Импорт данных из JSON
+echo "Импортируем данные из JSON..."
 python3.12 manage.py data_import
 
-# Создание папок для файлов с данными
+echo "Создаем необходимые папки..."
 python3.12 mosaic_conductor/etl/create_folders.py
 
 # Определение директорий для PID-файлов и логов
@@ -36,40 +36,54 @@ kill_process() {
   if [[ -f "$pidfile" ]]; then
     PID=$(cat "$pidfile")
     if kill -0 "$PID" 2>/dev/null; then
-      echo "Завершаем процесс с PID $PID (файл $pidfile)"
+      echo "Завершаем процесс с PID $PID (файл $pidfile)..."
       kill "$PID"
       sleep 2
       if kill -0 "$PID" 2>/dev/null; then
-        echo "Процесс $PID не завершился, принудительное завершение"
+        echo "Процесс $PID не завершился, выполняем принудительное завершение..."
         kill -9 "$PID"
+      else
+        echo "Процесс $PID успешно завершен."
       fi
     else
-      echo "Процесс из файла $pidfile не найден"
+      echo "Процесс из файла $pidfile не найден."
     fi
     rm -f "$pidfile"
+  else
+    echo "Файл $pidfile не существует, пропускаем."
   fi
 }
 
-# Завершение запущенных процессов, если PID-файлы существуют
+echo "Останавливаем запущенные процессы (если имеются)..."
 kill_process "$PID_DIR/django.pid"
 kill_process "$PID_DIR/analytical.pid"
 kill_process "$PID_DIR/chief.pid"
 kill_process "$PID_DIR/dagster.pid"
 
-# Перезапуск процессов с записью PID в соответствующие файлы
+# Функция для запуска процесса с nohup и сохранением его PID
+start_process() {
+  local cmd="$1"
+  local pidfile="$2"
+  local logfile="$3"
+  echo "Запускаем: $cmd"
+  nohup $cmd > "$logfile" 2>&1 &
+  NEW_PID=$!
+  echo "Новый процесс запущен с PID $NEW_PID"
+  echo $NEW_PID > "$pidfile"
+}
+
+echo "Перезапускаем процессы..."
 
 # Запуск сервера Django
-nohup python3.12 manage.py runserver 0.0.0.0:8000 > "$LOG_DIR/django.log" 2>&1 &
-echo $! > "$PID_DIR/django.pid"
+start_process "python3.12 manage.py runserver 0.0.0.0:8000" "$PID_DIR/django.pid" "$LOG_DIR/django.log"
 
 # Запуск аналитического приложения
-nohup python3.12 apps/analytical_app/index.py > "$LOG_DIR/analytical.log" 2>&1 &
-echo $! > "$PID_DIR/analytical.pid"
+start_process "python3.12 apps/analytical_app/index.py" "$PID_DIR/analytical.pid" "$LOG_DIR/analytical.log"
 
 # Запуск приложения Chief
-nohup python3.12 apps/chief_app/main.py > "$LOG_DIR/chief.log" 2>&1 &
-echo $! > "$PID_DIR/chief.pid"
+start_process "python3.12 apps/chief_app/main.py" "$PID_DIR/chief.pid" "$LOG_DIR/chief.log"
 
 # Запуск Dagster
-nohup python3.12 start_dagster.py --host 0.0.0.0 --port 3000 > "$LOG_DIR/dagster.log" 2>&1 &
-echo $! > "$PID_DIR/dagster.pid"
+start_process "python3.12 start_dagster.py --host 0.0.0.0 --port 3000" "$PID_DIR/dagster.pid" "$LOG_DIR/dagster.log"
+
+echo "Все процессы перезапущены."
