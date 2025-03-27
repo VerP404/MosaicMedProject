@@ -128,11 +128,11 @@ def kvazar_load(context: OpExecutionContext, kvazar_transform: dict):
         # Формируем run_url, используя run_id из context и базовый URL для Dagster.
         run_id = context.run_id if hasattr(context, "run_id") else "unknown"
         with engine.connect() as connection:
-            result = connection.execute(text("SELECT dagster_ip, dagster_port FROM home_mainsettings LIMIT 1"))
-            row = result.fetchone()
-            # Преобразуем результат в список или dict, чтобы сделать его сериализуемым:
+            query_result = connection.execute(text("SELECT dagster_ip, dagster_port FROM home_mainsettings LIMIT 1"))
+            row = query_result.fetchone()
+            # Преобразуем результат в dict, чтобы сделать его сериализуемым:
             if row:
-                row = dict(row._mapping)  # преобразуем в dict
+                row = dict(row._mapping)
                 dagster_base_url = f"http://{row['dagster_ip']}:{row['dagster_port']}"
             else:
                 dagster_base_url = "http://127.0.0.1:3000"
