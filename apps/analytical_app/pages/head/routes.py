@@ -11,6 +11,7 @@ from apps.analytical_app.pages.head.dispensary.children.main import head_childre
 from apps.analytical_app.pages.head.dispensary.children.tab1 import children_dn1
 from apps.analytical_app.pages.head.dispensary.children.tab2 import children_dn2
 from apps.analytical_app.pages.head.dispensary.children.tab3 import children_list_not_pn
+from apps.analytical_app.pages.head.dispensary.children.tab4 import children_unique
 from apps.analytical_app.pages.head.dispensary.reports.page import dispensary_reports
 from apps.analytical_app.pages.head.dispensary.reproductive.main import head_reproductive_main
 from apps.analytical_app.pages.head.dispensary.reproductive.tab1 import reproductive_dr1
@@ -126,7 +127,14 @@ routes_head = {
         ]),
         children_list_not_pn
     ]),
-
+    "/head/children/pn4": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансеризация детей", "href": "/head/children"},
+            {"label": "Уникальные дети в ПН", "active": True},
+        ]),
+        children_unique
+    ]),
     "/head/reproductive": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Заведующий", "href": "/head"},

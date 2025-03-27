@@ -18,6 +18,9 @@ cards_row_1 = dbc.Row(
         dbc.Col(create_card(3, type_page,
                             "Список прикрепленных детей",
                             "Список прикрепленных детей с отметками о наличии ПН1")),
+        dbc.Col(create_card(4, type_page,
+                            "Уникальные дети в ПН",
+                            "Уникальные дети в талонах диспансеризации детей")),
     ],
     className="mb-4 align-items-stretch",
 )
@@ -38,10 +41,11 @@ head_children_dd_main = html.Div([
     [Input(f'open-report-1-{type_page}', 'n_clicks'),
      Input(f'open-report-2-{type_page}', 'n_clicks'),
      Input(f'open-report-3-{type_page}', 'n_clicks'),
+     Input(f'open-report-4-{type_page}', 'n_clicks'),
      ],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3):
+def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4):
     ctx = callback_context
     if not ctx.triggered:
         return no_update, no_update
@@ -59,5 +63,7 @@ def navigate_pages(open_report_1, open_report_2, open_report_3):
     elif button_id == f'open-report-3-{type_page}' and open_report_3:
         breadcrumb_items.append({"active": True})
         return f'/{main_link}/pn3', breadcrumb_items
-
+    elif button_id == f'open-report-4-{type_page}' and open_report_4:
+        breadcrumb_items.append({"active": True})
+        return f'/{main_link}/pn4', breadcrumb_items
     return f'/{main_link}', breadcrumb_items

@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Переход в корневую директорию проекта (предполагается, что scripts находится в корне проекта)
 cd "$SCRIPT_DIR/.." || exit
 
+
 # Активация виртуального окружения
 source .venv/bin/activate
 

@@ -267,3 +267,127 @@ FROM naselenie n
 LEFT JOIN talon o ON n.enp = o.enp;
 
 """
+
+
+def query_uniq(selected_year):
+    return f"""
+WITH filtered AS (
+    SELECT
+        status::int,
+        enp,
+        department,
+        CASE
+            WHEN report_period = '-' THEN RIGHT(treatment_end, 4)
+            ELSE RIGHT(report_period, 4)
+        END AS report_year,
+        CASE
+            WHEN report_period = '-' THEN
+                CASE
+                    WHEN EXTRACT(DAY FROM CURRENT_DATE)::INT <= 4 THEN
+                        CASE
+                            WHEN TO_NUMBER(SUBSTRING(treatment_end FROM 4 FOR 2), '99')
+                                 = EXTRACT(MONTH FROM CURRENT_DATE) THEN
+                                EXTRACT(MONTH FROM CURRENT_DATE)::INT
+                            ELSE
+                                CASE
+                                    WHEN EXTRACT(MONTH FROM CURRENT_DATE)::INT = 1 THEN 12
+                                    ELSE EXTRACT(MONTH FROM CURRENT_DATE)::INT - 1
+                                END
+                        END
+                    ELSE EXTRACT(MONTH FROM CURRENT_DATE)::INT
+                END
+            ELSE
+                CASE TRIM(SUBSTRING(report_period FROM 1 FOR POSITION(' ' IN report_period) - 1))
+                    WHEN 'Января' THEN 1
+                    WHEN 'Февраля' THEN 2
+                    WHEN 'Марта' THEN 3
+                    WHEN 'Апреля' THEN 4
+                    WHEN 'Мая' THEN 5
+                    WHEN 'Июня' THEN 6
+                    WHEN 'Июля' THEN 7
+                    WHEN 'Августа' THEN 8
+                    WHEN 'Сентября' THEN 9
+                    WHEN 'Октября' THEN 10
+                    WHEN 'Ноября' THEN 11
+                    WHEN 'Декабря' THEN 12
+                    ELSE NULL
+                END
+        END AS month,
+        EXTRACT(YEAR FROM to_date(treatment_end, 'DD-MM-YYYY')) AS year,
+        COUNT(*) OVER (PARTITION BY enp) AS enp_count
+    FROM data_loader_omsdata
+    WHERE goal = 'ПН1'
+      AND treatment_end LIKE '%{selected_year}%'
+      AND enp != '-'
+      AND smo_code LIKE '360%'
+),
+has_status_3 AS (
+    SELECT enp
+    FROM filtered
+    WHERE status = 3
+    GROUP BY enp
+),
+prioritized AS (
+    SELECT f.*,
+           CASE
+               WHEN f.status = 3 THEN 0
+               ELSE
+                   CASE f.status
+                       WHEN 2 THEN 1
+                       WHEN 4 THEN 2
+                       WHEN 6 THEN 3
+                       WHEN 8 THEN 4
+                       WHEN 1 THEN 5
+                       WHEN 5 THEN 6
+                       WHEN 7 THEN 7
+                       WHEN 12 THEN 8
+                       WHEN 13 THEN 9
+                       WHEN 17 THEN 10
+                       WHEN 0 THEN 11
+                       ELSE 99
+                   END
+           END AS status_priority,
+           CASE WHEN hs.enp IS NOT NULL THEN true ELSE false END AS has_status_3
+    FROM filtered f
+    LEFT JOIN has_status_3 hs ON f.enp = hs.enp
+),
+ranked AS (
+    SELECT *,
+           ROW_NUMBER() OVER (
+               PARTITION BY enp
+               ORDER BY
+                   CASE WHEN has_status_3 THEN CASE WHEN status = 3 THEN 0 ELSE 1 END ELSE 0 END,
+                   month,
+                   status_priority
+           ) AS rank
+    FROM prioritized
+),
+data AS (
+    SELECT *
+    FROM ranked
+    WHERE rank = 1
+)
+SELECT
+    month,
+    department,
+    SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS "Оплачено",
+    SUM(CASE WHEN status IN (3,1,2,4,6,8) THEN 1 ELSE 0 END) AS "В работе",
+    SUM(CASE WHEN status IN (5,7,12) THEN 1 ELSE 0 END) AS "Отказано",
+    SUM(CASE WHEN status NOT IN (3,1,2,4,6,8,5,7,12) THEN 1 ELSE 0 END) AS "Отменено",
+    SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS "1",
+    SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) AS "2",
+    SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS "3",
+    SUM(CASE WHEN status = 4 THEN 1 ELSE 0 END) AS "4",
+    SUM(CASE WHEN status = 5 THEN 1 ELSE 0 END) AS "5",
+    SUM(CASE WHEN status = 6 THEN 1 ELSE 0 END) AS "6",
+    SUM(CASE WHEN status = 7 THEN 1 ELSE 0 END) AS "7",
+    SUM(CASE WHEN status = 8 THEN 1 ELSE 0 END) AS "8",
+    SUM(CASE WHEN status = 12 THEN 1 ELSE 0 END) AS "12",
+    SUM(CASE WHEN status = 13 THEN 1 ELSE 0 END) AS "13",
+    SUM(CASE WHEN status = 17 THEN 1 ELSE 0 END) AS "17",
+    SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) AS "0",
+    COUNT(*) AS total_count
+FROM data
+GROUP BY month, department
+ORDER BY month, department
+    """
