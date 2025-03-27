@@ -65,6 +65,21 @@ def kvazar_load(context: OpExecutionContext, kvazar_transform: dict):
     mapping_file = context.op_config["mapping_file"]
     enable_logging = context.op_config.get("enable_logging", True)
 
+    # Получаем count_before из БД до начала загрузки
+    try:
+        with engine.connect() as connection:
+            if "normal" in kvazar_transform and "complex" in kvazar_transform:
+                normal_table = kvazar_transform["normal"]["table_name"]
+                complex_table = kvazar_transform["complex"]["table_name"]
+                count_normal = connection.execute(text(f"SELECT COUNT(*) FROM {normal_table}")).scalar() or 0
+                count_complex = connection.execute(text(f"SELECT COUNT(*) FROM {complex_table}")).scalar() or 0
+                count_before = count_normal + count_complex
+            else:
+                count_before = connection.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar() or 0
+    except Exception as e:
+        context.log.info(f"Не удалось получить count_before из БД: {e}")
+        count_before = 0
+
     # Замер времени начала загрузки
     start_time = timezone.now()
     result = None
@@ -123,14 +138,12 @@ def kvazar_load(context: OpExecutionContext, kvazar_transform: dict):
                 count_after = result.get("final_count", 0)
         else:
             count_after = 0
-        count_before = 0  # При необходимости можно получить из БД до загрузки
 
         # Формируем run_url, используя run_id из context и базовый URL для Dagster.
         run_id = context.run_id if hasattr(context, "run_id") else "unknown"
         with engine.connect() as connection:
             query_result = connection.execute(text("SELECT dagster_ip, dagster_port FROM home_mainsettings LIMIT 1"))
             row = query_result.fetchone()
-            # Преобразуем результат в dict, чтобы сделать его сериализуемым:
             if row:
                 row = dict(row._mapping)
                 dagster_base_url = f"http://{row['dagster_ip']}:{row['dagster_port']}"
