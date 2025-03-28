@@ -59,7 +59,7 @@ class Person(models.Model):
 
     class Meta:
         verbose_name = "Физическое лицо"
-        verbose_name_plural = "Врачи"
+        verbose_name_plural = "Физические лица"
         ordering = ['last_name', 'first_name']
 
     @property

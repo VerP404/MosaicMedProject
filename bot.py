@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import asyncio  # Импортируем asyncio для запуска event loop
 
 from asgiref.sync import sync_to_async
 
@@ -30,27 +31,45 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Приветствие. Бот приветствует пользователя от имени медицинской организации, привязанной к боту.
-    """
-    user = update.effective_user
-    # Получаем объект бота
-    bot_entry = TelegramBot.objects.filter(alias="main_bot").first()
-    org_name = "Неизвестная организация"
-    if bot_entry and hasattr(bot_entry, "organization") and bot_entry.organization:
-        org_name = bot_entry.organization.name
-    greeting = (
-        f"Вас приветствует административный бот «{org_name}».\n"
-        "Для просмотра ваших групп используйте команду /mygroups"
-    )
-    logger.info("Пользователь %s (%s) вызвал /start", user.id, user.first_name)
-    await update.message.reply_text(greeting)
+@sync_to_async
+def get_bot_entry():
+    return TelegramBot.objects.filter(alias="main_bot").first()
 
 
 @sync_to_async
 def get_person_by_telegram(telegram_id: str):
     return Person.objects.filter(telegram=telegram_id).first()
+
+
+@sync_to_async
+def get_first_org():
+    return MedicalOrganization.objects.first()
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Приветствие. Бот приветствует пользователя от имени медицинской организации, привязанной к боту.
+    """
+    user = update.effective_user
+    org = await get_first_org()
+    org_name = org.name if org else "Неизвестная организация"
+    greeting = (
+        f"Вас приветствует административный бот «{org_name}».\n"
+        "Для просмотра Ваших групп используйте команду /mygroups\n"
+        "Чтобы узнать свой Telegram ID, используйте команду /myid"
+    )
+    logger.info("Пользователь %s (%s) вызвал /start", user.id, user.first_name)
+    await update.message.reply_text(greeting)
+
+
+async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Выводит Telegram ID пользователя.
+    """
+    user = update.effective_user
+    await update.message.reply_text(
+        f"Ваш Telegram ID: {user.id}. "
+        f"\nДля привязки Вашего телеграм-аккаунта к Вашей учетной записи в системе, передайте id администратору")
 
 
 async def mygroups(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -72,8 +91,7 @@ async def mygroups(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         response = "Вы состоите в следующих группах:\n"
         req = HTTPXRequest(connect_timeout=20, read_timeout=20)
-        # Используем токен основного бота для генерации приглашений
-        bot_entry = TelegramBot.objects.filter(alias="main_bot").first()
+        bot_entry = await get_bot_entry()
         if not bot_entry:
             await update.message.reply_text("Ошибка: не найден основной бот.")
             return
@@ -95,7 +113,13 @@ async def mygroups(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
-    bot_entry = TelegramBot.objects.filter(alias="main_bot").first()
+    import asyncio
+    # Создаем и устанавливаем новый event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Получаем объект бота через синхронную обёртку
+    bot_entry = loop.run_until_complete(get_bot_entry())
     if not bot_entry:
         raise Exception("Бот с alias='main_bot' не найден.")
     token = bot_entry.token
@@ -109,9 +133,10 @@ def main():
         .build()
     )
 
-    # Регистрируем только команды /start и /mygroups
+    # Регистрируем команды /start, /mygroups и /myid
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("mygroups", mygroups))
+    application.add_handler(CommandHandler("myid", myid))
 
     logger.info("Бот запущен. Начинаем polling.")
     application.run_polling()
