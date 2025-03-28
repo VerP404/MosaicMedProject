@@ -49,6 +49,13 @@ class Person(models.Model):
     phone_number = models.CharField("Номер телефона", max_length=20, blank=True, null=True)
     telegram = models.CharField("Телеграм", max_length=100, blank=True, null=True)
     citizenship = models.IntegerField("Гражданство", choices=CITIZENSHIP_CHOICES, default=1)
+    # Добавляем связь с группами Telegram (связь ManyToMany)
+    telegram_groups = models.ManyToManyField(
+        "home.TelegramGroup",
+        blank=True,
+        verbose_name="Телеграм группы",
+        related_name="persons"
+    )
 
     class Meta:
         verbose_name = "Физическое лицо"
@@ -128,6 +135,7 @@ class PostRG014(models.Model):
         verbose_name = "Должность RG014"
         verbose_name_plural = "Справочник: Должности RG014"
         ordering = ["description"]
+
     def __str__(self):
         return f"{self.code} - {self.description}"
 

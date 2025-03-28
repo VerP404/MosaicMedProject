@@ -1,6 +1,6 @@
 from import_export import resources, fields
 from import_export.widgets import DateWidget, CharWidget
-from .models import DigitalSignature, PostRG014
+from .models import DigitalSignature, PostRG014, SpecialtyRG014
 
 
 class DigitalSignatureResource(resources.ModelResource):
@@ -73,6 +73,25 @@ class PostRG014Resource(resources.ModelResource):
         # именно 'code' используем в качестве поля-идентификатора
         import_id_fields = ('code',)
         # указываем, какие поля хотим импортировать/экспортировать
+        fields = ('code', 'description')
+        skip_unchanged = True
+        report_skipped = True
+
+class SpecialtyRG014Resource(resources.ModelResource):
+    code = fields.Field(
+         column_name='code',
+         attribute='code',
+         widget=CharWidget()
+    )
+    description = fields.Field(
+         column_name='description',
+         attribute='description',
+         widget=CharWidget()
+    )
+
+    class Meta:
+        model = SpecialtyRG014
+        import_id_fields = ('code',)
         fields = ('code', 'description')
         skip_unchanged = True
         report_skipped = True

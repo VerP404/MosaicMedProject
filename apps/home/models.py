@@ -49,3 +49,40 @@ class MainSettings(models.Model):
     class Meta:
         verbose_name = "Настройка"
         verbose_name_plural = "Настройки"
+
+
+class TelegramBot(models.Model):
+    name = models.CharField("Название бота", max_length=100)
+    alias = models.CharField("Псевдоним", max_length=50, unique=True, help_text="Уникальный идентификатор бота")
+    bot_id = models.CharField("ID бота", max_length=100, unique=True)
+    token = models.CharField("Токен/Пароль бота", max_length=255)
+    additional_password = models.CharField("Дополнительный пароль", max_length=255, blank=True, null=True)
+
+    # При необходимости можно связать бота с конкретными настройками:
+    # settings = models.ForeignKey(MainSettings, on_delete=models.CASCADE, related_name='telegram_bots', blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Телеграм бот"
+        verbose_name_plural = "Телеграм боты"
+
+
+class TelegramGroup(models.Model):
+    bot = models.ForeignKey(
+        TelegramBot,
+        on_delete=models.CASCADE,
+        related_name='groups',
+        verbose_name="Бот"
+    )
+    group_id = models.CharField("ID группы", max_length=100, unique=True)
+    name = models.CharField("Название группы", max_length=100)
+    description = models.TextField("Описание группы", blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.group_id})"
+
+    class Meta:
+        verbose_name = "Телеграм группа"
+        verbose_name_plural = "Телеграм группы"

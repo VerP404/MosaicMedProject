@@ -1,19 +1,20 @@
 import csv
+
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
 from django.http import HttpResponse
-from django.urls import path
+from django.urls import path, reverse
 from django.contrib import messages
 from django.utils.html import format_html
 from django.shortcuts import render, redirect
-from import_export import resources
 from import_export.admin import ImportExportModelAdmin
 from unfold.admin import TabularInline, ModelAdmin
 
 from .forms import *
 from .models import *
-from .resource import DigitalSignatureResource, PostRG014Resource
+from .resource import DigitalSignatureResource, PostRG014Resource, SpecialtyRG014Resource
 from ..data_loader.models.oms_data import *
+from ..home.models import TelegramGroup
 from ..organization.models import MiskauzDepartment, OMSDepartment
 
 
@@ -21,8 +22,8 @@ class DoctorRecordInline(TabularInline):
     model = DoctorRecord
     form = DoctorRecordForm
     extra = 0
-    fields = (
-        'doctor_code', 'start_date', 'end_date', 'department', 'specialty', 'profile',)
+    autocomplete_fields = ('specialty', 'profile')
+    fields = ('doctor_code', 'start_date', 'end_date', 'department', 'specialty', 'profile',)
     verbose_name = "Запись врача"
     verbose_name_plural = "Записи врача"
 
@@ -396,12 +397,28 @@ class DoctorRecordAdmin(ModelAdmin):
         })
 
 
+# Кастомный фильтр для отбора по Telegram группам
+class TelegramGroupFilter(SimpleListFilter):
+    title = 'Телеграм группы'
+    parameter_name = 'telegram_group'
+
+    def lookups(self, request, model_admin):
+        groups = TelegramGroup.objects.all()
+        return [(group.pk, group.name) for group in groups]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(telegram_groups__pk=self.value())
+        return queryset
+
+
 @admin.register(Person)
 class PersonAdmin(ModelAdmin):
-    list_display = ('last_name', 'first_name', 'snils', 'email', 'phone_number', 'telegram', 'digital_signature_status',
-                    'maternity_leave_status')
+    list_display = ('fio_dob', 'phone_number', 'telegram', 'digital_signature_status', 'maternity_leave_status')
     search_fields = ('last_name', 'first_name', 'patronymic', 'snils', 'email', 'phone_number', 'telegram')
-    list_filter = ('citizenship', DigitalSignatureFilter, MaternityLeaveFilter, DigitalSignatureApplicationFilter)
+    list_filter = (
+        'citizenship', TelegramGroupFilter, DigitalSignatureFilter, MaternityLeaveFilter,
+        DigitalSignatureApplicationFilter)
     fieldsets = (
         ("Персональные данные", {
             "classes": ("four-columns",),
@@ -411,18 +428,27 @@ class PersonAdmin(ModelAdmin):
             "classes": ("three-columns",),
             'fields': ('snils', 'gender', 'citizenship')
         }),
-
         ('Контакты', {
-            "classes": ("three-columns",),
+            "classes": ("four-columns",),
             'fields': ('email', 'phone_number', 'telegram')
+        }),
+        ('Телеграм', {
+            'fields': ('telegram_groups',)
         }),
     )
     inlines = [DoctorRecordInline, RG014Inline, DigitalSignatureInline, MaternityLeaveInline]
+    filter_horizontal = ('telegram_groups',)
+    list_per_page = 15
+
+    def get_readonly_fields(self, request, obj=None):
+        if not request.user.is_superuser:
+            return self.readonly_fields + ('telegram_groups',)
+        return self.readonly_fields
 
     def get_queryset(self, request):
-        queryset = super().get_queryset(request)
-        queryset = queryset.prefetch_related('doctor_records')  # Для оптимизации запросов
-        return queryset
+        qs = super().get_queryset(request)
+        qs = qs.prefetch_related('doctor_records', 'telegram_groups', 'maternity_leaves')
+        return qs
 
     def digital_signature_status(self, obj):
         today = date.today()
@@ -440,6 +466,20 @@ class PersonAdmin(ModelAdmin):
         return format_html('<span style="color: red;">✘</span>')
 
     maternity_leave_status.short_description = "В декрете"
+
+    def fio_dob(self, obj):
+        """
+        Возвращает ФИО сотрудника и дату рождения (в формате дд.мм.гггг) в виде ссылки на change page.
+        """
+        dob = obj.date_of_birth.strftime("%d.%m.%Y") if obj.date_of_birth else ""
+        # Формируем URL для перехода на страницу редактирования (пример; скорректируйте reverse, если нужно)
+        url = reverse("admin:personnel_person_change", args=[obj.pk])
+        return format_html("<a href='{}'>{} {}</a>", url, obj.__str__(), dob)
+
+    fio_dob.short_description = "ФИО, ДР"
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(RG014)
@@ -510,6 +550,7 @@ class ProfileAdmin(ModelAdmin):
 
 @admin.register(SpecialtyRG014)
 class SpecialtyRG014Admin(ModelAdmin):
+    resource_class = SpecialtyRG014Resource
     list_display = ('code', 'description')
     search_fields = ('code', 'description')
 

@@ -39,3 +39,17 @@ class MainSettingsAdmin(ModelAdmin):
         if count >= 1:
             return False  # Если запись уже существует, запрещаем создание новой
         return True  # Если записей нет, разрешаем создание
+
+
+@admin.register(TelegramBot)
+class TelegramBotAdmin(ModelAdmin):
+    list_display = ('name', 'bot_id', 'token', 'additional_password')
+    search_fields = ('name', 'bot_id')
+    list_filter = ()
+
+
+@admin.register(TelegramGroup)
+class TelegramGroupAdmin(ModelAdmin):
+    list_display = ('name', 'group_id', 'bot')
+    search_fields = ('name', 'group_id')
+    list_filter = ('bot',)

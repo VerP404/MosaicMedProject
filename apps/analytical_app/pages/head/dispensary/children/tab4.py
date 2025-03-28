@@ -54,7 +54,7 @@ children_unique = html.Div([
             },
             # Свернуть группу "Статусы" по умолчанию (groupId указан в columnDefs)
             "columnState": [
-                {"colId": "statusesGroup", "open": False,}
+                {"colId": "statusesGroup", "open": False}
             ]
         }
     )
