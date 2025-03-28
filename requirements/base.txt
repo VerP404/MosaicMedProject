@@ -33,3 +33,5 @@ django-unfold==0.51.0
 dagster==1.10.5
 dagit==1.10.5
 dash_ag_grid==31.3.1
+
+python-telegram-bot==22.0
