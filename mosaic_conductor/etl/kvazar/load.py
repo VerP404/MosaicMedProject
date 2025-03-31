@@ -1,5 +1,6 @@
 import os
 import json
+import pandas as pd
 from dagster import asset, OpExecutionContext, Field, StringSource, AssetIn, String
 from django.utils import timezone
 from sqlalchemy import text
@@ -19,6 +20,7 @@ def clear_data_folder(data_folder):
             print(f"Удалён файл: {path}")
         except Exception as e:
             print(f"Не удалось удалить {path}: {e}")
+
 
 def kvazar_sql_generator(data, table_name, mapping_file):
     if not os.path.exists(mapping_file):
@@ -51,6 +53,7 @@ def kvazar_sql_generator(data, table_name, mapping_file):
         """
         yield sql, tuple(row[col] for col in cols)
 
+
 @asset(
     config_schema={
         "table_name": Field(StringSource, is_required=True, description="Имя таблицы для загрузки"),
@@ -80,33 +83,40 @@ def kvazar_load(context: OpExecutionContext, kvazar_transform: dict):
         context.log.info(f"Не удалось получить count_before из БД: {e}")
         count_before = 0
 
-    # Замер времени начала загрузки
     start_time = timezone.now()
     result = None
     error_occurred = False
     error_code = None
+
+    # Функция-обёртка для загрузки, которая в случае ошибки выводит сводную статистику по длинам строк
+    def safe_load_dataframe(table, data):
+        try:
+            return load_dataframe(
+                context,
+                table,
+                data,
+                db_alias="default",
+                mapping_file=mapping_file,
+                sql_generator=lambda d, t: kvazar_sql_generator(d, t, mapping_file)
+            )
+        except Exception as exc:
+            context.log.error(f"Ошибка загрузки данных в таблицу {table}: {exc}")
+            # Вычисляем максимальную длину строк по столбцам
+            max_lengths = data.astype(str).applymap(len).max()
+            stats_df = pd.DataFrame({
+                'Столбец': max_lengths.index,
+                'Макс. длина строки': max_lengths.values
+            })
+            context.log.info(f"ℹ️ Статистика длин значений в DataFrame:\n{stats_df.to_string(index=False)}")
+            raise exc
 
     try:
         if "normal" in kvazar_transform and "complex" in kvazar_transform:
             normal_payload = kvazar_transform["normal"]
             complex_payload = kvazar_transform["complex"]
             context.log.info("ℹ️ Загружаются данные для нормальных и комплексных талонов")
-            result_normal = load_dataframe(
-                context,
-                normal_payload["table_name"],
-                normal_payload["data"],
-                db_alias="default",
-                mapping_file=mapping_file,
-                sql_generator=lambda d, t: kvazar_sql_generator(d, t, mapping_file)
-            )
-            result_complex = load_dataframe(
-                context,
-                complex_payload["table_name"],
-                complex_payload["data"],
-                db_alias="default",
-                mapping_file=mapping_file,
-                sql_generator=lambda d, t: kvazar_sql_generator(d, t, mapping_file)
-            )
+            result_normal = safe_load_dataframe(normal_payload["table_name"], normal_payload["data"])
+            result_complex = safe_load_dataframe(complex_payload["table_name"], complex_payload["data"])
             result = {"normal": result_normal, "complex": result_complex}
         else:
             data = kvazar_transform.get("data")
@@ -114,14 +124,7 @@ def kvazar_load(context: OpExecutionContext, kvazar_transform: dict):
                 context.log.info(f"ℹ️ Нет данных для загрузки в таблицу {table_name}.")
                 result = {"table_name": table_name, "status": "skipped"}
             else:
-                result = load_dataframe(
-                    context,
-                    table_name,
-                    data,
-                    db_alias="default",
-                    mapping_file=mapping_file,
-                    sql_generator=lambda d, t: kvazar_sql_generator(d, t, mapping_file)
-                )
+                result = safe_load_dataframe(table_name, data)
         clear_data_folder(data_folder)
         context.log.info(f"✅ Папка {data_folder} очищена")
     except Exception as exc:

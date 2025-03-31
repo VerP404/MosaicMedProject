@@ -18,13 +18,15 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
       1. Загружает маппинг из mapping.json, переименовывает столбцы согласно mapping_fields.
       2. Проверяет наличие обязательных столбцов.
       3. Ограничивает DataFrame только ожидаемыми столбцами.
-      4. Заполняет отсутствующие столбцы из БД дефолтным значением "-".
-      5. Если данные талонов (is_talon=True или table_name в talonных таблицах),
+      4. Если в mapping.json задано новое поле "check_fields", удаляет строки, в которых
+         отсутствуют значения в указанных столбцах.
+      5. Заполняет отсутствующие столбцы из БД дефолтным значением "-".
+      6. Если данные талонов (is_talon=True или table_name в талонных таблицах),
          то гарантированно добавляет столбец is_complex с булевым значением,
          а затем, на основе группировки по (talon, source), для групп с более чем одной записью
          устанавливает is_complex = True.
-      6. Если обрабатываются талоны, дополнительно вычисляются report_year и report_month.
-      7. Возвращает либо единый DataFrame, либо словарь с ветками "normal" и "complex".
+      7. Если обрабатываются талоны, дополнительно вычисляются report_year и report_month.
+      8. Возвращает либо единый DataFrame, либо словарь с ветками "normal" и "complex".
     """
     config = context.op_config
     mapping_file = config["mapping_file"]
@@ -65,6 +67,19 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
         context.log.info(f"⚠️ Лишние после переименования: {extra_after_rename}. Они будут проигнорированы.")
     df = df[expected_cols]
 
+    # ФИЛЬТРАЦИЯ: если в mapping задано поле "check_fields", удаляем строки,
+    # где в указанных столбцах отсутствуют значения.
+    check_fields = table_config.get("check_fields", [])
+    if check_fields:
+        original_len = len(df)
+        # Здесь предполагается, что в check_fields указаны именно имена, после переименования (new names)
+        df = df.dropna(subset=check_fields)
+        context.log.info(
+            f"⚠️ Отфильтровано строк: {original_len - len(df)} (удалены строки с пустыми значениями в столбцах: {check_fields})"
+        )
+    else:
+        context.log.info("Поле 'check_fields' не задано – пропускаем фильтрацию по пустым значениям.")
+
     # Заполнение отсутствующих столбцов из БД дефолтным значением "-"
     engine, conn = connect_to_db(organization=ORGANIZATIONS, context=context)
     sql = f"""
@@ -86,13 +101,10 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
             df[col] = "-"
 
     # Если обрабатываются талоны, гарантируем заполнение столбца is_complex булевым значением.
-    # Это либо если is_talon=True, либо если таблица соответствует талонным данным.
     if config.get("is_talon", False) or table_name in ["load_data_talons", "load_data_complex_talons"]:
         context.log.info("ℹ️ Обработка данных талонов – гарантируем наличие столбца is_complex как boolean.")
-        # Переопределяем столбец is_complex (если он добавлен из БД) на значение False
         df["is_complex"] = False
 
-        # Вычисляем report_year и report_month
         def compute_report_year(report_period, treatment_end):
             return treatment_end[-4:] if report_period == '-' else report_period[-4:]
         def compute_report_month(report_period, treatment_end):
@@ -114,18 +126,17 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
         df['report_year'] = df.apply(lambda row: compute_report_year(row['report_period'], row['treatment_end']), axis=1)
         df['report_month'] = df.apply(lambda row: compute_report_month(row['report_period'], row['treatment_end']), axis=1)
 
-        # Группируем по (talon, source) и помечаем строки как комплексные, если группа больше одной записи
         grouped = df.groupby(["talon", "source"])
         for (talon, source), group in grouped:
             if len(group) > 1:
                 df.loc[group.index, "is_complex"] = True
-        # Гарантируем, что столбец is_complex заполнен и имеет тип bool
         df["is_complex"] = df["is_complex"].fillna(False).astype(bool)
 
-        # Разбиваем данные на две группы: нормальные и комплексные
         normal_df = df[df["is_complex"] == False].copy()
         complex_df = df[df["is_complex"] == True].copy()
-        context.log.info(f"🔄 Трансформация завершена. Всего строк: {len(df)}. Нормальных: {len(normal_df)}, Комплексных: {len(complex_df)}.")
+        context.log.info(
+            f"🔄 Трансформация завершена. Всего строк: {len(df)}. Нормальных: {len(normal_df)}, Комплексных: {len(complex_df)}."
+        )
         return {
             "normal": {"table_name": "load_data_talons", "data": normal_df},
             "complex": {"table_name": "load_data_complex_talons", "data": complex_df}

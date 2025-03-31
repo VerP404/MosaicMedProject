@@ -420,7 +420,10 @@
         "UNEMP": "unemp"
       },
       "column_check": [
-        "pid"
+        "pdwID"
+      ],
+      "check_fields": [
+        "date_update_list"
       ],
       "encoding": "cp1251",
       "delimiter": ";"

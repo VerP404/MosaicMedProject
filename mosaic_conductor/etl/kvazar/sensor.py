@@ -9,7 +9,7 @@ from config.settings import ORGANIZATIONS
 from mosaic_conductor.etl.kvazar import kvazar_job_eln, kvazar_job_emd, kvazar_job_recipes, kvazar_job_death, \
     kvazar_job_reference, iszl_job_dn, wo_old_job_talon, wo_old_job_doctors, wo_job_talon
 
-MIN_FILE_AGE_SECONDS = 60
+MIN_FILE_AGE_SECONDS = 30
 
 
 def _load_state(context) -> dict:
@@ -29,7 +29,6 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
     def _sensor(context):
         sensor_state = _load_state(context)  # {filename: run_key}
 
-        # Проверяем наличие mapping.json
         if not os.path.exists(mapping_file):
             context.log.info(f"❌ Файл маппинга {mapping_file} не найден.")
             yield SkipReason("Mapping file not found.")
@@ -43,7 +42,6 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
             yield SkipReason("Mapping config for table not found.")
             return
 
-        # Проверяем наличие папки с данными
         if not os.path.exists(data_folder):
             context.log.info(f"❌ Папка {data_folder} не найдена.")
             yield SkipReason("Data folder not found.")
@@ -59,7 +57,6 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
         valid_files = []
         invalid_files = []
 
-        # Получаем шаблон файлов
         file_pattern = table_config.get("file", {}).get("file_pattern", "")
         file_format = table_config.get("file", {}).get("file_format", "")
         valid_pattern = f"{file_pattern}.{file_format}"
@@ -111,19 +108,27 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
                         del sensor_state[file]
                         continue
                     elif matching_run.is_failure:
-                        context.log.warning(f"Файл {file} завершился ошибкой. Перезапускаем.")
+                        # Если запуск завершился ошибкой – перемещаем файл в папку ошибок
+                        error_folder = os.path.join(data_folder, "errors")
+                        os.makedirs(error_folder, exist_ok=True)
+                        new_file_name = f"{file}_{int(time.time())}_error"
+                        new_file_path = os.path.join(error_folder, new_file_name)
+                        try:
+                            os.rename(os.path.join(data_folder, file), new_file_path)
+                            context.log.warning(f"Файл {file} завершился ошибкой. Перемещён в {new_file_path}.")
+                        except Exception as e:
+                            context.log.error(f"Ошибка перемещения файла {file} в папку ошибок: {e}")
                         del sensor_state[file]
+                        continue
 
             if file not in sensor_state:
                 new_run_key = f"{file}-{int(time.time())}"
                 context.log.info(f"Запуск процесса обновления для файла {file} c run_key={new_run_key}.")
-
-                # ✅ Добавляем ВСЕ блоки в конфиг:
                 run_config = {
                     "ops": {
                         "kvazar_db_check": {
                             "config": {
-                                "organization": ORGANIZATIONS,  # можно заменить на реальный список
+                                "organization": ORGANIZATIONS,
                                 "tables": [table_name]
                             }
                         },
@@ -131,7 +136,7 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
                             "config": {
                                 "data_folder": data_folder,
                                 "mapping_file": mapping_file,
-                                "table_name": table_name,
+                                "table_name": table_name
                             }
                         },
                         "kvazar_transform": {

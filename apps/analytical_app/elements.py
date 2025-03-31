@@ -5,7 +5,7 @@ from apps.analytical_app.components.filters import get_current_reporting_month, 
 
 
 # Функция для создания таблицы с возможностью выбора колонок
-def card_table(id_table, card_header, page_size=None, column_selectable=None, show_sum_button=False):
+def card_table(id_table, card_header, page_size=None, column_selectable=None, row_selectable=None, hidden_columns=None, show_sum_button=False):
     table_kwargs = {
         'id': id_table,
         'editable': False,
@@ -23,6 +23,12 @@ def card_table(id_table, card_header, page_size=None, column_selectable=None, sh
 
     if column_selectable is not None:
         table_kwargs['column_selectable'] = column_selectable
+
+    if row_selectable is not None:
+        table_kwargs['row_selectable'] = row_selectable
+
+    if hidden_columns is not None:
+        table_kwargs['hidden_columns'] = hidden_columns
 
     sum_button_section = dbc.Row([
         dbc.Col(html.Button("Суммировать", id=f'sum-button-{id_table}',
@@ -52,6 +58,7 @@ def card_table(id_table, card_header, page_size=None, column_selectable=None, sh
             style={"margin": "0 auto", "padding": "0rem"}
         )
     )
+
 
 
 def get_selected_period(selected_months_range, selected_year, current_month_name):

@@ -36,8 +36,7 @@ def create_job(job_name, table_name, data_folder, mapping_file="mapping.json"):
                 "kvazar_transform": {
                     "config": {
                         "mapping_file": f"mosaic_conductor/etl/config/{mapping_file}",
-                        "table_name": table_name,
-                        "is_talon": True
+                        "table_name": table_name
                     }
                 },
                 "kvazar_load": {

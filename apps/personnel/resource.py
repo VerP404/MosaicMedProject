@@ -77,16 +77,17 @@ class PostRG014Resource(resources.ModelResource):
         skip_unchanged = True
         report_skipped = True
 
+
 class SpecialtyRG014Resource(resources.ModelResource):
     code = fields.Field(
-         column_name='code',
-         attribute='code',
-         widget=CharWidget()
+        column_name='code',
+        attribute='code',
+        widget=CharWidget()
     )
     description = fields.Field(
-         column_name='description',
-         attribute='description',
-         widget=CharWidget()
+        column_name='description',
+        attribute='description',
+        widget=CharWidget()
     )
 
     class Meta:

@@ -549,7 +549,7 @@ class ProfileAdmin(ModelAdmin):
 
 
 @admin.register(SpecialtyRG014)
-class SpecialtyRG014Admin(ModelAdmin):
+class SpecialtyRG014Admin(ImportExportModelAdmin, ModelAdmin):
     resource_class = SpecialtyRG014Resource
     list_display = ('code', 'description')
     search_fields = ('code', 'description')

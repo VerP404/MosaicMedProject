@@ -215,9 +215,9 @@ class PopulationISZL(TimeStampedModel):
 
 
 class DispanseryISZL(TimeStampedModel):
-    pid = models.CharField("pID", max_length=50, unique=True)
+    pid = models.CharField("pID", max_length=50)
     ldwid = models.CharField("ldwID", max_length=50)
-    pdwid = models.CharField("pdwID", max_length=50)
+    pdwid = models.CharField("pdwID", max_length=50, unique=True)
     fio = models.CharField("FIO", max_length=255)
     dr = models.CharField("DR", max_length=50)
     ds = models.CharField("DS", max_length=50)
