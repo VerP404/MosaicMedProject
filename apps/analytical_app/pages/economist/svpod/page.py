@@ -16,8 +16,8 @@ from apps.analytical_app.query_executor import engine
 type_page = "econ-sv-pod"
 
 
-# Функция для получения опций уровня
 def get_level_options(parent_id=None):
+    """Возвращает список опций для выбора уровня."""
     if parent_id is None:
         query = "SELECT DISTINCT id, name FROM plan_groupindicators WHERE parent_id IS NULL"
     else:
@@ -26,7 +26,6 @@ def get_level_options(parent_id=None):
     return [{'label': level['name'], 'value': level['id']} for _, level in levels.iterrows()]
 
 
-# Макет с контейнером для динамических выпадающих списков
 economist_sv_pod = html.Div(
     [
         dbc.Row(
@@ -41,8 +40,7 @@ economist_sv_pod = html.Div(
                                 dbc.Col(dbc.Alert(
                                     "Отобраны талоны: без санкций, местные (по полису ОМС), сумма талона не равна 0",
                                     color="primary"), width=8),
-                            ]
-                            ),
+                            ]),
                             dbc.Row([
                                 html.Div(id='dropdown-container', children=[
                                     dbc.Col(
@@ -56,8 +54,8 @@ economist_sv_pod = html.Div(
                                     ),
                                 ]),
                             ]),
-                            html.Div(
-                                [
+                            dbc.Row([
+                                dbc.Col(
                                     dcc.RadioItems(
                                         id=f'mode-toggle-{type_page}',
                                         options=[
@@ -68,16 +66,41 @@ economist_sv_pod = html.Div(
                                         inline=True,
                                         labelStyle={'margin-right': '15px'}
                                     ),
-                                    dcc.Checklist(  # Добавляем кнопку "Уникальные пациенты"
+                                    width=4
+                                ),
+                                dbc.Col(
+                                    dcc.Checklist(
                                         id=f'unique-toggle-{type_page}',
                                         options=[{"label": "Уникальные пациенты", "value": "unique"}],
                                         value=[],  # По умолчанию выключено
                                         inline=True,
                                         style={"margin-left": "20px"}
                                     ),
-                                ],
-                                style={'margin-bottom': '10px'}
-                            )
+                                    width=3
+                                ),
+                                dbc.Col(
+                                    dcc.Dropdown(
+                                        id=f'month-selector-{type_page}',
+                                        options=[
+                                            {'label': 'Январь', 'value': 1},
+                                            {'label': 'Февраль', 'value': 2},
+                                            {'label': 'Март', 'value': 3},
+                                            {'label': 'Апрель', 'value': 4},
+                                            {'label': 'Май', 'value': 5},
+                                            {'label': 'Июнь', 'value': 6},
+                                            {'label': 'Июль', 'value': 7},
+                                            {'label': 'Август', 'value': 8},
+                                            {'label': 'Сентябрь', 'value': 9},
+                                            {'label': 'Октябрь', 'value': 10},
+                                            {'label': 'Ноябрь', 'value': 11},
+                                            {'label': 'Декабрь', 'value': 12}
+                                        ],
+                                        placeholder="Выберите месяц",
+                                        value=None
+                                    ),
+                                    width=2
+                                )
+                            ], style={'margin-bottom': '10px'})
                         ]
                     ),
                     style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
@@ -95,59 +118,44 @@ economist_sv_pod = html.Div(
 )
 
 
-# Callback для кнопки "Суммировать"
 @app.callback(
     Output(f'sum-result-result-table1-{type_page}', 'children'),
     Input(f'sum-button-result-table1-{type_page}', 'n_clicks'),
     State(f'result-table1-{type_page}', 'derived_virtual_data'),
     State(f'result-table1-{type_page}', 'selected_cells'),
-    State(f'mode-toggle-{type_page}', 'value')  # Добавляем состояние для режима (Объемы или Финансы)
+    State(f'mode-toggle-{type_page}', 'value')
 )
 def calculate_sum_and_count(n_clicks, rows, selected_cells, mode):
     if n_clicks is None:
         raise PreventUpdate
 
-    # Проверка на наличие данных и выделенных ячеек
     if rows is None or not selected_cells:
         return "Нет данных или не выбраны ячейки для подсчета."
 
-    # Инициализация суммы и счетчика
     total_sum = 0
     count = 0
-
-    # Суммируем значения только в выделенных ячейках и считаем их количество
     for cell in selected_cells:
-        row_idx = cell['row']  # Индекс строки
-        col_id = cell['column_id']  # ID столбца
-
-        # Получаем значение ячейки и добавляем к сумме, если оно является числом
+        row_idx = cell['row']
+        col_id = cell['column_id']
         value = rows[row_idx].get(col_id, 0)
-        if isinstance(value, (int, float)):  # Проверяем, что значение является числом
+        if isinstance(value, (int, float)):
             total_sum += value
-            count += 1  # Увеличиваем счетчик для числовых значений
+            count += 1
 
-    # Округляем сумму до 2 знаков и форматируем с разделителями для финансового режима
     if mode == 'finance':
-        total_sum = f"{total_sum:,.2f}".replace(",", " ")  # Разделитель тысяч - пробел, два знака после запятой
+        total_sum = f"{total_sum:,.2f}".replace(",", " ")
     else:
-        total_sum = f"{int(total_sum):,}".replace(",",
-                                                  " ")  # Для объемов без дробной части и разделитель тысяч - пробел
-
-    # Формируем строку с результатом
+        total_sum = f"{int(total_sum):,}".replace(",", " ")
     return f"Количество: {count}, Сумма: {total_sum}"
 
 
-# Колбэк для динамического обновления выпадающих списков
 @app.callback(
     Output('dropdown-container', 'children'),
     Input({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
 )
 def display_dynamic_dropdowns(values):
-    # Инициализируем список выпадающих списков
     dropdowns = []
     level = 0
-
-    # Начальный уровень
     options = get_level_options()
     value = values[0] if values else None
 
@@ -162,19 +170,14 @@ def display_dynamic_dropdowns(values):
     )
     dropdowns.append(dropdown)
 
-    # Проходим по выбранным значениям и динамически создаём выпадающие списки
     while True:
         if value is None:
-            break  # Если значение не выбрано, прекращаем добавлять уровни
-
-        # Получаем опции для следующего уровня
+            break
         options = get_level_options(value)
         if not options:
-            break  # Если нет дочерних элементов, прекращаем добавлять уровни
-
+            break
         level += 1
         value = values[level] if len(values) > level else None
-
         dropdown = dbc.Col(
             dcc.Dropdown(
                 id={'type': 'dynamic-dropdown', 'index': level},
@@ -189,11 +192,9 @@ def display_dynamic_dropdowns(values):
     return dropdowns
 
 
-# Функция для получения данных плана
 def fetch_plan_data(selected_level, year, mode='volumes'):
-    # Выбираем поле для данных в зависимости от режима
+    """Получение плановых данных (помесячно) из БД."""
     plan_field = "quantity" if mode == 'volumes' else "amount"
-
     query = text(f"""
         SELECT mp.month, SUM(mp.{plan_field}) AS plan
         FROM plan_monthlyplan AS mp
@@ -202,116 +203,190 @@ def fetch_plan_data(selected_level, year, mode='volumes'):
         GROUP BY mp.month
         ORDER BY mp.month
     """)
-
     with engine.connect() as connection:
         result = connection.execute(query, {"selected_level": selected_level, "year": year}).mappings()
         plan_data = {row["month"]: row["plan"] for row in result}
-
     return plan_data
 
 
-# Callback для обновления таблицы с добавлением процента выполнения
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data'),
      Output(f'loading-output-{type_page}', 'children')],
-    Input(f'update-button-{type_page}', 'n_clicks'),  # Кнопка обновления как основной триггер
-    State(f'mode-toggle-{type_page}', 'value'),  # Используем `State`, чтобы тип плана обновлялся только при нажатии
+    Input(f'update-button-{type_page}', 'n_clicks'),
+    State(f'mode-toggle-{type_page}', 'value'),
     State(f'unique-toggle-{type_page}', 'value'),
     State(f'dropdown-year-{type_page}', 'value'),
     State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
+    State(f'month-selector-{type_page}', 'value')
 )
-def update_table_with_plan_and_balance(n_clicks, mode, unique_flag, selected_year, selected_levels):
+def update_table_with_plan_and_balance(n_clicks,
+                                       mode,
+                                       unique_flag,
+                                       selected_year,
+                                       selected_levels,
+                                       selected_month):
     if n_clicks is None:
         raise PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
 
-    selected_levels = [level for level in selected_levels if level is not None]
+    selected_levels = [lvl for lvl in selected_levels if lvl is not None]
     if not selected_levels:
         raise PreventUpdate
 
     selected_level = selected_levels[-1]
     filter_conditions = get_filter_conditions([selected_level], selected_year)
 
-    # Проверяем включен ли флаг уникальности
     unique = "unique" in unique_flag
 
-    # Передаем `mode` в `sql_query_rep` для переключения между объемами и финансами
-    fact_columns, fact_data = TableUpdater.query_to_df(
+    # Загружаем фактические данные
+    fact_columns, fact_data_list = TableUpdater.query_to_df(
         engine,
-        sql_query_rep(selected_year, group_id=[selected_level], filter_conditions=filter_conditions, mode=mode,
+        sql_query_rep(selected_year,
+                      group_id=[selected_level],
+                      filter_conditions=filter_conditions,
+                      mode=mode,
                       unique_flag=unique)
     )
 
-    # Получаем данные плана с учетом выбранного режима
+    # Превращаем список словарей fact_data_list в dict по ключу "month" (можно и так).
+    # Будем потом "сливать" с заготовкой всех месяцев.
+    fact_dict = {}
+    for row in fact_data_list:
+        m = row["month"]
+        fact_dict[m] = row
+
+    # Загружаем плановые данные
     plan_data = fetch_plan_data(selected_level, selected_year, mode)
 
     today = datetime.today()
-    current_month = today.month
+    default_month = today.month
     current_day = today.day
+    # Если пользователь выбрал месяц вручную, берём его, иначе - текущий
+    current_month = selected_month if selected_month is not None else default_month
 
+    # Формируем список месяцев для отображения: от 1 до current_month
+    months_to_show = list(range(1, current_month + 1))
+
+    # Создаём «заготовку» для итоговой таблицы.
+    # Для каждого месяца делаем словарь со всеми нужными полями, заполненными нулями.
+    # Потом при наличии данных - перезапишем.
+    fact_data = []
+    for m in months_to_show:
+        # Базовая заготовка на случай, если нет данных вообще
+        row_template = {
+            "month": m,
+            "План 1/12": 0,
+            "Входящий остаток": 0,
+            "План": 0,
+            "Факт": 0,
+            "%": 0,
+            "Остаток": 0,
+            "новые": 0,
+            "в_тфомс": 0,
+            "оплачено": 0,
+            "исправлено": 0,
+            "отказано": 0,
+            "отменено": 0,
+        }
+
+        # Если в fact_dict есть запись для этого месяца, берём данные
+        if m in fact_dict:
+            source = fact_dict[m]
+            # mode='finance' -> суммы, mode='volumes' -> кол-во
+            row_template["новые"] = source.get("новые", 0) or 0
+            row_template["в_тфомс"] = source.get("в_тфомс", 0) or 0
+            row_template["оплачено"] = source.get("оплачено", 0) or 0
+            row_template["исправлено"] = source.get("исправлено", 0) or 0
+            row_template["отказано"] = source.get("отказано", 0) or 0
+            row_template["отменено"] = source.get("отменено", 0) or 0
+
+        # Подставляем план, если он есть
+        row_template["План 1/12"] = plan_data.get(m, 0)
+
+        fact_data.append(row_template)
+
+    # Теперь пробегаемся по fact_data и рассчитываем Факт, Остаток, % и т.д.
     incoming_balance = 0
     for row in fact_data:
-        month = row.get("month")
-        row["План 1/12"] = plan_data.get(month, 0)
+        m = row["month"]
         row["Входящий остаток"] = incoming_balance
         row["План"] = (row["План 1/12"] or 0) + (row["Входящий остаток"] or 0)
 
-        if month < current_month - 1:
-            row["Факт"] = row.get("оплачено", 0) or 0
-
-        elif month == current_month - 1:
+        # Расчёт «Факт» по текущему дню.
+        # Если month < current_month - 1 => факт = оплачено
+        if m < current_month - 1:
+            row["Факт"] = row.get("оплачено", 0)
+        elif m == current_month - 1:
+            # если день <= 10, складываем "новые", "в_тфомс", "оплачено", "исправлено"
+            # иначе только "оплачено"
             if current_day <= 10:
-                row["Факт"] = sum(row.get(col, 0) or 0 for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
+                row["Факт"] = sum(row.get(col, 0) for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
             else:
-                row["Факт"] = row.get("оплачено", 0) or 0
-        elif month == current_month:
-            row["Факт"] = sum(row.get(col, 0) or 0 for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
+                row["Факт"] = row.get("оплачено", 0)
+        elif m == current_month:
+            row["Факт"] = sum(row.get(col, 0) for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
+        else:
+            # Если месяц больше выбранного (но в нашем случае мы их не показываем),
+            # можно задать 0 или пропустить. Сейчас months_to_show ограничивает это.
+            row["Факт"] = 0
 
-        row["%"] = round((row["Факт"] / row["План"] * 100), 1) if row["План"] > 0 else 0
+        if row["План"] > 0:
+            row["%"] = round(row["Факт"] / row["План"] * 100, 1)
+        else:
+            row["%"] = 0
+
         row["Остаток"] = (row["План"] or 0) - (row["Факт"] or 0)
         incoming_balance = row["Остаток"]
-    # Добавление строки "Нарастающе"
-    cumulative_row = {
-        "month": "Нарастающе",
-        "План": sum((row["План 1/12"] or 0) for row in fact_data),
-        "Факт": sum((row["Факт"] or 0) for row in fact_data),
-        "Остаток": fact_data[-1]["Остаток"] if fact_data else 0,
-        "Входящий остаток": 0,
-        "План 1/12": 0,
-        "новые": sum((row["новые"] or 0) for row in fact_data),
-        "в_тфомс": sum((row["в_тфомс"] or 0) for row in fact_data),
-        "оплачено": sum((row["оплачено"] or 0) for row in fact_data),
-        "исправлено": sum((row["исправлено"] or 0) for row in fact_data),
-        "отказано": sum((row["отказано"] or 0) for row in fact_data),
-        "отменено": sum((row["отменено"] or 0) for row in fact_data),
-        "%": round((sum((row["Факт"] or 0) for row in fact_data) /
-                    sum((row["План 1/12"] or 0) for row in fact_data) * 100), 1)
-        if sum((row["План 1/12"] or 0) for row in fact_data) > 0 else 0
-    }
 
-    fact_data.append(cumulative_row)  # Вставляем строку "Нарастающе" в начало
+    # Добавим строку «Нарастающе»
+    if fact_data:
+        total_plan_12 = sum(r["План 1/12"] for r in fact_data)
+        total_fact = sum(r["Факт"] for r in fact_data)
+        total_new = sum(r["новые"] for r in fact_data)
+        total_tfoms = sum(r["в_тфомс"] for r in fact_data)
+        total_oplacheno = sum(r["оплачено"] for r in fact_data)
+        total_ispravleno = sum(r["исправлено"] for r in fact_data)
+        total_otkazano = sum(r["отказано"] for r in fact_data)
+        total_otmeneno = sum(r["отменено"] for r in fact_data)
+        cumulative_row = {
+            "month": "Нарастающе",
+            "План 1/12": 0,
+            "Входящий остаток": 0,
+            "План": total_plan_12,
+            "Факт": total_fact,
+            "Остаток": fact_data[-1]["Остаток"],
+            "%": round(total_fact / total_plan_12 * 100, 1) if total_plan_12 > 0 else 0,
+            "новые": total_new,
+            "в_тфомс": total_tfoms,
+            "оплачено": total_oplacheno,
+            "исправлено": total_ispravleno,
+            "отказано": total_otkazano,
+            "отменено": total_otmeneno,
+        }
+        fact_data.append(cumulative_row)
 
-    # Расчет строки "Год"
-    year_plan = sum(plan_data.get(month, 0) for month in range(1, 13))  # План за 12 месяцев
-    year_row = {
-        "month": "Год",
-        "План": year_plan,
-        "Факт": cumulative_row["Факт"],
-        "Остаток": year_plan - cumulative_row["Факт"],
-        "Входящий остаток": 0,  # Всегда 0 для года
-        "План 1/12": 0,
-        "новые": cumulative_row["новые"],
-        "в_тфомс": cumulative_row["в_тфомс"],
-        "оплачено": cumulative_row["оплачено"],
-        "исправлено": cumulative_row["исправлено"],
-        "отказано": cumulative_row["отказано"],
-        "отменено": cumulative_row["отменено"],
-        "%": round((cumulative_row["Факт"] / year_plan * 100), 1) if year_plan > 0 else 0
-    }
-
-    fact_data.append(year_row)  # Добавляем строку "Год" в конец таблицы
+    # Добавим строку «Год» (1..12)
+    year_plan = sum(plan_data.get(m, 0) for m in range(1, 13))
+    if fact_data:
+        total_fact_overall = sum(r["Факт"] for r in fact_data if isinstance(r["month"], int))
+        year_row = {
+            "month": "Год",
+            "План 1/12": 0,
+            "Входящий остаток": 0,
+            "План": year_plan,
+            "Факт": total_fact_overall,
+            "Остаток": year_plan - total_fact_overall,
+            "%": round(total_fact_overall / year_plan * 100, 1) if year_plan else 0,
+            "новые": sum(r["новые"] for r in fact_data if isinstance(r["month"], int)),
+            "в_тфомс": sum(r["в_тфомс"] for r in fact_data if isinstance(r["month"], int)),
+            "оплачено": sum(r["оплачено"] for r in fact_data if isinstance(r["month"], int)),
+            "исправлено": sum(r["исправлено"] for r in fact_data if isinstance(r["month"], int)),
+            "отказано": sum(r["отказано"] for r in fact_data if isinstance(r["month"], int)),
+            "отменено": sum(r["отменено"] for r in fact_data if isinstance(r["month"], int)),
+        }
+        fact_data.append(year_row)
 
     columns = [
         {"name": ["", "Месяц"], "id": "month"},
@@ -328,4 +403,5 @@ def update_table_with_plan_and_balance(n_clicks, mode, unique_flag, selected_yea
         {"name": ["План 1/12", "План 1/12"], "id": "План 1/12"},
         {"name": ["План 1/12", "Входящий остаток"], "id": "Входящий остаток"},
     ]
+
     return columns, fact_data, loading_output
