@@ -83,3 +83,18 @@ class StatusWebOMS(models.Model):
 
     def __str__(self):
         return f"{self.status} - {self.name}"
+
+
+class DispensaryDiagnoses168n(models.Model):
+    ds = models.CharField(max_length=6, verbose_name="Диагноз")
+    profile = models.CharField(max_length=5, verbose_name="Профиль")
+    speciality = models.CharField(max_length=1000, verbose_name="Специальность")
+    speciality_join = models.CharField(max_length=1000, verbose_name="Совместная специальность")
+    group = models.CharField(max_length=100, verbose_name="Группа")
+
+    class Meta:
+        verbose_name = "Диагноз по 168н"
+        verbose_name_plural = "Диагнозы по 168н"
+
+    def __str__(self):
+        return f"{self.group} - {self.speciality_join} - {self.ds}"

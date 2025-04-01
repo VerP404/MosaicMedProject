@@ -2,14 +2,16 @@ from django.contrib import admin
 from django.db.models.functions import Cast
 from django import forms
 from django.db.models import IntegerField, Case, When, Value
+from unfold.admin import ModelAdmin
+from import_export.admin import ImportExportModelAdmin
 
 from .models import *
-from .models.models import MedicalOrganizationOMSTarget, OMSTargetCategory, StatusWebOMS
+from .models.models import MedicalOrganizationOMSTarget, OMSTargetCategory, StatusWebOMS, DispensaryDiagnoses168n
 from ..organization.models import MedicalOrganization
 
 
 @admin.register(GeneralOMSTarget)
-class GeneralOMSTargetAdmin(admin.ModelAdmin):
+class GeneralOMSTargetAdmin(ModelAdmin):
     list_display = ('code', 'name', 'start_date', 'end_date')
     search_fields = ('code', 'name')
     list_editable = ('name', 'start_date', 'end_date')
@@ -50,13 +52,13 @@ class MedicalOrganizationOMSTargetForm(forms.ModelForm):
 
 
 @admin.register(OMSTargetCategory)
-class OMSTargetCategoryAdmin(admin.ModelAdmin):
+class OMSTargetCategoryAdmin(ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
 
 
 @admin.register(MedicalOrganizationOMSTarget)
-class MedicalOrganizationOMSTargetAdmin(admin.ModelAdmin):
+class MedicalOrganizationOMSTargetAdmin(ModelAdmin):
     form = MedicalOrganizationOMSTargetForm
     list_display = ('general_target', 'is_active', 'start_date', 'end_date', 'get_categories')
     list_filter = ('is_active', 'categories', 'start_date', 'end_date')
@@ -84,7 +86,13 @@ class MedicalOrganizationOMSTargetAdmin(admin.ModelAdmin):
 
 
 @admin.register(StatusWebOMS)
-class StatusWebOMSAdmin(admin.ModelAdmin):
+class StatusWebOMSAdmin(ModelAdmin):
     list_display = ('status', 'name',)
     search_fields = ('status', 'name',)
     list_editable = ('name',)
+
+
+@admin.register(DispensaryDiagnoses168n)
+class DispensaryDiagnoses168nAdmin(ImportExportModelAdmin, ModelAdmin):
+    list_display = ('ds', 'profile', 'speciality', 'speciality_join', 'group')
+    search_fields = ('ds', 'profile', 'speciality', 'speciality_join', 'group')
