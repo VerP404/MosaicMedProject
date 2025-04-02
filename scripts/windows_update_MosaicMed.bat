@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 
 rem Определение директории скрипта
 set SCRIPT_DIR=%~dp0
@@ -6,40 +7,107 @@ set SCRIPT_DIR=%~dp0
 rem Переход в корневую директорию проекта
 cd /d %SCRIPT_DIR%\..
 
-rem Активация виртуального окружения
+echo ===================================================
+echo Активация виртуального окружения
+echo ===================================================
 call .venv\Scripts\activate.bat
 
-rem Обновление кода из репозитория
+echo ===================================================
+echo Обновление кода из репозитория
+echo ===================================================
 git pull
 
-rem Установка зависимостей
+echo ===================================================
+echo Установка зависимостей
+echo ===================================================
 pip install -r requirements\base.txt
 
-rem Выполнение миграций
+echo ===================================================
+echo Выполнение миграций
+echo ===================================================
 python manage.py migrate
 
-rem Создание папок для файлов с данными
-python manage.py mosaic_conductor\etl\create_folders.py
+echo ===================================================
+echo Создание папок для файлов с данными
+echo ===================================================
+rem Исправленная команда для создания папок
+python mosaic_conductor\etl\create_folders.py
+rem Или альтернативный вариант, если это команда Django:
+rem python manage.py create_folders
 
-rem Импорт данных из JSON
+echo ===================================================
+echo Импорт данных из JSON
+echo ===================================================
 python manage.py data_import
 
-rem Остановка текущих процессов
-for /f "tokens=2 delims=," %%a in ('wmic process where "name='python.exe' and commandline like '%%manage.py runserver%%'" get processid /format:csv') do (
-    if not "%%a"=="ProcessId" taskkill /pid %%a /f
+echo ===================================================
+echo Остановка текущих процессов по портам
+echo ===================================================
+
+rem Завершение процесса на порту 8000
+echo Проверка порта 8000...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8000" ^| findstr "LISTENING"') do (
+    set PID=%%a
+    if not "!PID!"=="" (
+        echo Найден процесс с PID !PID! на порту 8000. Завершение...
+        taskkill /f /pid !PID! 2>nul
+        if !ERRORLEVEL! EQU 0 (
+            echo Процесс на порту 8000 успешно завершен.
+        ) else (
+            echo Не удалось завершить процесс на порту 8000.
+        )
+    ) else (
+        echo Процессы на порту 8000 не найдены.
+    )
 )
 
-for /f "tokens=2 delims=," %%a in ('wmic process where "name='python.exe' and commandline like '%%index.py%%'" get processid /format:csv') do (
-    if not "%%a"=="ProcessId" taskkill /pid %%a /f
+rem Завершение процесса на порту 5000
+echo Проверка порта 5000...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5000" ^| findstr "LISTENING"') do (
+    set PID=%%a
+    if not "!PID!"=="" (
+        echo Найден процесс с PID !PID! на порту 5000. Завершение...
+        taskkill /f /pid !PID! 2>nul
+        if !ERRORLEVEL! EQU 0 (
+            echo Процесс на порту 5000 успешно завершен.
+        ) else (
+            echo Не удалось завершить процесс на порту 5000.
+        )
+    ) else (
+        echo Процессы на порту 5000 не найдены.
+    )
 )
 
-for /f "tokens=2 delims=," %%a in ('wmic process where "name='python.exe' and commandline like '%%main.py%%'" get processid /format:csv') do (
-    if not "%%a"=="ProcessId" taskkill /pid %%a /f
+rem Завершение процесса на порту 5010
+echo Проверка порта 5010...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5010" ^| findstr "LISTENING"') do (
+    set PID=%%a
+    if not "!PID!"=="" (
+        echo Найден процесс с PID !PID! на порту 5010. Завершение...
+        taskkill /f /pid !PID! 2>nul
+        if !ERRORLEVEL! EQU 0 (
+            echo Процесс на порту 5010 успешно завершен.
+        ) else (
+            echo Не удалось завершить процесс на порту 5010.
+        )
+    ) else (
+        echo Процессы на порту 5010 не найдены.
+    )
 )
-rem Перезапуск серверов в фоне
+
+echo ===================================================
+echo Перезапуск серверов в фоне
+echo ===================================================
 start "" python manage.py runserver 0.0.0.0:8000
 start "" python apps\analytical_app\index.py
 start "" python apps\chief_app\main.py
 
-rem Деактивация виртуального окружения
+echo ===================================================
+echo Деактивация виртуального окружения
+echo ===================================================
 deactivate.bat
+
+echo ===================================================
+echo Деплой успешно завершен!
+echo ===================================================
+pause
