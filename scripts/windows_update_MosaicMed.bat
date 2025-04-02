@@ -1,4 +1,8 @@
 @echo off
+
+rem Установка UTF-8 кодировки для корректного отображения кириллицы
+chcp 65001 > nul
+
 setlocal enabledelayedexpansion
 
 rem Определение директории скрипта
