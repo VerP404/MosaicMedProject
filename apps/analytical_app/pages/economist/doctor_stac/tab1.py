@@ -93,6 +93,20 @@ economist_doctor_stac = html.Div(
 )
 
 
+@app.callback(
+    [
+        Output(f'status-group-container-{type_page}', 'style'),
+        Output(f'status-individual-container-{type_page}', 'style')
+    ],
+    [Input(f'status-selection-mode-{type_page}', 'value')]
+)
+def toggle_status_selection_mode(mode):
+    if mode == 'group':
+        return {'display': 'block'}, {'display': 'none'}
+    else:  # mode == 'individual'
+        return {'display': 'none'}, {'display': 'block'}
+
+
 # Остальной callback для переключения режима фильтрации по статусу уже определён в filter_status
 @app.callback(
     [
