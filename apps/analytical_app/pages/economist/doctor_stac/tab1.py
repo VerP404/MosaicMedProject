@@ -4,12 +4,15 @@ import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
-from apps.analytical_app.components.filters import filter_years, filter_report_type, \
-    filter_inogorod, filter_sanction, filter_amount_null, filter_months, date_picker, get_current_reporting_month, \
-    update_buttons
+from apps.analytical_app.components.filters import (
+    filter_years, filter_report_type, filter_sanction,
+    filter_amount_null, filter_months, date_picker, get_current_reporting_month,
+    update_buttons, filter_status, status_groups, filter_inogorod
+)
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.economist.doctor_stac.query import sql_query_doc_stac_v_ds, sql_query_doc_stac, \
-    sql_query_doc_stac_na_d
+from apps.analytical_app.pages.economist.doctor_stac.query import (
+    sql_query_doc_stac_v_ds, sql_query_doc_stac, sql_query_doc_stac_na_d
+)
 from apps.analytical_app.query_executor import engine
 
 type_page = "economist-doctor-stac"
@@ -57,6 +60,12 @@ economist_doctor_stac = html.Div(
                                     ),
                                 ]
                             ),
+                            # Добавляем фильтр по статусу
+                            dbc.Row(
+                                [
+                                    dbc.Col(filter_status(type_page), width=6)
+                                ]
+                            ),
                             dbc.Row(
                                 [
                                     dbc.Col(html.Div(id=f'selected-doctor-{type_page}', className='filters-label',
@@ -84,6 +93,7 @@ economist_doctor_stac = html.Div(
 )
 
 
+# Остальной callback для переключения режима фильтрации по статусу уже определён в filter_status
 @app.callback(
     [
         Output(f'range-slider-month-{type_page}', 'style'),
@@ -128,11 +138,9 @@ def toggle_datepickers(report_type):
     ]
 )
 def toggle_label_visibility(report_type, start_date_input, end_date_input, start_date_treatment, end_date_treatment):
-    # Показать подпись только если выбран тип "initial_input" или "treatment", и установлены даты
     if report_type in ['initial_input', 'treatment'] and (
             start_date_input or end_date_input or start_date_treatment or end_date_treatment):
         return {'display': 'block'}
-    # В противном случае скрыть подпись
     return {'display': 'none'}
 
 
@@ -149,50 +157,63 @@ def update_current_month(n_intervals):
     Output(f'selected-period-{type_page}', 'children'),
     [Input(f'range-slider-month-{type_page}', 'value'),
      Input(f'dropdown-year-{type_page}', 'value'),
-     Input(f'current-month-name-{type_page}', 'children'),
-     ]
+     Input(f'current-month-name-{type_page}', 'children')]
 )
 def update_selected_period_list(selected_months_range, selected_year, current_month_name):
     return selected_months_range
 
 
+# Основной callback обновления таблиц
 @app.callback(
-    [Output(f'result-table1-{type_page}', 'columns'),
-     Output(f'result-table1-{type_page}', 'data'),
-    Output(f'result-table2-{type_page}', 'columns'),
-     Output(f'result-table2-{type_page}', 'data'),
-    Output(f'result-table3-{type_page}', 'columns'),
-     Output(f'result-table3-{type_page}', 'data'),
-     Output(f'loading-output-{type_page}', 'children')],
+    [
+        Output(f'result-table1-{type_page}', 'columns'),
+        Output(f'result-table1-{type_page}', 'data'),
+        Output(f'result-table2-{type_page}', 'columns'),
+        Output(f'result-table2-{type_page}', 'data'),
+        Output(f'result-table3-{type_page}', 'columns'),
+        Output(f'result-table3-{type_page}', 'data'),
+        Output(f'loading-output-{type_page}', 'children')
+    ],
     [Input(f'update-button-{type_page}', 'n_clicks')],
-    [State(f'range-slider-month-{type_page}', 'value'),
-     State(f'dropdown-year-{type_page}', 'value'),
-     State(f'dropdown-inogorodniy-{type_page}', 'value'),
-     State(f'dropdown-sanction-{type_page}', 'value'),
-     State(f'dropdown-amount-null-{type_page}', 'value'),
-     State(f'date-picker-range-input-{type_page}', 'start_date'),
-     State(f'date-picker-range-input-{type_page}', 'end_date'),
-     State(f'date-picker-range-treatment-{type_page}', 'start_date'),
-     State(f'date-picker-range-treatment-{type_page}', 'end_date'),
-     State(f'dropdown-report-type-{type_page}', 'value')]
+    [
+        State(f'range-slider-month-{type_page}', 'value'),
+        State(f'dropdown-year-{type_page}', 'value'),
+        State(f'dropdown-inogorodniy-{type_page}', 'value'),
+        State(f'dropdown-sanction-{type_page}', 'value'),
+        State(f'dropdown-amount-null-{type_page}', 'value'),
+        State(f'date-picker-range-input-{type_page}', 'start_date'),
+        State(f'date-picker-range-input-{type_page}', 'end_date'),
+        State(f'date-picker-range-treatment-{type_page}', 'start_date'),
+        State(f'date-picker-range-treatment-{type_page}', 'end_date'),
+        State(f'dropdown-report-type-{type_page}', 'value'),
+        # Добавляем состояния фильтра по статусу:
+        State(f'status-selection-mode-{type_page}', 'value'),
+        State(f'status-group-radio-{type_page}', 'value'),
+        State(f'status-individual-dropdown-{type_page}', 'value'),
+    ]
 )
 def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction,
-                 amount_null,
-                 start_date_input, end_date_input,
-                 start_date_treatment, end_date_treatment, report_type):
-    # Если кнопка не была нажата, обновление не происходит
+                 amount_null, start_date_input, end_date_input,
+                 start_date_treatment, end_date_treatment, report_type,
+                 status_mode, selected_status_group, selected_individual_statuses):
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
 
-    # Определяем используемый период в зависимости от типа отчета
+    # Определяем список статусов в зависимости от выбранного режима
+    if status_mode == 'group':
+        selected_status_values = status_groups[selected_status_group]
+    else:
+        selected_status_values = selected_individual_statuses if selected_individual_statuses else []
+    selected_status_tuple = tuple(selected_status_values)
+
+    # Определяем используемый период
     start_date_input_formatted, end_date_input_formatted = None, None
     start_date_treatment_formatted, end_date_treatment_formatted = None, None
 
     if report_type == 'month':
-        start_date_input_formatted, end_date_input_formatted = None, None
-        start_date_treatment_formatted, end_date_treatment_formatted = None, None
+        pass
     elif report_type == 'initial_input':
         selected_period = (1, 12)
         start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
@@ -204,12 +225,20 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
         end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
             '%d-%m-%Y')
 
-    # Генерация SQL-запроса с учетом всех фильтров
+    # Формируем строку для фильтрации по месяцам
+    sql_cond = ', '.join([f"'{period}'" for period in selected_period])
+
+    # Подготавливаем параметры для bind-переменных, включая status_list
+    bind_params = {
+        'status_list': selected_status_tuple
+    }
+
+    # Выполняем запросы для трёх таблиц
     columns1, data1 = TableUpdater.query_to_df(
         engine,
         sql_query_doc_stac_v_ds(
             selected_year,
-            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            sql_cond,
             inogorodniy,
             sanction,
             amount_null,
@@ -220,15 +249,15 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
             input_end=end_date_input_formatted,
             treatment_start=start_date_treatment_formatted,
             treatment_end=end_date_treatment_formatted
-        )
-
+        ),
+        bind_params
     )
 
     columns2, data2 = TableUpdater.query_to_df(
         engine,
         sql_query_doc_stac_na_d(
             selected_year,
-            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            sql_cond,
             inogorodniy,
             sanction,
             amount_null,
@@ -239,15 +268,15 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
             input_end=end_date_input_formatted,
             treatment_start=start_date_treatment_formatted,
             treatment_end=end_date_treatment_formatted
-        )
-
+        ),
+        bind_params
     )
 
     columns3, data3 = TableUpdater.query_to_df(
         engine,
         sql_query_doc_stac(
             selected_year,
-            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            sql_cond,
             inogorodniy,
             sanction,
             amount_null,
@@ -258,7 +287,7 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
             input_end=end_date_input_formatted,
             treatment_start=start_date_treatment_formatted,
             treatment_end=end_date_treatment_formatted
-        )
-
+        ),
+        bind_params
     )
     return columns1, data1, columns2, data2, columns3, data3, loading_output

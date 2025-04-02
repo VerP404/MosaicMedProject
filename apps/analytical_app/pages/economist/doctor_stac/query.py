@@ -33,6 +33,7 @@ def sql_query_doc_stac_na_dom(selected_year, months_placeholder, inogorod, sanct
             SUM(amount_numeric) as "Сумма"
         FROM oms
         WHERE goal = 'В дневном стационаре'
+        AND status IN :status_list
         GROUP BY doctor, building, department, profile
     """
     return query
@@ -69,6 +70,7 @@ def sql_query_doc_stac_v_ds(selected_year, months_placeholder, inogorod, sanctio
             SUM(amount_numeric) as "Сумма"
         FROM oms
         WHERE goal = 'В дневном стационаре'
+        AND status IN :status_list
         GROUP BY doctor, building, department, profile
         ORDER BY building, department, profile, doctor
 
@@ -108,6 +110,7 @@ def sql_query_doc_stac_na_d(selected_year, months_placeholder, inogorod, sanctio
             SUM(amount_numeric) as "Сумма"
         FROM oms
         WHERE goal = 'На дому'
+        AND status IN :status_list
         GROUP BY doctor, building, department, profile
         ORDER BY building, department, profile, doctor
         
@@ -146,6 +149,7 @@ def sql_query_doc_stac(selected_year, months_placeholder, inogorod, sanction, am
             SUM(amount_numeric) as "Сумма"
         FROM oms
         WHERE goal = 'Стационарно'
+        AND status IN :status_list
         GROUP BY doctor, building, department, profile
         ORDER BY building, department, profile, doctor
     """

@@ -12,7 +12,6 @@ from apps.analytical_app.components.filters import filter_years, filter_months, 
     get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
     update_buttons, filter_status, status_groups
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.administrator.generation_invoices.query import sql_query_fen_inv
 from apps.analytical_app.pages.economist.indicators.query import sql_query_indicators
 from apps.analytical_app.query_executor import engine
 
