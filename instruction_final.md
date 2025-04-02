@@ -88,7 +88,10 @@ tar -czvf mosaicmed_backup_$(date +%Y%m%d%H%M%S).tar.gz mosaicmed_backup_$(date 
 ```bash
 scp "mosaicmed_backup.sql" user@<IP>:/path/to/target/
 ```
-
+Разархивируем архив:
+```bash
+tar -xzvf mosaicmed_backup{*}.tar.gz
+```
 ### 🔹 **3. Удаление старой базы**  
 Открываем консоль PostgreSQL:
 ```bash
