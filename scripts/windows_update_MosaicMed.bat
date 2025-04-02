@@ -19,23 +19,27 @@ rem Выполнение миграций
 python manage.py migrate
 
 rem Создание папок для файлов с данными
-rem Если скрипт самостоятельный, запускайте его напрямую:
-python mosaic_conductor\etl\create_folders.py
-rem Если это команда Django, то используйте:
-rem python manage.py create_folders
+python manage.py mosaic_conductor\etl\create_folders.py
 
 rem Импорт данных из JSON
 python manage.py data_import
 
 rem Остановка текущих процессов
-for /f "tokens=2 delims=," %%a in ('tasklist /fi "imagename eq python.exe" /fi "windowtitle eq manage.py runserver" /fo csv /nh') do taskkill /pid %%~a
-for /f "tokens=2 delims=," %%a in ('tasklist /fi "imagename eq python.exe" /fi "windowtitle eq index.py" /fo csv /nh') do taskkill /pid %%~a
-for /f "tokens=2 delims=," %%a in ('tasklist /fi "imagename eq python.exe" /fi "windowtitle eq main.py" /fo csv /nh') do taskkill /pid %%~a
+for /f "tokens=2 delims=," %%a in ('wmic process where "name='python.exe' and commandline like '%%manage.py runserver%%'" get processid /format:csv') do (
+    if not "%%a"=="ProcessId" taskkill /pid %%a /f
+)
 
+for /f "tokens=2 delims=," %%a in ('wmic process where "name='python.exe' and commandline like '%%index.py%%'" get processid /format:csv') do (
+    if not "%%a"=="ProcessId" taskkill /pid %%a /f
+)
+
+for /f "tokens=2 delims=," %%a in ('wmic process where "name='python.exe' and commandline like '%%main.py%%'" get processid /format:csv') do (
+    if not "%%a"=="ProcessId" taskkill /pid %%a /f
+)
 rem Перезапуск серверов в фоне
 start "" python manage.py runserver 0.0.0.0:8000
 start "" python apps\analytical_app\index.py
 start "" python apps\chief_app\main.py
 
-rem (Опционально) Деактивация виртуального окружения
-call deactivate.bat
+rem Деактивация виртуального окружения
+deactivate.bat
