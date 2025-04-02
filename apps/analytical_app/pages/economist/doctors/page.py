@@ -120,6 +120,20 @@ economist_doctors_talon_list = html.Div(
 )
 
 
+@app.callback(
+    [
+        Output(f'status-group-container-{type_page}', 'style'),
+        Output(f'status-individual-container-{type_page}', 'style')
+    ],
+    [Input(f'status-selection-mode-{type_page}', 'value')]
+)
+def toggle_status_selection_mode(mode):
+    if mode == 'group':
+        return {'display': 'block'}, {'display': 'none'}
+    else:  # mode == 'individual'
+        return {'display': 'none'}, {'display': 'block'}
+
+
 # Определяем отчетный месяц и выводим его на страницу и в переменную dcc Store
 @app.callback(
     Output(f'current-month-name-{type_page}', 'children'),
@@ -166,18 +180,26 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
      Output('no-data-toast', 'is_open')],  # Управляем отображением Toast
     [Input(f'get-data-button-{type_page}', 'n_clicks')],
     [State(f'selected-period-{type_page}', 'children'),
+     State(f'dropdown-year-{type_page}', 'value'),
+     State(f'status-selection-mode-{type_page}', 'value'),
      State(f'status-group-radio-{type_page}', 'value'),
-     State(f'dropdown-year-{type_page}', 'value')]
+     State(f'status-individual-dropdown-{type_page}', 'value'),
+     ]
 )
-def update_table(n_clicks, selected_period, selected_status, selected_year):
-    if n_clicks is None or not selected_period or not selected_status or not selected_year:
+def update_table(n_clicks, selected_period, selected_year, status_mode, selected_status_group,
+                 selected_individual_statuses):
+    if n_clicks is None or not selected_period or not selected_year:
         raise exceptions.PreventUpdate
 
     # Показываем Placeholder во время загрузки данных
     placeholder_style = {"height": "300px", "marginTop": "20px"}
     loading_output = html.Div([dcc.Loading(type="default")])
 
-    selected_status_values = status_groups[selected_status]
+    # Определяем список статусов в зависимости от выбранного режима
+    if status_mode == 'group':
+        selected_status_values = status_groups[selected_status_group]
+    else:  # status_mode == 'individual'
+        selected_status_values = selected_individual_statuses if selected_individual_statuses else []
     selected_status_tuple = tuple(selected_status_values)
 
     sql_cond = ', '.join([f"'{period}'" for period in selected_period])

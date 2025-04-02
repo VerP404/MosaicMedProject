@@ -183,7 +183,6 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
     return doctors
 
 
-
 def filter_profile(type_page):
     return dbc.Col(
         dcc.Dropdown(
@@ -363,15 +362,100 @@ def date_end(label, type_page):
 
 
 def filter_status(type_page):
-    return (
-        dbc.CardBody(
-            dcc.RadioItems(
-                id=f'status-group-radio-{type_page}',
-                options=[{'label': group, 'value': group} for group in status_groups.keys()],
-                value='Предъявленные и оплаченные (2, 3)',
-                labelStyle={'display': 'block'}
+    # Словарь с описаниями статусов для более информативного выбора
+    status_descriptions = {
+        '0': 'Не подавать на оплату',
+        '1': 'Новый',
+        '2': 'Включен в реестр',
+        '3': 'Оплачен',
+        '4': 'Сверхъобъем',
+        '5': 'Дефект ФЛК',
+        '6': 'Исправлен после дефекта ФЛК',
+        '7': 'Дефект МЭК',
+        '8': 'Исправлен после дефекта МЭК',
+        '12': 'Возвращен в МИС',
+        '13': 'Удален МИС',
+        '17': 'Отмен МИС'
+    }
+
+    dropdown_options = [
+        {'label': f'Статус {status} - {status_descriptions.get(status, "")}', 'value': status}
+        for status in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '12', '13', '17']
+    ]
+
+    return dbc.Card(
+        [
+            dbc.CardBody(
+                [
+                    # Первая строка: «Режим выбора» слева и переключатель справа
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                html.Label("Фильтрация по статусам:", className="fw-bold"),
+                                # Можно добавить класс для жирного текста
+                                width="auto",  # Ширина по содержимому
+                                style={"display": "flex", "align-items": "center"}  # Вертикальное выравнивание
+                            ),
+                            dbc.Col(
+                                dbc.RadioItems(
+                                    id=f'status-selection-mode-{type_page}',
+                                    options=[
+                                        {'label': 'Группой', 'value': 'group'},
+                                        {'label': 'Индивидуально', 'value': 'individual'}
+                                    ],
+                                    value='group',
+                                    inline=True,  # Горизонтальное расположение
+                                    className="ms-2"  # Небольшой отступ слева
+                                ),
+                                width=True  # Оставшееся пространство
+                            )
+                        ],
+                        className="mb-3"  # Отступ снизу
+                    ),
+
+                    # Вторая строка: блоки с группой статусов или dropdown
+                    dbc.Row(
+                        [
+                            # Групповой выбор статусов
+                            html.Div(
+                                [
+                                    dbc.Label("Выберите группу статусов:", className="mb-2"),
+                                    dcc.RadioItems(
+                                        id=f'status-group-radio-{type_page}',
+                                        options=[{'label': group, 'value': group}
+                                                 for group in status_groups.keys()],
+                                        value='Предъявленные и оплаченные (2, 3)',
+                                        labelStyle={'display': 'block', 'margin-bottom': '4px'}
+                                    )
+                                ],
+                                id=f'status-group-container-{type_page}',
+                                style={"margin-bottom": "1rem"}  # Пока что отображается, если выбрана «group»
+                            ),
+
+                            # Индивидуальный выбор статусов
+                            html.Div(
+                                [
+                                    dbc.Label("Выберите индивидуальные статусы:", className="mb-2"),
+                                    dcc.Dropdown(
+                                        id=f'status-individual-dropdown-{type_page}',
+                                        options=dropdown_options,
+                                        value=[],
+                                        multi=True,
+                                        placeholder="Выберите статусы",
+                                        style={"max-width": "350px"}
+                                    ),
+                                ],
+                                id=f'status-individual-container-{type_page}',
+                                style={'display': 'none', "margin-bottom": "1rem"}  # Скрыт при загрузке
+                            ),
+                        ],
+                        className="gx-5",  # Горизонтальный отступ между колонками
+                    ),
+                ],
+                style={"padding": "1rem"}
             )
-        )
+        ],
+        className="mb-3"  # Отступ карточки снизу
     )
 
 
@@ -449,7 +533,6 @@ def get_departments_by_doctor(doctor_ids):
     return departments
 
 
-
 def get_doctor_details(doctor_ids):
     # Преобразуем doctor_ids в список целых чисел
     if isinstance(doctor_ids, str):
@@ -488,7 +571,6 @@ def get_doctor_details(doctor_ids):
             for row in result.fetchall()
         ]
     return details
-
 
 
 def parse_doctor_ids(doctor_value):

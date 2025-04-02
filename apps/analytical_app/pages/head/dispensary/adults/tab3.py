@@ -119,7 +119,18 @@ adults_dv3 = html.Div(
     ],
     style={"padding": "0rem"}
 )
-
+@app.callback(
+    [
+        Output(f'status-group-container-{type_page}', 'style'),
+        Output(f'status-individual-container-{type_page}', 'style')
+    ],
+    [Input(f'status-selection-mode-{type_page}', 'value')]
+)
+def toggle_status_selection_mode(mode):
+    if mode == 'group':
+        return {'display': 'block'}, {'display': 'none'}
+    else:  # mode == 'individual'
+        return {'display': 'none'}, {'display': 'block'}
 
 @app.callback(
     [
@@ -235,7 +246,9 @@ def update_filters(building_id):
      State(f'date-picker-range-treatment-{type_page}', 'end_date'),
      State(f'dropdown-report-type-{type_page}', 'value'),
      State(f'checklist-input-{type_page}', 'value'),
+     State(f'status-selection-mode-{type_page}', 'value'),
      State(f'status-group-radio-{type_page}', 'value'),
+     State(f'status-individual-dropdown-{type_page}', 'value'),
      ]
 )
 def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction,
@@ -244,14 +257,18 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
                  start_date_input, end_date_input,
                  start_date_treatment, end_date_treatment, report_type,
                  selected_type_dv,
-                 selected_status):
+                 status_mode, selected_status_group, selected_individual_statuses ):
     # Если кнопка не была нажата, обновление не происходит
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
     selected_type_dv_tuple = tuple(selected_type_dv)
-    selected_status_values = status_groups[selected_status]
+    # Определяем список статусов в зависимости от выбранного режима
+    if status_mode == 'group':
+        selected_status_values = status_groups[selected_status_group]
+    else:  # status_mode == 'individual'
+        selected_status_values = selected_individual_statuses if selected_individual_statuses else []
     selected_status_tuple = tuple(selected_status_values)
     # Определяем используемый период в зависимости от типа отчета
     start_date_input_formatted, end_date_input_formatted = None, None
