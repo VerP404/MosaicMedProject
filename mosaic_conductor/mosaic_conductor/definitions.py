@@ -1,3 +1,3 @@
-from mosaic_conductor.etl import assets
+from mosaic_conductor.mosaic_conductor import assets
 
 defs = assets.defs
