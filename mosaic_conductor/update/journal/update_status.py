@@ -29,6 +29,8 @@ def update_status_job():
     update_appeal_statuses_op()
 
 
-@schedule(cron_schedule="0 3 * * *", job=update_status_job, execution_timezone="Europe/Moscow")
+@schedule(cron_schedule="0 3 * * *",
+          job=update_status_job,
+          execution_timezone="Europe/Moscow")
 def daily_status_update_schedule(_context):
     return {}

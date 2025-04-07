@@ -62,7 +62,7 @@ wo_talon_job = wo_talon_graph.to_job(
 @schedule(
     cron_schedule="0 * * * *",
     job=wo_talon_job,
-    execution_timezone="UTC"
+    execution_timezone="Europe/Moscow"
 )
 def wo_talon_schedule(_context):
     return {}
