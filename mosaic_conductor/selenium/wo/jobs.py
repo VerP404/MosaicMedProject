@@ -84,7 +84,7 @@ wo_talon_job = create_download_job(
         os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "weboms", "talon", "old"),
         os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "weboms", "talon", "new")
     ],
-    file_pattern="journal_20*.csv",
+    file_pattern="journal_202*.csv",
     filter_input_op_fn=filter_input_op,  # передаем стандартную функцию фильтрации
     extra_filter_config={},  # если нужны дополнительные настройки для фильтрации
 )
