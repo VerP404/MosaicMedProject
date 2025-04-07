@@ -51,6 +51,7 @@ def selenium_driver_resource(context):
         from webdriver_manager.chrome import ChromeDriverManager
         from selenium.webdriver.chrome.options import Options as ChromeOptions
         from selenium.webdriver.chrome.service import Service as ChromeService
+        import tempfile
 
         options = ChromeOptions()
         options.headless = True
@@ -64,6 +65,9 @@ def selenium_driver_resource(context):
         options.add_argument("--disable-features=VizDisplayCompositor")
         options.add_argument('--proxy-server="direct://"')
         options.add_argument('--proxy-bypass-list=*')
+        user_data_dir = tempfile.mkdtemp()
+        options.add_argument(f"--user-data-dir={user_data_dir}")
+
         # Для Chrome задаем временную папку загрузки через preferences
         prefs = {
             "download.default_directory": temp_download_folder,
