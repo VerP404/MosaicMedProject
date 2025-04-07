@@ -1,5 +1,5 @@
 import os
-from dagster import graph, in_process_executor, Field, Array, String
+from dagster import graph, in_process_executor, Field, Array, String, schedule
 
 from mosaic_conductor.selenium.wo.config import OMS_BROWSER, OMS_BASE_URL
 from mosaic_conductor.selenium.wo.ops.wo_start import open_site_op
@@ -57,3 +57,12 @@ wo_talon_job = wo_talon_graph.to_job(
     },
     executor_def=in_process_executor,
 )
+
+
+@schedule(
+    cron_schedule="0 * * * *",
+    job=wo_talon_job,
+    execution_timezone="UTC"
+)
+def wo_talon_schedule(_context):
+    return {}

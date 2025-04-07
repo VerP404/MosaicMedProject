@@ -1,11 +1,11 @@
 import dagster as dg
 
-from mosaic_conductor.selenium.wo.jobs import wo_talon_job
+from mosaic_conductor.selenium.wo.jobs import wo_talon_job, wo_talon_schedule
 
 all_sensors = []
 all_assets = []
 all_jobs = [wo_talon_job]
-all_schedules = []
+all_schedules = [wo_talon_schedule]
 
 defs = dg.Definitions(
     assets=all_assets,
