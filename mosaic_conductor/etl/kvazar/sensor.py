@@ -86,22 +86,32 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
             yield SkipReason("Нет валидных файлов.")
             return
 
-        for file in valid_files:
-            existing_run_key = sensor_state.get(file)
+        def file_hash(file_path):
+            hasher = hashlib.md5()
+            with open(file_path, 'rb') as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hasher.update(chunk)
+            return hasher.hexdigest()
 
-            if existing_run_key:
+        for file in valid_files:
+            file_path = os.path.join(data_folder, file)
+            current_hash = file_hash(file_path)
+            existing_hash = sensor_state.get(file)
+
+            if existing_hash == current_hash:
+                # Файл уже встречался, ищем запуск с ключом, включающим хеш
                 runs = context.instance.get_runs()
                 matching_run = next(
-                    (r for r in runs if r.tags.get("dagster/run_key") == existing_run_key), None
+                    (r for r in runs if r.tags.get("dagster/run_key") == f"{file}-{current_hash}"),
+                    None
                 )
-
                 if matching_run:
                     if not matching_run.is_finished:
                         context.log.info(f"Файл {file} уже обрабатывается, пропускаем.")
                         continue
                     elif matching_run.is_success:
                         try:
-                            os.remove(os.path.join(data_folder, file))
+                            os.remove(file_path)
                             context.log.info(f"Файл {file} успешно обработан и удалён.")
                         except Exception as e:
                             context.log.error(f"Ошибка удаления файла {file}: {e}")
@@ -114,7 +124,7 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
                         new_file_name = f"{file}_{int(time.time())}_error"
                         new_file_path = os.path.join(error_folder, new_file_name)
                         try:
-                            os.rename(os.path.join(data_folder, file), new_file_path)
+                            os.rename(file_path, new_file_path)
                             context.log.warning(f"Файл {file} завершился ошибкой. Перемещён в {new_file_path}.")
                         except Exception as e:
                             context.log.error(f"Ошибка перемещения файла {file} в папку ошибок: {e}")
