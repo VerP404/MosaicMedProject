@@ -119,7 +119,7 @@
       "delimiter": ";",
       "use_timestamps": true
     },
-    "data_loader_doctordata": {
+    "load_data_doctor": {
       "file": {
         "file_pattern": "journal_doctor*",
         "file_format": "csv"

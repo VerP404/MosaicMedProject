@@ -8,7 +8,7 @@ from dagster import sensor, RunRequest, SkipReason
 
 from config.settings import ORGANIZATIONS
 from mosaic_conductor.etl.kvazar import kvazar_job_eln, kvazar_job_emd, kvazar_job_recipes, kvazar_job_death, \
-    kvazar_job_reference, iszl_job_dn, wo_old_job_talon, wo_old_job_doctors, wo_job_talon
+    kvazar_job_reference, iszl_job_dn, wo_old_job_talon, wo_old_job_doctors, wo_job_talon, wo_job_doctors
 
 MIN_FILE_AGE_SECONDS = 30
 
@@ -100,7 +100,6 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
             existing_hash = sensor_state.get(file)
 
             if existing_hash == current_hash:
-                # Файл уже встречался, ищем запуск с ключом, включающим хеш
                 runs = context.instance.get_runs()
                 matching_run = next(
                     (r for r in runs if r.tags.get("dagster/run_key") == f"{file}-{current_hash}"),
@@ -119,7 +118,6 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
                         del sensor_state[file]
                         continue
                     elif matching_run.is_failure:
-                        # Если запуск завершился ошибкой – перемещаем файл в папку ошибок
                         error_folder = os.path.join(data_folder, "errors")
                         os.makedirs(error_folder, exist_ok=True)
                         new_file_name = f"{file}_{int(time.time())}_error"
@@ -131,6 +129,11 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
                             context.log.error(f"Ошибка перемещения файла {file} в папку ошибок: {e}")
                         del sensor_state[file]
                         continue
+                else:
+                    # Если хэш совпадает, но запуск не найден, удаляем запись из состояния
+                    context.log.warning(
+                        f"Запись для файла {file} с хэшом {current_hash} найдена в состоянии, но запуск не найден. Удаляем запись и запускаем процесс заново.")
+                    del sensor_state[file]
 
             if file not in sensor_state:
                 new_run_key = f"{file}-{int(time.time())}"
@@ -242,7 +245,7 @@ wo_old_sensor_doctors = create_sensor(
     wo_old_job_doctors,
     "wo_old_sensor_doctors",
     "ОМС: Врачи. Старая версия",
-    "mosaic_conductor/etl/data/weboms/doctor",
+    "mosaic_conductor/etl/data/weboms/doctor/old",
     "data_loader_doctordata",
     "mosaic_conductor/etl/config/oms_old_mapping.json"
 )
@@ -254,6 +257,16 @@ wo_sensor_talon = create_sensor(
     "load_data_talons",
     "mosaic_conductor/etl/config/oms_mapping.json"
 )
+
+wo_sensor_doctors = create_sensor(
+    wo_job_doctors,
+    "wo_sensor_doctors",
+    "ОМС: Врачи.",
+    "mosaic_conductor/etl/data/weboms/doctor/new",
+    "load_data_doctor",
+    "mosaic_conductor/etl/config/oms_mapping.json"
+)
+
 kvazar_sensors = [
     kvazar_sensor_eln,
     kvazar_sensor_emd,
@@ -264,5 +277,5 @@ kvazar_sensors = [
     wo_old_sensor_talon,
     wo_old_sensor_doctors,
     wo_sensor_talon,
-
+    wo_sensor_doctors
 ]

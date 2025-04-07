@@ -396,3 +396,31 @@ class Reference(TimeStampedModel):
         db_table = 'load_data_reference'
         verbose_name = 'Справка'
         verbose_name_plural = 'Справки'
+
+
+class Doctor(TimeStampedModel):
+    snils = models.CharField("СНИЛС", max_length=255, unique=True)
+    doctor_code = models.CharField("Код врача", max_length=255, default="-")
+    last_name = models.CharField("Фамилия", max_length=255, default="-")
+    first_name = models.CharField("Имя", max_length=255, default="-")
+    middle_name = models.CharField("Отчество", max_length=255, default="-")
+    birth_date = models.CharField("Дата рождения", max_length=255, default="-")
+    gender = models.CharField("Пол", max_length=255, default="-")
+    start_date = models.CharField("Дата начала работы", max_length=255, default="-")
+    end_date = models.CharField("Дата окончания работы", max_length=255, default="-")
+    department = models.CharField("Структурное подразделение", max_length=255, default="-")
+    medical_profile_code = models.CharField("Код профиля медпомощи", max_length=255, default="-")
+    specialty_code = models.CharField("Код специальности", max_length=255, default="-")
+    department_code = models.CharField("Код отделения", max_length=255, default="-")
+    comment = models.CharField("Комментарий", max_length=255, default="-")
+
+    def __str__(self):
+        return f"{self.doctor_code} - {self.last_name}"
+
+    class Meta:
+        db_table = 'load_data_doctor'
+        verbose_name = 'Врач'
+        verbose_name_plural = 'Врачи'
+        constraints = [
+            models.UniqueConstraint(fields=['snils', 'doctor_code'], name='unique_snils_code_doctor')
+        ]

@@ -14,7 +14,6 @@ kvazar_assets = [
 ]
 
 
-
 def create_job(job_name, table_name, data_folder, mapping_file="mapping.json"):
     @job(
         name=job_name,
@@ -90,14 +89,18 @@ wo_old_job_talon = create_job("wo_old_job_talon",
 
 wo_old_job_doctors = create_job("wo_old_job_doctors",
                                 "data_loader_doctordata",
-                                "weboms/doctor",
+                                "weboms/doctor/old",
                                 "oms_old_mapping.json")
+
+wo_job_doctors = create_job("wo_job_doctors",
+                            "load_data_doctor",
+                            "weboms/doctor/new",
+                            "oms_mapping.json")
 
 wo_job_talon = create_job("wo_job_talon",
                           "load_data_talons",
                           "weboms/talon/new",
                           "oms_mapping.json")
-
 
 kvazar_jobs = [
     kvazar_job_eln,
@@ -108,5 +111,6 @@ kvazar_jobs = [
     iszl_job_dn,
     wo_old_job_talon,
     wo_old_job_doctors,
-    wo_job_talon
+    wo_job_talon,
+    wo_job_doctors
 ]
