@@ -9,7 +9,7 @@ from mosaic_conductor.selenium.wo.config import OMS_USERNAME, OMS_PASSWORD
 @op(required_resource_keys={"selenium_driver"})
 def open_site_op(context) -> str:
     driver = context.resources.selenium_driver
-    target_url = context.resources.selenium_driver.config["target_url"]
+    target_url = driver.target_url
 
     try:
         driver.get(target_url)

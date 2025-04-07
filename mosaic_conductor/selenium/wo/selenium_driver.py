@@ -83,6 +83,8 @@ def selenium_driver_resource(context):
 
     context.log.info(f"Браузер {browser} успешно запущен.")
 
+    driver.target_url = target_url
+
     try:
         yield driver
     finally:
