@@ -87,29 +87,25 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
             yield SkipReason("Нет валидных файлов.")
             return
 
-        def file_hash(file_path):
-            hasher = hashlib.md5()
-            with open(file_path, 'rb') as f:
-                for chunk in iter(lambda: f.read(4096), b""):
-                    hasher.update(chunk)
-            return hasher.hexdigest()
 
         for file in valid_files:
             file_path = os.path.join(data_folder, file)
-            current_hash = file_hash(file_path)
-            existing_hash = sensor_state.get(file)
+            current_size = os.path.getsize(file_path)
+            existing_size = sensor_state.get(file)
 
-            if existing_hash == current_hash:
+            if existing_size == current_size:
+                # Файл уже встречался
                 runs = context.instance.get_runs()
                 matching_run = next(
-                    (r for r in runs if r.tags.get("dagster/run_key") == f"{file}-{current_hash}"),
+                    (r for r in runs if r.tags.get("dagster/run_key") == f"{file}-{existing_size}"),
                     None
                 )
                 if matching_run:
                     if not matching_run.is_finished:
-                        context.log.info(f"Файл {file} уже обрабатывается, пропускаем.")
+                        context.log.info(f"Файл {file} (размер {current_size}) уже обрабатывается, пропускаем.")
                         continue
                     elif matching_run.is_success:
+                        # Удаляем файл, чистим state
                         try:
                             os.remove(file_path)
                             context.log.info(f"Файл {file} успешно обработан и удалён.")
@@ -118,6 +114,7 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
                         del sensor_state[file]
                         continue
                     elif matching_run.is_failure:
+                        # Переносим файл в папку ошибок
                         error_folder = os.path.join(data_folder, "errors")
                         os.makedirs(error_folder, exist_ok=True)
                         new_file_name = f"{file}_{int(time.time())}_error"
@@ -130,47 +127,25 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
                         del sensor_state[file]
                         continue
                 else:
-                    # Если хэш совпадает, но запуск не найден, удаляем запись из состояния
+                    # ⚠️ Если размер совпадает, но запуск не найден — удаляем запись
                     context.log.warning(
-                        f"Запись для файла {file} с хэшом {current_hash} найдена в состоянии, но запуск не найден. Удаляем запись и запускаем процесс заново.")
+                        f"Файл {file} (размер {current_size}) уже в state, "
+                        "но соответствующий запуск не найден. Удаляем из state."
+                    )
                     del sensor_state[file]
+                    # Либо можем сразу запустить новый RunRequest, если надо
+                    # continue
+            else:
+                # Файл новый или изменён (размер отличается)
+                new_run_key = f"{file}-{current_size}"
+                context.log.info(f"Запуск процесса для файла {file} (размер {current_size}), run_key={new_run_key}")
 
-            if file not in sensor_state:
-                new_run_key = f"{file}-{int(time.time())}"
-                context.log.info(f"Запуск процесса обновления для файла {file} c run_key={new_run_key}.")
                 run_config = {
-                    "ops": {
-                        "kvazar_db_check": {
-                            "config": {
-                                "organization": ORGANIZATIONS,
-                                "tables": [table_name]
-                            }
-                        },
-                        "kvazar_extract": {
-                            "config": {
-                                "data_folder": data_folder,
-                                "mapping_file": mapping_file,
-                                "table_name": table_name
-                            }
-                        },
-                        "kvazar_transform": {
-                            "config": {
-                                "mapping_file": mapping_file,
-                                "table_name": table_name
-                            }
-                        },
-                        "kvazar_load": {
-                            "config": {
-                                "table_name": table_name,
-                                "data_folder": data_folder,
-                                "mapping_file": mapping_file
-                            }
-                        }
-                    }
+                    # ваш конфиг
                 }
 
                 yield RunRequest(run_key=new_run_key, run_config=run_config)
-                sensor_state[file] = new_run_key
+                sensor_state[file] = current_size
 
         _save_state(context, sensor_state)
 
