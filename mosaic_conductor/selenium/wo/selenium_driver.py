@@ -84,14 +84,6 @@ def selenium_driver_resource(context):
     context.log.info(f"Браузер {browser} успешно запущен.")
 
     try:
-        driver.get(target_url)
-        context.log.info(f"Страница {target_url} успешно открыта.")
-    except Exception as e:
-        context.log.info(f"Ошибка при открытии страницы {target_url}: {e}")
-        driver.quit()
-        raise e
-
-    try:
         yield driver
     finally:
         context.log.info("Закрытие браузера.")
