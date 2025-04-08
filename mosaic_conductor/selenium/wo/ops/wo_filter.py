@@ -133,7 +133,7 @@ def filter_input_doctor_op(context, site_url: str):
     wait = WebDriverWait(driver, 10)
     # Дожидаемся появления кнопки поиска
 
-    for attempt in range(10):
+    for attempt in range(3):
         try:
             search_button = wait.until(
                 EC.presence_of_element_located(

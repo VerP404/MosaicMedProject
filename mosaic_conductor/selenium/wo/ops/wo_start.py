@@ -40,5 +40,15 @@ def open_site_op(context) -> str:
         except StaleElementReferenceException:
             context.log.info(f"Попытка {attempt + 1}: элемент устарел, повторный поиск...")
             time.sleep(1)
-    context.log.info("Авторизация выполнена")
+    # Дополнительная проверка успешной авторизации.
+    try:
+        # Указываем XPath элемента, который появляется только после успешной авторизации.
+        authenticated_element = wait.until(
+            EC.presence_of_element_located((By.XPATH, '//*[@id="navBar"]/header/div/div/div[2]/p'))
+        )
+        context.log.info("Авторизация успешна, элемент найден: " + authenticated_element.text)
+    except Exception as e:
+        context.log.info("Не удалось найти элемент, свидетельствующий об успешной авторизации: " + str(e))
+        context.log.error("Не удалось найти элемент, свидетельствующий об успешной авторизации: " + str(e))
+        raise
     return target_url
