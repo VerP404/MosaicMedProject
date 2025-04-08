@@ -133,7 +133,7 @@ def filter_input_doctor_op(context, site_url: str):
     wait = WebDriverWait(driver, 10)
     # Дожидаемся появления кнопки поиска
 
-    for attempt in range(3):
+    for attempt in range(10):
         try:
             search_button = wait.until(
                 EC.presence_of_element_located(
@@ -141,7 +141,7 @@ def filter_input_doctor_op(context, site_url: str):
             )
             search_button.click()
             break  # Если прошло успешно, выходим из цикла
-        except StaleElementReferenceException:
+        except:
             context.log.info(f"Попытка {attempt + 1}: элемент устарел, повторный поиск...")
             time.sleep(1)
 
