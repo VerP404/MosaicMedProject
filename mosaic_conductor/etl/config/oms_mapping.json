@@ -121,7 +121,7 @@
     },
     "load_data_doctor": {
       "file": {
-        "file_pattern": "journal_doctor*",
+        "file_pattern": "journal_Doctors_*",
         "file_format": "csv"
       },
       "mapping_fields": {
