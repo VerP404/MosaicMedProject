@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
 from dagster import op, Field, String
+from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -129,13 +130,20 @@ def filter_input_doctor_op(context, site_url: str):
     page_doctor = f"{site_url.rstrip('/')}/registry/doctors"
     driver.get(page_doctor)
     context.log.info(f'Открыта страница: {page_doctor}')
-    wait = WebDriverWait(driver, 20)
+    wait = WebDriverWait(driver, 10)
     # Дожидаемся появления кнопки поиска
-    search_button = wait.until(
-        EC.presence_of_element_located(
-            (By.XPATH, '/html/body/div[1]/div/div[2]/div[2]/div[1]/div/div[3]/div/div[2]/div/button'))
-    )
-    search_button.click()
+
+    for attempt in range(3):
+        try:
+            search_button = wait.until(
+                EC.presence_of_element_located(
+                    (By.XPATH, '/html/body/div[1]/div/div[2]/div[2]/div[1]/div/div[3]/div/div[2]/div/button'))
+            )
+            search_button.click()
+            break  # Если прошло успешно, выходим из цикла
+        except StaleElementReferenceException:
+            context.log.info(f"Попытка {attempt + 1}: элемент устарел, повторный поиск...")
+            time.sleep(1)
 
     try:
         select_all_checkbox = driver.find_element(By.XPATH,
