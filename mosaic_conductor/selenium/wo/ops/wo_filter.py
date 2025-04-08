@@ -117,4 +117,38 @@ def filter_input_op(context, site_url: str):
     download_button = driver.find_element(By.XPATH, '//*[@id="menu"]/div/div[3]/div/div/div[5]/a/button')
     download_button.click()
     time.sleep(5)
-    return "Фильтры установлены корректно."
+    return "Данные выгруженны в csv."
+
+
+@op(
+    required_resource_keys={"selenium_driver"}
+)
+def filter_input_doctor_op(context, site_url: str):
+    time.sleep(5)
+    driver = context.resources.selenium_driver
+    page_doctor = f"{site_url.rstrip('/')}/registry/doctors"
+    driver.get(page_doctor)
+    context.log.info(f'Открыта страница: {page_doctor}')
+    wait = WebDriverWait(driver, 10)
+    # Дожидаемся появления кнопки поиска
+    search_button = wait.until(
+        EC.presence_of_element_located(
+            (By.XPATH, '/html/body/div[1]/div/div[2]/div[2]/div[1]/div/div[3]/div/div[2]/div/button'))
+    )
+    search_button.click()
+
+    try:
+        select_all_checkbox = driver.find_element(By.XPATH,
+                                                  '/html/body/div[1]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
+        select_all_checkbox.click()
+    except:
+        time.sleep(5)
+        select_all_checkbox = driver.find_element(By.XPATH,
+                                                  '/html/body/div[1]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
+        select_all_checkbox.click()
+    download_button = wait.until(
+        EC.element_to_be_clickable(
+            (By.XPATH, '/html/body/div[1]/div/div[2]/div[2]/div[1]/div/div[2]/div/div[2]/div[2]/a/button'))
+    )
+    download_button.click()
+    return "Данные выгруженны в csv."
