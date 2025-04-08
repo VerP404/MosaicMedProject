@@ -399,7 +399,7 @@ class Reference(TimeStampedModel):
 
 
 class Doctor(TimeStampedModel):
-    snils = models.CharField("СНИЛС", max_length=255, unique=True)
+    snils = models.CharField("СНИЛС", max_length=255)
     doctor_code = models.CharField("Код врача", max_length=255, default="-")
     last_name = models.CharField("Фамилия", max_length=255, default="-")
     first_name = models.CharField("Имя", max_length=255, default="-")

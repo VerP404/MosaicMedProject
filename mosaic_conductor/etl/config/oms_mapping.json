@@ -146,7 +146,7 @@
       ],
       "encoding": "utf-8",
       "delimiter": ";",
-      "use_timestamps": false
+      "use_timestamps": true
     }
   }
 }
