@@ -129,7 +129,7 @@ def filter_input_doctor_op(context, site_url: str):
     page_doctor = f"{site_url.rstrip('/')}/registry/doctors"
     driver.get(page_doctor)
     context.log.info(f'Открыта страница: {page_doctor}')
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 20)
     # Дожидаемся появления кнопки поиска
     search_button = wait.until(
         EC.presence_of_element_located(
