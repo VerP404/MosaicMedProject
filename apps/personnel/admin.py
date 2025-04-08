@@ -28,6 +28,13 @@ class DoctorRecordInline(TabularInline):
     verbose_name_plural = "Записи врача"
 
 
+class StaffRecordInline(TabularInline):
+    model = StaffRecord
+    extra = 0
+    verbose_name = "Запись сотрудника"
+    verbose_name_plural = "Записи сотрудников"
+
+
 class RG014Inline(TabularInline):
     model = RG014
     form = RG014Form  # Используем форму с автозаполнением
@@ -412,12 +419,69 @@ class TelegramGroupFilter(SimpleListFilter):
         return queryset
 
 
+# Кастомный фильтр для статуса врача (Нет/Да/Уволен)
+class DoctorStatusFilter(SimpleListFilter):
+    title = 'Статус врача'
+    parameter_name = 'doctor_status'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('none', 'Нет'),
+            ('active', 'Да'),
+            ('terminated', 'Уволен'),
+        )
+
+    def queryset(self, request, queryset):
+        today = date.today()
+        if self.value() == 'none':
+            return queryset.filter(doctor_records__isnull=True)
+        elif self.value() == 'active':
+            return queryset.filter(doctor_records__isnull=False).filter(
+                models.Q(doctor_records__end_date__isnull=True) | models.Q(doctor_records__end_date__gte=today)
+            ).distinct()
+        elif self.value() == 'terminated':
+            # Пользователь имеет записи врача, но ни одна не активна
+            return queryset.filter(doctor_records__isnull=False).exclude(
+                models.Q(doctor_records__end_date__isnull=True) | models.Q(doctor_records__end_date__gte=today)
+            ).distinct()
+        return queryset
+
+
+# Кастомный фильтр для статуса персонала
+class StaffStatusFilter(SimpleListFilter):
+    title = 'Статус персонала'
+    parameter_name = 'staff_status'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('none', 'Нет'),
+            ('active', 'Да'),
+            ('terminated', 'Уволен'),
+        )
+
+    def queryset(self, request, queryset):
+        today = date.today()
+        if self.value() == 'none':
+            return queryset.filter(staff_record__isnull=True)
+        elif self.value() == 'active':
+            return queryset.filter(staff_record__isnull=False).filter(
+                models.Q(staff_record__end_date__isnull=True) | models.Q(staff_record__end_date__gte=today)
+            )
+        elif self.value() == 'terminated':
+            return queryset.filter(staff_record__isnull=False).filter(
+                staff_record__end_date__lt=today
+            )
+        return queryset
+
+
 @admin.register(Person)
 class PersonAdmin(ModelAdmin):
-    list_display = ('fio_dob', 'phone_number', 'telegram', 'digital_signature_status', 'maternity_leave_status')
+    list_display = (
+        'fio_dob', 'is_doctor_display', 'is_staff_display', 'phone_number', 'telegram', 'digital_signature_status',
+        'maternity_leave_status')
     search_fields = ('last_name', 'first_name', 'patronymic', 'snils', 'email', 'phone_number', 'telegram')
     list_filter = (
-        'citizenship', TelegramGroupFilter, DigitalSignatureFilter, MaternityLeaveFilter,
+        DoctorStatusFilter, StaffStatusFilter, 'citizenship', TelegramGroupFilter, DigitalSignatureFilter, MaternityLeaveFilter,
         DigitalSignatureApplicationFilter)
     fieldsets = (
         ("Персональные данные", {
@@ -436,9 +500,31 @@ class PersonAdmin(ModelAdmin):
             'fields': ('telegram_groups',)
         }),
     )
-    inlines = [DoctorRecordInline, RG014Inline, DigitalSignatureInline, MaternityLeaveInline]
+    inlines = [DoctorRecordInline, StaffRecordInline, RG014Inline, DigitalSignatureInline, MaternityLeaveInline]
     filter_horizontal = ('telegram_groups',)
     list_per_page = 15
+
+    def is_doctor_display(self, obj):
+        qs = obj.doctor_records.all()
+        today = date.today()
+        if not qs.exists():
+            return format_html('<span style="color: red;">Нет</span>')
+        if qs.filter(models.Q(end_date__isnull=True) | models.Q(end_date__gte=today)).exists():
+            return format_html('<span style="color: green;">Да</span>')
+        return format_html('<span style="color: orange;">Уволен</span>')
+
+    is_doctor_display.short_description = "Врач"
+
+    def is_staff_display(self, obj):
+        if not hasattr(obj, 'staff_record'):
+            return format_html('<span style="color: red;">Нет</span>')
+        staff = obj.staff_record
+        today = date.today()
+        if staff.end_date is None or staff.end_date >= today:
+            return format_html('<span style="color: green;">Да</span>')
+        return format_html('<span style="color: orange;">Уволен</span>')
+
+    is_staff_display.short_description = "Персонал"
 
     def get_readonly_fields(self, request, obj=None):
         if not request.user.is_superuser:

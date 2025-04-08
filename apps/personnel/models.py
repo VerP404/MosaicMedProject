@@ -73,6 +73,27 @@ class Person(models.Model):
             start_date__lte=today
         ).exists()
 
+    @property
+    def is_doctor(self):
+        qs = self.doctor_records.all()
+        if not qs.exists():
+            return "Нет"
+        today = date.today()
+        # Если найдётся хотя бы одна активная запись – считаем, что врач работает
+        if qs.filter(models.Q(end_date__isnull=True) | models.Q(end_date__gte=today)).exists():
+            return "Да"
+        return "Уволен"
+
+    @property
+    def is_staff(self):
+        try:
+            staff = self.staff_record
+        except StaffRecord.DoesNotExist:
+            return "Нет"
+        today = date.today()
+        if staff.end_date is None or staff.end_date >= today:
+            return "Да"
+        return "Уволен"
     def __str__(self):
         return f"{self.last_name} {self.first_name} {self.patronymic or ''}".strip()
 
@@ -114,6 +135,20 @@ class DoctorRecord(models.Model):
     def __str__(self):
         return f"{self.person} ({self.specialty}) - {self.doctor_code}: {self.structural_unit} {self.start_date}-{self.end_date}"
 
+
+class StaffRecord(models.Model):
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="staff_records")
+    position = models.ForeignKey('PostRG014', on_delete=models.PROTECT, verbose_name="Должность")
+    department = models.ForeignKey('organization.Department', on_delete=models.SET_NULL, null=True, verbose_name="Отделение")
+    start_date = models.DateField("Дата начала работы")
+    end_date = models.DateField("Дата окончания работы", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Запись сотрудника"
+        verbose_name_plural = "Записи сотрудника"
+
+    def __str__(self):
+        return f"{self.person} - {self.position}: {self.department} {self.start_date}-{self.end_date}"
 
 class SpecialtyRG014(models.Model):
     code = models.CharField("Код специальности", max_length=10, unique=True)
