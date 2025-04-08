@@ -65,6 +65,8 @@ def selenium_driver_resource(context):
         options.add_argument("--disable-features=VizDisplayCompositor")
         options.add_argument('--proxy-server="direct://"')
         options.add_argument('--proxy-bypass-list=*')
+        options.add_argument("--no-proxy-server")
+        options.add_argument("--proxy-bypass-list=<-loopback>")
         user_data_dir = tempfile.mkdtemp()
         options.add_argument(f"--user-data-dir={user_data_dir}")
 
