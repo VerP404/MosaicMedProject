@@ -31,6 +31,12 @@ pkill -f 'python3.12 apps/analytical_app/index.py'
 pkill -f 'python3.12 apps/chief_app/main.py'
 pkill -f 'python3.12 start_dagster.py --host 0.0.0.0 --port 3000'
 
+DAGSTER_DAEMON_PIDS=$(pgrep -f 'dagster-daemon run')
+if [ -n "$DAGSTER_DAEMON_PIDS" ]; then
+    echo "Останавливаем процессы dagster-daemon: $DAGSTER_DAEMON_PIDS"
+    kill $DAGSTER_DAEMON_PIDS
+fi
+
 # Перезапуск серверов в фоне
 nohup python3.12 manage.py runserver 0.0.0.0:8000 &
 nohup python3.12 apps/analytical_app/index.py &
