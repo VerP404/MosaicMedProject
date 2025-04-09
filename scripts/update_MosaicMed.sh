@@ -36,7 +36,11 @@ if [ -n "$DAGSTER_DAEMON_PIDS" ]; then
     echo "Останавливаем процессы dagster-daemon: $DAGSTER_DAEMON_PIDS"
     kill $DAGSTER_DAEMON_PIDS
 fi
-
+DAGIT_PIDS=$(pgrep -f 'dagit')
+if [ -n "$DAGIT_PIDS" ]; then
+    echo "Останавливаем процессы dagit: $DAGIT_PIDS"
+    kill $DAGIT_PIDS
+fi
 # Перезапуск серверов в фоне
 nohup python3.12 manage.py runserver 0.0.0.0:8000 &
 nohup python3.12 apps/analytical_app/index.py &
