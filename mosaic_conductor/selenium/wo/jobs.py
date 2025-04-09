@@ -106,7 +106,7 @@ def wo_talon_schedule(_context):
 
 
 @schedule(
-    cron_schedule="0 8-17 * * *",
+    cron_schedule="10 8-17 * * *",
     job=wo_doctor_job,
     execution_timezone="Europe/Moscow"
 )
