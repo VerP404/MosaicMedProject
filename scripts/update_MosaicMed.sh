@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Определение лог-файла с временной меткой
+# Определение лог-файла с временной меткой для текущего обновления
 LOG_FILE="/tmp/update_MosaicMed_$(date +'%Y%m%d_%H%M%S').log"
-# Перенаправление STDOUT и STDERR в лог-файл и на экран
+# Перенаправление STDOUT и STDERR только для этапов обновления, фоновые процессы будут иметь отдельное перенаправление
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "=============================================="
 echo "Начало выполнения скрипта обновления: $(date)"
-echo "Лог записывается в $LOG_FILE"
+echo "Лог обновления записывается в: $LOG_FILE"
 echo "=============================================="
 
 # Определение директории, в которой находится скрипт
@@ -81,7 +81,7 @@ pkill -f 'python3.12 apps/chief_app/main.py'
 pkill -f 'python3.12 start_dagster.py --host 0.0.0.0 --port 3000'
 echo "[INFO] Основные процессы остановлены (если были запущены)."
 
-echo "[INFO] Поиск процессов dagster-daemon..."
+echo "[INFO] Поиск и остановка процессов dagster-daemon..."
 DAGSTER_DAEMON_PIDS=$(pgrep -f 'dagster-daemon run')
 if [ -n "$DAGSTER_DAEMON_PIDS" ]; then
     echo "[INFO] Останавливаем процессы dagster-daemon: $DAGSTER_DAEMON_PIDS"
@@ -90,7 +90,7 @@ else
     echo "[INFO] Процессы dagster-daemon не найдены."
 fi
 
-echo "[INFO] Поиск процессов dagit..."
+echo "[INFO] Поиск и остановка процессов dagit..."
 DAGIT_PIDS=$(pgrep -f 'dagit')
 if [ -n "$DAGIT_PIDS" ]; then
     echo "[INFO] Останавливаем процессы dagit: $DAGIT_PIDS"
@@ -101,10 +101,10 @@ fi
 
 # Перезапуск серверов в фоне
 echo "[INFO] Перезапуск серверов..."
-nohup python3.12 manage.py runserver 0.0.0.0:8000 &
-nohup python3.12 apps/analytical_app/index.py &
-nohup python3.12 apps/chief_app/main.py &
-nohup python3.12 start_dagster.py --host 0.0.0.0 --port 3000 &
+nohup python3.12 manage.py runserver 0.0.0.0:8000 > /dev/null 2>&1 &
+nohup python3.12 apps/analytical_app/index.py > /dev/null 2>&1 &
+nohup python3.12 apps/chief_app/main.py > /dev/null 2>&1 &
+nohup python3.12 start_dagster.py --host 0.0.0.0 --port 3000 > /dev/null 2>&1 &
 
 echo "=============================================="
 echo "Скрипт обновления завершён: $(date)"
