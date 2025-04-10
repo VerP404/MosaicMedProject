@@ -202,3 +202,4 @@ exponent.txt
 .cloudstorage/
 /etl_wo/data/
 /mosaic_conductor/dagster_home/
+/mosaic_conductor/update/servers/
