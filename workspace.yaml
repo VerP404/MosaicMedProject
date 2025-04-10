@@ -8,3 +8,6 @@ load_from:
   - python_package:
       package_name: mosaic_conductor.selenium.definitions
       location_name: "Автоматизация браузера"
+  - python_package:
+      package_name: mosaic_conductor.local.definitions
+      location_name: "Локальные задачи автоматизации"
