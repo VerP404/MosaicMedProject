@@ -101,7 +101,7 @@ wo_doctor_job = create_download_job(
     job=wo_talon_job,
     execution_timezone="Europe/Moscow"
 )
-def wo_talon_schedule(_context):
+def selenium_wo_talon_schedule(_context):
     return {}
 
 
@@ -110,5 +110,5 @@ def wo_talon_schedule(_context):
     job=wo_doctor_job,
     execution_timezone="Europe/Moscow"
 )
-def wo_doctor_schedule(_context):
+def selenium_wo_doctor_schedule(_context):
     return {}
