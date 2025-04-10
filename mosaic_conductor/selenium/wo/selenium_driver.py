@@ -11,6 +11,10 @@ from selenium import webdriver
     }
 )
 def selenium_driver_resource(context):
+    os.environ.pop("HTTP_PROXY", None)
+    os.environ.pop("HTTPS_PROXY", None)
+    os.environ.pop("http_proxy", None)
+    os.environ.pop("https_proxy", None)
     browser = context.resource_config.get("browser")
     destination_folder = context.resource_config.get("destination_folder")
     temp_download_folder = context.resource_config.get("temp_download_folder")
