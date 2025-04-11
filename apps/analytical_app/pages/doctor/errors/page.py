@@ -7,12 +7,9 @@ from sqlalchemy import text
 from apps.analytical_app.app import app
 from apps.analytical_app.query_executor import engine
 
-# При необходимости можно импортировать функции для формирования списка докторов, корпусов и отделений,
-# например, из apps.analytical_app.components.filters
-
 type_page = "error_log"
 
-# Форма фильтров
+# Форма фильтров (как у вас уже есть)
 filters = html.Div([
     dbc.Row([
         dbc.Col(html.Div("Выберите год:"), width=2),
@@ -48,60 +45,71 @@ filters = html.Div([
     ], className="mb-2")
 ], style={"padding": "15px"})
 
-# Таблица с результатами – два таба: "Сводный" и "Детальный"
-tabs = dbc.Card(
-    [
-        dbc.CardHeader("Отчёт по ошибкам"),
-        dbc.CardBody(
-            dbc.Tabs([
-                dbc.Tab(
-                    dash_table.DataTable(
-                        id=f"summary-table-{type_page}",
-                        style_table={'overflowX': 'auto'},
-                        style_cell={'textAlign': 'left'},
-                        export_format="xlsx",
-                        page_size=15,
-                        filter_action="native",
-                        sort_action="native",
-                        sort_mode="multi",
-                        style_header={'fontWeight': 'bold'}
-                    ),
-                    label="Сводный"
-                ),
-                dbc.Tab(
-                    dash_table.DataTable(
-                        id=f"detailed-table-{type_page}",
-                        style_table={'overflowX': 'auto'},
-                        style_cell={'textAlign': 'left'},
-                        export_format="xlsx",
-                        page_size=15,
-                        filter_action="native",
-                        sort_action="native",
-                        sort_mode="multi",
-                        style_header={'fontWeight': 'bold'}
-                    ),
-                    label="Детальный"
-                )
-            ])
-        )
-    ],
-    className="mb-3"
-)
-
+# Основной layout страницы error_log
 layout_error_log = html.Div([
     filters,
     dcc.Loading(id=f"loading-output-{type_page}", type="default"),
-    tabs,
+    dbc.Card(
+        [
+            dbc.CardHeader(
+                dbc.Row([
+                    dbc.Col(html.H5("Отчёт по ошибкам", className="mb-0"), width="auto"),
+                    dbc.Col(
+                        html.Div(
+                            id=f"last-updated-error_log-{type_page}",
+                            style={"textAlign": "right", "fontWeight": "normal"}
+                        ),
+                        width=True
+                    )
+                ], align="center", justify="between")
+            ),
+            dbc.CardBody(
+                dbc.Tabs([
+                    dbc.Tab(
+                        dash_table.DataTable(
+                            id=f"summary-table-{type_page}",
+                            style_table={'overflowX': 'auto'},
+                            style_cell={'textAlign': 'left'},
+                            export_format="xlsx",
+                            page_size=15,
+                            filter_action="native",
+                            sort_action="native",
+                            sort_mode="multi",
+                            style_header={'fontWeight': 'bold'}
+                        ),
+                        label="Сводный"
+                    ),
+                    dbc.Tab(
+                        dash_table.DataTable(
+                            id=f"detailed-table-{type_page}",
+                            style_table={'overflowX': 'auto'},
+                            style_cell={'textAlign': 'left'},
+                            export_format="xlsx",
+                            page_size=15,
+                            filter_action="native",
+                            sort_action="native",
+                            sort_mode="multi",
+                            style_header={'fontWeight': 'bold'}
+                        ),
+                        label="Детальный"
+                    )
+                ])
+            )
+        ],
+        className="mb-3"
+    ),
     html.Div(id=f"report-status-{type_page}", style={"color": "red", "padding": "15px"})
 ])
 
 
+# Callback для обновления таблиц и даты последнего обновления
 @app.callback(
     [
         Output(f"summary-table-{type_page}", "data"),
         Output(f"summary-table-{type_page}", "columns"),
         Output(f"detailed-table-{type_page}", "data"),
         Output(f"detailed-table-{type_page}", "columns"),
+        Output(f"last-updated-error_log-{type_page}", "children"),
         Output(f"report-status-{type_page}", "children")
     ],
     Input(f"update-button-{type_page}", "n_clicks"),
@@ -117,14 +125,12 @@ def update_error_log(n_clicks, selected_year, selected_doctor, selected_building
         raise exceptions.PreventUpdate
 
     # Приведение значений фильтров к нужному виду
-    # Например, преобразуем списки в корректное представление для SQL
     selected_doctor_ids = selected_doctor if selected_doctor else []
     building_ids = selected_building if selected_building else []
     department_ids = selected_department if selected_department else []
 
     try:
         # --- Сводный запрос ---
-        # Группировка по врачу и цели, подсчёт количества талонов (у талона может быть несколько ошибок)
         summary_sql = f"""
         SELECT 
             err.doctor AS "Врач",
@@ -149,7 +155,6 @@ def update_error_log(n_clicks, selected_year, selected_doctor, selected_building
         summary_columns = [{"name": col, "id": col} for col in df_summary.columns]
 
         # --- Детальный запрос ---
-        # Выборка всех ошибок с дополнительными данными по корпусу и отделению
         detailed_sql = f"""
         SELECT 
             err.doctor AS "Врач",
@@ -176,11 +181,15 @@ def update_error_log(n_clicks, selected_year, selected_doctor, selected_building
         """
         with engine.connect() as conn:
             df_detailed = pd.read_sql(text(detailed_sql), conn, params={"selected_year": selected_year})
-
         detailed_data = df_detailed.to_dict('records')
         detailed_columns = [{"name": col, "id": col} for col in df_detailed.columns]
 
-        return summary_data, summary_columns, detailed_data, detailed_columns, ""
+        # --- Получаем дату последнего обновления из load_data_error_log_talon ---
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT MAX(updated_at) FROM load_data_error_log_talon")).fetchone()
+        last_updated = row[0].strftime('%d.%m.%Y %H:%M') if row and row[0] else "Нет данных"
+
+        return summary_data, summary_columns, detailed_data, detailed_columns, last_updated, ""
     except Exception as e:
         error_msg = f"Ошибка при выполнении запроса: {str(e)}"
-        return [], [], [], [], error_msg
+        return [], [], [], [], "", error_msg
