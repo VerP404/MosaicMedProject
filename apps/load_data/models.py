@@ -424,3 +424,95 @@ class Doctor(TimeStampedModel):
         constraints = [
             models.UniqueConstraint(fields=['snils', 'doctor_code'], name='unique_snils_code_doctor')
         ]
+
+
+class TalonRefusal(TimeStampedModel):
+    """
+    Модель для хранения отказов в талонах.
+    is_fixed - показывает, был ли талон исправлен (True/False)
+    """
+    source = models.CharField(max_length=255, default='-', verbose_name="Источник")
+    error = models.CharField(max_length=255, default='-', unique=True, verbose_name="Ошибка")
+    error_status = models.CharField(max_length=255, default='-', verbose_name="Статус ошибки")
+    talon_status = models.CharField(max_length=255, default='-', verbose_name="Статус талона")
+    talon = models.CharField(max_length=255, default='-', verbose_name="Талон")
+    talon_type = models.CharField(max_length=255, default='-', verbose_name="Тип талона")
+    goal = models.CharField(max_length=255, default='-', verbose_name="Цель")
+    error_type = models.CharField(max_length=255, default='-', verbose_name="Тип ошибки")
+    patient = models.CharField(max_length=255, default='-', verbose_name="Пациент")
+    birth_date = models.CharField(max_length=255, default='-', verbose_name="Дата рождения")
+    treatment_start = models.CharField(max_length=255, default='-', verbose_name="Начало лечения")
+    treatment_end = models.CharField(max_length=255, default='-', verbose_name="Окончание лечения")
+    insurance = models.CharField(max_length=255, default='-', verbose_name="Страховая")
+    enp = models.CharField(max_length=255, default='-', verbose_name="ЕНП")
+    operator = models.CharField(max_length=255, default='-', verbose_name="Оператор")
+    doctor = models.CharField(max_length=255, default='-', verbose_name="Врач")
+    department = models.CharField(max_length=255, default='-', verbose_name="Подразделение")
+    tfoms_error_code = models.CharField(max_length=255, default='-', verbose_name="Код ошибки ТФОМС")
+    tfoms_error_text = models.CharField(max_length=500, default='-', verbose_name="Текст ошибки ТФОМС")
+    tfoms_error_extra = models.CharField(max_length=500, default='-', verbose_name="Доп.инф. к ошибке ТФОМС")
+    field_with_error = models.CharField(max_length=255, default='-', verbose_name="Поле с ошибкой")
+    base_element = models.CharField(max_length=255, default='-', verbose_name="Базовый элемент")
+    sanctions_amount = models.CharField(max_length=255, default='-', verbose_name="Сумма санкций")
+    source_file = models.CharField(max_length=255, default='-', verbose_name="Исходный файл с загрузкой")
+    account_number = models.CharField(max_length=255, default='-', verbose_name="Номер счета")
+    account_date = models.CharField(max_length=255, default='-', verbose_name="Дата счета")
+    edit_date = models.CharField(max_length=255, default='-', verbose_name="Дата редактирования")
+
+    # Поле для отметки исправления
+    is_fixed = models.BooleanField(default=False, verbose_name="Исправлено")
+
+    def __str__(self):
+        return f"{self.talon} - {self.error}"
+
+    class Meta:
+        db_table = "load_data_error_log_talon"
+        verbose_name = "Отказ в талоне"
+        verbose_name_plural = "Отказы в талонах"
+
+
+class DetailedMedicalExamination(TimeStampedModel):
+    """
+    Модель для хранения детализации диспансеризации.
+    """
+    talon_number = models.CharField(max_length=255, default='-', verbose_name="Номер талона")
+    account = models.CharField(max_length=255, default='-', verbose_name="Счет")
+    upload_date = models.CharField(max_length=255, default='-', verbose_name="Дата выгрузки")
+    status = models.CharField(max_length=255, default='-', verbose_name="Статус")
+    mo = models.CharField(max_length=255, default='-', verbose_name="МО")
+    start_date = models.CharField(max_length=255, default='-', verbose_name="Дата начала")
+    end_date = models.CharField(max_length=255, default='-', verbose_name="Дата окончания")
+    policy_series = models.CharField(max_length=255, default='-', verbose_name="Серия полиса")
+    policy_number = models.CharField(max_length=255, default='-', verbose_name="Номер полиса")
+    enp = models.CharField(max_length=255, default='-', verbose_name="ЕНП")
+    last_name = models.CharField(max_length=255, default='-', verbose_name="Фамилия")
+    first_name = models.CharField(max_length=255, default='-', verbose_name="Имя")
+    middle_name = models.CharField(max_length=255, default='-', verbose_name="Отчество")
+    insurance_org = models.CharField(max_length=255, default='-', verbose_name="Страховая организация")
+    gender = models.CharField(max_length=255, default='-', verbose_name="Пол")
+    birth_date = models.CharField(max_length=255, default='-', verbose_name="Дата рождения")
+    talon_type = models.CharField(max_length=255, default='-', verbose_name="Тип талона")
+    main_diagnosis = models.CharField(max_length=255, default='-', verbose_name="Основной диагноз")
+    additional_diagnosis = models.CharField(max_length=255, default='-', verbose_name="Сопутствующий диагноз")
+    health_group = models.CharField(max_length=255, default='-', verbose_name="Группа здоровья")
+    doctor_code = models.CharField(max_length=255, default='-', verbose_name="Доктор (Код)")
+    doctor_fio = models.CharField(max_length=255, default='-', verbose_name="Доктор (ФИО)")
+    cost = models.CharField(max_length=255, default='-', verbose_name="Стоимость")
+    service_name = models.CharField(max_length=255, default='-', verbose_name="Название услуги")
+    service_nomenclature = models.CharField(max_length=255, default='-', verbose_name="Номенклатурный код услуги")
+    doctor_services_code = models.CharField(max_length=255, default='-', verbose_name="Доктор-Услуги (Код)")
+    doctor_services_fio = models.CharField(max_length=255, default='-', verbose_name="Доктор-Услуги (ФИО)")
+    service_date = models.CharField(max_length=255, default='-', verbose_name="Дата-Услуги")
+    service_status = models.CharField(max_length=255, default='-', verbose_name="Статус-Услуги")
+    route = models.CharField(max_length=255, default='-', verbose_name="Маршрут")
+    service_department = models.CharField(max_length=255, default='-', verbose_name="Подразделение врача-Услуги")
+    mo_code_other = models.CharField(max_length=255, default='-', verbose_name="Код МО (при оказ.услуги в другой МО)")
+
+    def __str__(self):
+        return f"{self.talon_number} - {self.account}"
+
+    class Meta:
+        db_table = "load_data_detailed_medical_examination"
+        verbose_name = "Детализация диспансеризации"
+        verbose_name_plural = "Детализации диспансеризации"
+        unique_together = (("talon_number", "service_nomenclature"),)
