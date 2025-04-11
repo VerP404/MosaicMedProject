@@ -124,7 +124,20 @@ def kvazar_load(context: OpExecutionContext, kvazar_transform: dict):
                 context.log.info(f"ℹ️ Нет данных для загрузки в таблицу {table_name}.")
                 result = {"table_name": table_name, "status": "skipped"}
             else:
+                # Если это загрузка для таблицы load_data_error_log_talon, убедимся, что столбец is_fixed есть
+                if table_name == "load_data_error_log_talon":
+                    if "is_fixed" not in data.columns:
+                        data["is_fixed"] = False
+                        context.log.info("Добавлен столбец is_fixed со значением False для load_data_error_log_talon")
                 result = safe_load_dataframe(table_name, data)
+                # Добавляем набор ошибок из CSV
+                if table_name == "load_data_error_log_talon":
+                    if "error" in data.columns:
+                        error_set = list(data["error"].unique())
+                        result["error_set"] = error_set
+                    else:
+                        context.log.warning("Поле 'error' не найдено в данных для load_data_error_log_talon.")
+
         clear_data_folder(data_folder)
         context.log.info(f"✅ Папка {data_folder} очищена")
     except Exception as exc:

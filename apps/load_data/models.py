@@ -449,7 +449,7 @@ class TalonRefusal(TimeStampedModel):
     doctor = models.CharField(max_length=255, default='-', verbose_name="Врач")
     department = models.CharField(max_length=255, default='-', verbose_name="Подразделение")
     tfoms_error_code = models.CharField(max_length=255, default='-', verbose_name="Код ошибки ТФОМС")
-    tfoms_error_text = models.CharField(max_length=500, default='-', verbose_name="Текст ошибки ТФОМС")
+    tfoms_error_text = models.TextField(default='-', verbose_name="Текст ошибки ТФОМС")
     tfoms_error_extra = models.CharField(max_length=500, default='-', verbose_name="Доп.инф. к ошибке ТФОМС")
     field_with_error = models.CharField(max_length=255, default='-', verbose_name="Поле с ошибкой")
     base_element = models.CharField(max_length=255, default='-', verbose_name="Базовый элемент")
