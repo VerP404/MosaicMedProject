@@ -88,7 +88,6 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
             yield SkipReason("Нет валидных файлов.")
             return
 
-
         for file in valid_files:
             file_path = os.path.join(data_folder, file)
             current_size = os.path.getsize(file_path)
@@ -271,5 +270,7 @@ kvazar_sensors = [
     wo_old_sensor_talon,
     wo_old_sensor_doctors,
     wo_sensor_talon,
-    wo_sensor_doctors
+    wo_sensor_doctors,
+    wo_sensor_detailed,
+    wo_sensor_errorlog
 ]
