@@ -8,7 +8,8 @@ from dagster import sensor, RunRequest, SkipReason
 
 from config.settings import ORGANIZATIONS
 from mosaic_conductor.etl.kvazar import kvazar_job_eln, kvazar_job_emd, kvazar_job_recipes, kvazar_job_death, \
-    kvazar_job_reference, iszl_job_dn, wo_old_job_talon, wo_old_job_doctors, wo_job_talon, wo_job_doctors
+    kvazar_job_reference, iszl_job_dn, wo_old_job_talon, wo_old_job_doctors, wo_job_talon, wo_job_doctors, \
+    wo_job_detailed
 
 MIN_FILE_AGE_SECONDS = 30
 
@@ -239,6 +240,24 @@ wo_sensor_doctors = create_sensor(
     "ОМС: Врачи.",
     "mosaic_conductor/etl/data/weboms/doctor/new",
     "load_data_doctor",
+    "mosaic_conductor/etl/config/oms_mapping.json"
+)
+
+wo_sensor_detailed = create_sensor(
+    wo_job_detailed,
+    "wo_sensor_detailed",
+    "ОМС: Детализация диспансеризации.",
+    "mosaic_conductor/etl/data/weboms/detailed",
+    "load_data_detailed_medical_examination",
+    "mosaic_conductor/etl/config/oms_mapping.json"
+)
+
+wo_sensor_errorlog = create_sensor(
+    wo_job_detailed,
+    "wo_sensor_errorlog",
+    "ОМС: Отказы МЭК и ФЛК.",
+    "mosaic_conductor/etl/data/weboms/errorlog",
+    "load_data_error_log_talon",
     "mosaic_conductor/etl/config/oms_mapping.json"
 )
 
