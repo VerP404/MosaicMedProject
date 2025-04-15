@@ -424,6 +424,7 @@ def update_journal_appeals(n_clicks, start_date, end_date):
             SELECT
                 p.last_name || ' ' || p.first_name || ' ' || COALESCE(p.middle_name, '') AS responsible_fio,
                 a.status,
+                COUNT(a.id) AS appeals_count,
                 STRING_AGG(a.answer_date::text, ', ') AS answer_dates
             FROM journal_appeal a
             JOIN journal_appeal_responsible jar ON jar.appeal_id = a.id
@@ -434,34 +435,13 @@ def update_journal_appeals(n_clicks, start_date, end_date):
         """
         df_resp = pd.read_sql(query_resp, con=engine)
 
-        # Группируем + считаем count
-        # pivot -> (responsible_fio) x (status) => count, plus we store answer_dates
-        group_resp = (
-            df_resp
-            .groupby(['responsible_fio', 'status'], dropna=False)
-            .agg({
-                'answer_dates': lambda x: ', '.join(filter(None, x)),
-            })
-            .reset_index()
-        )
-        # Отдельно count
-        count_resp = (
-            df_resp
-            .groupby(['responsible_fio', 'status'], dropna=False)
-            .size()
-            .reset_index(name='count')
-        )
-        group_resp = group_resp.merge(count_resp, on=['responsible_fio', 'status'], how='left')
-
-        # pivot для count
-        pivot_resp_count = group_resp.pivot(
+        pivot_resp_count = df_resp.pivot(
             index='responsible_fio',
             columns='status',
-            values='count'
+            values='appeals_count'
         ).fillna(0).reset_index()
 
-        # pivot для dates
-        pivot_resp_dates = group_resp.pivot(
+        pivot_resp_dates = df_resp.pivot(
             index='responsible_fio',
             columns='status',
             values='answer_dates'
@@ -490,6 +470,7 @@ def update_journal_appeals(n_clicks, start_date, end_date):
             SELECT
                 p.last_name || ' ' || p.first_name || ' ' || COALESCE(p.middle_name, '') AS executor_fio,
                 a.status,
+                COUNT(a.id) AS appeals_count,
                 STRING_AGG(a.answer_date::text, ', ') AS answer_dates
             FROM journal_appeal a
             JOIN journal_appeal_executors jae ON jae.appeal_id = a.id
@@ -500,26 +481,13 @@ def update_journal_appeals(n_clicks, start_date, end_date):
         """
         df_exec = pd.read_sql(query_exec, con=engine)
 
-        group_exec = (
-            df_exec
-            .groupby(['executor_fio', 'status'], dropna=False)
-            .agg({'answer_dates': lambda x: ', '.join(filter(None, x))})
-            .reset_index()
-        )
-        count_exec = (
-            df_exec
-            .groupby(['executor_fio', 'status'], dropna=False)
-            .size()
-            .reset_index(name='count')
-        )
-        group_exec = group_exec.merge(count_exec, on=['executor_fio', 'status'], how='left')
-
-        pivot_exec_count = group_exec.pivot(
+        pivot_exec_count = df_exec.pivot(
             index='executor_fio',
             columns='status',
-            values='count'
+            values='appeals_count'
         ).fillna(0).reset_index()
-        pivot_exec_dates = group_exec.pivot(
+
+        pivot_exec_dates = df_exec.pivot(
             index='executor_fio',
             columns='status',
             values='answer_dates'
