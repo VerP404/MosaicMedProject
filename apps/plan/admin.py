@@ -232,12 +232,28 @@ class DepartmentAutocomplete(autocomplete.Select2QuerySetView):
 class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     import_form_class = ImportForm
     export_form_class = ExportForm
-    list_display = ('group', 'year',)
+    list_display = ('group', 'year', 'has_quantity_plan', 'has_amount_plan')
+    list_filter = ('year',)
     search_fields = ('group__name', 'year',)
     inlines = [MonthlyPlanInline]
 
-    def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
+    def has_quantity_plan(self, obj):
+        """
+        Возвращает значок "да", если хотя бы один из месячных планов имеет ненулевое количество.
+        """
+        if obj.monthly_plans.filter(quantity__gt=0).exists():
+            return format_html('<img src="/static/admin/img/icon-yes.svg" alt="Да">')
+        return format_html('<img src="/static/admin/img/icon-no.svg" alt="Нет">')
+    has_quantity_plan.short_description = "План количества"
+
+    def has_amount_plan(self, obj):
+        """
+        Возвращает значок "да", если хотя бы один из месячных планов имеет ненулевую сумму.
+        """
+        if obj.monthly_plans.filter(amount__gt=0).exists():
+            return format_html('<img src="/static/admin/img/icon-yes.svg" alt="Да">')
+        return format_html('<img src="/static/admin/img/icon-no.svg" alt="Нет">')
+    has_amount_plan.short_description = "План суммы"
 
 
 # Инлайн для MonthlyBuildingPlan
