@@ -33,80 +33,35 @@ def get_filter_conditions(group_ids, year):
     return " AND ".join(filter_clauses)
 
 
-def sql_query_rep(selected_year, group_id, months_placeholder='1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12', inogorod=None,
-                  sanction=None, amount_null=None,
-                  building=None, department=None, profile=None, doctor=None, input_start=None, input_end=None,
-                  treatment_start=None, treatment_end=None, filter_conditions=None, mode='finance', unique_flag=False):
-    # Основной базовый запрос
-    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
-                      doctor, input_start, input_end, treatment_start, treatment_end)
+def sql_query_rep(selected_year, group_id,
+                  months_placeholder='1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12',
+                  inogorod=None, sanction=None, amount_null=None,
+                  building=None, department=None, profile=None, doctor=None,
+                  input_start=None, input_end=None, treatment_start=None, treatment_end=None,
+                  filter_conditions=None, mode='finance', unique_flag=False):
+    """
+    Формирует SQL запрос с учетом базовых фильтров и, опционально, рассчета уникальных записей.
 
-    # Если включена уникальность, фильтруем данные, но сам запрос не трогаем
-    if unique_flag:
-        base = f"""
-        {base},
-        ranked_patients AS (
-            SELECT 
-                *,
-                ROW_NUMBER() OVER (
-                    PARTITION BY enp, report_month_number 
-                    ORDER BY 
-                        CASE status 
-                            WHEN '3' THEN 1
-                            WHEN '2' THEN 2
-                            WHEN '4' THEN 3
-                            WHEN '6' THEN 4
-                            WHEN '8' THEN 5
-                            WHEN '1' THEN 6
-                            WHEN '5' THEN 7
-                            WHEN '7' THEN 8
-                            WHEN '12' THEN 9
-                            WHEN '13' THEN 10
-                            WHEN '17' THEN 11
-                            WHEN '0' THEN 12
-                            ELSE 99 
-                        END
-                ) AS rn
-            FROM oms
-        ),
-        oms_unique AS (
-            SELECT * FROM ranked_patients WHERE rn = 1
-        )
-        """
+    Параметры:
+      selected_year: выбранный год
+      group_id: идентификатор группы (при необходимости, можно использовать в base_query)
+      months_placeholder: строка с номерами месяцев
+      inogorod, sanction, amount_null, building, department, profile, doctor,
+      input_start, input_end, treatment_start, treatment_end: дополнительные фильтры,
+        передаваемые в base_query
+      filter_conditions: дополнительные условия для WHERE
+      mode: 'finance' или иное – влияет на тип агрегации (суммы или количества)
+      unique_flag: если True, происходит выборка уникальных записей с применением оконной функции.
 
-    # Определяем, какую таблицу использовать
-    from_table = "oms_unique" if unique_flag else "oms"
+    Возвращает:
+      Итоговый SQL запрос (строка)
+    """
 
-    # Начало основного запроса
-    if mode == 'finance':
-        query = f"""
-        {base}
-            SELECT
-                report_month_number AS month,
-                SUM(CASE WHEN status = '1' THEN amount_numeric END) AS новые,
-                SUM(CASE WHEN status = '2' THEN amount_numeric END) AS в_тфомс,
-                SUM(CASE WHEN status = '3' THEN amount_numeric END) AS оплачено,
-                SUM(CASE WHEN status IN ('5', '7', '12') THEN amount_numeric END) AS отказано,
-                SUM(CASE WHEN status IN ('6', '8', '4') THEN amount_numeric END) AS исправлено,
-                SUM(CASE WHEN status IN ('0', '13', '17') THEN amount_numeric END) AS отменено
-            FROM {from_table}
-            """
-    else:
-        query = f"""
-        {base}
-            SELECT
-                report_month_number AS month,
-                COUNT(CASE WHEN status = '1' THEN 1 END) AS новые,
-                COUNT(CASE WHEN status = '2' THEN 1 END) AS в_тфомс,
-                COUNT(CASE WHEN status = '3' THEN 1 END) AS оплачено,
-                COUNT(CASE WHEN status IN ('5', '7', '12') THEN 1 END) AS отказано,
-                COUNT(CASE WHEN status IN ('6', '8', '4') THEN 1 END) AS исправлено,
-                COUNT(CASE WHEN status IN ('0', '13', '17') THEN 1 END) AS отменено
-            FROM {from_table}
-            
-        """
+    # Получаем базовую часть запроса (например, с привязкой к году, периодам и т.п.)
+    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null,
+                      building, department, profile, doctor, input_start, input_end, treatment_start, treatment_end)
 
-    # Условия WHERE
+    # Формируем базовый набор условий
     where_conditions = [
         "inogorodniy = false",
         "sanctions = '-'",
@@ -115,14 +70,102 @@ def sql_query_rep(selected_year, group_id, months_placeholder='1, 2, 3, 4, 5, 6,
     if filter_conditions:
         where_conditions.append(filter_conditions)
 
-    # Добавляем условия WHERE в запрос, если они есть
-    if where_conditions:
-        query += " WHERE " + " AND ".join(where_conditions)
+    # Если есть условия – формируем WHERE-клаузулу
+    where_clause = " WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 
-    # Завершаем запрос с группировкой и сортировкой
-    query += """
-    GROUP BY month
-    ORDER BY month
-    """
+    # В зависимости от режима (finance или нет) выбираем агрегирующие столбцы
+    if mode == 'finance':
+        agg_columns = f"""
+                SUM(CASE WHEN status = '1' THEN amount_numeric END) AS новые,
+                SUM(CASE WHEN status = '2' THEN amount_numeric END) AS в_тфомс,
+                SUM(CASE WHEN status = '3' THEN amount_numeric END) AS оплачено,
+                SUM(CASE WHEN status IN ('5', '7', '12') THEN amount_numeric END) AS отказано,
+                SUM(CASE WHEN status IN ('6', '8', '4') THEN amount_numeric END) AS исправлено,
+                SUM(CASE WHEN status IN ('0', '13', '17') THEN amount_numeric END) AS отменено
+        """
+    else:
+        agg_columns = f"""
+                COUNT(CASE WHEN status = '1' THEN 1 END) AS новые,
+                COUNT(CASE WHEN status = '2' THEN 1 END) AS в_тфомс,
+                COUNT(CASE WHEN status = '3' THEN 1 END) AS оплачено,
+                COUNT(CASE WHEN status IN ('5', '7', '12') THEN 1 END) AS отказано,
+                COUNT(CASE WHEN status IN ('6', '8', '4') THEN 1 END) AS исправлено,
+                COUNT(CASE WHEN status IN ('0', '13', '17') THEN 1 END) AS отменено
+        """
 
+    if unique_flag:
+        # Формируем запрос с уникальностью через оконную функцию и CTE
+        query = f"""
+WITH filtered AS (
+    {base}
+    SELECT *
+    FROM oms
+    {where_clause}
+),
+has_status_3 AS (
+    SELECT enp
+    FROM filtered
+    WHERE status = '3'
+    GROUP BY enp
+),
+prioritized AS (
+    SELECT f.*,
+           CASE 
+             WHEN f.status = '3' THEN 0
+             ELSE
+               CASE f.status
+                 WHEN '2' THEN 1
+                 WHEN '4' THEN 2
+                 WHEN '6' THEN 3
+                 WHEN '8' THEN 4
+                 WHEN '1' THEN 5
+                 WHEN '5' THEN 6
+                 WHEN '7' THEN 7
+                 WHEN '12' THEN 8
+                 WHEN '13' THEN 9
+                 WHEN '17' THEN 10
+                 WHEN '0' THEN 11
+                 ELSE 99
+               END
+           END AS status_priority,
+           CASE WHEN hs.enp IS NOT NULL THEN true ELSE false END AS has_status_3
+    FROM filtered f
+    LEFT JOIN has_status_3 hs ON f.enp = hs.enp
+),
+ranked AS (
+    SELECT *,
+           ROW_NUMBER() OVER (
+               PARTITION BY enp, report_month_number
+               ORDER BY 
+                   CASE WHEN has_status_3 THEN CASE WHEN status = '3' THEN 0 ELSE 1 END ELSE 0 END,
+                   report_month_number,
+                   status_priority
+           ) AS rn
+    FROM prioritized
+),
+unique_oms AS (
+    SELECT *
+    FROM ranked
+    WHERE rn = 1
+)
+SELECT report_month_number AS month,
+       {agg_columns},
+       COUNT(*) AS total_count
+FROM unique_oms
+GROUP BY month
+ORDER BY month;
+        """
+    else:
+        # Стандартный запрос без уникальности
+        query = f"""
+{base}
+SELECT report_month_number AS month,
+       {agg_columns},
+       COUNT(*) AS total_count
+FROM oms
+{where_clause}
+GROUP BY month
+ORDER BY month
+        """
     return query
+

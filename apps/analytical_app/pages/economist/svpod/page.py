@@ -39,7 +39,17 @@ economist_sv_pod = html.Div(
                                 dbc.Col(filter_years(type_page), width=1),
                                 dbc.Col(dbc.Alert(
                                     "Отобраны талоны: без санкций, местные (по полису ОМС), сумма талона не равна 0",
-                                    color="primary"), width=8),
+                                    color="primary"), width=4),
+                                dbc.Col(
+                                    dbc.Alert(
+                                        [
+                                            html.P("Примененные фильтры:", style={"margin-bottom": "5px"}),
+                                            html.Div(id=f"applied-filters-{type_page}", style={"margin-top": "10px"})
+                                        ],
+                                        color="warning"
+                                    ),
+                                    width=4
+                                ),
                             ]),
                             dbc.Row([
                                 html.Div(id='dropdown-container', children=[
@@ -212,7 +222,9 @@ def fetch_plan_data(selected_level, year, mode='volumes'):
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data'),
-     Output(f'loading-output-{type_page}', 'children')],
+     Output(f'loading-output-{type_page}', 'children'),
+     Output(f'applied-filters-{type_page}', 'children'),
+     ],
     Input(f'update-button-{type_page}', 'n_clicks'),
     State(f'mode-toggle-{type_page}', 'value'),
     State(f'unique-toggle-{type_page}', 'value'),
@@ -404,4 +416,4 @@ def update_table_with_plan_and_balance(n_clicks,
         {"name": ["План 1/12", "Входящий остаток"], "id": "Входящий остаток"},
     ]
 
-    return columns, fact_data, loading_output
+    return columns, fact_data, loading_output, filter_conditions
