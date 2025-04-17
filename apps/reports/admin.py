@@ -3,13 +3,17 @@ from datetime import datetime
 import openpyxl
 from django.contrib import admin
 from django.http import HttpResponse
+from import_export.admin import ImportExportModelAdmin
+
+from unfold.admin import ModelAdmin
 
 from apps.reports.models import DeleteEmd, InvalidationReason, SVOMember, SVOMemberOMSData, PatientAction, Patient, \
     Site, ActionType, Group
+from apps.reports.resources import PatientResource
 
 
 @admin.register(DeleteEmd)
-class DeleteEmdAdmin(admin.ModelAdmin):
+class DeleteEmdAdmin(ModelAdmin):
     list_display = ('oid_medical_organization', 'oid_document', 'goal', 'added_date')
 
     def get_readonly_fields(self, request, obj=None):
@@ -19,7 +23,7 @@ class DeleteEmdAdmin(admin.ModelAdmin):
 
 
 @admin.register(InvalidationReason)
-class InvalidationReasonAdmin(admin.ModelAdmin):
+class InvalidationReasonAdmin(ModelAdmin):
     list_display = ('reason_text',)
 
 
@@ -156,7 +160,7 @@ class HasDV4OrOPVFilter(admin.SimpleListFilter):
 
 
 @admin.register(SVOMember)
-class SVOMemberAdmin(admin.ModelAdmin):
+class SVOMemberAdmin(ModelAdmin):
     list_display = ('last_name', 'first_name', 'middle_name', 'phone', 'enp', 'department', 'has_dv4_opv')
     search_fields = ('last_name', 'first_name', 'enp')
     list_filter = ('department', HasDV4OrOPVFilter, 'enp')
@@ -192,7 +196,7 @@ class ActionTypeInline(admin.TabularInline):
 # Регистрируем Group без отдельной регистрации ActionType;
 # теперь действия (ActionType) создаются/редактируются прямо в группе (inline).
 @admin.register(Group)
-class GroupAdmin(admin.ModelAdmin):
+class GroupAdmin(ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
     inlines = [ActionTypeInline]
@@ -200,7 +204,7 @@ class GroupAdmin(admin.ModelAdmin):
 
 # 2) Участки: добавить фильтр по корпусам:
 @admin.register(Site)
-class SiteAdmin(admin.ModelAdmin):
+class SiteAdmin(ModelAdmin):
     list_display = ('building', 'site_name')
     search_fields = ('building', 'site_name')
     list_filter = ('building',)  # Фильтр по корпусам
@@ -227,13 +231,13 @@ class PatientActionInline(admin.TabularInline):
 
 
 @admin.register(Patient)
-class PatientAdmin(admin.ModelAdmin):
+class PatientAdmin(ImportExportModelAdmin, ModelAdmin):
+    resource_class = PatientResource      # указываем ресурс
     list_display = ('full_name', 'date_of_birth', 'enp', 'gender', 'phone', 'site', 'get_groups')
     list_filter = ('gender', 'groups', 'site')
     search_fields = ('full_name', 'phone', 'address', 'enp')
-    inlines = [PatientActionInline]
+    inlines = [PatientActionInline]       # ваш inline для PatientAction
 
-    # Специальный метод, чтобы в list_display показать, в каких группах пациент
     def get_groups(self, obj):
-        return ", ".join([g.name for g in obj.groups.all()])
+        return ", ".join(g.name for g in obj.groups.all())
     get_groups.short_description = 'Группы'
