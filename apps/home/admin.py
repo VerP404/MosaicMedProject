@@ -11,21 +11,25 @@ admin.site.unregister(Group)
 
 
 @admin.register(User)
-class CustomUserAdmin(BaseUserAdmin, ModelAdmin):
-    # подтягиваем из BaseUserAdmin все секции для отображения в change_view
-    fieldsets = BaseUserAdmin.fieldsets
-    # и секции для отображения в add_view
-    add_fieldsets = BaseUserAdmin.add_fieldsets
+class CustomUserAdmin(ModelAdmin, BaseUserAdmin):
+    # берем стандартные формы
+    form     = BaseUserAdmin.form
+    add_form = BaseUserAdmin.add_form
 
-    # можно дополнительно настроить отображение списка
-    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
+    # на change: те же секции, что в BaseUserAdmin
+    fieldsets = BaseUserAdmin.fieldsets
+    # на add: тоже показываем все секции сразу
+    add_fieldsets = BaseUserAdmin.fieldsets
+
+    list_display  = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     search_fields = ('username', 'email', 'first_name', 'last_name')
 
 
 @admin.register(Group)
-class CustomGroupAdmin(BaseGroupAdmin, ModelAdmin):
-    fieldsets = BaseGroupAdmin.fieldsets
-    list_display = BaseGroupAdmin.list_display
+class CustomGroupAdmin(ModelAdmin, BaseGroupAdmin):
+    form        = BaseGroupAdmin.form
+    fieldsets   = BaseGroupAdmin.fieldsets
+    list_display  = BaseGroupAdmin.list_display
     search_fields = BaseGroupAdmin.search_fields
 
 
