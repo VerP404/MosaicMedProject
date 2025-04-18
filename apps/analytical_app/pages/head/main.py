@@ -32,7 +32,7 @@ cards_row_2 = dbc.Row(
 
 cards_row_3 = dbc.Row(
     [
-        dbc.Col(create_card(9, type_page, "По врачам", "Анализ выставления целей по врачам.")),
+        dbc.Col(create_card(9, type_page, "Талоны по врачам", "Талоны ОМС по врачам в разрезе по месяцям.")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
@@ -69,7 +69,7 @@ def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8, ts9):
         6: "131 форма",
         7: "Диспансерное наблюдение",
         8: "Обращения граждан",
-        9: "По врачам",
+        9: "Талоны по врачам",
     }
     route_map = {
         1: f"/{main_link}/adults",

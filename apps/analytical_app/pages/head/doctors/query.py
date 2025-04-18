@@ -21,6 +21,7 @@ def sql_query_doctors_goal(selected_year, months_placeholder,
     pivot AS (
         SELECT
             doctor,
+            specialty,
             building,
             department,
             COUNT(*) FILTER (WHERE report_month_number IS NOT NULL) AS "Итого",
@@ -39,9 +40,9 @@ def sql_query_doctors_goal(selected_year, months_placeholder,
         FROM oms
         WHERE 1=1
         {filter_goals}
-        GROUP BY doctor, building, department
+        GROUP BY doctor, specialty, building, department
     )
     SELECT *
     FROM pivot
-    ORDER BY doctor, building, department;
+    ORDER BY doctor, specialty, building, department;
     """
