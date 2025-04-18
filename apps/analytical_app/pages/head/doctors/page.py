@@ -57,7 +57,7 @@ layout_doctors_goal = html.Div([
         )
     ),
     dcc.Loading(id=f'loading-{type_page}', type='default'),
-    card_table(f'result-table-{type_page}', "Талоны врачей в разрезе по месяцам"),
+    card_table(f'result-table-{type_page}', "Талоны врачей в разрезе по месяцам", page_size=15),
 ], style={"padding": "0rem"})
 
 
