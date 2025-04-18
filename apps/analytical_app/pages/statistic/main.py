@@ -1,12 +1,15 @@
-from dash import html, callback_context, no_update, Output, Input
+from dash import html, Input, Output, callback_context
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.components.cards import create_card
 
-type_page = "statistic"
-main_link = "statistic"  # начало ссылки
-label = "Статистик"  # для хлебных крошек
-# Карточки для отчётов
+# Тип страницы и базовые настройки
+type_page = 'statistic'
+main_link = 'statistic'
+label = 'Статистик'
+
+# Сетка Bootstrap: 4 колонки на MD+, единый gap, выравнивание по высоте
 cards_row_1 = dbc.Row(
     [
         dbc.Col(create_card(1, type_page,
@@ -17,14 +20,14 @@ cards_row_1 = dbc.Row(
                             "Ежемесячный отчет по кардиологическим показателям.")),
         dbc.Col(create_card(3, type_page,
                             "Пневмонии",
-                            "Отчет по пневмониям в талонах ОМС")),
+                            "Отчет по пневмониям в талонах ОМС.")),
         dbc.Col(create_card(4, type_page,
                             "Посещения в диспансеризации",
-                            "Посещения в диспансеризации и профосмотрах взрослых для вставки в гугл-таблицу")),
-
+                            "Посещения в диспансеризации и профосмотрах взрослых для вставки в гугл-таблицу.")),
     ],
-    className="mb-4 align-items-stretch",
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
+
 cards_row_2 = dbc.Row(
     [
         dbc.Col(create_card(5, type_page,
@@ -40,67 +43,60 @@ cards_row_2 = dbc.Row(
                             "РЭМД 500",
                             "Отчеты по РЭМД.")),
     ],
-    className="mb-4 align-items-stretch",
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
+
+# Основной layout
 statistic_main = html.Div([
-    dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
-        {"label": label, "active": True},
-    ]),
+    dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[{"label": label, "active": True}]),
     html.Hr(),
-    html.Div(cards_row_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
-    html.Div(cards_row_2, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
+    cards_row_1,
+    cards_row_2,
 ])
 
-
+# Колбэк навигации: n_clicks_timestamp + allow_duplicate
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
-     Output(f'breadcrumb-{type_page}', 'items'),
-     ],
-    [Input(f'open-report-1-{type_page}', 'n_clicks'),
-     Input(f'open-report-2-{type_page}', 'n_clicks'),
-     Input(f'open-report-3-{type_page}', 'n_clicks'),
-     Input(f'open-report-4-{type_page}', 'n_clicks'),
-     Input(f'open-report-5-{type_page}', 'n_clicks'),
-     Input(f'open-report-6-{type_page}', 'n_clicks'),
-     Input(f'open-report-7-{type_page}', 'n_clicks'),
-     Input(f'open-report-8-{type_page}', 'n_clicks'),
-     ],
+     Output(f'breadcrumb-{type_page}', 'items')],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 9)],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_6,
-                   open_report_7, open_report_8):
-    ctx = callback_context
-    if not ctx.triggered:
-        return no_update, no_update
+def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8):
+    timestamps = [ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8]
+    if not any(timestamps):
+        raise PreventUpdate
 
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    # Определяем последнюю нажатую кнопку
+    idx = max(range(len(timestamps)), key=lambda i: timestamps[i] or 0) + 1
 
-    breadcrumb_items = [{"label": label, "href": f"/{main_link}", "active": True}]
+    # Словари меток и маршрутов
+    label_map = {
+        1: "Отчет Шараповой по ДН",
+        2: "Кардиологический отчет",
+        3: "Пневмонии",
+        4: "Посещения в диспансеризации",
+        5: "Посещения в талонах",
+        6: "Отчет по ВОП",
+        7: "Листы нетрудоспособности",
+        8: "РЭМД 500",
+    }
+    route_map = {
+        1: f"/{main_link}/statistic-sharapova",
+        2: f"/{main_link}/cardiology",
+        3: f"/{main_link}/pneumonia",
+        4: f"/{main_link}/dd-visits",
+        5: f"/{main_link}/visits",
+        6: f"/{main_link}/vop",
+        7: f"/{main_link}/eln",
+        8: f"/{main_link}/remd500",
+    }
 
-    if button_id.startswith("open-report-") and main_link in button_id:
-        if button_id == f'open-report-1-{type_page}' and open_report_1:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/statistic-sharapova', breadcrumb_items
-        elif button_id == f'open-report-2-{type_page}' and open_report_2:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/cardiology', breadcrumb_items
-        elif button_id == f'open-report-3-{type_page}' and open_report_3:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/pneumonia', breadcrumb_items
-        elif button_id == f'open-report-4-{type_page}' and open_report_4:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/dd-visits', breadcrumb_items
-        elif button_id == f'open-report-5-{type_page}' and open_report_5:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/visits', breadcrumb_items
-        elif button_id == f'open-report-6-{type_page}' and open_report_6:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/vop', breadcrumb_items
-        elif button_id == f'open-report-7-{type_page}' and open_report_7:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/eln', breadcrumb_items
-        elif button_id == f'open-report-8-{type_page}' and open_report_8:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/remd500', breadcrumb_items
+    selected_label = label_map[idx]
+    selected_route = route_map[idx]
 
-    return f'/{main_link}', breadcrumb_items
+    # Формируем хлебные крошки
+    breadcrumbs = [
+        {"label": label, "href": f"/{main_link}", "active": False},
+        {"label": selected_label, "active": True}
+    ]
+    return selected_route, breadcrumbs

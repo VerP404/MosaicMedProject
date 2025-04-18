@@ -6,21 +6,7 @@ from apps.analytical_app.pages.administrator.generation_invoices.page import adm
 from apps.analytical_app.pages.administrator.main import admin_main
 from apps.analytical_app.pages.administrator.update_data.page import admin_update_data
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
-from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
-from apps.analytical_app.pages.head.dispensary.adults.main import head_adults_dd_main
-from apps.analytical_app.pages.head.dispensary.adults.tab1 import adults_dv1
-from apps.analytical_app.pages.head.dispensary.adults.tab3 import adults_dv3
-from apps.analytical_app.pages.head.dispensary.adults.tab8 import adults_dv8
-from apps.analytical_app.pages.head.dispensary.children.main import head_children_dd_main
-from apps.analytical_app.pages.head.dispensary.children.tab1 import children_dn1
-from apps.analytical_app.pages.head.dispensary.children.tab2 import children_dn2
-from apps.analytical_app.pages.head.dispensary.reports.page import dispensary_reports
-from apps.analytical_app.pages.head.dispensary.reproductive.main import head_reproductive_main
-from apps.analytical_app.pages.head.dispensary.reproductive.tab1 import reproductive_dr1
-from apps.analytical_app.pages.head.dispensary.reproductive.tab2 import reproductive_dr2
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
-from apps.analytical_app.pages.head.main import head_main
-from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapova
 
 routes_administrator = {
     "/admin": admin_main,

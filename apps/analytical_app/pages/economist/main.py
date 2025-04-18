@@ -1,12 +1,15 @@
-from dash import html, Input, Output, no_update, callback_context
+from dash import html, Input, Output, callback_context
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.components.cards import create_card
 
+# Тип страницы и базовые настройки
 type_page = 'economist'
-main_link = "economist"  # начало ссылки
-label = "Экономист"  # для хлебных крошек
+main_link = "economist"
+label = "Экономист"
 
+# Первая группа карточек: 4 колонки на MD+, общий gap, выравнивание по высоте
 cards_row_1 = dbc.Row(
     [
         dbc.Col(create_card(1, type_page,
@@ -20,11 +23,12 @@ cards_row_1 = dbc.Row(
                             "Отчет по всем видам диспансеризации по возрастам с разбивкой по полу и возрасту.")),
         dbc.Col(create_card(4, type_page,
                             "Стационары",
-                            "Отчет по КСГ в разбивке по корпусам. "
-                            "колическтва талонов и стоимости")),
+                            "Отчет по КСГ в разбивке по корпусам. количества талонов и стоимости")),
     ],
-    className="mb-4 align-items-stretch",
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
+
+# Вторая группа: те же настройки, хотя колонок меньше
 cards_row_2 = dbc.Row(
     [
         dbc.Col(create_card(5, type_page,
@@ -34,58 +38,59 @@ cards_row_2 = dbc.Row(
                             "Стационары: по врачам",
                             "Отчет по стационарным случаям по врачам.")),
     ],
-    className="mb-4 align-items-stretch",
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
+
+# Основной layout
 economist_main = html.Div([
     dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
         {"label": label, "active": True},
     ]),
     html.Hr(),
-    html.Div(cards_row_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
-    html.Div(cards_row_2, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
+    cards_row_1,
+    cards_row_2,
 ])
 
-
+# Callback навигации по карточкам: с n_clicks_timestamp, без ложных срабатываний
 @app.callback(
-    [Output('url', 'pathname', allow_duplicate=True),
-     Output(f'breadcrumb-{type_page}', 'items'),
-     ],
-    [Input(f'open-report-1-{type_page}', 'n_clicks'),
-     Input(f'open-report-2-{type_page}', 'n_clicks'),
-     Input(f'open-report-3-{type_page}', 'n_clicks'),
-     Input(f'open-report-4-{type_page}', 'n_clicks'),
-     Input(f'open-report-5-{type_page}', 'n_clicks'),
-     Input(f'open-report-6-{type_page}', 'n_clicks'),
-     ],
+    [Output('url', 'pathname'),
+     Output(f'breadcrumb-{type_page}', 'items')],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 7)],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4, open_report_5, open_report_6):
-    ctx = callback_context
-    if not ctx.triggered:
-        return no_update, no_update
+def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6):
+    timestamps = [ts1, ts2, ts3, ts4, ts5, ts6]
+    # если ни одна кнопка не была нажата — не обновляем
+    if not any(timestamps):
+        raise PreventUpdate
 
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    # определяем индекс последней нажатой кнопки
+    idx = max(range(len(timestamps)), key=lambda i: timestamps[i] or 0) + 1
 
-    breadcrumb_items = [{"label": label, "href": f"/{main_link}", "active": True}]
+    # словари меток и маршрутов
+    label_map = {
+        1: "Сверхподушевое финансирование",
+        2: "По врачам",
+        3: "Диспансеризация по возрастам",
+        4: "Стационары",
+        5: "Показатели: сводная по индикаторам",
+        6: "Стационары: по врачам"
+    }
+    route_map = {
+        1: f"/{main_link}/svpod",
+        2: f"/{main_link}/doctors",
+        3: f"/{main_link}/disp_by_ages",
+        4: f"/{main_link}/stationary",
+        5: f"/{main_link}/indicators",
+        6: f"/{main_link}/doctor-stac"
+    }
 
-    if button_id.startswith("open-report-") and main_link in button_id:
-        if button_id == f'open-report-1-{type_page}' and open_report_1:
-            breadcrumb_items.append({"label": "Сверхподушевое финансирование", "active": True})
-            return f'/{main_link}/svpod', breadcrumb_items
-        elif button_id == f'open-report-2-{type_page}' and open_report_2:
-            breadcrumb_items.append({"label": "По врачам", "active": True})
-            return f'/{main_link}/doctors', breadcrumb_items
-        elif button_id == f'open-report-3-{type_page}' and open_report_3:
-            breadcrumb_items.append({"label": "Диспансеризация по возрастам", "active": True})
-            return f'/{main_link}/disp_by_ages', breadcrumb_items
-        elif button_id == f'open-report-4-{type_page}' and open_report_4:
-            breadcrumb_items.append({"label": "Стационары", "active": True})
-            return f'/{main_link}/stationary', breadcrumb_items
-        elif button_id == f'open-report-5-{type_page}' and open_report_5:
-            breadcrumb_items.append({"label": "Стационары", "active": True})
-            return f'/{main_link}/indicators', breadcrumb_items
-        elif button_id == f'open-report-6-{type_page}' and open_report_6:
-            breadcrumb_items.append({"label": "Стационары", "active": True})
-            return f'/{main_link}/doctor-stac', breadcrumb_items
+    selected_label = label_map[idx]
+    selected_route = route_map[idx]
 
-    return f'/{main_link}', breadcrumb_items
+    # формируем хлебные крошки
+    breadcrumbs = [
+        {"label": label, "href": f"/{main_link}", "active": False},
+        {"label": selected_label, "active": True}
+    ]
+    return selected_route, breadcrumbs

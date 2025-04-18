@@ -17,6 +17,7 @@ from apps.analytical_app.pages.head.dispensary.reproductive.main import head_rep
 from apps.analytical_app.pages.head.dispensary.reproductive.tab1 import reproductive_dr1
 from apps.analytical_app.pages.head.dispensary.reproductive.tab2 import reproductive_dr2
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
+from apps.analytical_app.pages.head.doctors.page import layout_doctors_goal
 from apps.analytical_app.pages.head.journal.journal import layout_journal
 from apps.analytical_app.pages.head.main import head_main
 from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapova
@@ -157,5 +158,12 @@ routes_head = {
             {"label": "Списки пациентов репродуктивного здоровья", "active": True},
         ]),
         reproductive_dr2
+    ]),
+    "/head/doctors_talon": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "По врачам", "active": True},
+        ]),
+        layout_doctors_goal
     ]),
 }

@@ -347,3 +347,35 @@ sudo apt install cron
 ```
 0 * * * * /home/user/code/MosaicMedProject/.venv/bin/python /home/user/code/MosaicMedProject/manage.py update_panel_patients
 ```
+
+## Инструкция по установке simon для мониторинга сервера
+
+Скачиваем бинарник
+```bash
+cd /usr/local/bin
+sudo curl -L -o simon \
+  https://github.com/alibahmanyar/simon/releases/download/v0.1.1/simon-x86_64-linux
+sudo chmod +x simon
+```
+Создаем файл сервиса с автозапуском
+```bash
+sudo nano /etc/systemd/system/simon.service
+```
+Прописываем пользователя и нужный путь к рабочей директории
+```bash
+[Service]
+ExecStart=/usr/local/bin/simon --address 0.0.0.0 --port 30000
+Restart=always
+User={user}
+
+WorkingDirectory=/home/{user}/code
+
+[Install]
+WantedBy=multi-user.target
+```
+Перезагружаем и проверяем
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart simon
+sudo systemctl status simon
+```

@@ -1,63 +1,75 @@
-from dash import html, callback_context, no_update, Output, Input
+from dash import html, Input, Output, callback_context
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.components.cards import create_card
 
-type_page = "adults"
-main_link = "head/adults"  # начало ссылки
-label = "Диспансеризация взрослых"  # для хлебных крошек
+# "Диспансеризация взрослых"
+type_page = 'adults'
+main_link = 'head/adults'
+label = 'Диспансеризация взрослых'
 
+# Сетка Bootstrap: 3 карточки, равная сетка на MD+ и gap
 cards_row_1 = dbc.Row(
     [
-        dbc.Col(create_card(1, type_page,
-                            "Отчет по видам диспансеризации",
-                            "Все виды диспансеризации с разбивкой по целям, корпусам и отделениям")),
-        dbc.Col(create_card(3, type_page,
-                            "Диспансеризация по возрастам",
-                            "Все виды диспансеризации с разбивкой по возрастам")),
-        dbc.Col(create_card(8, type_page,
-                            "Диспансеризация с группировкой по стоимости",
-                            "Все виды диспансеризации с группировкой по стоимости")),
+        dbc.Col(
+            create_card(1, type_page,
+                        "Отчет по видам диспансеризации",
+                        "Все виды диспансеризации с разбивкой по целям, корпусам и отделениям"),
+            className="d-flex"
+        ),
+        dbc.Col(
+            create_card(3, type_page,
+                        "Диспансеризация по возрастам",
+                        "Все виды диспансеризации с разбивкой по возрастам"),
+            className="d-flex"
+        ),
+        dbc.Col(
+            create_card(8, type_page,
+                        "Диспансеризация по стоимости",
+                        "Все виды диспансеризации с группировкой по стоимости"),
+            className="d-flex"
+        ),
     ],
-    className="mb-4 align-items-stretch",
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
 
+# Основной layout
 head_adults_dd_main = html.Div([
     dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
         {"label": label, "active": True},
     ]),
     html.Hr(),
-    html.Div(cards_row_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
+    cards_row_1,
 ])
 
-
+# Callback навигации: n_clicks_timestamp + allow_duplicate
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
-     Output(f'breadcrumb-{type_page}', 'items'),
-     ],
-    [Input(f'open-report-1-{type_page}', 'n_clicks'),
-     Input(f'open-report-3-{type_page}', 'n_clicks'),
-     Input(f'open-report-8-{type_page}', 'n_clicks'),
-     ],
+     Output(f'breadcrumb-{type_page}', 'items')],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in [1, 3, 8]],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_3, open_report_8):
-    ctx = callback_context
-    if not ctx.triggered:
-        return no_update, no_update
+def navigate_adults(ts1, ts3, ts8):
+    timestamps = [ts1, ts3, ts8]
+    if not any(timestamps):
+        raise PreventUpdate
 
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    # Определяем индекс последней нажатой кнопки
+    idx = max(range(len(timestamps)), key=lambda i: timestamps[i] or 0)
 
-    breadcrumb_items = [{"label": label, "href": f"/{main_link}", "active": True}]
+    # Подписи и сегменты маршрутов
+    mapping = {
+        0: ("Отчет по видам диспансеризации", "dv1"),
+        1: ("Диспансеризация по возрастам", "dv3"),
+        2: ("Диспансеризация по стоимости", "dv8"),
+    }
+    label_text, segment = mapping[idx]
+    new_path = f"/{main_link}/{segment}"
 
-    if button_id == f'open-report-1-{type_page}' and open_report_1:
-        breadcrumb_items.append({"active": True})
-        return f'/{main_link}/dv1', breadcrumb_items
-    elif button_id == f'open-report-3-{type_page}' and open_report_3:
-        breadcrumb_items.append({"active": True})
-        return f'/{main_link}/dv3', breadcrumb_items
-    elif button_id == f'open-report-8-{type_page}' and open_report_8:
-        breadcrumb_items.append({"active": True})
-        return f'/{main_link}/dv8', breadcrumb_items
-
-    return f'/{main_link}', breadcrumb_items
+    # Хлебные крошки
+    breadcrumbs = [
+        {"label": label, "href": f"/{main_link}", "active": False},
+        {"label": label_text, "active": True}
+    ]
+    return new_path, breadcrumbs

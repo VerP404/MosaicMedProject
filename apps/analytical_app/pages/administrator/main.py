@@ -1,12 +1,15 @@
-from dash import html, callback_context, no_update, Output, Input
+from dash import html, Input, Output, callback_context
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.components.cards import create_card
 
-type_page = "admin"
-main_link = "admin"  # начало ссылки
-label = "Администратор"  # для хлебных крошек
+# Тип страницы и базовые настройки
+type_page = 'admin'
+main_link = 'admin'
+label = 'Администратор'
 
+# Сетка Bootstrap: 4 колонки на MD+, единый gap, выравнивание по высоте
 cards_row_1 = dbc.Row(
     [
         dbc.Col(create_card(1, type_page,
@@ -19,45 +22,50 @@ cards_row_1 = dbc.Row(
                             "Обновление данных",
                             "Страница обновления данных в базе данных.")),
     ],
-    className="mb-4 align-items-stretch",
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
 
+# Основной layout
 admin_main = html.Div([
     dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
         {"label": label, "active": True},
     ]),
     html.Hr(),
-    html.Div(cards_row_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
+    cards_row_1,
 ])
 
-
+# Колбэк навигации: n_clicks_timestamp + allow_duplicate
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
-     Output(f'breadcrumb-{type_page}', 'items'),
-     ],
-    [Input(f'open-report-1-{type_page}', 'n_clicks'),
-     Input(f'open-report-2-{type_page}', 'n_clicks'),
-     Input(f'open-report-3-{type_page}', 'n_clicks'),
-     ],
+     Output(f'breadcrumb-{type_page}', 'items')],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 4)],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2, open_report_3):
-    ctx = callback_context
-    if not ctx.triggered:
-        return no_update, no_update
+def navigate_pages(ts1, ts2, ts3):
+    timestamps = [ts1, ts2, ts3]
+    if not any(timestamps):
+        raise PreventUpdate
 
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    # Определяем индекс последней нажатой кнопки
+    idx = max(range(len(timestamps)), key=lambda i: timestamps[i] or 0) + 1
 
-    breadcrumb_items = [{"label": label, "href": f"/{main_link}", "active": True}]
+    label_map = {
+        1: "Для сборки талонов",
+        2: "Аннулирование ЭМД",
+        3: "Обновление данных"
+    }
+    route_map = {
+        1: f"/{main_link}/gen_invoices",
+        2: f"/{main_link}/admin_delete_emd",
+        3: f"/{main_link}/admin_update_data"
+    }
 
-    if button_id.startswith("open-report-") and main_link in button_id:
-        if button_id == f'open-report-1-{type_page}' and open_report_1:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/gen_invoices', breadcrumb_items
-        elif button_id == f'open-report-2-{type_page}' and open_report_2:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/admin_delete_emd', breadcrumb_items
-        elif button_id == f'open-report-3-{type_page}' and open_report_3:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/admin_update_data', breadcrumb_items
-    return f'/{main_link}', breadcrumb_items
+    selected_label = label_map[idx]
+    selected_route = route_map[idx]
+
+    # Формируем хлебные крошки
+    breadcrumbs = [
+        {"label": label, "href": f"/{main_link}", "active": False},
+        {"label": selected_label, "active": True}
+    ]
+    return selected_route, breadcrumbs

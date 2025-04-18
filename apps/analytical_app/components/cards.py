@@ -1,5 +1,5 @@
-from dash import html
 import dash_bootstrap_components as dbc
+from dash import html
 
 
 def create_card(card_num, card_type_page, card_header, card_text, color_button="success"):
@@ -13,19 +13,26 @@ def create_card(card_num, card_type_page, card_header, card_text, color_button="
     """
     return dbc.Card(
         [
-            dbc.CardHeader([html.H5(f"{card_header}", className="card-title")]),
-            dbc.CardBody(
-                [
-                    html.P(f"{card_text}", className="card-text"),
-                ],
-                className="d-flex flex-column h-100"
+            # Заголовок
+            dbc.CardHeader(
+                html.H5(card_header, className="card-title")
             ),
+
+            # Тело — flex-grow, чтобы занять всё пространство между header и footer
+            dbc.CardBody(
+                html.P(card_text, className="card-text"),
+                className="flex-grow-1"
+            ),
+
+            # Футер: кнопка прижата вниз благодаря mt-auto на wrapper‑div
             dbc.CardFooter(
                 dbc.Button(
-                    "Открыть", color=color_button, className="mt-auto", id=f"open-report-{card_num}-{card_type_page}"
+                    "Открыть",
+                    color=color_button,
+                    id=f"open-report-{card_num}-{card_type_page}"
                 ),
-                className="d-flex justify-content-end"
+                className="mt-auto d-flex justify-content-end"
             ),
         ],
-        className="h-100"
+        className="h-100 d-flex flex-column"
     )

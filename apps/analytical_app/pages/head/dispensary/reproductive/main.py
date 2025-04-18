@@ -1,58 +1,67 @@
-from dash import html, callback_context, no_update, Output, Input
+from dash import html, Input, Output, callback_context
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.components.cards import create_card
 
-type_page = "reproductive"
-main_link = "head/reproductive"  # начало ссылки
-label = "Репродуктивное здоровье"  # для хлебных крошек
+# "Репродуктивное здоровье"
+type_page = 'reproductive'
+main_link = 'head/reproductive'
+label = 'Репродуктивное здоровье'
 
+# Bootstrap-сетка: 4 колонки на MD+, единый gap, выравнивание по высоте
 cards_row_1 = dbc.Row(
     [
-        dbc.Col(create_card(1, type_page,
-                            "Отчет по видам диспансеризации",
-                            "Все виды диспансеризации репродуктивного здоровья с разбивкой по целям, "
-                            "корпусам и отделениям")),
-        dbc.Col(create_card(2, type_page,
-                            "Списки пациентов репродуктивного здоровья",
-                            "Списки пациентов для анализа и планирования диспансеризации репродуктивного "
-                            "здоровья")),
+        dbc.Col(
+            create_card(1, type_page,
+                        "Отчет по видам диспансеризации",
+                        "Все виды диспансеризации репродуктивного здоровья с разбивкой по целям, корпусам и отделениям"),
+            className="d-flex"
+        ),
+        dbc.Col(
+            create_card(2, type_page,
+                        "Списки пациентов репродуктивного здоровья",
+                        "Списки пациентов для анализа и планирования диспансеризации репродуктивного здоровья"),
+            className="d-flex"
+        ),
     ],
-    className="mb-4 align-items-stretch",
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
 
-head_reproductive_main = html.Div([
-    dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
-        {"label": label, "active": True},
-    ]),
+# Основной layout
+data_div = html.Div([
+    dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[{"label": label, "active": True}]),
     html.Hr(),
-    html.Div(cards_row_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
+    cards_row_1,
 ])
+head_reproductive_main = data_div
 
-
+# Callback навигации: n_clicks_timestamp + allow_duplicate
 @app.callback(
-    [Output('url', 'pathname', allow_duplicate=True),
-     Output(f'breadcrumb-{type_page}', 'items'),
-     ],
-    [Input(f'open-report-1-{type_page}', 'n_clicks'),
-     Input(f'open-report-2-{type_page}', 'n_clicks'),
-     ],
+    [Output('url', 'pathname', allow_duplicate=True), Output(f'breadcrumb-{type_page}', 'items')],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in [1, 2]],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1, open_report_2):
-    ctx = callback_context
-    if not ctx.triggered:
-        return no_update, no_update
+def navigate_reproductive(ts1, ts2):
+    timestamps = [ts1, ts2]
+    if not any(timestamps):
+        raise PreventUpdate
 
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    idx = max(range(len(timestamps)), key=lambda i: timestamps[i] or 0) + 1
 
-    breadcrumb_items = [{"label": label, "href": f"/{main_link}", "active": True}]
+    label_map = {
+        1: "Отчет по видам диспансеризации",
+        2: "Списки пациентов репродуктивного здоровья"
+    }
+    route_map = {
+        1: f"/{main_link}/dr1",
+        2: f"/{main_link}/dr2"
+    }
+    selected_label = label_map[idx]
+    selected_route = route_map[idx]
 
-    if button_id == f'open-report-1-{type_page}' and open_report_1:
-        breadcrumb_items.append({"active": True})
-        return f'/{main_link}/dr1', breadcrumb_items
-    elif button_id == f'open-report-2-{type_page}' and open_report_2:
-        breadcrumb_items.append({"active": True})
-        return f'/{main_link}/dr2', breadcrumb_items
-
-    return f'/{main_link}', breadcrumb_items
+    breadcrumbs = [
+        {"label": label, "href": f"/{main_link}", "active": False},
+        {"label": selected_label, "active": True}
+    ]
+    return selected_route, breadcrumbs
