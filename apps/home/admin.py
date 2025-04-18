@@ -13,7 +13,7 @@ admin.site.unregister(Group)
 @admin.register(User)
 class CustomUserAdmin(ModelAdmin, BaseUserAdmin):
     # берем стандартные формы
-    form     = BaseUserAdmin.form
+    form = BaseUserAdmin.form
     add_form = BaseUserAdmin.add_form
 
     # на change: те же секции, что в BaseUserAdmin
@@ -21,15 +21,15 @@ class CustomUserAdmin(ModelAdmin, BaseUserAdmin):
     # на add: тоже показываем все секции сразу
     add_fieldsets = BaseUserAdmin.fieldsets
 
-    list_display  = ('username', 'email', 'first_name', 'last_name', 'is_staff')
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     search_fields = ('username', 'email', 'first_name', 'last_name')
 
 
 @admin.register(Group)
 class CustomGroupAdmin(ModelAdmin, BaseGroupAdmin):
-    form        = BaseGroupAdmin.form
-    fieldsets   = BaseGroupAdmin.fieldsets
-    list_display  = BaseGroupAdmin.list_display
+    form = BaseGroupAdmin.form
+    fieldsets = BaseGroupAdmin.fieldsets
+    list_display = BaseGroupAdmin.list_display
     search_fields = BaseGroupAdmin.search_fields
 
 
