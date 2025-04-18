@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'apps.person',
     'apps.talon',
     'apps.dn_app',
+    'apps.report_cards_disp',
 
     'import_export',
     'channels',
