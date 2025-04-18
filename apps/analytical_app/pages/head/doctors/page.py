@@ -61,6 +61,21 @@ layout_doctors_goal = html.Div([
 ], style={"padding": "0rem"})
 
 
+# Callback переключения режима выбора статусов
+@app.callback(
+    [
+        Output(f'status-group-container-{type_page}', 'style'),
+        Output(f'status-individual-container-{type_page}', 'style')
+    ],
+    [Input(f'status-selection-mode-{type_page}', 'value')]
+)
+def toggle_status_selection_mode(mode):
+    if mode == 'group':
+        return {'display': 'block'}, {'display': 'none'}
+    else:
+        return {'display': 'none'}, {'display': 'block'}
+
+# Callback обновления отчёта по врачам
 @app.callback(
     [
         Output(f'result-table-{type_page}', 'columns'),
