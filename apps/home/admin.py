@@ -10,15 +10,23 @@ admin.site.unregister(User)
 admin.site.unregister(Group)
 
 
-# Регистрируем заново, используя чистый unfold
 @admin.register(User)
-class CustomUserAdmin(ModelAdmin, BaseUserAdmin):
-    pass
+class CustomUserAdmin(BaseUserAdmin, ModelAdmin):
+    # подтягиваем из BaseUserAdmin все секции для отображения в change_view
+    fieldsets = BaseUserAdmin.fieldsets
+    # и секции для отображения в add_view
+    add_fieldsets = BaseUserAdmin.add_fieldsets
+
+    # можно дополнительно настроить отображение списка
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
+    search_fields = ('username', 'email', 'first_name', 'last_name')
 
 
 @admin.register(Group)
-class CustomGroupAdmin(ModelAdmin, BaseGroupAdmin):
-    pass
+class CustomGroupAdmin(BaseGroupAdmin, ModelAdmin):
+    fieldsets = BaseGroupAdmin.fieldsets
+    list_display = BaseGroupAdmin.list_display
+    search_fields = BaseGroupAdmin.search_fields
 
 
 class MainSettingsForm(forms.ModelForm):

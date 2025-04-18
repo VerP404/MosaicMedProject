@@ -15,6 +15,7 @@ from apps.analytical_app.pages.economist.svpod.page import economist_sv_pod
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
+from apps.analytical_app.pages.head.doctors.page import layout_doctors_goal
 from apps.analytical_app.pages.head.routes import routes_head
 from apps.analytical_app.pages.iszl.main import iszl_main
 from apps.analytical_app.pages.main.page import main_layout
@@ -82,7 +83,13 @@ routes = {
         ]),
         economist_doctor_stac
     ]),
-
+    "/economist/doctors_talon": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "По врачам", "active": True},
+        ]),
+        layout_doctors_goal
+    ]),
 
 
 
