@@ -37,6 +37,8 @@ cards_row_2 = dbc.Row(
         dbc.Col(create_card(6, type_page,
                             "Стационары: по врачам",
                             "Отчет по стационарным случаям по врачам.")),
+        dbc.Col(create_card(7, type_page, "Талоны по врачам", "Талоны ОМС по врачам в разрезе по месяцям.")),
+
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
@@ -55,11 +57,11 @@ economist_main = html.Div([
 @app.callback(
     [Output('url', 'pathname'),
      Output(f'breadcrumb-{type_page}', 'items')],
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 7)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 8)],
     prevent_initial_call=True
 )
-def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6):
-    timestamps = [ts1, ts2, ts3, ts4, ts5, ts6]
+def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7):
+    timestamps = [ts1, ts2, ts3, ts4, ts5, ts6, ts7]
     # если ни одна кнопка не была нажата — не обновляем
     if not any(timestamps):
         raise PreventUpdate
@@ -74,7 +76,8 @@ def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6):
         3: "Диспансеризация по возрастам",
         4: "Стационары",
         5: "Показатели: сводная по индикаторам",
-        6: "Стационары: по врачам"
+        6: "Стационары: по врачам",
+        7: "Талоны по врачам помесячно",
     }
     route_map = {
         1: f"/{main_link}/svpod",
@@ -82,7 +85,9 @@ def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6):
         3: f"/{main_link}/disp_by_ages",
         4: f"/{main_link}/stationary",
         5: f"/{main_link}/indicators",
-        6: f"/{main_link}/doctor-stac"
+        6: f"/{main_link}/doctor-stac",
+        7: f"/{main_link}/doctors_talon",
+
     }
 
     selected_label = label_map[idx]
