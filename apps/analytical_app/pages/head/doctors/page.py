@@ -1,15 +1,14 @@
 from dash import html, dcc, Input, Output, State, exceptions
 import dash_bootstrap_components as dbc
-from datetime import datetime
 from sqlalchemy import text
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.components.filters import filter_years, filter_inogorod, filter_sanction, filter_amount_null, \
     update_buttons, status_groups, filter_status
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.SQL_query.query import base_query, columns_by_status_oms
 from apps.analytical_app.pages.head.doctors.query import sql_query_doctors_goal
 from apps.analytical_app.query_executor import engine
+from apps.analytical_app.pages.head.doctors.query import sql_query_doctors_goal_with_emd
 
 # Страница и SQL для отчёта по врачам (doctors_goal)
 type_page = "doctors_goal"
@@ -36,22 +35,27 @@ layout_doctors_goal = html.Div([
                         dbc.Col(filter_inogorod(type_page), width=2),
                         dbc.Col(filter_sanction(type_page), width=2),
                         dbc.Col(filter_amount_null(type_page), width=2),
-                        dbc.Col([
+                        dbc.Col(
                             dcc.Dropdown(
                                 id=f'dropdown-goal-{type_page}',
                                 options=goal_options,
                                 multi=True,
                                 placeholder="Цели"
-                            )], width=2),
-                        dbc.Col([
-                            dbc.Checklist(
-                                options=[{"label": "Показывать РЭМД", "value": True}],
-                                value=[],
+                            ),
+                            width=2
+                        ),
+                        dbc.Col(
+                            dcc.RadioItems(
                                 id=f'toggle-emd-{type_page}',
+                                options=[
+                                    {'label': 'Только талоны', 'value': 'talons'},
+                                    {'label': 'Талоны + ЭМД', 'value': 'both'},
+                                ],
+                                value='talons',
                                 inline=True
-                            )
-                        ], width=1),
-                        html.Br(),
+                            ),
+                            width=2
+                        ),
                     ], align="center", className="mb-3"),
                     # Статусы во второй строке
                     dbc.Row([
@@ -82,7 +86,6 @@ def toggle_status_selection_mode(mode):
     else:
         return {'display': 'none'}, {'display': 'block'}
 
-
 # Callback обновления отчёта по врачам
 @app.callback(
     [
@@ -104,35 +107,38 @@ def toggle_status_selection_mode(mode):
     ]
 )
 def update_table_doctors_goal(
-        n_clicks,
-        selected_year, inogorodniy, sanction, amount_null,
-        goals,
-        status_mode, status_group, individual_statuses,
-        emd_toggle
+    n_clicks,
+    selected_year, inogorodniy, sanction, amount_null,
+    goals,
+    status_mode, status_group, individual_statuses,
+    toggle_mode
 ):
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
+    # формируем список статусов
     if status_mode == 'group':
         status_list = status_groups.get(status_group, [])
     else:
         status_list = individual_statuses or []
 
-    months_placeholder = ', '.join(str(m) for m in range(1, 13))
-    with_emd = bool(emd_toggle)
+    months_placeholder = ", ".join(str(m) for m in range(1, 13))
 
-    columns, data = TableUpdater.query_to_df(
-        engine,
-        sql_query_doctors_goal(
-            selected_year,
-            months_placeholder,
-            inogorodniy,
-            sanction,
-            amount_null,
-            goals,
-            status_list,
-            with_emd
+    # выбираем нужный SQL
+    if toggle_mode == 'both':
+        sql = sql_query_doctors_goal_with_emd(
+            selected_year, months_placeholder,
+            inogorodniy, sanction, amount_null,
+            goals, status_list
         )
-    )
+    else:
+        # только талоны
+        sql = sql_query_doctors_goal(
+            selected_year, months_placeholder,
+            inogorodniy, sanction, amount_null,
+            goals, status_list
+        )
 
+    columns, data = TableUpdater.query_to_df(engine, sql)
     return columns, data, None
+
