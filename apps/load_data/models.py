@@ -33,6 +33,13 @@ class Talon(TimeStampedModel):
     talon = models.CharField(max_length=255)
     report_period = models.CharField(max_length=255, default='-')
     source = models.CharField(max_length=255, default='-')
+    source_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="ИД источника"
+    )
     account_number = models.CharField(max_length=255, default='-')
     upload_date = models.CharField(max_length=255, default='-')
     status = models.CharField(max_length=255, default='-')
@@ -96,6 +103,13 @@ class ComplexTalon(TimeStampedModel):
     talon = models.CharField(max_length=255)
     report_period = models.CharField(max_length=255, default='-')
     source = models.CharField(max_length=255, default='-')
+    source_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="ИД источника"
+    )
     account_number = models.CharField(max_length=255, default='-')
     upload_date = models.CharField(max_length=255, default='-')
     status = models.CharField(max_length=255, default='-')
@@ -282,7 +296,14 @@ class ElectronicMedicalDocument(TimeStampedModel):
     sending_status = models.CharField('Статус отправки в РИР.РЭМД', max_length=255, default='-')
     registration_number = models.CharField('Регистрационный номер', max_length=255, default='-')
     status_details = models.TextField('Детали статуса отправки', default='-')
-
+    talon = models.ForeignKey(
+        Talon,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        db_index=True,
+        related_name='emds',
+    )
     def __str__(self):
         return f"{self.epmd_id} - {self.patient}"
 

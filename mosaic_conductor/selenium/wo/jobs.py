@@ -68,8 +68,8 @@ def create_download_job(
     )
 
 
-wo_talon_job = create_download_job(
-    job_name="wo_talon_job",
+wo_download_talon_job = create_download_job(
+    job_name="wo_download_talon_job",
     target_url=OMS_BASE_URL,
     browser=OMS_BROWSER,
     temp_download_folder=os.path.join(os.getcwd(), "uploads", "talon"),
@@ -81,8 +81,8 @@ wo_talon_job = create_download_job(
     filter_input_op_fn=filter_input_op,
     extra_filter_config={},
 )
-wo_doctor_job = create_download_job(
-    job_name="wo_doctor_job",
+wo_download_doctor_job = create_download_job(
+    job_name="wo_download_doctor_job",
     target_url=OMS_BASE_URL,
     browser=OMS_BROWSER,
     temp_download_folder=os.path.join(os.getcwd(), "uploads", "doctor"),
@@ -98,7 +98,7 @@ wo_doctor_job = create_download_job(
 
 @schedule(
     cron_schedule="0 7-21 * * *",
-    job=wo_talon_job,
+    job=wo_download_talon_job,
     execution_timezone="Europe/Moscow"
 )
 def selenium_wo_talon_schedule(_context):
@@ -107,7 +107,7 @@ def selenium_wo_talon_schedule(_context):
 
 @schedule(
     cron_schedule="10 8-17 * * *",
-    job=wo_doctor_job,
+    job=wo_download_doctor_job,
     execution_timezone="Europe/Moscow"
 )
 def selenium_wo_doctor_schedule(_context):

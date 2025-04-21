@@ -8,6 +8,7 @@ from .extract import kvazar_extract
 from .load import kvazar_load
 from .transform import kvazar_transform
 from .update import update_personnel_op
+from .update_emd_talon import update_emd_talon_id_op
 from .update_error import update_error_log_is_fixed_op
 
 kvazar_assets = [
@@ -103,6 +104,8 @@ kvazar_job_emd = create_etl_job(
     "load_data_emd",
     "kvazar/emd",
     "mapping.json",
+    op_fn=update_emd_talon_id_op,
+    op_config={}
 )
 kvazar_job_recipes = create_etl_job(
     "kvazar_job_recipes",
