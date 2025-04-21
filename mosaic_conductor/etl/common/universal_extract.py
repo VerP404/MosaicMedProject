@@ -1,3 +1,4 @@
+import csv
 import datetime
 import os
 import json
@@ -72,7 +73,15 @@ def universal_extract(
     encoding = table_config.get("encoding", "utf-8")
     delimiter = table_config.get("delimiter", ",")
     try:
-        df = pd.read_csv(file_path, encoding=encoding, delimiter=delimiter, dtype=str)
+        df = pd.read_csv(
+            file_path,
+            encoding=encoding,
+            delimiter=delimiter,
+            dtype=str,
+            engine='python',
+            quoting=csv.QUOTE_NONE,
+            on_bad_lines='skip'
+        )
     except pd.errors.ParserError as e:
         # Если CSV битый — переносим в папку ошибок
         context.log.error(f"Файл {file_path} битый (ParserError): {e}")
