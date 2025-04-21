@@ -154,6 +154,8 @@ wo_job_talon = create_etl_job(
     "load_data_talons",
     "weboms/talon/new",
     "oms_mapping.json",
+    op_fn=update_emd_talon_id_op,
+    op_config={}
 )
 
 wo_job_detailed = create_etl_job(
