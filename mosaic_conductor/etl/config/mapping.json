@@ -427,6 +427,43 @@
       ],
       "encoding": "cp1251",
       "delimiter": ";"
+    },
+    "load_data_journal_appeals": {
+      "file": {
+        "file_pattern": "Обращ*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "Фамилия": "patient_last_name",
+        "Имя": "patient_first_name",
+        "Отчество": "patient_middle_name",
+        "Дата рождения": "birth_date",
+        "Пол": "gender",
+        "Телефон": "phone",
+        "ЕНП": "enp",
+        "Прикрепление": "attachment",
+        "Серия": "series",
+        "Номер": "number",
+        "Фамилия_1": "employee_last_name",
+        "Имя_1": "employee_first_name",
+        "Отчество_1": "employee_middle_name",
+        "Должность": "position",
+        "Дата приема": "acceptance_date",
+        "Дата записи": "record_date",
+        "Тип расписания": "schedule_type",
+        "Источник записи": "record_source",
+        "Подразделение": "department",
+        "Создавший": "creator",
+        "Не явился": "no_show",
+        "ЭПМЗ": "epmz"
+      },
+      "column_check": [
+        "enp",
+        "employee_last_name",
+        "acceptance_date"
+      ],
+      "encoding": "cp1251",
+      "delimiter": ";"
     }
   }
 }

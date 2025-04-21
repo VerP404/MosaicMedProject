@@ -208,3 +208,4 @@ exponent.txt
 /mosaic_conductor/local/
 /mosaic_conductor/local/assets.py
 /mosaic_conductor/local/definitions.py
+/mosaic_conductor/etl/data/

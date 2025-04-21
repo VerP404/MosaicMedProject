@@ -167,6 +167,12 @@ wo_job_errorlog = create_etl_job(
     op_fn=update_error_log_is_fixed_op,
 )
 
+wo_job_journal_appeals = create_etl_job(
+    "wo_job_journal_appeals",
+    "load_data_journal_appeals",
+    "kvazar/journal_appeals",
+    "mapping.json",
+)
 kvazar_jobs = [
     kvazar_job_eln,
     kvazar_job_emd,
@@ -180,5 +186,6 @@ kvazar_jobs = [
     wo_job_doctors,
     wo_job_talon,
     wo_job_detailed,
-    wo_job_errorlog
+    wo_job_errorlog,
+    wo_job_journal_appeals
 ]

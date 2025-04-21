@@ -1,9 +1,35 @@
 import json
 from datetime import date
+from collections import Counter
 from dagster import asset, Field, String, OpExecutionContext, AssetIn
 from config.settings import ORGANIZATIONS
 from mosaic_conductor.etl.common.connect_db import connect_to_db
 
+# Словарь (набор) таблиц, для которых проверка наличия обязательных столбцов будет пропущена.
+SKIP_CHECK_TABLES = {"load_data_journal_appeals"}  # добавьте сюда имена таблиц, для которых нужно пропускать проверку
+
+def make_columns_unique(columns):
+    """Возвращает список столбцов с уникальными именами (добавляет суффиксы при повторениях)."""
+    counts = {}
+    new_cols = []
+    for col in columns:
+        if col in counts:
+            counts[col] += 1
+            new_cols.append(f"{col}_{counts[col]}")
+        else:
+            counts[col] = 0
+            new_cols.append(col)
+    return new_cols
+
+def normalize(col: str) -> str:
+    """
+    Удаляет автоматически добавленный суффикс вида _<число> из названия столбца.
+    Например, 'Фамилия_1' -> 'Фамилия'
+    """
+    parts = col.split("_")
+    if len(parts) > 1 and parts[-1].isdigit():
+        return "_".join(parts[:-1])
+    return col
 
 @asset(
     config_schema={
@@ -16,18 +42,15 @@ from mosaic_conductor.etl.common.connect_db import connect_to_db
 def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
     """
     Трансформация данных:
-      1. Загружает маппинг из mapping.json, переименовывает столбцы согласно mapping_fields.
-      2. Проверяет наличие обязательных столбцов.
-      3. Ограничивает DataFrame только ожидаемыми столбцами.
-      4. Если в mapping.json задано новое поле "check_fields", удаляет строки, в которых
-         отсутствуют значения в указанных столбцах.
-      5. Заполняет отсутствующие столбцы из БД дефолтным значением "-".
-      6. Если данные талонов (is_talon=True или table_name в талонных таблицах),
-         то гарантированно добавляет столбец is_complex с булевым значением,
-         а затем, на основе группировки по (talon, source), для групп с более чем одной записью
-         устанавливает is_complex = True.
-      7. Если обрабатываются талоны, дополнительно вычисляются report_year и report_month.
-      8. Возвращает либо единый DataFrame, либо словарь с ветками "normal" и "complex".
+      1. Загружает маппинг из mapping.json.
+      2. Делает имена столбцов уникальными.
+      3. Если таблица не указана в SKIP_CHECK_TABLES, проверяет наличие обязательных столбцов с учётом нормализации.
+      4. Переименовывает столбцы согласно mapping_fields.
+      5. Оставляет только ожидаемые столбцы.
+      6. Если задано "check_fields" в маппинге, удаляет строки с пустыми значениями.
+      7. Заполняет отсутствующие столбцы дефолтным значением "-".
+      8. При обработке талонов вычисляет is_complex, report_year и report_month.
+      9. Возвращает либо единый DataFrame, либо словарь с ветками "normal" и "complex".
     """
     config = context.op_config
     mapping_file = config["mapping_file"]
@@ -38,24 +61,38 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
         context.log.info("⚠️ Нет данных для трансформации!")
         raise ValueError("❌ Нет данных для трансформации.")
 
-    # Загружаем маппинг и переименовываем столбцы
+    # Делаем имена столбцов уникальными
+    df.columns = make_columns_unique(df.columns)
+    actual_cols = list(df.columns)
+
+    # Загружаем маппинг
     with open(mapping_file, "r", encoding="utf-8") as f:
         mappings = json.load(f)
     table_config = mappings.get("tables", {}).get(table_name, {})
     column_mapping = table_config.get("mapping_fields", {})
 
+    # Список ожидаемых столбцов согласно маппингу (ключи)
     expected_original_cols = list(column_mapping.keys())
-    actual_cols = list(df.columns)
 
-    # Проверка обязательных столбцов в исходном CSV
-    missing_in_csv = set(expected_original_cols) - set(actual_cols)
-    if missing_in_csv:
-        context.log.info(f"❌ Отсутствуют следующие столбцы в CSV: {missing_in_csv}")
-        raise KeyError(f"Отсутствуют обязательные столбцы в CSV: {missing_in_csv}")
-    extra_in_csv = set(actual_cols) - set(expected_original_cols)
-    if extra_in_csv:
-        context.log.info(f"⚠️ Лишние столбцы в CSV: {extra_in_csv}. Они будут проигнорированы.")
+    # Если таблица не в SKIP_CHECK_TABLES, выполняем проверку обязательных столбцов.
+    if table_name not in SKIP_CHECK_TABLES:
+        # Группируем ожидаемые столбцы по нормализованному имени
+        expected_counts = Counter(normalize(col) for col in expected_original_cols)
+        actual_counts = Counter(normalize(col) for col in actual_cols)
 
+        missing_in_csv = {key: expected_counts[key] - actual_counts.get(key, 0)
+                          for key in expected_counts if actual_counts.get(key, 0) < expected_counts[key]}
+        if missing_in_csv:
+            context.log.info(f"❌ Отсутствуют следующие столбцы в CSV (нормализовано): {missing_in_csv}")
+            raise KeyError(f"Отсутствуют обязательные столбцы в CSV: {missing_in_csv}")
+
+        extra_in_csv = {normalize(col) for col in actual_cols} - {normalize(col) for col in expected_original_cols}
+        if extra_in_csv:
+            context.log.info(f"⚠️ Лишние столбцы (нормализованные) в CSV: {extra_in_csv}. Они будут проигнорированы.")
+    else:
+        context.log.info(f"Пропускаем проверку обязательных столбцов для таблицы {table_name}.")
+
+    # Переименовываем столбцы согласно mapping_fields
     df = df.rename(columns=column_mapping)
     expected_cols = list(column_mapping.values())
     actual_transformed_cols = list(df.columns)
@@ -68,12 +105,10 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
         context.log.info(f"⚠️ Лишние после переименования: {extra_after_rename}. Они будут проигнорированы.")
     df = df[expected_cols]
 
-    # ФИЛЬТРАЦИЯ: если в mapping задано поле "check_fields", удаляем строки,
-    # где в указанных столбцах отсутствуют значения.
+    # Фильтрация: если в mapping задано поле "check_fields", удаляем строки с пустыми значениями
     check_fields = table_config.get("check_fields", [])
     if check_fields:
         original_len = len(df)
-        # Здесь предполагается, что в check_fields указаны именно имена, после переименования (new names)
         df = df.dropna(subset=check_fields)
         context.log.info(
             f"⚠️ Отфильтровано строк: {original_len - len(df)} (удалены строки с пустыми значениями в столбцах: {check_fields})"
@@ -101,10 +136,10 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
             context.log.info(f"⚠️ Добавляем отсутствующий столбец '{col}' со значением '-' по умолчанию.")
             df[col] = "-"
 
-    # очистка датафрейма
+    # Очистка DataFrame от лишних символов
     df = df.replace('`', '', regex=True)
 
-    # Если обрабатываются талоны, гарантируем заполнение столбца is_complex булевым значением.
+    # Если обрабатываются талоны, вычисляем is_complex, report_year и report_month
     if config.get("is_talon", False) or table_name in ["load_data_talons", "load_data_complex_talons"]:
         context.log.info("ℹ️ Обработка данных талонов – гарантируем наличие столбца is_complex как boolean.")
         df["is_complex"] = False
@@ -130,10 +165,8 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
                 month_str = report_period.split()[0].strip()
                 return month_mapping.get(month_str, None)
 
-        df['report_year'] = df.apply(lambda row: compute_report_year(row['report_period'], row['treatment_end']),
-                                     axis=1)
-        df['report_month'] = df.apply(lambda row: compute_report_month(row['report_period'], row['treatment_end']),
-                                      axis=1)
+        df['report_year'] = df.apply(lambda row: compute_report_year(row['report_period'], row['treatment_end']), axis=1)
+        df['report_month'] = df.apply(lambda row: compute_report_month(row['report_period'], row['treatment_end']), axis=1)
 
         grouped = df.groupby(["talon", "source"])
         for (talon, source), group in grouped:

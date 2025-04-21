@@ -516,3 +516,40 @@ class DetailedMedicalExamination(TimeStampedModel):
         verbose_name = "Детализация диспансеризации"
         verbose_name_plural = "Детализации диспансеризации"
         unique_together = (("talon_number", "service_nomenclature"),)
+
+
+class JournalAppeals(models.Model):
+    # Поля для данных пациента
+    patient_last_name = models.CharField("Фамилия пациента", max_length=255, default='-')
+    patient_first_name = models.CharField("Имя пациента", max_length=255, default='-')
+    patient_middle_name = models.CharField("Отчество пациента", max_length=255, default='-')
+    birth_date = models.CharField("Дата рождения", max_length=50, default='-')
+    gender = models.CharField("Пол", max_length=50, default='-')
+    phone = models.CharField("Телефон", max_length=50, default='-')
+    enp = models.CharField("ЕНП", max_length=255, default='-')
+    attachment = models.CharField("Прикрепление", max_length=255, default='-')
+    series = models.CharField("Серия", max_length=50, default='-')
+    number = models.CharField("Номер", max_length=50, default='-')
+
+    # Поля для данных о сотруднике (расписании)
+    employee_last_name = models.CharField("Фамилия сотрудника", max_length=255, default='-')
+    employee_first_name = models.CharField("Имя сотрудника", max_length=255, default='-')
+    employee_middle_name = models.CharField("Отчество сотрудника", max_length=255, default='-')
+    position = models.CharField("Должность", max_length=255, default='-')
+    acceptance_date = models.CharField("Дата приема", max_length=50, default='-')
+    record_date = models.CharField("Дата записи", max_length=50, default='-')
+    schedule_type = models.CharField("Тип расписания", max_length=255, default='-')
+    record_source = models.CharField("Источник записи", max_length=255, default='-')
+    department = models.CharField("Подразделение", max_length=255, default='-')
+    creator = models.CharField("Создавший", max_length=255, default='-')
+    no_show = models.CharField("Не явился", max_length=50, default='-')
+    epmz = models.CharField("ЭПМЗ", max_length=255, default='-')
+
+    def __str__(self):
+        return f"{self.patient_last_name} {self.patient_first_name} - {self.enp}"
+
+    class Meta:
+        db_table = "load_data_journal_appeals"
+        verbose_name = "Обращение"
+        verbose_name_plural = "Обращения"
+        unique_together = (("enp", "employee_last_name", "acceptance_date"),)
