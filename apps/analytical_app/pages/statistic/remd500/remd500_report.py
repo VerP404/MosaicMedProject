@@ -1,5 +1,6 @@
 # remd500.py
-
+import base64
+import io
 import re
 import pandas as pd
 from datetime import datetime, timedelta
@@ -13,6 +14,19 @@ from apps.analytical_app.app import app
 from apps.analytical_app.query_executor import engine
 
 type_page = "remd500"
+
+
+# Утилита для парсинга загруженных файлов
+def parse_contents(contents, filename):
+    if not contents:
+        return pd.DataFrame()
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    try:
+        return pd.read_csv(io.StringIO(decoded.decode('cp1251')), sep=';', low_memory=False, dtype=str)
+    except Exception:
+        return pd.DataFrame()
+
 
 layout_remd500 = html.Div(
     [
@@ -310,13 +324,276 @@ layout_remd500 = html.Div(
                     ),
                     label="По врачам"
                 ),
+                dbc.Tab(
+                    dbc.Card(
+                        dbc.CardBody(
+                            [
+                                html.Table(
+                                    style={"width": "100%", "tableLayout": "fixed"},
+                                    children=[
+                                        html.Tr([
+                                            html.Td(
+                                                dcc.Upload(
+                                                    id=f"upload-emd-{type_page}",
+                                                    children=dbc.Button("Выбрать файл ЭМД", size="sm",
+                                                                        className="w-100"),
+                                                    multiple=False,
+                                                    style={"display": "block"}
+                                                ),
+                                                style={"width": "25%", "padding": "4px"}
+                                            ),
+                                            html.Td(
+                                                html.Div(id=f"output-emd-filename-{type_page}"),
+                                                style={"width": "75%", "padding": "4px"}
+                                            ),
+                                        ]),
+                                        html.Tr([
+                                            html.Td(
+                                                dcc.Upload(
+                                                    id=f"upload-spr-{type_page}",
+                                                    children=dbc.Button("Выбрать файл Справки", size="sm",
+                                                                        className="w-100"),
+                                                    multiple=False,
+                                                    style={"display": "block"}
+                                                ),
+                                                style={"padding": "4px"}
+                                            ),
+                                            html.Td(
+                                                html.Div(id=f"output-spr-filename-{type_page}"),
+                                                style={"padding": "4px"}
+                                            ),
+                                        ]),
+                                        html.Tr([
+                                            html.Td(
+                                                dcc.Upload(
+                                                    id=f"upload-smer-{type_page}",
+                                                    children=dbc.Button("Выбрать файл Смертность", size="sm",
+                                                                        className="w-100"),
+                                                    multiple=False,
+                                                    style={"display": "block"}
+                                                ),
+                                                style={"padding": "4px"}
+                                            ),
+                                            html.Td(
+                                                html.Div(id=f"output-smer-filename-{type_page}"),
+                                                style={"padding": "4px"}
+                                            ),
+                                        ]),
+                                        html.Tr([
+                                            html.Td(
+                                                dcc.Upload(
+                                                    id=f"upload-rec-{type_page}",
+                                                    children=dbc.Button("Выбрать файл Рецепты", size="sm",
+                                                                        className="w-100"),
+                                                    multiple=False,
+                                                    style={"display": "block"}
+                                                ),
+                                                style={"padding": "4px"}
+                                            ),
+                                            html.Td(
+                                                html.Div(id=f"output-rec-filename-{type_page}"),
+                                                style={"padding": "4px"}
+                                            ),
+                                        ]),
+                                    ]
+                                ),
+                                # Отдельная зелёная кнопка снизу, растянутая по ширине таблицы
+                                dbc.Button(
+                                    "Обработать файлы",
+                                    id=f"manual-process-button-{type_page}",
+                                    color="success",
+                                    className="mt-3 w-100"
+                                ),
+                                # Статус после нажатия
+                                html.Div(id=f"manual-process-status-{type_page}", className="mt-2")
+                            ]
+                        )
+                    ),
+                    label="Отчет по ручной выгрузке"
+                ),
             ]
         ),
 
-        html.Div(id=f"report-status-{type_page}", className="mt-2")
+        html.Div(id=f"report-status-{type_page}", className="mt-2"),
+        html.Div(id=f"manual-new-tables-{type_page}", className="mt-3"),
     ],
     style={"padding": "15px"}
 )
+
+
+# Callbacks для обновления имён загруженных файлов
+@app.callback(
+    Output(f"output-emd-filename-{type_page}", "children"),
+    Input(f"upload-emd-{type_page}", "filename")
+)
+def update_emd_filename(filename):
+    return html.Div(f"Загружен файл: {filename}") if filename else ""
+
+
+@app.callback(
+    Output(f"output-spr-filename-{type_page}", "children"),
+    Input(f"upload-spr-{type_page}", "filename")
+)
+def update_spr_filename(filename):
+    return html.Div(f"Загружен файл: {filename}") if filename else ""
+
+
+@app.callback(
+    Output(f"output-smer-filename-{type_page}", "children"),
+    Input(f"upload-smer-{type_page}", "filename")
+)
+def update_smer_filename(filename):
+    return html.Div(f"Загружен файл: {filename}") if filename else ""
+
+
+@app.callback(
+    Output(f"output-rec-filename-{type_page}", "children"),
+    Input(f"upload-rec-{type_page}", "filename")
+)
+def update_rec_filename(filename):
+    return html.Div(f"Загружен файл: {filename}") if filename else ""
+
+
+# Новый callback для ручной выгрузки
+@app.callback(
+    Output(f"manual-new-tables-{type_page}", "children"),
+    Output(f"manual-process-status-{type_page}", "children"),
+    Input(f"manual-process-button-{type_page}", "n_clicks"),
+    State(f"upload-emd-{type_page}", "contents"),
+    State(f"upload-emd-{type_page}", "filename"),
+    State(f"upload-spr-{type_page}", "contents"),
+    State(f"upload-spr-{type_page}", "filename"),
+    State(f"upload-smer-{type_page}", "contents"),
+    State(f"upload-smer-{type_page}", "filename"),
+    State(f"upload-rec-{type_page}", "contents"),
+    State(f"upload-rec-{type_page}", "filename"),
+)
+def process_manual(n_clicks, emd_c, emd_fn, spr_c, spr_fn, smer_c, smer_fn, rec_c, rec_fn):
+    if not n_clicks:
+        return [], ""
+    try:
+        # Парсим данные
+        df_emd = parse_contents(emd_c, emd_fn)
+        df_spr = parse_contents(spr_c, spr_fn)
+        df_smer = parse_contents(smer_c, smer_fn)
+        df_rec = parse_contents(rec_c, rec_fn)
+
+        # --- Обработка ЭМД ---
+        df_emd['Тип'] = 'ЭМД'
+        df_emd['Подразделение'] = df_emd['Подразделение'].str.lower()
+        df_emd['Обособленное подразделение'] = df_emd['Обособленное подразделение'].str.lower()
+        df_emd['Врач'] = df_emd.apply(
+            lambda
+                row: f"{row['Врач']}, {row['Подразделение'] if pd.notna(row['Подразделение']) else row['Обособленное подразделение']}",
+            axis=1
+        )
+        result_df_emd = df_emd[['Врач', 'Статус отправки в РИР.РЭМД', 'Тип']].rename(
+            columns={'Статус отправки в РИР.РЭМД': 'Статус'}
+        )
+
+        # --- Обработка Справок ---
+        df_spr['Тип'] = 'Справки'
+        result_df_spr = df_spr[['Врач', 'Статус', 'Тип']]
+
+        # --- Обработка Смертность ---
+        df_smer['Тип'] = 'Смертность'
+
+        def split_vrach_and_department(vrach_str):
+            if pd.isna(vrach_str): return pd.Series([vrach_str, ''])
+            parts = vrach_str.split(') (')
+            if len(parts) == 2:
+                name_specialty = parts[0] + ')'
+                dept = parts[1].rstrip(')')
+                return pd.Series([name_specialty.strip(), dept.lower()])
+            return pd.Series([vrach_str, ''])
+
+        df_smer[['Врач', 'Подразделение']] = df_smer['Врач'].apply(split_vrach_and_department)
+        result_df_smer = df_smer[['Врач', 'Статус отправки ЭМД', 'Тип']].rename(
+            columns={'Статус отправки ЭМД': 'Статус'}
+        )
+
+        # --- Обработка Рецептов ---
+        df_rec['Тип'] = 'Рецепты'
+        df_rec['Подразделение'] = df_rec['Подразделение'].str.lower()
+
+        def convert_name(full_name):
+            parts = full_name.split()
+            if len(parts) >= 3:
+                return f"{parts[0]} {parts[1][0]}.{parts[2][0]}."
+            if len(parts) == 2:
+                return f"{parts[0]} {parts[1][0]}."
+            return full_name
+
+        df_rec['Ф.И.О. врача'] = df_rec['Ф.И.О. врача'].apply(convert_name)
+        df_rec['Врач'] = df_rec.apply(
+            lambda
+                r: f"{r['Ф.И.О. врача']} ({r['Должность врача']}), {r['Подразделение'] if pd.notna(r['Подразделение']) else r['Обособленное подразделение']}",
+            axis=1
+        )
+        result_df_rec = df_rec[['Врач', 'Статус отправки в РЭМД', 'Тип']].rename(
+            columns={'Статус отправки в РЭМД': 'Статус'}
+        )
+
+        # --- Объединяем и фильтруем ---
+        combined = pd.concat([result_df_emd, result_df_spr, result_df_smer, result_df_rec], ignore_index=True)
+        filtered = combined[combined['Статус'].isin([
+            'Документ успешно зарегистрирован', 'Зарегистрирован',
+            'Зарегистрирована', 'Зарегистрировано'
+        ])].copy()
+
+        # --- Специальности ---
+        filtered['Специальность'] = filtered['Врач'].str.extract(r'\((.*?)\)')
+
+        def replace_specialty(s):
+            m = s.lower() if isinstance(s, str) else s
+            if 'семейный врач' in m: return 'ВОП'
+            if m in ['врач по медицинской профилактике', 'врач-терапевт',
+                     'врач-терапевт участковый']: return 'Терапевт'
+            if m in ['врач-педиатр', 'врач-педиатр участковый']: return 'Педиатр'
+            return s
+
+        filtered['Специальность'] = filtered['Специальность'].apply(replace_specialty)
+        filtered = filtered[filtered['Специальность'].isin(['ВОП', 'Терапевт', 'Педиатр'])]
+
+        # --- Категории ---
+        bins = [0, 99, 499, float('inf')]
+        labels = ['до 100', '100-499', '>500']
+
+        # --- Сводная таблица по группам ---
+        doctor_pivot = filtered.pivot_table(
+            index=['Специальность', 'Врач'],
+            columns='Тип',
+            aggfunc='size',
+            fill_value=0
+        )
+        doctor_pivot['Итого'] = doctor_pivot.sum(axis=1)
+        doctor_df = doctor_pivot.reset_index()
+        doctor_df['Категория'] = pd.cut(doctor_df['Итого'], bins=bins, labels=labels)
+
+        grouped_pivot = doctor_df.groupby(['Специальность', 'Категория']).size().unstack(fill_value=0)
+        grouped_pivot['Итого'] = grouped_pivot.sum(axis=1)
+
+        # Таблицы Dash
+        table_group = dash_table.DataTable(
+            data=grouped_pivot.reset_index().to_dict('records'),
+            columns=[{'name': i, 'id': i} for i in grouped_pivot.reset_index().columns],
+            export_format='xlsx', page_size=15
+        )
+        table_doctor = dash_table.DataTable(
+            data=doctor_df.to_dict('records'),
+            columns=[{'name': i, 'id': i} for i in doctor_df.columns],
+            export_format='xlsx', page_size=15
+        )
+
+        return [
+            html.H5("Сводная информация (Новые данные)"),
+            table_group,
+            html.H5("Список по врачам (Новые данные)"),
+            table_doctor
+        ], "Обработка завершена успешно."
+
+    except Exception as e:
+        return [], f"Ошибка при обработке: {str(e)}"
 
 
 # ОБЪЕДИНЁННЫЙ CALLBACK: формирует отчет и получает даты обновления для каждой таблицы
@@ -457,7 +734,7 @@ def generate_remd500_report(n_clicks, start_date, end_date, emd_date_type, emd_s
 
         recipe_all_status = [row[0] for row in result]
         recipe_unknown_status = [status for status in recipe_all_status if
-                                        status not in recipe_known_status]
+                                 status not in recipe_known_status]
         # ✅ Если список пуст или None — также выбираем все статусы
         if not recipe_status or len(recipe_status) == 0:
             recipe_status = recipe_known_status + recipe_unknown_status
