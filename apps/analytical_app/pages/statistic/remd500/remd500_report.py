@@ -402,7 +402,7 @@ layout_remd500 = html.Div(
                                     "Обработать файлы",
                                     id=f"manual-process-button-{type_page}",
                                     color="success",
-                                    className="mt-3 w-100"
+                                    className="mt-3"
                                 ),
                                 # Статус после нажатия
                                 html.Div(id=f"manual-process-status-{type_page}", className="mt-2")
