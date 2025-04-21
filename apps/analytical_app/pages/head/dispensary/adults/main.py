@@ -30,6 +30,12 @@ cards_row_1 = dbc.Row(
                         "Все виды диспансеризации с группировкой по стоимости"),
             className="d-flex"
         ),
+        dbc.Col(
+            create_card(9, type_page,
+                        "РЭМД диспансеризации",
+                        "По статусам и месяцам."),
+            className="d-flex"
+        ),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
@@ -47,11 +53,11 @@ head_adults_dd_main = html.Div([
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output(f'breadcrumb-{type_page}', 'items')],
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in [1, 3, 8]],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in [1, 3, 8, 9]],
     prevent_initial_call=True
 )
-def navigate_adults(ts1, ts3, ts8):
-    timestamps = [ts1, ts3, ts8]
+def navigate_adults(ts1, ts3, ts8, ts9):
+    timestamps = [ts1, ts3, ts8, ts9]
     if not any(timestamps):
         raise PreventUpdate
 
@@ -63,6 +69,7 @@ def navigate_adults(ts1, ts3, ts8):
         0: ("Отчет по видам диспансеризации", "dv1"),
         1: ("Диспансеризация по возрастам", "dv3"),
         2: ("Диспансеризация по стоимости", "dv8"),
+        3: ("РЭМД диспансеризации", "dv9"),
     }
     label_text, segment = mapping[idx]
     new_path = f"/{main_link}/{segment}"
