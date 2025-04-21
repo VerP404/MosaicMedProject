@@ -31,20 +31,27 @@ layout_doctors_goal = html.Div([
                     dbc.CardHeader("Фильтры"),
                     # Первая строка
                     dbc.Row([
-                        dbc.Col(update_buttons(type_page), width=2),
-                        dbc.Col(filter_years(type_page), width=2),
+                        dbc.Col(update_buttons(type_page), width=1),
+                        dbc.Col(filter_years(type_page), width=1),
                         dbc.Col(filter_inogorod(type_page), width=2),
                         dbc.Col(filter_sanction(type_page), width=2),
                         dbc.Col(filter_amount_null(type_page), width=2),
-                        dbc.Col(
+                        dbc.Col([
                             dcc.Dropdown(
                                 id=f'dropdown-goal-{type_page}',
                                 options=goal_options,
                                 multi=True,
                                 placeholder="Цели"
-                            ),
-                            width=2
-                        )
+                            )], width=2),
+                        dbc.Col([
+                            dbc.Checklist(
+                                options=[{"label": "Показывать РЭМД", "value": True}],
+                                value=[],
+                                id=f'toggle-emd-{type_page}',
+                                inline=True
+                            )
+                        ], width=1),
+                        html.Br(),
                     ], align="center", className="mb-3"),
                     # Статусы во второй строке
                     dbc.Row([
@@ -75,12 +82,13 @@ def toggle_status_selection_mode(mode):
     else:
         return {'display': 'none'}, {'display': 'block'}
 
+
 # Callback обновления отчёта по врачам
 @app.callback(
     [
         Output(f'result-table-{type_page}', 'columns'),
         Output(f'result-table-{type_page}', 'data'),
-        Output(f'loading-{type_page}', 'children')
+        Output(f'loading-{type_page}', 'children'),
     ],
     [Input(f'update-button-{type_page}', 'n_clicks')],
     [
@@ -91,26 +99,28 @@ def toggle_status_selection_mode(mode):
         State(f'dropdown-goal-{type_page}', 'value'),
         State(f'status-selection-mode-{type_page}', 'value'),
         State(f'status-group-radio-{type_page}', 'value'),
-        State(f'status-individual-dropdown-{type_page}', 'value')
+        State(f'status-individual-dropdown-{type_page}', 'value'),
+        State(f'toggle-emd-{type_page}', 'value'),
     ]
 )
 def update_table_doctors_goal(
-    n_clicks, selected_year, inogorodniy, sanction, amount_null,
-    goals, status_mode, status_group, individual_statuses
+        n_clicks,
+        selected_year, inogorodniy, sanction, amount_null,
+        goals,
+        status_mode, status_group, individual_statuses,
+        emd_toggle
 ):
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
-    # Определяем список статусов
     if status_mode == 'group':
         status_list = status_groups.get(status_group, [])
     else:
         status_list = individual_statuses or []
 
-    # Все месяцы
     months_placeholder = ', '.join(str(m) for m in range(1, 13))
+    with_emd = bool(emd_toggle)
 
-    # Запрос и обновление таблицы
     columns, data = TableUpdater.query_to_df(
         engine,
         sql_query_doctors_goal(
@@ -120,7 +130,8 @@ def update_table_doctors_goal(
             sanction,
             amount_null,
             goals,
-            status_list
+            status_list,
+            with_emd
         )
     )
 
