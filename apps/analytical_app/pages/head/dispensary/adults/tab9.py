@@ -40,7 +40,18 @@ adults_dv9 = html.Div(
                             dbc.Row(
                                 [
                                     dbc.Col(update_buttons(type_page), width=2),
-                                    dbc.Col(filter_years(type_page),    width=2),
+                                    dbc.Col(filter_years(type_page), width=2),
+                                    dbc.Col(dbc.Alert(
+                                        [
+                                            html.Span("Данные из Журнала ЭМД."), html.Br(),
+                                            html.Span("Тип: Диспансеризация взрослого населения"), html.Br(),
+                                            html.Span("- да: статус \"Документ успешно зарегистрирован\"."), html.Br(),
+                                            html.Span(
+                                                "- нет: документ сформирован, но не зарегистрирован. Все прочие статусы."),
+                                            html.Br(),
+                                        ],
+                                        color="success"
+                                    )),
                                 ],
                                 align="center",
                                 className="g-2"
@@ -61,7 +72,7 @@ adults_dv9 = html.Div(
         # сама таблица с merge_duplicate_headers=True
         card_table(
             f'result-table1-{type_page}',
-            "РЭМД по врачам и месяцам документа",
+            "РЭМД диспансеризации (ДВ4, ОПВ) по врачам и месяцам документа",
             merge_duplicate_headers=True
         )
     ],
@@ -77,8 +88,8 @@ adults_dv9 = html.Div(
         Output(f'loading-output-{type_page}', 'children'),
         Output(f'last-updated-{type_page}', 'children'),
     ],
-    [ Input(f'update-button-{type_page}', 'n_clicks') ],
-    [ State(f'dropdown-year-{type_page}', 'value') ]
+    [Input(f'update-button-{type_page}', 'n_clicks')],
+    [State(f'dropdown-year-{type_page}', 'value')]
 )
 def update_table_tab9(n_clicks, selected_year):
     if n_clicks is None:
@@ -93,26 +104,26 @@ def update_table_tab9(n_clicks, selected_year):
 
     # Собираем колонки с merge_duplicate_headers
     month_map = {
-        'янв': 'Январь',   'фев': 'Февраль', 'мар': 'Март',
-        'апр': 'Апрель',   'май': 'Май',      'июн': 'Июнь',
-        'июл': 'Июль',     'авг': 'Август',   'сен': 'Сентябрь',
-        'окт': 'Октябрь',  'ноя': 'Ноябрь',   'дек': 'Декабрь'
+        'янв': 'Январь', 'фев': 'Февраль', 'мар': 'Март',
+        'апр': 'Апрель', 'май': 'Май', 'июн': 'Июнь',
+        'июл': 'Июль', 'авг': 'Август', 'сен': 'Сентябрь',
+        'окт': 'Октябрь', 'ноя': 'Ноябрь', 'дек': 'Декабрь'
     }
-    metrics = ['да','нет','итого']
+    metrics = ['да', 'нет', 'итого']
 
     dash_columns = []
     for col in orig_columns:
         cid = col['id']
         if cid == 'doctor':
-            dash_columns.append({'name': ['', 'Врач'],   'id': 'doctor'})
+            dash_columns.append({'name': ['', 'Врач'], 'id': 'doctor'})
         elif cid == 'branch':
-            dash_columns.append({'name': ['', 'Корпус'],  'id': 'branch'})
+            dash_columns.append({'name': ['', 'Корпус'], 'id': 'branch'})
         else:
             short_m, met = cid.split('_', 1)
             if short_m in month_map and met in metrics:
                 dash_columns.append({
                     'name': [month_map[short_m], met],
-                    'id':   cid
+                    'id': cid
                 })
             else:
                 dash_columns.append(col)

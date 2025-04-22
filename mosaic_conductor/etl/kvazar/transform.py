@@ -8,6 +8,7 @@ from mosaic_conductor.etl.common.connect_db import connect_to_db
 # Словарь (набор) таблиц, для которых проверка наличия обязательных столбцов будет пропущена.
 SKIP_CHECK_TABLES = {"load_data_journal_appeals"}  # добавьте сюда имена таблиц, для которых нужно пропускать проверку
 
+
 def make_columns_unique(columns):
     """Возвращает список столбцов с уникальными именами (добавляет суффиксы при повторениях)."""
     counts = {}
@@ -21,6 +22,7 @@ def make_columns_unique(columns):
             new_cols.append(col)
     return new_cols
 
+
 def normalize(col: str) -> str:
     """
     Удаляет автоматически добавленный суффикс вида _<число> из названия столбца.
@@ -30,6 +32,7 @@ def normalize(col: str) -> str:
     if len(parts) > 1 and parts[-1].isdigit():
         return "_".join(parts[:-1])
     return col
+
 
 @asset(
     config_schema={
@@ -60,11 +63,9 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
     if df is None:
         context.log.info("⚠️ Нет данных для трансформации!")
         raise ValueError("❌ Нет данных для трансформации.")
-
     # Делаем имена столбцов уникальными
     df.columns = make_columns_unique(df.columns)
     actual_cols = list(df.columns)
-
     # Загружаем маппинг
     with open(mapping_file, "r", encoding="utf-8") as f:
         mappings = json.load(f)
@@ -104,7 +105,6 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
     if extra_after_rename:
         context.log.info(f"⚠️ Лишние после переименования: {extra_after_rename}. Они будут проигнорированы.")
     df = df[expected_cols]
-
     # Фильтрация: если в mapping задано поле "check_fields", удаляем строки с пустыми значениями
     check_fields = table_config.get("check_fields", [])
     if check_fields:
@@ -138,11 +138,11 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
 
     # Очистка DataFrame от лишних символов
     df = df.replace('`', '', regex=True)
-
     # Если обрабатываются талоны, вычисляем is_complex, report_year и report_month
     if config.get("is_talon", False) or table_name in ["load_data_talons", "load_data_complex_talons"]:
         context.log.info("ℹ️ Обработка данных талонов – гарантируем наличие столбца is_complex как boolean.")
         df["is_complex"] = False
+        df.drop(columns=['report_year', 'report_month'], errors='ignore', inplace=True)
 
         def compute_report_year(report_period, treatment_end):
             return treatment_end[-4:] if report_period == '-' else report_period[-4:]
@@ -165,8 +165,17 @@ def kvazar_transform(context: OpExecutionContext, kvazar_extract: dict) -> dict:
                 month_str = report_period.split()[0].strip()
                 return month_mapping.get(month_str, None)
 
-        df['report_year'] = df.apply(lambda row: compute_report_year(row['report_period'], row['treatment_end']), axis=1)
-        df['report_month'] = df.apply(lambda row: compute_report_month(row['report_period'], row['treatment_end']), axis=1)
+        years = [
+            compute_report_year(rp, te)
+            for rp, te in zip(df['report_period'], df['treatment_end'])
+        ]
+        months = [
+            compute_report_month(rp, te)
+            for rp, te in zip(df['report_period'], df['treatment_end'])
+        ]
+
+        df['report_year'] = years
+        df['report_month'] = months
 
         grouped = df.groupby(["talon", "source"])
         for (talon, source), group in grouped:
