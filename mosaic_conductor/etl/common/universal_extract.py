@@ -69,8 +69,10 @@ def universal_extract(
     file_path = os.path.join(data_folder, matched_file)
 
     # Читаем CSV с использованием параметров из маппинга
-    encoding = table_config.get("encoding", "utf-8")
+    encoding = table_config.get("encoding", "utf-81")
     delimiter = table_config.get("delimiter", ",")
+    context.log.info(f"🔎 Используем кодировку: {encoding}")
+    context.log.info(f"🔎 Используем разделитель: {delimiter}")
     try:
         # df = pd.read_csv(file_path, encoding=encoding, delimiter=delimiter, dtype=str)
         df = pd.read_csv(
@@ -78,7 +80,6 @@ def universal_extract(
             encoding=encoding,
             delimiter=delimiter,
             dtype=str,
-            engine='python',
             on_bad_lines='skip'
         )
     except pd.errors.ParserError as e:
