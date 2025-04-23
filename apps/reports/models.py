@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from apps.data_loader.models.oms_data import OMSData
@@ -213,6 +214,15 @@ class Patient(models.Model):
     phone = models.CharField(max_length=20, verbose_name='Телефон')
     site = models.ForeignKey(Site, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Участок')
     groups = models.ManyToManyField(Group, blank=True, verbose_name='Группы')
+    is_parent = models.BooleanField('Родитель', default=False)
+    parents = models.ManyToManyField(
+        'self',
+        verbose_name='Родители',
+        symmetrical=False,
+        blank=True,
+        related_name='children',
+        limit_choices_to={'is_parent': True},
+    )
 
     class Meta:
         verbose_name = 'Пациент'
@@ -246,3 +256,56 @@ class PatientAction(models.Model):
 
     def __str__(self):
         return f"{self.patient.full_name} – {self.action.name}"
+
+
+INTAKE_CHOICES = [
+    ('oral', 'Перорально'),
+    ('inj', 'Инъекции'),
+]
+
+
+class DPChildDetail(models.Model):
+    """Дополнительная информация по детям‑инвалидам ЛЛО"""
+    patient = models.OneToOneField(
+        Patient,
+        on_delete=models.CASCADE,
+        related_name='dp_detail',
+        verbose_name='Пациент'
+    )
+    benefit = models.CharField('Льгота', max_length=200, blank=True)
+    drug = models.CharField('Препарат', max_length=200, blank=True)
+    remaining = models.PositiveIntegerField('Остаток (таб)', null=True, blank=True)
+    dose_per_day = models.DecimalField('Дозировка в день (таб)', max_digits=5, decimal_places=2, null=True, blank=True)
+    last_date = models.DateField('Дата последнего получения', null=True, blank=True)
+    last_dose = models.DecimalField('Дозировка в таблетках полученного в последний раз', max_digits=5, decimal_places=2,
+                                    null=True, blank=True)
+    supply_days = models.PositiveIntegerField('Обеспечение в днях', null=True, blank=True)
+    intake_type = models.CharField('Способ приёма', max_length=20, blank=True)
+    note = models.TextField('Примечание', blank=True)
+    created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    modified = models.DateTimeField(auto_now=True, verbose_name='Дата редактирования')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        editable=False,
+        verbose_name='Автор'
+    )
+
+    class Meta:
+        verbose_name = 'Дети‑инвалиды ЛЛО: детали'
+        verbose_name_plural = 'Дети‑инвалиды ЛЛО: реестр'
+
+    def is_low_stock(self):
+        return self.supply_days is not None and self.supply_days <= 3
+
+    is_low_stock.boolean = True
+
+
+class UserGroupAccess(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    group = models.ForeignKey(Group, verbose_name='Группа пациента', on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('user', 'group')
+        verbose_name = 'Доступ пользователя к группе'
+        verbose_name_plural = 'Доступы пользователей к группам'

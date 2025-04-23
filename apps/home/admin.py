@@ -4,6 +4,50 @@ from apps.home.models import *
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin, GroupAdmin as BaseGroupAdmin
 from unfold.admin import ModelAdmin, forms
+from django.contrib.admin.widgets import FilteredSelectMultiple
+from apps.reports.models import UserGroupAccess
+from apps.reports.models import Group as PatientGroup, UserGroupAccess
+
+
+class UserGroupsForm(forms.ModelForm):
+    patient_groups = forms.ModelMultipleChoiceField(
+        queryset=PatientGroup.objects.all(),
+        required=False,
+        widget=FilteredSelectMultiple('Группы пациентов', is_stacked=False),
+        label='Группы пациентов'
+    )
+
+    class Meta:
+        model = User
+        # перечисляем все нужные поля + patient_groups
+        fields = (
+            'username', 'password', 'first_name', 'last_name', 'email',
+            'is_active', 'is_staff', 'is_superuser', 'user_permissions',
+            'patient_groups',
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            # загружаем из UserGroupAccess уже назначенные группы
+            self.fields['patient_groups'].initial = (
+                UserGroupAccess.objects
+                .filter(user=self.instance)
+                .values_list('group_id', flat=True)
+            )
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        if commit:
+            user.save()
+        selected = self.cleaned_data['patient_groups']
+        # удаляем старые доступы, которых нет в выбранном списке
+        UserGroupAccess.objects.filter(user=user).exclude(group__in=selected).delete()
+        # создаём новые доступы
+        for g in selected:
+            UserGroupAccess.objects.get_or_create(user=user, group=g)
+        return user
+
 
 # Отменяем стандартную регистрацию
 admin.site.unregister(User)
@@ -13,16 +57,26 @@ admin.site.unregister(Group)
 @admin.register(User)
 class CustomUserAdmin(ModelAdmin, BaseUserAdmin):
     # берем стандартные формы
-    form = BaseUserAdmin.form
+    form = UserGroupsForm
     add_form = BaseUserAdmin.add_form
-
-    # на change: те же секции, что в BaseUserAdmin
-    fieldsets = BaseUserAdmin.fieldsets
+    fieldsets = BaseUserAdmin.fieldsets + (
+        ('Доступ к группам пациентов', {
+            'classes': ('collapse',),
+            'fields': ('patient_groups',),
+        }),
+    )
     # на add: тоже показываем все секции сразу
     add_fieldsets = BaseUserAdmin.fieldsets
 
-    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'get_patient_groups')
     search_fields = ('username', 'email', 'first_name', 'last_name')
+
+    def get_patient_groups(self, obj):
+        return ", ".join(
+            obj.usergroupaccess_set.values_list('group__name', flat=True)
+        )
+
+    get_patient_groups.short_description = 'Группы пациентов'
 
 
 @admin.register(Group)

@@ -8,7 +8,7 @@ from import_export.admin import ImportExportModelAdmin
 from unfold.admin import ModelAdmin
 
 from apps.reports.models import DeleteEmd, InvalidationReason, SVOMember, SVOMemberOMSData, PatientAction, Patient, \
-    Site, ActionType, Group
+    Site, ActionType, Group, DPChildDetail, UserGroupAccess
 from apps.reports.resources import PatientResource
 
 
@@ -219,6 +219,8 @@ class PatientActionInline(admin.TabularInline):
     # Отобразим поле, чтобы видеть группу действия (только для чтения)
     readonly_fields = ('action_group',)
     fields = ('action_group', 'action', 'done', 'done_datetime', 'comment')
+    ordering = ('done_datetime',)
+    ordering_field = 'done_datetime'
 
     def action_group(self, obj):
         """
@@ -227,17 +229,87 @@ class PatientActionInline(admin.TabularInline):
         if obj.action:
             return obj.action.group.name
         return "-"
+
     action_group.short_description = 'Группа действия'
+
+
+class DPChildDetailInline(admin.StackedInline):
+    model = DPChildDetail
+    can_delete = False
+    extra = 0
+    verbose_name = 'Детали ЛЛО'
+    verbose_name_plural = 'Дети‑инвалиды ЛЛО: детали'
+    readonly_fields = ('created', 'modified', 'created_by')
+    ordering_field = None
+
 
 
 @admin.register(Patient)
 class PatientAdmin(ImportExportModelAdmin, ModelAdmin):
-    resource_class = PatientResource      # указываем ресурс
-    list_display = ('full_name', 'date_of_birth', 'enp', 'gender', 'phone', 'site', 'get_groups')
+    resource_class = PatientResource  # указываем ресурс
+    list_display = ('full_name', 'date_of_birth', 'enp', 'gender', 'phone', 'site', 'is_parent', 'get_groups')
     list_filter = ('gender', 'groups', 'site')
+    list_editable = ('is_parent',)
     search_fields = ('full_name', 'phone', 'address', 'enp')
-    inlines = [PatientActionInline]       # ваш inline для PatientAction
+
+    # inlines = [PatientActionInline]  # ваш inline для PatientAction
+
+    def get_parents(self, obj):
+        return ", ".join(p.full_name for p in obj.parents.all())
+
+    get_parents.short_description = 'Родители'
 
     def get_groups(self, obj):
         return ", ".join(g.name for g in obj.groups.all())
+
     get_groups.short_description = 'Группы'
+
+    def get_inline_instances(self, request, obj=None):
+        """
+        Динамически подключаем инлайны в зависимости от прав:
+          - patient_action: если есть perm 'reports.view_patientaction'
+          - dp_detail:      если есть perm 'reports.view_dpchilddetail'
+        """
+        inlines = []
+        if request.user.has_perm('reports.view_patientaction'):
+            inlines.append(PatientActionInline(self.model, self.admin_site))
+        if request.user.has_perm('reports.view_dpchilddetail'):
+            inlines.append(DPChildDetailInline(self.model, self.admin_site))
+        return inlines
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        # показываем только пациентов из тех групп, к которым у user есть доступ
+        allowed = request.user.usergroupaccess_set.values_list('group_id', flat=True)
+        return qs.filter(groups__in=allowed).distinct()
+
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        if db_field.name == 'groups' and not request.user.is_superuser:
+            allowed = request.user.usergroupaccess_set.values_list('group_id', flat=True)
+            kwargs['queryset'] = db_field.related_model.objects.filter(id__in=allowed)
+        if db_field.name == 'parents':
+            kwargs['queryset'] = Patient.objects.filter(is_parent=True)
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
+
+    # импорт/экспорт
+    def get_export_queryset(self, request, queryset):
+        if request.user.is_superuser:
+            return queryset
+        allowed = request.user.usergroupaccess_set.values_list('group_id', flat=True)
+        return queryset.filter(groups__in=allowed).distinct()
+
+    def get_export_resource_kwargs(self, request, *args, **kwargs):
+        return {'context': {'request': request}}
+
+
+@admin.register(DPChildDetail)
+class DPChildDetailAdmin(ModelAdmin):
+    readonly_fields = ('created', 'modified', 'created_by')
+    exclude = ()  # если хотите вовсе скрыть created_by из форм
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
