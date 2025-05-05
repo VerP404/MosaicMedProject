@@ -131,6 +131,12 @@ iszl_job_dn = create_etl_job(
     "iszl/dn",
     "mapping.json",
 )
+iszl_job_dn_work = create_etl_job(
+    "iszl_job_dn_work",
+    "load_data_dn_work_iszl",
+    "iszl/dn_work",
+    "mapping.json",
+)
 iszl_job_people = create_etl_job(
     "iszl_job_people",
     "load_data_iszl_population",
@@ -185,6 +191,7 @@ kvazar_jobs = [
     kvazar_job_death,
     kvazar_job_reference,
     iszl_job_dn,
+    iszl_job_dn_work,
     iszl_job_people,
     wo_old_job_talon,
     wo_old_job_doctors,

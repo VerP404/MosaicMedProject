@@ -40,6 +40,7 @@ class Talon(TimeStampedModel):
         db_index=True,
         verbose_name="ИД источника"
     )
+    place_service = models.CharField(max_length=255, default='-')
     account_number = models.CharField(max_length=255, default='-')
     upload_date = models.CharField(max_length=255, default='-')
     status = models.CharField(max_length=255, default='-')
@@ -110,6 +111,7 @@ class ComplexTalon(TimeStampedModel):
         db_index=True,
         verbose_name="ИД источника"
     )
+    place_service = models.CharField(max_length=255, default='-')
     account_number = models.CharField(max_length=255, default='-')
     upload_date = models.CharField(max_length=255, default='-')
     status = models.CharField(max_length=255, default='-')
@@ -304,6 +306,7 @@ class ElectronicMedicalDocument(TimeStampedModel):
         db_index=True,
         related_name='emds',
     )
+
     def __str__(self):
         return f"{self.epmd_id} - {self.patient}"
 
@@ -574,3 +577,29 @@ class JournalAppeals(models.Model):
         verbose_name = "Обращение"
         verbose_name_plural = "Обращения"
         unique_together = (("enp", "employee_last_name", "acceptance_date"),)
+
+
+class DispanseryWorkISZL(TimeStampedModel):
+    external_id = models.CharField("id", max_length=50, unique=True)
+    mo_prof_m = models.CharField("МО проф.м.", max_length=255, default='-')
+    mo_prikreplenia = models.CharField("МО прикрепления", max_length=255, default='-')
+    org_prof_m = models.CharField("Организация Проф.м.", max_length=255, default='-')
+    address = models.CharField("Адрес", max_length=255, default='-')
+    fio = models.CharField("Ф.И.О.", max_length=255, default='-')
+    dr = models.CharField("Д.Р.", max_length=50, default='-')
+    enp = models.CharField("ЕНП", max_length=50, default='-')
+    ds = models.CharField("DS", max_length=50, default='-')
+    date = models.CharField("Дата", max_length=50, default='-')
+    time = models.CharField("Время", max_length=50, default='-')
+    inf = models.CharField("Инф.", max_length=255, default='-')
+    fact = models.CharField("Факт", max_length=255, default='-')
+    smo = models.CharField("СМО", max_length=50, default='-')
+    date_change_operator = models.CharField("Дата изм./Оператор", max_length=255, default='-')
+
+    def __str__(self):
+        return f"{self.external_id} — {self.fio}"
+
+    class Meta:
+        db_table = "load_data_dn_work_iszl"
+        verbose_name = "МО – профиль и прикрепление"
+        verbose_name_plural = "МО – профиль и прикрепление"

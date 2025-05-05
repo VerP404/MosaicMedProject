@@ -428,6 +428,34 @@
       "encoding": "cp1251",
       "delimiter": ";"
     },
+    "load_data_dn_work_iszl": {
+      "file": {
+        "file_pattern": "Report*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "id": "external_id",
+        "МО проф.м.": "mo_prof_m",
+        "МО прикрепления": "mo_prikreplenia",
+        "Организация Проф.м.": "org_prof_m",
+        "Адрес": "address",
+        "Ф.И.О.": "fio",
+        "Д.Р.": "dr",
+        "ЕНП": "enp",
+        "DS": "ds",
+        "Дата": "date",
+        "Время": "time",
+        "Инф.": "inf",
+        "Факт": "fact",
+        "СМО": "smo",
+        "Дата изм./Оператор": "date_change_operator"
+      },
+      "column_check": [
+        "external_id"
+      ],
+      "encoding": "cp1251",
+      "delimiter": ";"
+    },
     "load_data_journal_appeals": {
       "file": {
         "file_pattern": "Обращ*",
