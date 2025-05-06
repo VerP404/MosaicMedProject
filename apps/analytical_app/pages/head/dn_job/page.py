@@ -445,7 +445,87 @@ head_dn_job = html.Div([
                                 ),
                             ]
                         ),
-
+                        dbc.Tab(
+                            label="Охват",
+                            tab_id="tab-coverage",
+                            children=[
+                                dbc.Row(
+                                    [
+                                        dbc.Col(
+                                            dbc.Card(
+                                                [
+                                                    dbc.CardHeader("Охват работающего населения"),
+                                                    dbc.CardBody(
+                                                        html.H2(
+                                                            id=f"coverage-output-{type_page}",
+                                                            className="text-center fw-bold"
+                                                        )
+                                                    )
+                                                ],
+                                                color="info",
+                                                inverse=True,
+                                                className="h-100"
+                                            ),
+                                            width=3
+                                        ),
+                                        dbc.Col(
+                                            dbc.Card(
+                                                [
+                                                    dbc.CardHeader("Уникальные пациенты в ИСЗЛ"),
+                                                    dbc.CardBody(
+                                                        html.H2(
+                                                            id=f"coverage-iszl-output-{type_page}",
+                                                            className="text-center fw-bold"
+                                                        )
+                                                    )
+                                                ],
+                                                color="secondary",
+                                                inverse=True,
+                                                className="h-100"
+                                            ),
+                                            width=3
+                                        ),
+                                        dbc.Col(
+                                            dbc.Card(
+                                                [
+                                                    dbc.CardHeader(
+                                                        "Уникальные пациенты  в талонах по месту работы (17)"),
+                                                    dbc.CardBody(
+                                                        html.H2(
+                                                            id=f"coverage-work-output-{type_page}",
+                                                            className="text-center fw-bold"
+                                                        )
+                                                    )
+                                                ],
+                                                color="warning",
+                                                inverse=True,
+                                                className="h-100"
+                                            ),
+                                            width=3
+                                        ),
+                                        dbc.Col(
+                                            dbc.Card(
+                                                [
+                                                    dbc.CardHeader("Уникальные пациенты  в талонах по месту работы (17) - оплаченные"),
+                                                    dbc.CardBody(
+                                                        html.H2(
+                                                            id=f"coverage-work-paid-output-{type_page}",
+                                                            className="text-center fw-bold"
+                                                        )
+                                                    )
+                                                ],
+                                                color="success",
+                                                inverse=True,
+                                                className="h-100"
+                                            ),
+                                            width=3
+                                        ),
+                                    ],
+                                    className="mb-3",
+                                    align="center"
+                                )
+                            ]
+                        ),
                     ]
                 )
             ),
@@ -504,15 +584,15 @@ def _update_org_options(year):
 
 # 1) Загрузка всех данных по году (без фильтра по организации)
 @app.callback(
-    Output(f"store-{type_page}",             "data"),
-    Output(f"loading-{type_page}",           "children"),
-    Output(f"last-updated-dn-{type_page}",    "children"),
+    Output(f"store-{type_page}", "data"),
+    Output(f"loading-{type_page}", "children"),
+    Output(f"last-updated-dn-{type_page}", "children"),
     Output(f"last-updated-talons-{type_page}", "children"),
-    Output(f"last-updated-main-{type_page}",  "children"),
-    Input(f"btn-get-{type_page}",            "n_clicks"),
-    State(f"dropdown-year-{type_page}",      "value"),
-    State(f"status-selection-mode-{type_page}",      "value"),
-    State(f"status-group-radio-{type_page}",         "value"),
+    Output(f"last-updated-main-{type_page}", "children"),
+    Input(f"btn-get-{type_page}", "n_clicks"),
+    State(f"dropdown-year-{type_page}", "value"),
+    State(f"status-selection-mode-{type_page}", "value"),
+    State(f"status-group-radio-{type_page}", "value"),
     State(f"status-individual-dropdown-{type_page}", "value"),
 )
 def load_all(n_clicks, year, mode, sel_group, sel_ind):
@@ -936,3 +1016,69 @@ def toggle_help(n_clicks, is_open):
     if n_clicks:
         return not is_open
     return is_open
+
+
+@app.callback(
+    Output(f"coverage-output-{type_page}",            "children"),
+    Output(f"coverage-iszl-output-{type_page}",       "children"),
+    Output(f"coverage-work-output-{type_page}",       "children"),
+    Output(f"coverage-work-paid-output-{type_page}",  "children"),
+    Input(f"dropdown-year-{type_page}",               "value"),
+)
+def update_coverage_all(year):
+    if not year:
+        return "", "", "", ""
+
+    sql_cov = f"""
+    WITH base AS (
+      SELECT
+        enp,
+        {year} - EXTRACT(YEAR FROM to_date(birth_date, 'DD-MM-YYYY')) AS age,
+        gender
+      FROM load_data_talons
+      WHERE goal = '3'
+        AND EXTRACT(YEAR FROM to_date(treatment_end, 'DD-MM-YYYY')) = {year}
+    )
+    SELECT COUNT(DISTINCT enp) AS patient_count
+    FROM base
+    WHERE (gender = 'М' AND age < 65)
+       OR (gender = 'Ж' AND age < 60)
+    """
+    df_cov = pd.read_sql(sql_cov, con=engine)
+    cov_count = int(df_cov["patient_count"].iloc[0]) if not df_cov.empty else 0
+
+    sql_iszl = f"""
+    SELECT COUNT(DISTINCT enp) AS patient_count
+    FROM load_data_dn_work_iszl
+    WHERE EXTRACT(YEAR FROM TO_TIMESTAMP(date, 'DD.MM.YYYY HH24:MI:SS')) = {year}
+    """
+    df_iszl = pd.read_sql(sql_iszl, con=engine)
+    iszl_count = int(df_iszl["patient_count"].iloc[0]) if not df_iszl.empty else 0
+
+    sql_work = f"""
+    SELECT COUNT(DISTINCT enp) AS patient_count
+    FROM load_data_talons
+    WHERE goal = '3'
+      AND EXTRACT(YEAR FROM TO_DATE(treatment_end, 'DD-MM-YYYY')) = {year}
+      AND place_service = '17'
+    """
+    df_work = pd.read_sql(sql_work, con=engine)
+    work_count = int(df_work["patient_count"].iloc[0]) if not df_work.empty else 0
+
+    sql_work_paid = f"""
+    SELECT COUNT(DISTINCT enp) AS patient_count
+    FROM load_data_talons
+    WHERE goal = '3'
+      AND EXTRACT(YEAR FROM TO_DATE(treatment_end, 'DD-MM-YYYY')) = {year}
+      AND place_service = '17'
+      AND status = '3'
+    """
+    df_work_paid = pd.read_sql(sql_work_paid, con=engine)
+    work_paid_count = int(df_work_paid["patient_count"].iloc[0]) if not df_work_paid.empty else 0
+
+    return (
+        f"{cov_count} чел.",
+        f"{iszl_count} чел.",
+        f"{work_count} чел.",
+        f"{work_paid_count} чел."
+    )
