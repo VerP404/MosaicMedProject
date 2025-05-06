@@ -9,7 +9,7 @@ from dagster import sensor, RunRequest, SkipReason
 from config.settings import ORGANIZATIONS
 from mosaic_conductor.etl.kvazar import kvazar_job_eln, kvazar_job_emd, kvazar_job_recipes, kvazar_job_death, \
     kvazar_job_reference, iszl_job_dn, wo_old_job_talon, wo_old_job_doctors, wo_job_talon, wo_job_doctors, \
-    wo_job_detailed
+    wo_job_detailed, iszl_job_dn_work
 
 MIN_FILE_AGE_SECONDS = 30
 
@@ -207,6 +207,14 @@ iszl_sensor_dn = create_sensor(
     "mosaic_conductor/etl/config/mapping.json"
 )
 
+iszl_sensor_dn_work = create_sensor(
+    iszl_job_dn_work,
+    "iszl_sensor_dn_work",
+    "ИСЗЛ: Диспансерное наблюдение по месту работы",
+    "mosaic_conductor/etl/data/iszl/dn_work",
+    "load_data_dn_work_iszl",
+    "mosaic_conductor/etl/config/mapping.json"
+)
 wo_old_sensor_talon = create_sensor(
     wo_old_job_talon,
     "wo_old_sensor_talon",
