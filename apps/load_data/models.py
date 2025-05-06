@@ -603,3 +603,62 @@ class DispanseryWorkISZL(TimeStampedModel):
         db_table = "load_data_dn_work_iszl"
         verbose_name = "МО – профиль и прикрепление"
         verbose_name_plural = "МО – профиль и прикрепление"
+
+
+class OmsData(TimeStampedModel):
+    talon = models.CharField("Талон", max_length=255, default='-')
+    month = models.CharField("Месяц", max_length=20, default='-')
+    report_month = models.IntegerField("Номер месяца", default=0)
+    report_year = models.IntegerField("Год отчёта", default=0)
+    source_id = models.CharField("ИД источника", max_length=255, default='-', db_index=True)
+    place_service = models.CharField("Место обслуживания", max_length=255, default='-')
+    status = models.CharField("Статус", max_length=255, default='-')
+    goal = models.CharField("Цель", max_length=255, default='-')
+    patient = models.CharField("Пациент", max_length=255, default='-')
+    birth_date = models.DateField("Дата рождения", null=True, blank=True)
+    treatment_start = models.DateField("Начало лечения", null=True, blank=True)
+    treatment_end = models.DateField("Окончание лечения", null=True, blank=True)
+    age = models.IntegerField("Возраст", default=0)
+    gender = models.CharField("Пол", max_length=50, default='-')
+    enp = models.CharField("ЕНП", max_length=255, default='-')
+    smo_code = models.CharField("Код СМО", max_length=255, default='-')
+    inogorodniy = models.BooleanField("Иногородний", default=False)
+    visits = models.IntegerField("Визиты", default=0)
+    mo_visits = models.IntegerField("Визиты в МО", default=0)
+    home_visits = models.IntegerField("Визиты на дому", default=0)
+    main_diagnosis_code = models.CharField("Код основного диагноза", max_length=50, default='-')
+    additional_diagnosis_codes = models.CharField("Коды доп. диагнозов", max_length=255, default='-')
+    initial_input_date = models.DateField("Дата ввода", null=True, blank=True)
+    last_change_date = models.DateField("Дата изменения", null=True, blank=True)
+    amount_numeric = models.DecimalField("Сумма", max_digits=12, decimal_places=2, default=0)
+    sanctions = models.CharField("Санкции", max_length=255, default='-')
+    ksg = models.CharField("КСГ", max_length=255, default='-')
+    department_id = models.IntegerField("ID отделения", default=0)
+    department = models.CharField("Отделение", max_length=255, default='-')
+    building_id = models.IntegerField("ID корпуса", default=0)
+    building = models.CharField("Корпус", max_length=255, default='-')
+    doctor_code = models.CharField("Код врача", max_length=255, default='-')
+    doctor_id = models.IntegerField("ID врача", default=0)
+    doctor = models.CharField("Врач", max_length=255, default='-')
+    specialty = models.CharField("Специальность", max_length=255, default='-')
+    profile = models.CharField("Профиль", max_length=255, default='-')
+    profile_id = models.IntegerField("ID профиля", default=0)
+    health_group = models.CharField("Группа здоровья", max_length=255, default='-')
+    attached = models.BooleanField("Прикреплен", default=True)
+
+    class Meta:
+        db_table = "load_data_oms_data"
+        verbose_name = "ОМС: Сводные данные"
+        verbose_name_plural = "ОМС: Сводные данные"
+        # Обычные индексы для ускорения поиска
+        indexes = [
+            models.Index(fields=["source_id"], name="omsdata_source_id_idx"),
+            models.Index(fields=["doctor_code"], name="omsdata_doctor_code_idx"),
+        ]
+        # Уникальное ограничение, аналогично ComplexTalon.unique_together
+        constraints = [
+            models.UniqueConstraint(
+                fields=["talon", "source_id", "doctor_code"],
+                name="omsdata_talon_src_doc_uniq"
+            ),
+        ]

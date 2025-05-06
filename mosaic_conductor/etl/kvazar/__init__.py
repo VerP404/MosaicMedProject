@@ -10,6 +10,7 @@ from .transform import kvazar_transform
 from .update import update_personnel_op
 from .update_emd_talon import update_emd_talon_id_op
 from .update_error import update_error_log_is_fixed_op
+from .update_oms_data import update_oms_data_op
 
 kvazar_assets = [
     kvazar_db_check,
@@ -67,7 +68,7 @@ def create_etl_job(
         },
     }
     # Если дополнительная операция передана, добавляем её конфигурацию
-    if op_fn is not None:
+    if op_fn is not None and op_config is not None:
         op_name = getattr(op_fn, "__name__", "op_fn")
         job_ops[op_name] = {"config": op_config or {}}
 
@@ -155,13 +156,20 @@ wo_old_job_doctors = create_etl_job(
     "weboms/doctor/old",
     "oms_old_mapping.json",
 )
+
+
+def update_talon_and_oms(load_result):
+    emd_result = update_emd_talon_id_op(load_result)
+    oms_result = update_oms_data_op(emd_result)
+    return oms_result
+
+
 wo_job_talon = create_etl_job(
     "wo_job_talon",
     "load_data_talons",
     "weboms/talon/new",
     "oms_mapping.json",
-    op_fn=update_emd_talon_id_op,
-    op_config={}
+    op_fn=update_talon_and_oms,
 )
 
 wo_job_detailed = create_etl_job(
