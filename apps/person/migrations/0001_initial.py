@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('organizations', '0001_initial'),
+        ('organization', '0001_initial'),
     ]
 
     operations = [
@@ -70,7 +70,7 @@ class Migration(migrations.Migration):
                 ('start_date', models.DateField(verbose_name='Дата начала прикрепления')),
                 ('end_date', models.DateField(blank=True, null=True, verbose_name='Дата окончания прикрепления')),
                 ('report_date', models.DateField(verbose_name='Дата отчёта')),
-                ('station', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='organizations.station', verbose_name='Участок')),
+                ('station', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='organization.station', verbose_name='Участок')),
                 ('physical_person', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='person.physicalperson', verbose_name='Физическое лицо')),
             ],
             options={

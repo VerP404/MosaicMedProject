@@ -2,7 +2,6 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
-from apps.kadry.models import DoctorCode
 from apps.person.models import PhysicalPerson
 
 
@@ -84,11 +83,6 @@ class Ticket(models.Model):
     ksg = models.CharField("КСГ", max_length=255, blank=True, null=True)
     amount = models.DecimalField("Сумма", max_digits=10, decimal_places=2)
     sanctions = models.DecimalField("Санкции", max_digits=10, decimal_places=2)
-    doctor_code = models.ForeignKey(
-        DoctorCode,
-        on_delete=models.CASCADE,
-        verbose_name="Код врача"
-    )
     formation_date = models.DateField("Дата формирования")
     change_date = models.DateField("Дата изменения")
     updated = models.DateTimeField("Обновлено", default=timezone.now)

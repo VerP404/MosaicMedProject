@@ -11,7 +11,6 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('kadry', '0002_initial'),
         ('person', '0001_initial'),
     ]
 
@@ -75,7 +74,6 @@ class Migration(migrations.Migration):
                 ('change_date', models.DateField(verbose_name='Дата изменения')),
                 ('updated', models.DateTimeField(default=django.utils.timezone.now, verbose_name='Обновлено')),
                 ('blocked', models.BooleanField(default=False, verbose_name='Заблокировано')),
-                ('doctor_code', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='kadry.doctorcode', verbose_name='Код врача')),
                 ('goal', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='talon.goal', verbose_name='Цель')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='person.physicalperson', verbose_name='Пациент')),
                 ('source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='talon.source', verbose_name='Источник')),
