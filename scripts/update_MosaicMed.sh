@@ -2,6 +2,9 @@
 
 # Определение лог-файла с временной меткой для текущего обновления
 LOG_FILE="/tmp/update_MosaicMed_$(date +'%Y%m%d_%H%M%S').log"
+echo "[INFO] Очистка /tmp..."
+find /tmp -mindepth 1 ! -name "$(basename "$LOG_FILE")" -exec rm -rf {} +
+echo "[INFO] Очистка /tmp завершена."
 # Перенаправление STDOUT и STDERR только для этапов обновления, фоновые процессы будут иметь отдельное перенаправление
 exec > >(tee -a "$LOG_FILE") 2>&1
 
