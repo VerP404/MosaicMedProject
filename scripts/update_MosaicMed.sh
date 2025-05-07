@@ -2,9 +2,7 @@
 
 # Определение лог-файла с временной меткой для текущего обновления
 LOG_FILE="/tmp/update_MosaicMed_$(date +'%Y%m%d_%H%M%S').log"
-echo "[INFO] Очистка /tmp..."
-find /tmp -mindepth 1 ! -name "$(basename "$LOG_FILE")" -exec rm -rf {} +
-echo "[INFO] Очистка /tmp завершена."
+
 # Перенаправление STDOUT и STDERR только для этапов обновления, фоновые процессы будут иметь отдельное перенаправление
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -12,7 +10,9 @@ echo "=============================================="
 echo "Начало выполнения скрипта обновления: $(date)"
 echo "Лог обновления записывается в: $LOG_FILE"
 echo "=============================================="
-
+echo "[INFO] Очистка /tmp..."
+find /tmp -mindepth 1 -not -name "$(basename "$LOG_FILE")" -exec rm -rf {} + 2>/dev/null
+echo "[INFO] Очистка /tmp завершена."
 # Определение директории, в которой находится скрипт
 echo "[INFO] Определяем директорию скрипта..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
