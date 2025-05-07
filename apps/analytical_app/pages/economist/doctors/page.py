@@ -202,7 +202,7 @@ def update_table(n_clicks, selected_period, selected_year, status_mode, selected
         selected_status_values = selected_individual_statuses if selected_individual_statuses else []
     selected_status_tuple = tuple(selected_status_values)
 
-    sql_cond = ', '.join([f"'{period}'" for period in selected_period])
+    sql_cond = ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)])
 
     sql_query = sql_query_by_doc(sql_cond, selected_year)
 

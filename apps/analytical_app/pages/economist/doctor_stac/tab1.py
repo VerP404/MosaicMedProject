@@ -238,10 +238,8 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
             '%d-%m-%Y')
         end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
             '%d-%m-%Y')
-
     # Формируем строку для фильтрации по месяцам
-    sql_cond = ', '.join([f"'{period}'" for period in selected_period])
-
+    sql_cond = ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)])
     # Подготавливаем параметры для bind-переменных, включая status_list
     bind_params = {
         'status_list': selected_status_tuple
@@ -285,7 +283,6 @@ def update_table(n_clicks, selected_period, selected_year, inogorodniy, sanction
         ),
         bind_params
     )
-
     columns3, data3 = TableUpdater.query_to_df(
         engine,
         sql_query_doc_stac(

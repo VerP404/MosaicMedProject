@@ -180,7 +180,7 @@ def update_table(n_clicks, selected_period, selected_type_dv, selected_year, sel
     selected_type_dv_tuple = tuple(selected_type_dv)
 
     # Передаем также selected_buildings в функцию sql_query_disp_dv4
-    sql_cond = ', '.join([f"'{period}'" for period in selected_period])
+    sql_cond = ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)])
     sql_query = sql_query_stac(sql_cond, selected_year, selected_buildings)
 
     bind_params = {
