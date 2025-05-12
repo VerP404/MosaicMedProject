@@ -29,7 +29,26 @@ adults_dv10 = html.Div(
                 dbc.Card(
                     dbc.CardBody(
                         [
-                            dbc.CardHeader("Фильтры"),
+                            dbc.CardHeader(
+                                dbc.Row(
+                                    [
+                                        dbc.Col(html.H5("Фильтры", className="mb-0"), width="auto"),
+                                        dbc.Col(
+                                            html.Div(
+                                                id=f"last-updated-main-{type_page}",
+                                                style={
+                                                    "textAlign": "right",
+                                                    "fontSize": "0.8rem",
+                                                    "color": "#666"
+                                                },
+                                            ),
+                                            width=True
+                                        ),
+                                    ],
+                                    align="center",
+                                    justify="between",
+                                )
+                            ),
                             dbc.Row(
                                 [
                                     dbc.Col(update_buttons(type_page), width=2),
@@ -106,6 +125,37 @@ adults_dv10 = html.Div(
     ],
     style={"padding": "0rem"},
 )
+
+
+@app.callback(
+    Output(f"dropdown-health-group-{type_page}", "value"),
+    Input(f"dropdown-health-group-{type_page}", "value"),
+)
+def _enforce_single_special(vals):
+    if not vals:
+        return []
+
+    if "all" in vals and len(vals) > 1:
+        return ["all"]
+        # Если выбрано "С группой" вместе с чем-то — только "with"
+    if "with" in vals and len(vals) > 1:
+        return ["with"]
+    return vals
+
+
+@app.callback(
+    Output(f"last-updated-main-{type_page}", "children"),
+    Input(f"update-button-{type_page}", "n_clicks"),
+    prevent_initial_call=True
+)
+def _update_last_updated(n):
+    # Берём максимальный updated_at из нужной таблицы
+    sql = text("SELECT MAX(updated_at) FROM load_data_detailed_medical_examination")
+    with engine.connect() as conn:
+        row = conn.execute(sql).fetchone()
+    if row and row[0]:
+        return "Детализация обновлена: " + row[0].strftime("%d.%m.%Y %H:%M")
+    return ""
 
 
 @app.callback(
@@ -228,8 +278,16 @@ def render_tab10_table_and_export(
 
     # health_group
     if health_groups:
-        hg_q = ",".join(f"'{hg}'" for hg in health_groups)
-        conds.append(f"health_group IN ({hg_q})")
+        # «all» — ничего не фильтруем (все, включая '-')
+        if "all" in health_groups:
+            pass
+        # «with» — все, у кого есть группа (не '-')
+        elif health_groups == ["with"]:
+            conds.append("health_group <> '-'")
+        # конкретные значения — выбираем их (возможно, включая '-')
+        else:
+            values = ", ".join(f"'{hg}'" for hg in health_groups)
+            conds.append(f"health_group IN ({values})")
 
     where = " AND ".join(conds)
 

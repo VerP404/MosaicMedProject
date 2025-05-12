@@ -594,27 +594,35 @@ def parse_doctor_ids(doctor_value):
 
 
 def filter_health_group(page):
-    # Получаем уникальные Группы здоровья по нужным целям
+    # 1) Получаем все группы из БД (включая "-")
     sql = text("""
         SELECT DISTINCT health_group
         FROM load_data_oms_data
         WHERE goal IN ('ДВ4','ДВ2','ОПВ','УД1','УД2','ДР1','ДР2')
         ORDER BY health_group
     """)
+    with engine.connect() as conn:
+        groups = [row[0] for row in conn.execute(sql).fetchall()]
 
-    # Открываем соединение и выполняем запрос
-    with engine.connect() as connection:
-        result = connection.execute(sql)
-        groups = [row[0] for row in result.fetchall()]
+    # 2) Формируем опции: сначала «С группой», потом реальные значения
+    options = [
+        {"label": "С группой", "value": "with"},
+        {"label": "Все", "value": "all"},
+    ] + [{"label": g, "value": g} for g in groups]
 
-    options = [{"label": g, "value": g} for g in groups]
+    # 3) По-умолчанию «С группой»
+    default = ["with"]
 
     return html.Div([
         html.Label("Группа здоровья", style={"font-weight": "bold"}),
         dcc.Dropdown(
             id=f"dropdown-health-group-{page}",
             options=options,
+            value=default,
             multi=True,
-            placeholder="Все группы"
+            clearable=False,
+            placeholder="Выберите группу",
+            style={"whiteSpace": "normal"},
+            optionHeight=70
         )
     ])
