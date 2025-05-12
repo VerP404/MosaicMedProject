@@ -177,6 +177,7 @@ wo_job_detailed = create_etl_job(
     "load_data_detailed_medical_examination",
     "weboms/detailed",
     "oms_mapping.json",
+    op_fn=update_talon_and_oms,
 )
 wo_job_errorlog = create_etl_job(
     "wo_job_errorlog",
