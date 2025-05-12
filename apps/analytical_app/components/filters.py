@@ -591,3 +591,30 @@ def parse_doctor_ids(doctor_value):
     elif isinstance(doctor_value, str):
         doctor_ids = [int(x.strip()) for x in doctor_value.split(',') if x.strip().isdigit()]
     return doctor_ids
+
+
+def filter_health_group(page):
+    # Получаем уникальные Группы здоровья по нужным целям
+    sql = text("""
+        SELECT DISTINCT health_group
+        FROM load_data_oms_data
+        WHERE goal IN ('ДВ4','ДВ2','ОПВ','УД1','УД2','ДР1','ДР2')
+        ORDER BY health_group
+    """)
+
+    # Открываем соединение и выполняем запрос
+    with engine.connect() as connection:
+        result = connection.execute(sql)
+        groups = [row[0] for row in result.fetchall()]
+
+    options = [{"label": g, "value": g} for g in groups]
+
+    return html.Div([
+        html.Label("Группа здоровья", style={"font-weight": "bold"}),
+        dcc.Dropdown(
+            id=f"dropdown-health-group-{page}",
+            options=options,
+            multi=True,
+            placeholder="Все группы"
+        )
+    ])

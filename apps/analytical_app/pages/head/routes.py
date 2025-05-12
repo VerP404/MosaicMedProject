@@ -111,7 +111,7 @@ routes_head = {
         dbc.Breadcrumb(items=[
             {"label": "Заведующий", "href": "/head"},
             {"label": "Диспансеризация взрослых", "href": "/head/adults"},
-            {"label": "РЭМД диспансеризации", "active": True},
+            {"label": "По возрастам и группам здоровья", "active": True},
         ]),
         adults_dv10
     ]),

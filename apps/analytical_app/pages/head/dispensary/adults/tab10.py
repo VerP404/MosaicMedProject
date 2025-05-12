@@ -1,15 +1,11 @@
 # apps/analytical_app/pages/head/dispensary/adults/tab10-da.py
-
+import io
 from datetime import datetime
 
-import pandas as pd
 from dash import html, dcc, Input, Output, State, exceptions
 import dash_bootstrap_components as dbc
-from dash.exceptions import PreventUpdate
-from sqlalchemy import text
 
 from apps.analytical_app.app import app
-from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.components.filters import (
     update_buttons,
     filter_years,
@@ -21,10 +17,8 @@ from apps.analytical_app.components.filters import (
     date_picker,
     get_current_reporting_month,
     filter_status,
-    status_groups,
+    status_groups, filter_health_group,
 )
-from apps.analytical_app.elements import card_table
-from apps.analytical_app.query_executor import engine
 
 type_page = "tab10-da"
 
@@ -44,11 +38,15 @@ adults_dv10 = html.Div(
                                     dbc.Col(filter_inogorod(type_page), width=2),
                                     dbc.Col(filter_sanction(type_page), width=2),
                                     dbc.Col(filter_amount_null(type_page), width=2),
+                                    dbc.Col(html.Button("Выгрузить в Excel", id=f"btn-export-{type_page}", n_clicks=0,
+                                                        className="btn btn-outline-primary"), width="auto"),
+                                    dcc.Download(id=f"download-{type_page}")
                                 ]
                             ),
                             dbc.Row(
                                 [
-                                    dbc.Col(filter_months(type_page), width=12),
+                                    dbc.Col(filter_months(type_page), width=8),
+                                    dbc.Col(filter_health_group(type_page), width=4),
                                     dbc.Col(
                                         html.Label(
                                             "Выберите дату",
@@ -142,10 +140,24 @@ def _show_period(months, year):
     return f"Год: {year}, месяцы: {months}"
 
 
+from dash import no_update, callback_context
+from dash.dcc import send_data_frame, send_bytes
+from dash.exceptions import PreventUpdate
+import pandas as pd
+import datetime
+from sqlalchemy import text
+from apps.analytical_app.query_executor import engine
+
 
 @app.callback(
-    Output(f"table-container-{type_page}", "children"),
-    Input(f"update-button-{type_page}", "n_clicks"),
+    [
+        Output(f"table-container-{type_page}", "children"),
+        Output(f"download-{type_page}", "data"),
+    ],
+    [
+        Input(f"update-button-{type_page}", "n_clicks"),
+        Input(f"btn-export-{type_page}", "n_clicks"),
+    ],
     [
         State(f"range-slider-month-{type_page}", "value"),
         State(f"dropdown-year-{type_page}", "value"),
@@ -160,44 +172,68 @@ def _show_period(months, year):
         State(f"status-selection-mode-{type_page}", "value"),
         State(f"status-group-radio-{type_page}", "value"),
         State(f"status-individual-dropdown-{type_page}", "value"),
+        State(f"dropdown-health-group-{type_page}", "value"),
     ],
+    prevent_initial_call=True
 )
-def render_tab10_table(
-    n_clicks,
-    months, year, inog, sanc, amt_null,
-    start_input, end_input, start_treat, end_treat, report_type,
-    status_mode, status_group, status_indiv
+def render_tab10_table_and_export(
+        n_clicks_update, n_clicks_export,
+        selected_months, year, inog, sanc, amt_null,
+        start_input, end_input, start_treat, end_treat,
+        report_type, status_mode, status_group, status_indiv,
+        health_groups
 ):
-    if not n_clicks:
+    ctx = callback_context
+    if not ctx.triggered:
         raise PreventUpdate
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
 
-    # --- Собираем WHERE-условия ---
+    # --- собираем WHERE-условия ---
     conds = [f"report_year = {int(year)}", "age > 17"]
-    if report_type == "month" and months:
-        conds.append(f"report_month IN ({','.join(map(str,months))})")
+    if report_type == "month" and selected_months:
+        start, end = selected_months
+        conds.append(f"report_month BETWEEN {start} AND {end}")
     if report_type == "initial_input" and start_input and end_input:
-        conds.append(f"initial_input_date BETWEEN '{start_input[:10]}' AND '{end_input[:10]}'")
+        conds.append(
+            f"initial_input_date BETWEEN '{start_input[:10]}' AND '{end_input[:10]}'"
+        )
     if report_type == "treatment" and start_treat and end_treat:
-        conds.append(f"treatment_end BETWEEN '{start_treat[:10]}' AND '{end_treat[:10]}'")
-    if inog=="yes":   conds.append("inogorodniy = TRUE")
-    if inog=="no":    conds.append("inogorodniy = FALSE")
-    if sanc=="has":   conds.append("sanctions <> '-'")
-    if sanc=="none":  conds.append("(sanctions = '-' OR sanctions IS NULL)")
-    if amt_null=="null":     conds.append("amount_numeric IS NULL")
-    if amt_null=="not_null": conds.append("amount_numeric IS NOT NULL")
+        conds.append(
+            f"treatment_end BETWEEN '{start_treat[:10]}' AND '{end_treat[:10]}'"
+        )
+
+    if inog == '1':
+        conds.append("inogorodniy = FALSE")
+    elif inog == '2':
+        conds.append("inogorodniy = TRUE")
+
+    if sanc == '1':
+        conds.append("(sanctions = '-' OR sanctions IS NULL)")
+    elif sanc == '2':
+        conds.append("sanctions <> '-'")
+
+    if amt_null == '1':
+        conds.append("amount_numeric IS NOT NULL")
+    elif amt_null == '2':
+        conds.append("amount_numeric IS NULL")
 
     # статусы
-    if status_mode=="group":
+    if status_mode == "group":
         sts = status_groups.get(status_group, [])
     else:
         sts = status_indiv or []
     if sts:
-        quoted = ",".join(f"'{s}'" for s in sts)
-        conds.append(f"status IN ({quoted})")
+        q = ",".join(f"'{s}'" for s in sts)
+        conds.append(f"status IN ({q})")
+
+    # health_group
+    if health_groups:
+        hg_q = ",".join(f"'{hg}'" for hg in health_groups)
+        conds.append(f"health_group IN ({hg_q})")
 
     where = " AND ".join(conds)
 
-    # --- Основной SQL ---
+    # --- основной SQL (из вашего файла) ---
     sql = f"""
     SELECT
       age,
@@ -236,44 +272,70 @@ def render_tab10_table(
     GROUP BY age
     ORDER BY age;
     """
-
     df = pd.read_sql_query(text(sql), engine)
 
-    # --- Подготовка для dbc.Table.from_dataframe ---
+    # --- подготовка MultiIndex для отображения ---
     df = df.set_index("age")
     df.index.name = "Возраст"
-
     goal_map = {
-        "dv4":"ДВ4","dv2":"ДВ2","opv":"ОПВ",
-        "ud1":"УД1","ud2":"УД2","dr1":"ДР1","dr2":"ДР2"
+        "dv4": "ДВ4", "dv2": "ДВ2", "opv": "ОПВ",
+        "ud1": "УД1", "ud2": "УД2", "dr1": "ДР1", "dr2": "ДР2"
     }
-    suffix_map = {"ж":"Ж","м":"М","итог":"Итого"}
+    suffix_map = {"ж": "Ж", "м": "М", "итог": "Итого"}
 
-    # порядок и заголовки
-    tuples = []
-    cols = []
+    cols, tuples = [], []
     for p, gl in goal_map.items():
         for sk, sl in suffix_map.items():
-            c = f"{p}_{sk}"
-            if c in df.columns:
+            name = f"{p}_{sk}"
+            if name in df.columns:
+                cols.append(name)
                 tuples.append((gl, sl))
-                cols.append(c)
-    if "общий_итог" in df:
-        tuples.append(("Общий итог",""))
+    if "общий_итог" in df.columns:
         cols.append("общий_итог")
+        tuples.append(("Общий итог", ""))
 
     df = df[cols]
-    df.columns = pd.MultiIndex.from_tuples(tuples, names=["Цель","Пол/Итого"])
+    df.columns = pd.MultiIndex.from_tuples(tuples, names=["Цель", "Пол/Итого"])
 
-    # --- Финальный компонент ---
-    table = dbc.Table.from_dataframe(
-        df,
-        striped=True,
-        bordered=True,
-        hover=True,
-        index=True,
-        responsive=True
-    )
+    # --- возвращаем результат в зависимости от кнопки ---
+    if trigger == f"update-button-{type_page}":
+        table = dbc.Table.from_dataframe(
+            df, striped=True, bordered=True, hover=True, index=True, responsive=True
+        )
+        return table, no_update
 
-    return table
 
+
+    elif trigger == f"btn-export-{type_page}":
+        # подготавливаем табличные данные
+        flat = [" ".join(col).strip() for col in df.columns]
+        df.columns = flat
+        df.index.name = "Возраст"
+        # собираем параметры
+        start, end = selected_months or (None, None)
+        params = {
+            "Год": year,
+            "Период (месяцы)": f"{start}–{end}" if start and end else "",
+            "Тип отчёта": report_type,
+            "Иногородние": inog,
+            "Санкции": sanc,
+            "Сумма null": amt_null,
+            "Статус (режим)": status_mode,
+            "Статус (группа)": status_group,
+            "Статус (индив)": status_indiv,
+            "Группы здоровья": ", ".join(health_groups) if health_groups else "Все",
+        }
+
+        def to_excel(buffer):
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                df.to_excel(writer, sheet_name="Данные", index=True)
+                pd.DataFrame({
+                    "Параметр": list(params.keys()),
+                    "Значение": list(params.values())
+                }).to_excel(writer, sheet_name="Параметры", index=False)
+            buffer.seek(0)
+
+        filename = f"tab10_da_{datetime.datetime.now():%Y%m%d_%H%M}.xlsx"
+        return no_update, send_bytes(to_excel, filename)
+    else:
+        raise PreventUpdate
