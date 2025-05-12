@@ -1,6 +1,6 @@
 import os
 
-OMS_BROWSER = os.getenv("OMS_BROWSER")
-OMS_BASE_URL = os.getenv("OMS_BASE_URL")
-OMS_USERNAME = os.getenv("OMS_USERNAME")
-OMS_PASSWORD = os.getenv("OMS_PASSWORD")
+ISZL_BROWSER = os.getenv("ISZL_BROWSER")
+ISZL_BASE_URL = os.getenv("ISZL_BASE_URL")
+ISZL_USERNAME = os.getenv("ISZL_USERNAME")
+ISZL_PASSWORD = os.getenv("ISZL_PASSWORD")

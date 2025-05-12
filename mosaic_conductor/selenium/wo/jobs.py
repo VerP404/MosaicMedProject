@@ -3,7 +3,8 @@ from dagster import graph, in_process_executor, Field, Array, String, schedule
 
 from mosaic_conductor.selenium.wo.config import OMS_BROWSER, OMS_BASE_URL
 from mosaic_conductor.selenium.wo.ops.wo_start import open_site_op
-from mosaic_conductor.selenium.wo.ops.wo_filter import filter_input_op, filter_input_doctor_op, filter_input_detail_op
+from mosaic_conductor.selenium.wo.ops.wo_filter import filter_input_op, filter_input_doctor_op, filter_input_detail_op, \
+    filter_input_error_op
 from mosaic_conductor.selenium.wo.ops.wo_download import move_downloaded_file_op
 from mosaic_conductor.selenium.wo.selenium_driver import selenium_driver_resource
 
@@ -107,6 +108,20 @@ wo_download_detail_job = create_download_job(
     filter_input_op_fn=filter_input_detail_op,
     extra_filter_config={}
 )
+wo_download_error_job = create_download_job(
+    job_name="wo_download_error_job",
+    target_url=OMS_BASE_URL,
+    browser=OMS_BROWSER,
+    temp_download_folder=os.path.join(os.getcwd(), "uploads", "errorlog"),
+    destination_folders=[
+        os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "weboms", "errorlog"),
+    ],
+    file_pattern="journal_ErrorLog_*.csv",
+    filter_input_op_fn=filter_input_error_op,
+    extra_filter_config={}
+)
+
+
 @schedule(
     cron_schedule="0 7-21 * * *",
     job=wo_download_talon_job,
@@ -124,10 +139,20 @@ def selenium_wo_talon_schedule(_context):
 def selenium_wo_doctor_schedule(_context):
     return {}
 
+
 @schedule(
     cron_schedule="15 7,13 * * *",
     job=wo_download_detail_job,
     execution_timezone="Europe/Moscow"
 )
 def selenium_wo_detail_schedule(_context):
+    return {}
+
+
+@schedule(
+    cron_schedule="20 7-16 * * *",
+    job=wo_download_error_job,
+    execution_timezone="Europe/Moscow"
+)
+def selenium_wo_error_schedule(_context):
     return {}
