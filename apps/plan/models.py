@@ -3,6 +3,7 @@ from datetime import datetime
 from django.core.exceptions import ValidationError
 from django.db import models
 from dal import autocomplete
+from django.db.models import JSONField
 
 from apps.oms_reference.models import GeneralOMSTarget
 from apps.organization.models import Department, Building
@@ -667,3 +668,23 @@ class MonthlyDoctorPlan(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()  # Запускает clean() перед сохранением
         super().save(*args, **kwargs)
+
+
+
+class GoalGroupConfig(models.Model):
+    """
+    Одна запись — это конфигурация групп целей для конкретного проекта/сайта.
+    """
+    name = models.CharField(max_length=100, unique=True)
+    groups = models.TextField(default='{}',
+        help_text="Пример:\n"
+                  "{'Посещения': ['1','5','7','10'], 'Обращения':['30','301']}"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+    updated_at = models.DateTimeField(auto_now=True,     verbose_name="Дата изменения")
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Группы целей для талонов врачей"
+        verbose_name_plural = "Группы целей для талонов врачей"

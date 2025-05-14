@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     'import_export',
     'channels',
     'rest_framework',
-
+    'django_json_widget'
 ]
 
 MIDDLEWARE = [

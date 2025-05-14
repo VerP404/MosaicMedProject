@@ -4,11 +4,12 @@ from datetime import datetime
 from dal import autocomplete
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Q, JSONField
 from django.utils.html import format_html
 from django.urls import reverse
 from django import forms
 from django.db import models
+from django_json_widget.widgets import JSONEditorWidget
 from import_export.widgets import ManyToManyWidget, ForeignKeyWidget
 
 from unfold.admin import ModelAdmin, TabularInline
@@ -20,7 +21,7 @@ from .forms import GroupIndicatorsForm
 from .models import (
     GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition,
     AnnualPlan, BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan,
-    GroupBuildingDepartment, ChiefDashboard, MonthlyDoctorPlan, AnnualDoctorPlan
+    GroupBuildingDepartment, ChiefDashboard, MonthlyDoctorPlan, AnnualDoctorPlan, GoalGroupConfig
 )
 from .utils import copy_filters_to_new_year
 from ..organization.models import Department, Building
@@ -177,6 +178,7 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
                 # ... и так далее ...
             )
         return queryset, False
+
     def save_model(self, request, obj, form, change):
         if not obj.pk:
             obj.save()
@@ -244,6 +246,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
         if obj.monthly_plans.filter(quantity__gt=0).exists():
             return format_html('<img src="/static/admin/img/icon-yes.svg" alt="Да">')
         return format_html('<img src="/static/admin/img/icon-no.svg" alt="Нет">')
+
     has_quantity_plan.short_description = "План количества"
 
     def has_amount_plan(self, obj):
@@ -253,6 +256,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
         if obj.monthly_plans.filter(amount__gt=0).exists():
             return format_html('<img src="/static/admin/img/icon-yes.svg" alt="Да">')
         return format_html('<img src="/static/admin/img/icon-no.svg" alt="Нет">')
+
     has_amount_plan.short_description = "План суммы"
 
 
@@ -498,3 +502,13 @@ class MonthlyDoctorPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     export_form_class = ExportForm
     list_display = ('annual_doctor_plan', 'month', 'quantity', 'amount')
     list_filter = ('annual_doctor_plan__doctor_record', 'month')
+
+
+@admin.register(GoalGroupConfig)
+class GoalGroupConfigAdmin(ModelAdmin, ImportExportModelAdmin):
+    list_display = ('name', 'groups', 'created_at', 'updated_at')
+
+    formfield_overrides = {
+        # Переключаемся на TextField (вместо JSONField)
+        models.TextField: {'widget': JSONEditorWidget},
+    }
