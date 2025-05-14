@@ -60,16 +60,43 @@ def economist_doctors_talon_list_def():
         dbc.Row([
             dbc.Col([
                 html.Label("Конфигурация групп целей:", className="me-2"),
-                dcc.Dropdown(
-                    id=f"dropdown-config-{type_page}",
-                    options=config_options,
-                    value=default_config,
-                    clearable=False,
-                    style={"width": "300px"}
-                )
-            ])
+                html.Div([
+                    dcc.Dropdown(
+                        id=f"dropdown-config-{type_page}",
+                        options=config_options,
+                        value=default_config,
+                        clearable=False,
+                        style={"width": "300px", "flex": "0 0 auto"}
+                    ),
+                    dbc.Button(
+                        "Показать все группы и цели",
+                        id=f"open-offcanvas-{type_page}",
+                        color="secondary",
+                        n_clicks=0,
+                        className="ms-2",
+                        style={"flex": "0 0 auto"}
+                    ),
+                ],
+                    style={"display": "flex", "alignItems": "center"})
+            ]),
         ], className="mb-3"),
-
+        dbc.Offcanvas(
+            children=[
+                html.Div(id=f"offcanvas-body-{type_page}"),
+                dbc.Button(
+                    "Закрыть",
+                    id=f"close-offcanvas-{type_page}",
+                    color="outline-secondary",
+                    n_clicks=0,
+                    className="mt-4"
+                ),
+            ],
+            id=f"offcanvas-goals-{type_page}",
+            title="Группы и их цели",
+            is_open=False,
+            scrollable=True,
+            backdrop=True,
+        ),
         # Фильтры
         dbc.Card(
             dbc.CardBody([
@@ -162,6 +189,43 @@ def economist_doctors_talon_list_def():
 
 
 economist_doctors_talon_list = economist_doctors_talon_list_def()
+
+
+# колбэк для открытия/закрытия Offcanvas
+@app.callback(
+    Output(f"offcanvas-goals-{type_page}", "is_open"),
+    Input(f"open-offcanvas-{type_page}", "n_clicks"),
+    Input(f"close-offcanvas-{type_page}", "n_clicks"),
+    State(f"offcanvas-goals-{type_page}", "is_open"),
+)
+def toggle_offcanvas(n_open, n_close, is_open):
+    if n_open or n_close:
+        return not is_open
+    return is_open
+
+
+# ---------------------------
+# колбэк для наполнения Offcanvas по выбранной конфигурации
+@app.callback(
+    Output(f"offcanvas-body-{type_page}", "children"),
+    Input(f"dropdown-config-{type_page}", "value")
+)
+def update_offcanvas_body(config_id):
+    if not config_id:
+        return html.Div("Конфигурация не выбрана.", className="text-muted")
+    df = load_configs()
+    row = df[df["id"] == config_id].iloc[0]
+    groups = json.loads(row["groups_json"])
+
+    # строим список: заголовок группы + ul-лист целей
+    content = []
+    for grp, goals in sorted(groups.items(), key=lambda x: x[0].lower()):
+        content.append(html.H6(grp, className="mt-3 mb-1"))
+        content.append(
+            html.Ul([html.Li(g) for g in sorted(goals, key=sort_key)])
+        )
+    return content
+
 
 # --- Колбэки ---
 

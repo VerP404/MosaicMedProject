@@ -32,7 +32,8 @@ cards_row_2 = dbc.Row(
 
 cards_row_3 = dbc.Row(
     [
-        dbc.Col(create_card(9, type_page, "Талоны по врачам", "Талоны ОМС по врачам в разрезе по месяцям.")),
+        dbc.Col(create_card(9, type_page, "Талоны по врачам (помесячно)", "Талоны ОМС по врачам в разрезе по месяцям.")),
+        dbc.Col(create_card(10, type_page, "Талоны по врачам (по целям)", "Талоны ОМС по врачам и целям.")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
@@ -50,11 +51,11 @@ head_main = html.Div([
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output(f'breadcrumb-{type_page}', 'items')],
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 10)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 11)],
     prevent_initial_call=True
 )
-def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8, ts9):
-    timestamps = [ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8, ts9]
+def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8, ts9, ts10):
+    timestamps = [ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8, ts9, ts10]
     if not any(timestamps):
         raise PreventUpdate
 
@@ -69,7 +70,8 @@ def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8, ts9):
         6: "131 форма",
         7: "Диспансерное наблюдение",
         8: "Обращения граждан",
-        9: "Талоны по врачам",
+        9: "Талоны по врачам (помесячно)",
+        10: "Талоны по врачам (по целям)",
     }
     route_map = {
         1: f"/{main_link}/adults",
@@ -81,6 +83,7 @@ def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8, ts9):
         7: f"/{main_link}/dispensary-reports",
         8: f"/{main_link}/journal",
         9: f"/{main_link}/doctors_talon",
+        10: f"/{main_link}/doctors_talon_goals",
     }
 
     selected_label = label_map[idx]
