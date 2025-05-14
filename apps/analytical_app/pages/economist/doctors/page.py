@@ -1,15 +1,18 @@
 # File: apps/analytical_app/pages/economist/doctors/econ_doctors_talon_list.py
+
 import json
 from datetime import datetime
 from dash import html, dcc, Input, Output, State, exceptions, dash_table
 import dash_bootstrap_components as dbc
 import pandas as pd
 from sqlalchemy import text
+
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.components.filters import (
     filter_years, filter_inogorod, filter_sanction, filter_amount_null,
-    filter_status, status_groups, filter_report_type, filter_months, date_picker, update_buttons
+    filter_status, status_groups, filter_report_type, filter_months,
+    date_picker, update_buttons
 )
 from apps.analytical_app.pages.economist.doctors.query import sql_query_doctors_goal_stat
 from apps.analytical_app.query_executor import engine
@@ -21,197 +24,222 @@ type_page = "econ-doctors-talon-list"
 def sort_key(x):
     return (0, int(x)) if x.isdigit() else (1, x.lower())
 
-# ---------------------------------------------------
-# 1) Загружаем список конфигураций из БД
+
+# Функция для загрузки списка конфигураций из БД
 def load_configs():
-    df = pd.read_sql(
-        text("SELECT id, name, groups::text AS groups_json, created_at "
-             "FROM plan_goalgroupconfig ORDER BY created_at DESC"),
+    return pd.read_sql(
+        text("""
+            SELECT id, name, groups::text AS groups_json, created_at
+            FROM plan_goalgroupconfig
+            ORDER BY created_at DESC
+        """),
         engine
     )
-    return df
 
-_configs_df = load_configs()
-config_options = [
-    {"label": f"{row['name']} ({row['created_at'].strftime('%Y-%m-%d')})", "value": row["id"]}
-    for _, row in _configs_df.iterrows()
-]
-default_config = config_options[0]["value"] if config_options else None
 
-# Словарь групп целей (будет перезаписываться в колбэке)
+# Глобальный словарь групп целей (будет обновляться в колбэке)
 GOAL_GROUPS = {}
-# ---------------------------------------------------
 
-economist_doctors_talon_list = html.Div([
 
-    # Выбор конфигурации
-    dbc.Row([
-        dbc.Col([
-            html.Label("Конфигурация групп целей:", className="me-2"),
-            dcc.Dropdown(
-                id=f"dropdown-config-{type_page}",
-                options=config_options,
-                value=default_config,
-                clearable=False,
-                style={"width": "300px"}
-            )
-        ])
-    ], className="mb-3"),
+# --- Layout как функция, чтобы при каждом заходе подтягивались свежие настройки ---
+def economist_doctors_talon_list_def():
+    # Загружаем конфигурации
+    df_configs = load_configs()
+    config_options = [
+        {
+            "label": f"{row['name']} ({row['created_at'].strftime('%Y-%m-%d')})",
+            "value": row["id"]
+        }
+        for _, row in df_configs.iterrows()
+    ]
+    default_config = config_options[0]["value"] if config_options else None
 
-    # Фильтры
-    dbc.Card(
-        dbc.CardBody([
+    return html.Div([
 
-            dbc.CardHeader("Фильтры"),
+        # Выбор конфигурации
+        dbc.Row([
+            dbc.Col([
+                html.Label("Конфигурация групп целей:", className="me-2"),
+                dcc.Dropdown(
+                    id=f"dropdown-config-{type_page}",
+                    options=config_options,
+                    value=default_config,
+                    clearable=False,
+                    style={"width": "300px"}
+                )
+            ])
+        ], className="mb-3"),
 
-            # Первая строка: спиннер+кнопка, год и т.п.
-            dbc.Row([
-                dbc.Col(
-                    dcc.Loading(
-                        id=f'loading-button-{type_page}',
-                        type="circle",
-                        children=html.Div(update_buttons(type_page))
-                    ), width=1
-                ),
-                dbc.Col(filter_years(type_page), width=1),
-                dbc.Col(filter_report_type(type_page), width=2),
-                dbc.Col(filter_inogorod(type_page), width=2),
-                dbc.Col(filter_sanction(type_page), width=2),
-                dbc.Col(filter_amount_null(type_page), width=2),
-            ], align="center", className="mb-3"),
+        # Фильтры
+        dbc.Card(
+            dbc.CardBody([
 
-            # Вторая строка: период и цели / статусы
-            dbc.Row([
+                dbc.CardHeader("Фильтры"),
 
-                # Левый столбец: период + выбор целей
-                dbc.Col([
-
-                    # единый контейнер для трёх контролов периода
-                    html.Div(filter_months(type_page),
-                             id=f'col-months-{type_page}', style={'width': '100%'}),
-                    html.Div(date_picker(f'input-{type_page}'),
-                             id=f'col-input-{type_page}', style={'display': 'none','width':'100%'}),
-                    html.Div(date_picker(f'treatment-{type_page}'),
-                             id=f'col-treatment-{type_page}', style={'display': 'none','width':'100%'}),
-
-                    html.Hr(),
-
-                    # Режим и выбор целей
-                    dbc.Label("Режим выбора целей:", className="mt-2"),
-                    dbc.RadioItems(
-                        id=f"goals-selection-mode-{type_page}",
-                        options=[{"label": "Группы", "value": "group"},
-                                 {"label": "Отдельные", "value": "individual"}],
-                        value="individual",
-                        inline=True,
-                        className="mb-2"
+                # Первая строка: спиннер+кнопка, год и т.п.
+                dbc.Row([
+                    dbc.Col(
+                        dcc.Loading(
+                            id=f'loading-button-{type_page}',
+                            type="circle",
+                            children=html.Div(update_buttons(type_page))
+                        ), width=1
                     ),
+                    dbc.Col(filter_years(type_page), width=1),
+                    dbc.Col(filter_report_type(type_page), width=2),
+                    dbc.Col(filter_inogorod(type_page), width=2),
+                    dbc.Col(filter_sanction(type_page), width=2),
+                    dbc.Col(filter_amount_null(type_page), width=2),
+                ], align="center", className="mb-3"),
 
-                    # Дропдаун групп
-                    html.Div(
-                        dcc.Dropdown(id=f"dropdown-goal-groups-{type_page}", multi=True),
-                        id=f"goal-groups-container-{type_page}", style={'display': 'none'}
-                    ),
+                # Вторая строка: период и цели / статусы
+                dbc.Row([
 
-                    # Превью
-                    html.Div(id=f"preview-goals-{type_page}",
-                             style={"marginTop": "0.5rem","fontStyle":"italic","whiteSpace":"pre-line"}),
+                    # Левый столбец: период + выбор целей
+                    dbc.Col([
 
-                    # Дропдаун отдельных целей
-                    html.Div(
-                        dcc.Dropdown(id=f"dropdown-goals-{type_page}", multi=True),
-                        id=f"goals-individual-container-{type_page}"
-                    ),
+                        html.Div(filter_months(type_page),
+                                 id=f'col-months-{type_page}', style={'width': '100%'}),
+                        html.Div(date_picker(f'input-{type_page}'),
+                                 id=f'col-input-{type_page}', style={'display': 'none', 'width': '100%'}),
+                        html.Div(date_picker(f'treatment-{type_page}'),
+                                 id=f'col-treatment-{type_page}', style={'display': 'none', 'width': '100%'}),
 
-                ], width=8),
+                        html.Hr(),
 
-                # Правый столбец: только статусы
-                dbc.Col([
-                    dbc.Label("Статусы:"),
-                    filter_status(type_page)
-                ], width=4),
+                        dbc.Label("Режим выбора целей:", className="mt-2"),
+                        dbc.RadioItems(
+                            id=f"goals-selection-mode-{type_page}",
+                            options=[
+                                {"label": "Группы", "value": "group"},
+                                {"label": "Отдельные", "value": "individual"}
+                            ],
+                            value="individual",
+                            inline=True,
+                            className="mb-2"
+                        ),
 
-            ], className="mb-3"),
+                        # Дропдаун групп целей (скрыт по умолчанию)
+                        html.Div(
+                            dcc.Dropdown(id=f"dropdown-goal-groups-{type_page}", multi=True),
+                            id=f"goal-groups-container-{type_page}",
+                            style={'display': 'none'}
+                        ),
 
-        ])
-    ),
+                        # Превью выбранных групп/целей
+                        html.Div(
+                            id=f"preview-goals-{type_page}",
+                            style={"marginTop": "0.5rem", "fontStyle": "italic", "whiteSpace": "pre-line"}
+                        ),
 
-    # Спиннер вокруг результата
-    dcc.Loading(
-        id=f'loading-table-{type_page}',
-        type="default",
-        children=html.Div(id=f'result-table-container-{type_page}')
-    )
-])
+                        # Дропдаун отдельных целей
+                        html.Div(
+                            dcc.Dropdown(id=f"dropdown-goals-{type_page}", multi=True),
+                            id=f"goals-individual-container-{type_page}"
+                        ),
+
+                    ], width=8),
+
+                    # Правый столбец: статусы
+                    dbc.Col([
+                        dbc.Label("Статусы:"),
+                        filter_status(type_page)
+                    ], width=4),
+
+                ], className="mb-3"),
+
+            ])
+        ),
+
+        # Спиннер вокруг результата
+        dcc.Loading(
+            id=f'loading-table-{type_page}',
+            type="default",
+            children=html.Div(id=f'result-table-container-{type_page}')
+        )
+
+    ], style={"padding": "0rem"})
 
 
-# ---------------------------------------------------
-# Колбэк: при смене конфигурации подгружаем groups из БД
+economist_doctors_talon_list = economist_doctors_talon_list_def()
+
+# --- Колбэки ---
+
+# 1) При смене конфигурации — только обновляем список групп
 @app.callback(
-    [
-        Output(f"dropdown-goal-groups-{type_page}", "options"),
-        Output(f"dropdown-goals-{type_page}", "options"),
-        Output(f"dropdown-goal-groups-{type_page}", "value"),
-        Output(f"dropdown-goals-{type_page}", "value"),
-    ],
+    Output(f"dropdown-goal-groups-{type_page}", "options"),
+    Output(f"dropdown-goal-groups-{type_page}", "value"),
     Input(f"dropdown-config-{type_page}", "value")
 )
 def apply_config(config_id):
     if not config_id:
-        # пустые варианты
-        return [], [], [], []
+        return [], None
 
-    # ищем в загруженном DF строку
-    row = _configs_df[_configs_df["id"] == config_id].iloc[0]
+    df = load_configs()
+    row = df[df["id"] == config_id].iloc[0]
     groups_dict = json.loads(row["groups_json"])
-    # обновляем глобальный словарь
+
     global GOAL_GROUPS
     GOAL_GROUPS = groups_dict
 
-    # формируем опции для групп
-    grp_opts = [{"label": k, "value": k} for k in sorted(groups_dict.keys(), key=lambda x: x.lower())]
-
-    # и для отдельных целей — все значения из всех групп
-    all_goals = sorted({g for lst in groups_dict.values() for g in lst}, key=sort_key)
-    goal_opts = [{"label": g, "value": g} for g in all_goals]
-
-    # по умолчанию не выбран ни один
-    return grp_opts, goal_opts, [], []
+    grp_opts = [
+        {"label": grp, "value": grp}
+        for grp in sorted(groups_dict.keys(), key=lambda x: x.lower())
+    ]
+    # по умолчанию — первая группа
+    return grp_opts, (grp_opts[0]["value"] if grp_opts else None)
 
 
-def _toggle_goal_mode(mode):
-    if mode == "group":
-        return {'display': 'block'}, {'display': 'none'}
-    return {'display': 'none'}, {'display': 'block'}
+# 2) В зависимости от режима «Группы»/«Отдельные» наполняем дроп-целей
+@app.callback(
+    Output(f"dropdown-goals-{type_page}", "options"),
+    Output(f"dropdown-goals-{type_page}", "value"),
+    Input(f"goals-selection-mode-{type_page}", "value"),
+    Input(f"dropdown-config-{type_page}", "value"),
+)
+def update_goals_options(mode, config_id):
+    # Режим «Группы» → все цели из GOAL_GROUPS
+    if mode == "group" and GOAL_GROUPS:
+        all_goals = sorted(
+            {g for lst in GOAL_GROUPS.values() for g in lst},
+            key=sort_key
+        )
+        opts = [{"label": g, "value": g} for g in all_goals]
+        return opts, []
+
+    # Режим «Отдельные» → берём все уникальные цели напрямую из таблицы
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT DISTINCT goal "
+            "FROM data_loader_omsdata "
+            "WHERE goal IS NOT NULL AND goal <> '-'"
+        )).fetchall()
+    goals = sorted([r[0] for r in rows], key=sort_key)
+    opts = [{"label": g, "value": g} for g in goals]
+    return opts, []
 
 
-# Колбэк для превью целей по выбранным группам
+# 2) Превью целей по выбранным группам
 @app.callback(
     Output(f"preview-goals-{type_page}", "children"),
-    Input(f"dropdown-goal-groups-{type_page}", "value"),
+    Input(f"dropdown-goal-groups-{type_page}", "value")
 )
 def _preview_goals(selected_groups):
     if not selected_groups:
-        return ""  # ничего не отображаем
-
+        return ""
     lines = []
     for grp in selected_groups:
         items = GOAL_GROUPS.get(grp, [])
-        if not items:
-            continue
-        # склеиваем цели через запятую
-        lines.append(f"{grp}: {', '.join(items)}")
-    # соединяем строки через \n (whiteSpace: pre-line их отобразит)
+        if items:
+            lines.append(f"{grp}: {', '.join(items)}")
     return "\n".join(lines)
 
 
-# Toggle callbacks for filters
+# 3) Toggle для периода
 @app.callback(
-    [
-        Output(f'range-slider-month-{type_page}', 'style'),
-        Output(f'col-input-{type_page}', 'style'),
-        Output(f'col-treatment-{type_page}', 'style')
-    ],
+    Output(f'range-slider-month-{type_page}', 'style'),
+    Output(f'col-input-{type_page}', 'style'),
+    Output(f'col-treatment-{type_page}', 'style'),
     Input(f'dropdown-report-type-{type_page}', 'value')
 )
 def toggle_period_inputs(report_type):
@@ -224,31 +252,35 @@ def toggle_period_inputs(report_type):
     return {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
 
 
+# 4) Toggle между группами и отдельными целями
 @app.callback(
-    [
-        Output(f'goal-groups-container-{type_page}', 'style'),
-        Output(f'goals-individual-container-{type_page}', 'style')
-    ],
+    Output(f'goal-groups-container-{type_page}', 'style'),
+    Output(f'goals-individual-container-{type_page}', 'style'),
     Input(f'goals-selection-mode-{type_page}', 'value')
 )
 def toggle_goals(mode):
-    return ({'display': 'block'}, {'display': 'none'}) if mode == 'group' else (
-        {'display': 'none'}, {'display': 'block'})
+    return (
+        {'display': 'block'}, {'display': 'none'}
+    ) if mode == 'group' else (
+        {'display': 'none'}, {'display': 'block'}
+    )
 
 
+# 5) Toggle статусов
 @app.callback(
-    [
-        Output(f'status-group-container-{type_page}', 'style'),
-        Output(f'status-individual-container-{type_page}', 'style')
-    ],
+    Output(f'status-group-container-{type_page}', 'style'),
+    Output(f'status-individual-container-{type_page}', 'style'),
     Input(f'status-selection-mode-{type_page}', 'value')
 )
 def toggle_status(mode):
-    return ({'display': 'block'}, {'display': 'none'}) if mode == 'group' else (
-        {'display': 'none'}, {'display': 'block'})
+    return (
+        {'display': 'block'}, {'display': 'none'}
+    ) if mode == 'group' else (
+        {'display': 'none'}, {'display': 'block'}
+    )
 
 
-# Основной колбэк — собираем все фильтры и строим SQL
+# 6) Основной колбэк: строим и выполняем SQL, рисуем таблицу
 @app.callback(
     Output(f'result-table-container-{type_page}', 'children'),
     Input(f'update-button-{type_page}', 'n_clicks'),
@@ -287,17 +319,19 @@ def update_table_doctors_goal(
         group_mapping = {}
         goals = indiv_goals
     else:
-        # ничего не выбрано — все группы + все цели из БД
         group_mapping = GOAL_GROUPS
         with engine.connect() as conn:
             rows = conn.execute(text(
                 "SELECT DISTINCT goal FROM data_loader_omsdata WHERE goal IS NOT NULL AND goal <> '-'"
             )).fetchall()
         goals = [r[0] for r in rows]
-    goals = list(dict.fromkeys(goals))  # убираем дубликаты
-    goals = sorted(goals, key=sort_key)
+    goals = sorted(dict.fromkeys(goals), key=sort_key)
+
     # Статусы
-    statuses = status_groups.get(status_grp, []) if status_mode == 'group' else (status_indiv or [])
+    statuses = (
+        status_groups.get(status_grp, [])
+        if status_mode == 'group' else (status_indiv or [])
+    )
 
     # Период
     months_ph = None
@@ -312,7 +346,7 @@ def update_table_doctors_goal(
         st = datetime.fromisoformat(start_tr).strftime("%d-%m-%Y")
         et = datetime.fromisoformat(end_tr).strftime("%d-%m-%Y")
 
-    # Генерация SQL
+    # Генерация SQL и выполнение
     sql = sql_query_doctors_goal_stat(
         selected_year=year,
         months_placeholder=months_ph,
@@ -326,16 +360,20 @@ def update_table_doctors_goal(
         input_start=si, input_end=ei,
         treatment_start=st, treatment_end=et
     )
-
     cols, data = TableUpdater.query_to_df(engine, sql)
     df = pd.DataFrame(data)
 
-    # Рендер DataTable
+    # Рендерим DataTable
     return html.Div([
         dash_table.DataTable(
             id=f"table-{type_page}",
-            columns=[{"name": c["name"] if isinstance(c, dict) else c, "id": c["id"] if isinstance(c, dict) else c} for
-                     c in cols],
+            columns=[
+                {
+                    "name": c["name"] if isinstance(c, dict) else c,
+                    "id": c["id"] if isinstance(c, dict) else c
+                }
+                for c in cols
+            ],
             data=df.to_dict('records'),
             page_size=20,
             sort_action="native",
