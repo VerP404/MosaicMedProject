@@ -261,7 +261,8 @@ def update_table_with_plan_and_balance(n_clicks,
                       mode=mode,
                       unique_flag=unique)
     )
-
+    # Добавляем общую сумму "исправлено"
+    total_ispravleno_all_months = sum(row.get("исправлено", 0) or 0 for row in fact_data_list)
     # Превращаем список словарей fact_data_list в dict по ключу "month" (можно и так).
     # Будем потом "сливать" с заготовкой всех месяцев.
     fact_dict = {}
@@ -327,22 +328,36 @@ def update_table_with_plan_and_balance(n_clicks,
         row["План"] = (row["План 1/12"] or 0) + (row["Входящий остаток"] or 0)
 
         # Расчёт «Факт» по текущему дню.
-        # Если month < current_month - 1 => факт = оплачено
-        if m < current_month - 1:
+        manually_selected = selected_month is not None and m == selected_month
+
+        # Расчёт «Факт» по текущему дню.
+        if manually_selected:
+            # Если пользователь выбрал месяц, то как раньше — только оплаченные
             row["Факт"] = row.get("оплачено", 0)
-        elif m == current_month - 1:
-            # если день <= 10, складываем "новые", "в_тфомс", "оплачено", "исправлено"
-            # иначе только "оплачено"
-            if current_day <= 10:
-                row["Факт"] = sum(row.get(col, 0) for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
-            else:
-                row["Факт"] = row.get("оплачено", 0)
-        elif m == current_month:
-            row["Факт"] = sum(row.get(col, 0) for col in ["новые", "в_тфомс", "оплачено", "исправлено"])
         else:
-            # Если месяц больше выбранного (но в нашем случае мы их не показываем),
-            # можно задать 0 или пропустить. Сейчас months_to_show ограничивает это.
-            row["Факт"] = 0
+            if m < current_month - 1:
+                row["Факт"] = row.get("оплачено", 0)
+            elif m == current_month - 1:
+                if current_day <= 10:
+                    # Используем total_ispravleno_all_months вместо row["исправлено"]
+                    row["Факт"] = (
+                            row.get("новые", 0) +
+                            row.get("в_тфомс", 0) +
+                            row.get("оплачено", 0) +
+                            total_ispravleno_all_months
+                    )
+                else:
+                    row["Факт"] = row.get("оплачено", 0)
+            elif m == current_month:
+                # Для текущего месяца тоже используем total_ispravleno_all_months
+                row["Факт"] = (
+                        row.get("новые", 0) +
+                        row.get("в_тфомс", 0) +
+                        row.get("оплачено", 0) +
+                        total_ispravleno_all_months
+                )
+            else:
+                row["Факт"] = 0
 
         if row["План"] > 0:
             row["%"] = round(row["Факт"] / row["План"] * 100, 1)
