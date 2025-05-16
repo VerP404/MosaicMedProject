@@ -2,6 +2,9 @@ import os
 from dagster import resource
 from selenium import webdriver
 
+from mosaic_conductor.selenium.wo.config import CHROME_DRIVER
+
+
 @resource(
     config_schema={
         "browser": str,
@@ -80,7 +83,16 @@ def selenium_driver_resource(context):
             "safebrowsing.enabled": True
         }
         options.add_experimental_option("prefs", prefs)
-        service = ChromeService(ChromeDriverManager().install())
+
+        chrome_driver_version = CHROME_DRIVER
+        context.log.info(f"Версия драйвера Chrome: {chrome_driver_version}")
+        # Создаем ChromeDriverManager с указанием версии драйвера, если она установлена в окружении
+        if chrome_driver_version:
+            service = ChromeService(
+                ChromeDriverManager(driver_version=chrome_driver_version).install()
+            )
+        else:
+            service = ChromeService(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
     else:
         raise ValueError("Поддерживаются только 'firefox' и 'chrome'")
