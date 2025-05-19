@@ -101,7 +101,17 @@ if [ -n "$DAGIT_PIDS" ]; then
 else
     echo "[INFO] Процессы dagit не найдены."
 fi
+echo "[INFO] Очистка .dagster/storage/..."
+DAGSTER_STORAGE_DIR="mosaic_conductor/dagster_home/storage"
 
+# Удаляем всё, кроме файлов БД (runs.db, runs.db-shm, runs.db-wal)
+find "$DAGSTER_STORAGE_DIR" -mindepth 1 \
+    ! -name "runs.db" \
+    ! -name "runs.db-shm" \
+    ! -name "runs.db-wal" \
+    -exec rm -rf {} + 2>/dev/null
+
+echo "[INFO] Очистка .dagster/storage завершена."
 # Перезапуск серверов в фоне
 echo "[INFO] Перезапуск серверов..."
 nohup python3.12 manage.py runserver 0.0.0.0:8000 > /dev/null 2>&1 &
