@@ -1,9 +1,6 @@
 import os
 import subprocess
 import re
-import shutil
-import uuid
-from pathlib import Path
 from dagster import resource
 from selenium import webdriver
 
@@ -32,29 +29,6 @@ def get_chrome_version():
     except Exception as e:
         print(f"Ошибка при определении версии Chrome: {e}")
     return None
-
-
-def create_unique_user_data_dir():
-    """Создает уникальную временную директорию для данных пользователя Chrome"""
-    # Создаем базовую директорию для временных данных Chrome
-    base_dir = Path('/tmp/chrome_user_data')
-    base_dir.mkdir(exist_ok=True)
-    
-    # Создаем уникальную поддиректорию
-    unique_dir = base_dir / str(uuid.uuid4())
-    unique_dir.mkdir(exist_ok=True)
-    
-    return str(unique_dir)
-
-
-def cleanup_old_user_data_dirs():
-    """Очищает старые временные директории Chrome"""
-    base_dir = Path('/tmp/chrome_user_data')
-    if base_dir.exists():
-        try:
-            shutil.rmtree(base_dir)
-        except Exception as e:
-            print(f"Ошибка при очистке старых директорий: {e}")
 
 
 @resource(
@@ -111,33 +85,37 @@ def selenium_driver_resource(context):
         from selenium.webdriver.chrome.options import Options as ChromeOptions
         from selenium.webdriver.chrome.service import Service as ChromeService
 
-        # Очищаем старые временные директории
-        cleanup_old_user_data_dirs()
-        
-        # Создаем новую уникальную директорию для данных пользователя
-        user_data_dir = create_unique_user_data_dir()
-        context.log.info(f"Создана временная директория для Chrome: {user_data_dir}")
-
         options = ChromeOptions()
         options.headless = True
+        
+        # Базовые опции для стабильности
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-setuid-sandbox")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-gpu")
         options.add_argument("--disable-software-rasterizer")
-        options.add_argument("--remote-debugging-port=9222")
         options.add_argument("--disable-features=VizDisplayCompositor")
+        
+        # Отключаем использование пользовательской директории
+        options.add_argument("--incognito")
+        options.add_argument("--disable-application-cache")
+        options.add_argument("--disable-cache")
+        options.add_argument("--disable-offline-load-stale-cache")
+        options.add_argument("--disk-cache-size=0")
+        
+        # Настройки прокси
         options.add_argument('--proxy-server="direct://"')
         options.add_argument('--proxy-bypass-list=*')
-        options.add_argument(f"--user-data-dir={user_data_dir}")
 
         # Для Chrome задаем временную папку загрузки через preferences
         prefs = {
             "download.default_directory": temp_download_folder,
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
-            "safebrowsing.enabled": True
+            "safebrowsing.enabled": True,
+            "profile.default_content_settings.popups": 0,
+            "profile.content_settings.exceptions.automatic_downloads.*.setting": 1
         }
         options.add_experimental_option("prefs", prefs)
 
@@ -168,10 +146,3 @@ def selenium_driver_resource(context):
     finally:
         context.log.info("Закрытие браузера.")
         driver.quit()
-        # Очищаем временную директорию после использования
-        if browser == "chrome":
-            try:
-                shutil.rmtree(user_data_dir)
-                context.log.info(f"Временная директория {user_data_dir} удалена")
-            except Exception as e:
-                context.log.warning(f"Не удалось удалить временную директорию: {e}")
