@@ -1,8 +1,34 @@
 import os
+import subprocess
+import re
 from dagster import resource
 from selenium import webdriver
 
 from mosaic_conductor.selenium.wo.config import CHROME_DRIVER
+
+
+def get_chrome_version():
+    """Получает версию установленного Chrome в системе"""
+    try:
+        # Для Ubuntu/Debian
+        if os.path.exists('/usr/bin/google-chrome'):
+            result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True)
+            version = re.search(r'Google Chrome (\d+\.\d+\.\d+\.\d+)', result.stdout)
+            if version:
+                return version.group(1)
+        
+        # Для Windows
+        elif os.path.exists('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'):
+            result = subprocess.run(
+                ['reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'],
+                capture_output=True, text=True
+            )
+            version = re.search(r'version\s+REG_SZ\s+(\d+\.\d+\.\d+\.\d+)', result.stdout)
+            if version:
+                return version.group(1)
+    except Exception as e:
+        print(f"Ошибка при определении версии Chrome: {e}")
+    return None
 
 
 @resource(
@@ -84,15 +110,20 @@ def selenium_driver_resource(context):
         }
         options.add_experimental_option("prefs", prefs)
 
-        chrome_driver_version = CHROME_DRIVER
-        context.log.info(f"Версия драйвера Chrome: {chrome_driver_version}")
-        # Создаем ChromeDriverManager с указанием версии драйвера, если она установлена в окружении
-        if chrome_driver_version:
+        # Определяем версию Chrome
+        chrome_version = get_chrome_version()
+        if chrome_version:
+            context.log.info(f"Обнаружена версия Chrome: {chrome_version}")
+            # Извлекаем мажорную версию (например, из 120.0.6099.109 получаем 120)
+            major_version = chrome_version.split('.')[0]
+            context.log.info(f"Используем драйвер для версии Chrome {major_version}")
             service = ChromeService(
-                ChromeDriverManager(driver_version=chrome_driver_version).install()
+                ChromeDriverManager(driver_version=major_version).install()
             )
         else:
+            context.log.warning("Не удалось определить версию Chrome, используется последняя версия драйвера")
             service = ChromeService(ChromeDriverManager().install())
+
         driver = webdriver.Chrome(service=service, options=options)
     else:
         raise ValueError("Поддерживаются только 'firefox' и 'chrome'")
