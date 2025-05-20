@@ -4,7 +4,16 @@ import os
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(BASE_DIR)
 
-from config.settings import DEBUG_DASH, PORT_DASH
+# Загружаем переменные окружения
+from dotenv import load_dotenv
+
+env_path = os.path.join(BASE_DIR, '.env')
+load_dotenv(env_path)
+
+# Получаем настройки напрямую из переменных окружения
+DEBUG_DASH = os.getenv('DEBUG_DASH', 'True').lower() == 'true'
+PORT_DASH = int(os.getenv('PORT_DASH', '8050'))
+HOST_DASH = os.getenv('HOST_DASH', '127.0.0.1')  # Добавляем переменную для хоста
 
 from dash import dcc, html
 from apps.analytical_app.app import app
@@ -27,10 +36,9 @@ app.layout = html.Div(
         create_sidebar(),
         html.Div(id='page-content', style={'margin-left': '5rem', 'margin-top': '56px', 'padding': '2rem 1rem'}),
         create_footer(),
-
     ]
 )
 
 register_routes(app)
 if __name__ == "__main__":
-    app.run_server(debug=DEBUG_DASH, host='0.0.0.0', port=PORT_DASH)
+    app.run(debug=DEBUG_DASH, host=HOST_DASH, port=PORT_DASH)

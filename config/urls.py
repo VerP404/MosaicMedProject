@@ -7,7 +7,6 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('apps.home.urls')),
-    path('django_plotly_dash/', include('django_plotly_dash.urls')),
     path('data_loader/', include('apps.data_loader.urls', namespace='data_loader')),
     path('organization/', include('apps.organization.urls')),
     path('personnel/', include('apps.personnel.urls')),

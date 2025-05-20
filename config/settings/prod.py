@@ -15,7 +15,6 @@ DATABASES = {
 
 INSTALLED_APPS += [
     'debug_toolbar',
-    'django_plotly_dash.apps.DjangoPlotlyDashConfig',
 
     'apps.personnel',
     'apps.organization',
