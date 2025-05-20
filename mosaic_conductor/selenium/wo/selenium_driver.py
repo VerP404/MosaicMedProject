@@ -1,6 +1,7 @@
 import os
 import subprocess
 import re
+import tempfile
 from dagster import resource
 from selenium import webdriver
 
@@ -16,7 +17,7 @@ def get_chrome_version():
             version = re.search(r'Google Chrome (\d+\.\d+\.\d+\.\d+)', result.stdout)
             if version:
                 return version.group(1)
-        
+
         # Для Windows
         elif os.path.exists('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'):
             result = subprocess.run(
@@ -34,8 +35,8 @@ def get_chrome_version():
 @resource(
     config_schema={
         "browser": str,
-        "destination_folder": str,         # Конечная папка (OMS_TALON_FOLDER)
-        "temp_download_folder": str,         # Временная папка для загрузок (например, "uploads/talon")
+        "destination_folder": str,  # Конечная папка (OMS_TALON_FOLDER)
+        "temp_download_folder": str,  # Временная папка для загрузок (например, "uploads/talon")
         "target_url": str
     }
 )
@@ -87,7 +88,13 @@ def selenium_driver_resource(context):
 
         options = ChromeOptions()
         options.headless = True
-        
+
+        # Создаем уникальную временную директорию для пользовательских данных Chrome
+        unique_user_data_dir = os.path.join(tempfile.gettempdir(), f"chrome_user_data_{os.getpid()}_{id(options)}")
+        context.log.info(
+            f"Устанавливаем уникальную директорию для пользовательских данных Chrome: {unique_user_data_dir}")
+        options.add_argument(f"--user-data-dir={unique_user_data_dir}")
+
         # Базовые опции для стабильности
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -96,14 +103,14 @@ def selenium_driver_resource(context):
         options.add_argument("--disable-gpu")
         options.add_argument("--disable-software-rasterizer")
         options.add_argument("--disable-features=VizDisplayCompositor")
-        
-        # Отключаем использование пользовательской директории
+
+        # Важно: используем incognito вместе с уникальной user-data-dir
         options.add_argument("--incognito")
         options.add_argument("--disable-application-cache")
         options.add_argument("--disable-cache")
         options.add_argument("--disable-offline-load-stale-cache")
         options.add_argument("--disk-cache-size=0")
-        
+
         # Настройки прокси
         options.add_argument('--proxy-server="direct://"')
         options.add_argument('--proxy-bypass-list=*')
@@ -146,3 +153,11 @@ def selenium_driver_resource(context):
     finally:
         context.log.info("Закрытие браузера.")
         driver.quit()
+        # Удаляем временную директорию пользовательских данных Chrome после завершения
+        if browser == "chrome" and os.path.exists(unique_user_data_dir):
+            try:
+                import shutil
+                shutil.rmtree(unique_user_data_dir, ignore_errors=True)
+                context.log.info(f"Удалена временная директория пользовательских данных Chrome: {unique_user_data_dir}")
+            except Exception as e:
+                context.log.warning(f"Не удалось удалить временную директорию: {e}")
