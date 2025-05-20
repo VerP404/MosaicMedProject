@@ -13,7 +13,7 @@ load_dotenv(env_path)
 # Получаем настройки напрямую из переменных окружения
 DEBUG_DASH = os.getenv('DEBUG_DASH', 'True').lower() == 'true'
 PORT_DASH = int(os.getenv('PORT_DASH', '8050'))
-HOST_DASH = os.getenv('HOST_DASH', '127.0.0.1')  # Добавляем переменную для хоста
+HOST_DASH = os.getenv('HOST_DASH', '0.0.0.0')
 
 from dash import dcc, html
 from apps.analytical_app.app import app
