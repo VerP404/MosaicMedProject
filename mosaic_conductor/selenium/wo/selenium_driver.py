@@ -1,11 +1,52 @@
 import os
 import subprocess
 import re
-import tempfile
+import signal
+import psutil
 from dagster import resource
 from selenium import webdriver
 
 from mosaic_conductor.selenium.wo.config import CHROME_DRIVER
+
+
+def cleanup_chrome_processes(context):
+    """Убивает все процессы Chrome и chromedriver в системе"""
+    try:
+        chrome_processes = []
+        # Находим и собираем все процессы Chrome и chromedriver
+        for proc in psutil.process_iter(['pid', 'name']):
+            if any(chrome_name in proc.info['name'].lower() for chrome_name in ['chrome', 'chromedriver']):
+                chrome_processes.append(proc)
+
+        # Логируем найденные процессы
+        if chrome_processes:
+            context.log.info(f"Найдено {len(chrome_processes)} процессов Chrome/chromedriver для очистки")
+
+            # Убиваем каждый процесс
+            for proc in chrome_processes:
+                try:
+                    proc.kill()
+                    context.log.info(f"Завершен процесс {proc.info['name']} (PID: {proc.info['pid']})")
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
+                    context.log.warning(
+                        f"Не удалось завершить процесс {proc.info['name']} (PID: {proc.info['pid']}): {e}")
+        else:
+            context.log.info("Активных процессов Chrome/chromedriver не найдено")
+    except Exception as e:
+        context.log.warning(f"Ошибка при очистке процессов Chrome: {e}")
+
+    # Дополнительная очистка с использованием команд системы (для большей надежности)
+    try:
+        if os.name == 'posix':  # Linux/Mac
+            subprocess.run(['pkill', '-f', 'chrome'], stderr=subprocess.DEVNULL)
+            subprocess.run(['pkill', '-f', 'chromedriver'], stderr=subprocess.DEVNULL)
+            context.log.info("Выполнена системная очистка процессов Chrome/chromedriver")
+        elif os.name == 'nt':  # Windows
+            subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], stderr=subprocess.DEVNULL)
+            subprocess.run(['taskkill', '/f', '/im', 'chromedriver.exe'], stderr=subprocess.DEVNULL)
+            context.log.info("Выполнена системная очистка процессов Chrome/chromedriver")
+    except Exception as e:
+        context.log.warning(f"Ошибка при системной очистке процессов Chrome: {e}")
 
 
 def get_chrome_version():
@@ -55,6 +96,11 @@ def selenium_driver_resource(context):
     context.log.info(f"Временная папка для загрузок: {temp_download_folder}")
     context.log.info(f"Целевой URL: {target_url}")
 
+    # Очищаем все процессы Chrome перед запуском драйвера
+    context.log.info("Начинаем очистку незавершенных процессов Chrome...")
+    cleanup_chrome_processes(context)
+    context.log.info("Очистка процессов Chrome завершена")
+
     # Создаем конечную папку, если не существует
     if not os.path.exists(destination_folder):
         os.makedirs(destination_folder)
@@ -89,11 +135,12 @@ def selenium_driver_resource(context):
         options = ChromeOptions()
         options.headless = True
 
-        # Создаем уникальную временную директорию для пользовательских данных Chrome
-        unique_user_data_dir = os.path.join(tempfile.gettempdir(), f"chrome_user_data_{os.getpid()}_{id(options)}")
-        context.log.info(
-            f"Устанавливаем уникальную директорию для пользовательских данных Chrome: {unique_user_data_dir}")
-        options.add_argument(f"--user-data-dir={unique_user_data_dir}")
+        # Полное отключение использования пользовательской директории данных
+        options.add_argument("--no-first-run")
+        options.add_argument("--no-default-browser-check")
+        options.add_argument("--remote-debugging-port=0")
+        options.add_argument("--password-store=basic")
+        context.log.info("Отключено использование пользовательской директории для Chrome")
 
         # Базовые опции для стабильности
         options.add_argument("--no-sandbox")
@@ -153,11 +200,4 @@ def selenium_driver_resource(context):
     finally:
         context.log.info("Закрытие браузера.")
         driver.quit()
-        # Удаляем временную директорию пользовательских данных Chrome после завершения
-        if browser == "chrome" and os.path.exists(unique_user_data_dir):
-            try:
-                import shutil
-                shutil.rmtree(unique_user_data_dir, ignore_errors=True)
-                context.log.info(f"Удалена временная директория пользовательских данных Chrome: {unique_user_data_dir}")
-            except Exception as e:
-                context.log.warning(f"Не удалось удалить временную директорию: {e}")
+        # Больше не нужно удалять директорию, так как мы её не создаем
