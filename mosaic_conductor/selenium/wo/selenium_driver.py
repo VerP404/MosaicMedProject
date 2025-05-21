@@ -87,6 +87,33 @@ def cleanup_chrome_processes(context):
         context.log.warning(f"Ошибка при системной очистке процессов Chrome: {e}")
 
 
+def download_chromedriver(version, context):
+    """Скачивает и устанавливает ChromeDriver нужной версии"""
+    try:
+        # Формируем URL для скачивания ChromeDriver
+        base_url = "https://chromedriver.storage.googleapis.com"
+        download_url = f"{base_url}/{version}/chromedriver_linux64.zip"
+        
+        # Создаем временную директорию для загрузки
+        temp_dir = "/tmp/chromedriver"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Скачиваем и распаковываем ChromeDriver
+        context.log.info(f"Скачиваем ChromeDriver версии {version}")
+        subprocess.run(['wget', download_url, '-O', f"{temp_dir}/chromedriver.zip"], check=True)
+        subprocess.run(['unzip', '-o', f"{temp_dir}/chromedriver.zip", '-d', temp_dir], check=True)
+        
+        # Делаем файл исполняемым
+        chromedriver_path = f"{temp_dir}/chromedriver"
+        os.chmod(chromedriver_path, 0o755)
+        
+        context.log.info(f"ChromeDriver успешно установлен в {chromedriver_path}")
+        return chromedriver_path
+    except Exception as e:
+        context.log.error(f"Ошибка при установке ChromeDriver: {e}")
+        return None
+
+
 @resource(
     config_schema={
         "browser": str,
@@ -146,33 +173,22 @@ def selenium_driver_resource(context):
 
         # Определяем версию Chrome
         chrome_version = get_chrome_version()
-        if chrome_version:
-            context.log.info(f"Обнаружена версия Chrome: {chrome_version}")
-            # Извлекаем мажорную версию (например, из 120.0.6099.109 получаем 120)
-            major_version = chrome_version.split('.')[0]
-            context.log.info(f"Используем драйвер для версии Chrome {major_version}")
-            
-            # Устанавливаем драйвер
-            driver_path = ChromeDriverManager(driver_version=major_version).install()
-            context.log.info(f"Установлен ChromeDriver по пути: {driver_path}")
-            
-            # Получаем версию установленного драйвера
-            driver_version = get_chromedriver_version(driver_path)
-            if driver_version:
-                context.log.info(f"Версия установленного ChromeDriver: {driver_version}")
-            
-            service = ChromeService(driver_path)
-        else:
-            context.log.warning("Не удалось определить версию Chrome, используется последняя версия драйвера")
-            driver_path = ChromeDriverManager().install()
-            context.log.info(f"Установлен ChromeDriver по пути: {driver_path}")
-            
-            # Получаем версию установленного драйвера
-            driver_version = get_chromedriver_version(driver_path)
-            if driver_version:
-                context.log.info(f"Версия установленного ChromeDriver: {driver_version}")
-            
-            service = ChromeService(driver_path)
+        if not chrome_version:
+            raise ValueError("Не удалось определить версию Chrome")
+
+        context.log.info(f"Обнаружена версия Chrome: {chrome_version}")
+        
+        # Скачиваем ChromeDriver нужной версии
+        driver_path = download_chromedriver(chrome_version, context)
+        if not driver_path:
+            raise ValueError(f"Не удалось установить ChromeDriver для версии {chrome_version}")
+        
+        # Проверяем версию установленного драйвера
+        driver_version = get_chromedriver_version(driver_path)
+        if driver_version:
+            context.log.info(f"Версия установленного ChromeDriver: {driver_version}")
+        
+        service = ChromeService(driver_path)
 
         options = ChromeOptions()
         options.headless = True
