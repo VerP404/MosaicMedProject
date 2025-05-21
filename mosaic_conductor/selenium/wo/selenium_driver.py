@@ -5,8 +5,46 @@ import signal
 import psutil
 from dagster import resource
 from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service as ChromeService
 
 from mosaic_conductor.selenium.wo.config import CHROME_DRIVER
+
+
+def get_chrome_version():
+    """Получает версию установленного Chrome в системе"""
+    try:
+        # Для Ubuntu/Debian
+        if os.path.exists('/usr/bin/google-chrome'):
+            result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True)
+            version = re.search(r'Google Chrome (\d+\.\d+\.\d+\.\d+)', result.stdout)
+            if version:
+                return version.group(1)
+        
+        # Для Windows
+        elif os.path.exists('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'):
+            result = subprocess.run(
+                ['reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'],
+                capture_output=True, text=True
+            )
+            version = re.search(r'version\s+REG_SZ\s+(\d+\.\d+\.\d+\.\d+)', result.stdout)
+            if version:
+                return version.group(1)
+    except Exception as e:
+        print(f"Ошибка при определении версии Chrome: {e}")
+    return None
+
+
+def get_chromedriver_version(driver_path):
+    """Получает версию установленного ChromeDriver"""
+    try:
+        result = subprocess.run([driver_path, '--version'], capture_output=True, text=True)
+        version = re.search(r'ChromeDriver (\d+\.\d+\.\d+\.\d+)', result.stdout)
+        if version:
+            return version.group(1)
+    except Exception as e:
+        print(f"Ошибка при определении версии ChromeDriver: {e}")
+    return None
 
 
 def cleanup_chrome_processes(context):
@@ -47,30 +85,6 @@ def cleanup_chrome_processes(context):
             context.log.info("Выполнена системная очистка процессов Chrome/chromedriver")
     except Exception as e:
         context.log.warning(f"Ошибка при системной очистке процессов Chrome: {e}")
-
-
-def get_chrome_version():
-    """Получает версию установленного Chrome в системе"""
-    try:
-        # Для Ubuntu/Debian
-        if os.path.exists('/usr/bin/google-chrome'):
-            result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True)
-            version = re.search(r'Google Chrome (\d+\.\d+\.\d+\.\d+)', result.stdout)
-            if version:
-                return version.group(1)
-
-        # Для Windows
-        elif os.path.exists('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'):
-            result = subprocess.run(
-                ['reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'],
-                capture_output=True, text=True
-            )
-            version = re.search(r'version\s+REG_SZ\s+(\d+\.\d+\.\d+\.\d+)', result.stdout)
-            if version:
-                return version.group(1)
-    except Exception as e:
-        print(f"Ошибка при определении версии Chrome: {e}")
-    return None
 
 
 @resource(
@@ -128,9 +142,37 @@ def selenium_driver_resource(context):
         service = FirefoxService(GeckoDriverManager().install())
         driver = webdriver.Firefox(service=service, options=options)
     elif browser == "chrome":
-        from webdriver_manager.chrome import ChromeDriverManager
         from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
+
+        # Определяем версию Chrome
+        chrome_version = get_chrome_version()
+        if chrome_version:
+            context.log.info(f"Обнаружена версия Chrome: {chrome_version}")
+            # Извлекаем мажорную версию (например, из 120.0.6099.109 получаем 120)
+            major_version = chrome_version.split('.')[0]
+            context.log.info(f"Используем драйвер для версии Chrome {major_version}")
+            
+            # Устанавливаем драйвер
+            driver_path = ChromeDriverManager(driver_version=major_version).install()
+            context.log.info(f"Установлен ChromeDriver по пути: {driver_path}")
+            
+            # Получаем версию установленного драйвера
+            driver_version = get_chromedriver_version(driver_path)
+            if driver_version:
+                context.log.info(f"Версия установленного ChromeDriver: {driver_version}")
+            
+            service = ChromeService(driver_path)
+        else:
+            context.log.warning("Не удалось определить версию Chrome, используется последняя версия драйвера")
+            driver_path = ChromeDriverManager().install()
+            context.log.info(f"Установлен ChromeDriver по пути: {driver_path}")
+            
+            # Получаем версию установленного драйвера
+            driver_version = get_chromedriver_version(driver_path)
+            if driver_version:
+                context.log.info(f"Версия установленного ChromeDriver: {driver_version}")
+            
+            service = ChromeService(driver_path)
 
         options = ChromeOptions()
         options.headless = True
@@ -151,7 +193,7 @@ def selenium_driver_resource(context):
         options.add_argument("--disable-software-rasterizer")
         options.add_argument("--disable-features=VizDisplayCompositor")
 
-        # Важно: используем incognito вместе с уникальной user-data-dir
+        # Важно: используем incognito для изоляции сессии
         options.add_argument("--incognito")
         options.add_argument("--disable-application-cache")
         options.add_argument("--disable-cache")
@@ -172,20 +214,6 @@ def selenium_driver_resource(context):
             "profile.content_settings.exceptions.automatic_downloads.*.setting": 1
         }
         options.add_experimental_option("prefs", prefs)
-
-        # Определяем версию Chrome
-        chrome_version = get_chrome_version()
-        if chrome_version:
-            context.log.info(f"Обнаружена версия Chrome: {chrome_version}")
-            # Извлекаем мажорную версию (например, из 120.0.6099.109 получаем 120)
-            major_version = chrome_version.split('.')[0]
-            context.log.info(f"Используем драйвер для версии Chrome {major_version}")
-            service = ChromeService(
-                ChromeDriverManager(driver_version=major_version).install()
-            )
-        else:
-            context.log.warning("Не удалось определить версию Chrome, используется последняя версия драйвера")
-            service = ChromeService(ChromeDriverManager().install())
 
         driver = webdriver.Chrome(service=service, options=options)
     else:
