@@ -12,7 +12,7 @@ load_dotenv(env_path)
 
 # Получаем настройки напрямую из переменных окружения
 DEBUG_DASH = os.getenv('DEBUG_DASH', 'True').lower() == 'true'
-PORT_DASH = int(os.getenv('PORT_DASH', '8050'))
+PORT_DASH = int(os.getenv('PORT_DASH', '5000'))
 HOST_DASH = os.getenv('HOST_DASH', '0.0.0.0')
 
 from dash import dcc, html
