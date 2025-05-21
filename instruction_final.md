@@ -1,4 +1,3 @@
-
 # 🚀 **ПОЛНАЯ ИНСТРУКЦИЯ ПО НАСТРОЙКЕ ПРОЕКТА**
 
 ## 🏆 **1. Установка и настройка PostgreSQL на сервере**
@@ -237,13 +236,65 @@ sudo mv chromedriver /usr/local/bin/
 xvfb-run -a python3.12 manage.py load_data_oms_chrome
 ```
 
-## 🕒 **7. Добавление в cron**
-### ➡️ Открываем crontab:
+## 🚀 **1. Установка Chrome и ChromeDriver**
+
+### Windows:
+1. Скачайте и установите Chrome версии 114.0.5735.90:
+   - https://dl.google.com/chrome/win/114.0.5735.90/chrome_installer.exe
+
+2. Скачайте ChromeDriver версии 114.0.5735.90:
+   - https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_win32.zip
+   - Распакуйте в `C:\chromedriver\`
+
+3. Установите переменные окружения:
+```powershell
+$env:CHROME_VERSION="114.0.5735.90"
+$env:CHROMEDRIVER_VERSION="114.0.5735.90"
+$env:CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
+$env:CHROMEDRIVER_PATH="C:\chromedriver\chromedriver.exe"
+```
+
+### Linux (Ubuntu):
+1. Установите Chrome версии 114.0.5735.90:
+```bash
+wget https://dl.google.com/linux/direct/google-chrome-stable_114.0.5735.90-1_amd64.deb
+sudo dpkg -i google-chrome-stable_114.0.5735.90-1_amd64.deb
+sudo apt-get install -f
+```
+
+2. Установите ChromeDriver версии 114.0.5735.90:
+```bash
+wget https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
+unzip chromedriver_linux64.zip
+sudo mv chromedriver /usr/local/bin/
+sudo chmod +x /usr/local/bin/chromedriver
+```
+
+3. Установите переменные окружения:
+```bash
+export CHROME_VERSION="114.0.5735.90"
+export CHROMEDRIVER_VERSION="114.0.5735.90"
+export CHROME_PATH="/usr/bin/google-chrome"
+export CHROMEDRIVER_PATH="/usr/local/bin/chromedriver"
+```
+
+## 🕒 **2. Добавление в cron**
+### Windows:
+Создайте задачу в Планировщике задач Windows:
+1. Откройте "Планировщик задач"
+2. Создайте новую задачу
+3. Установите триггер "Ежечасно"
+4. Действие: Запустить программу
+5. Программа: `C:\path\to\python.exe`
+6. Аргументы: `C:\path\to\manage.py load_data_oms_chrome`
+
+### Linux:
+Откройте crontab:
 ```bash
 crontab -e
 ```
 
-Добавляем задачу для выполнения каждый час:
+Добавьте задачу:
 ```bash
 0 * * * * /path/to/.venv/bin/python /path/to/manage.py load_data_oms_chrome
 ```

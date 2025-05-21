@@ -1,124 +1,60 @@
 import os
-import subprocess
-import re
-import signal
-import psutil
 from dagster import resource
 from selenium import webdriver
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+import tempfile
+import subprocess
+import json
+import platform
 
 from mosaic_conductor.selenium.wo.config import CHROME_DRIVER
 
-
 def get_chrome_version():
-    """Получает версию установленного Chrome в системе"""
     try:
-        # Для Ubuntu/Debian
-        if os.path.exists('/usr/bin/google-chrome'):
-            result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True)
-            version = re.search(r'Google Chrome (\d+\.\d+\.\d+\.\d+)', result.stdout)
-            if version:
-                return version.group(1)
-        
-        # Для Windows
-        elif os.path.exists('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'):
-            result = subprocess.run(
-                ['reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'],
-                capture_output=True, text=True
-            )
-            version = re.search(r'version\s+REG_SZ\s+(\d+\.\d+\.\d+\.\d+)', result.stdout)
-            if version:
-                return version.group(1)
-    except Exception as e:
-        print(f"Ошибка при определении версии Chrome: {e}")
-    return None
-
-
-def get_chromedriver_version(driver_path):
-    """Получает версию установленного ChromeDriver"""
-    try:
-        result = subprocess.run([driver_path, '--version'], capture_output=True, text=True)
-        version = re.search(r'ChromeDriver (\d+\.\d+\.\d+\.\d+)', result.stdout)
-        if version:
-            return version.group(1)
-    except Exception as e:
-        print(f"Ошибка при определении версии ChromeDriver: {e}")
-    return None
-
-
-def cleanup_chrome_processes(context):
-    """Убивает все процессы Chrome и chromedriver в системе"""
-    try:
-        chrome_processes = []
-        # Находим и собираем все процессы Chrome и chromedriver
-        for proc in psutil.process_iter(['pid', 'name']):
-            if any(chrome_name in proc.info['name'].lower() for chrome_name in ['chrome', 'chromedriver']):
-                chrome_processes.append(proc)
-
-        # Логируем найденные процессы
-        if chrome_processes:
-            context.log.info(f"Найдено {len(chrome_processes)} процессов Chrome/chromedriver для очистки")
-
-            # Убиваем каждый процесс
-            for proc in chrome_processes:
-                try:
-                    proc.kill()
-                    context.log.info(f"Завершен процесс {proc.info['name']} (PID: {proc.info['pid']})")
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
-                    context.log.warning(
-                        f"Не удалось завершить процесс {proc.info['name']} (PID: {proc.info['pid']}): {e}")
+        system = platform.system().lower()
+        if system == 'windows':
+            cmd = r'reg query "HKEY_CURRENT_USER\Software\Google\Chrome\BLBeacon" /v version'
+            output = subprocess.check_output(cmd, shell=True).decode('utf-8')
+            return output.strip().split()[-1]
+        elif system == 'linux':
+            # Пробуем разные пути к Chrome в Linux
+            chrome_paths = [
+                '/usr/bin/google-chrome',
+                '/usr/bin/google-chrome-stable',
+                '/snap/bin/google-chrome',
+                '/usr/bin/chromium-browser',
+                '/usr/bin/chromium'
+            ]
+            
+            for path in chrome_paths:
+                if os.path.exists(path):
+                    try:
+                        output = subprocess.check_output([path, '--version'], stderr=subprocess.STDOUT).decode('utf-8')
+                        return output.strip().split()[-1]
+                    except subprocess.CalledProcessError:
+                        continue
+            
+            # Если не нашли Chrome, пробуем через which
+            try:
+                chrome_path = subprocess.check_output(['which', 'google-chrome']).decode('utf-8').strip()
+                output = subprocess.check_output([chrome_path, '--version'], stderr=subprocess.STDOUT).decode('utf-8')
+                return output.strip().split()[-1]
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
+                
+            return "Chrome не найден в системе"
         else:
-            context.log.info("Активных процессов Chrome/chromedriver не найдено")
+            return f"Неподдерживаемая операционная система: {system}"
     except Exception as e:
-        context.log.warning(f"Ошибка при очистке процессов Chrome: {e}")
-
-    # Дополнительная очистка с использованием команд системы (для большей надежности)
-    try:
-        if os.name == 'posix':  # Linux/Mac
-            subprocess.run(['pkill', '-f', 'chrome'], stderr=subprocess.DEVNULL)
-            subprocess.run(['pkill', '-f', 'chromedriver'], stderr=subprocess.DEVNULL)
-            context.log.info("Выполнена системная очистка процессов Chrome/chromedriver")
-        elif os.name == 'nt':  # Windows
-            subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], stderr=subprocess.DEVNULL)
-            subprocess.run(['taskkill', '/f', '/im', 'chromedriver.exe'], stderr=subprocess.DEVNULL)
-            context.log.info("Выполнена системная очистка процессов Chrome/chromedriver")
-    except Exception as e:
-        context.log.warning(f"Ошибка при системной очистке процессов Chrome: {e}")
-
-
-def download_chromedriver(version, context):
-    """Скачивает и устанавливает ChromeDriver нужной версии"""
-    try:
-        # Формируем URL для скачивания ChromeDriver
-        base_url = "https://chromedriver.storage.googleapis.com"
-        download_url = f"{base_url}/{version}/chromedriver_linux64.zip"
-        
-        # Создаем временную директорию для загрузки
-        temp_dir = "/tmp/chromedriver"
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        # Скачиваем и распаковываем ChromeDriver
-        context.log.info(f"Скачиваем ChromeDriver версии {version}")
-        subprocess.run(['wget', download_url, '-O', f"{temp_dir}/chromedriver.zip"], check=True)
-        subprocess.run(['unzip', '-o', f"{temp_dir}/chromedriver.zip", '-d', temp_dir], check=True)
-        
-        # Делаем файл исполняемым
-        chromedriver_path = f"{temp_dir}/chromedriver"
-        os.chmod(chromedriver_path, 0o755)
-        
-        context.log.info(f"ChromeDriver успешно установлен в {chromedriver_path}")
-        return chromedriver_path
-    except Exception as e:
-        context.log.error(f"Ошибка при установке ChromeDriver: {e}")
-        return None
-
+        return f"Не удалось определить версию Chrome: {str(e)}"
 
 @resource(
     config_schema={
         "browser": str,
-        "destination_folder": str,  # Конечная папка (OMS_TALON_FOLDER)
-        "temp_download_folder": str,  # Временная папка для загрузок (например, "uploads/talon")
+        "destination_folder": str,         # Конечная папка (OMS_TALON_FOLDER)
+        "temp_download_folder": str,         # Временная папка для загрузок (например, "uploads/talon")
         "target_url": str
     }
 )
@@ -136,11 +72,7 @@ def selenium_driver_resource(context):
     context.log.info(f"Конечная папка для сохранения: {destination_folder}")
     context.log.info(f"Временная папка для загрузок: {temp_download_folder}")
     context.log.info(f"Целевой URL: {target_url}")
-
-    # Очищаем все процессы Chrome перед запуском драйвера
-    context.log.info("Начинаем очистку незавершенных процессов Chrome...")
-    cleanup_chrome_processes(context)
-    context.log.info("Очистка процессов Chrome завершена")
+    context.log.info(f"Операционная система: {platform.system()} {platform.release()}")
 
     # Создаем конечную папку, если не существует
     if not os.path.exists(destination_folder):
@@ -169,69 +101,59 @@ def selenium_driver_resource(context):
         service = FirefoxService(GeckoDriverManager().install())
         driver = webdriver.Firefox(service=service, options=options)
     elif browser == "chrome":
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-
-        # Определяем версию Chrome
         chrome_version = get_chrome_version()
-        if not chrome_version:
-            raise ValueError("Не удалось определить версию Chrome")
-
-        context.log.info(f"Обнаружена версия Chrome: {chrome_version}")
+        context.log.info(f"Установленная версия Chrome: {chrome_version}")
         
-        # Скачиваем ChromeDriver нужной версии
-        driver_path = download_chromedriver(chrome_version, context)
-        if not driver_path:
-            raise ValueError(f"Не удалось установить ChromeDriver для версии {chrome_version}")
-        
-        # Проверяем версию установленного драйвера
-        driver_version = get_chromedriver_version(driver_path)
-        if driver_version:
-            context.log.info(f"Версия установленного ChromeDriver: {driver_version}")
-        
-        service = ChromeService(driver_path)
-
         options = ChromeOptions()
         options.headless = True
-
-        # Полное отключение использования пользовательской директории данных
-        options.add_argument("--no-first-run")
-        options.add_argument("--no-default-browser-check")
-        options.add_argument("--remote-debugging-port=0")
-        options.add_argument("--password-store=basic")
-        context.log.info("Отключено использование пользовательской директории для Chrome")
-
-        # Базовые опции для стабильности
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-setuid-sandbox")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-gpu")
         options.add_argument("--disable-software-rasterizer")
+        options.add_argument("--remote-debugging-port=9222")
         options.add_argument("--disable-features=VizDisplayCompositor")
-
-        # Важно: используем incognito для изоляции сессии
-        options.add_argument("--incognito")
-        options.add_argument("--disable-application-cache")
-        options.add_argument("--disable-cache")
-        options.add_argument("--disable-offline-load-stale-cache")
-        options.add_argument("--disk-cache-size=0")
-
-        # Настройки прокси
         options.add_argument('--proxy-server="direct://"')
         options.add_argument('--proxy-bypass-list=*')
+        user_data_dir = tempfile.mkdtemp()
+        options.add_argument(f"--user-data-dir={user_data_dir}")
 
         # Для Chrome задаем временную папку загрузки через preferences
         prefs = {
             "download.default_directory": temp_download_folder,
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
-            "safebrowsing.enabled": True,
-            "profile.default_content_settings.popups": 0,
-            "profile.content_settings.exceptions.automatic_downloads.*.setting": 1
+            "safebrowsing.enabled": True
         }
         options.add_experimental_option("prefs", prefs)
 
-        driver = webdriver.Chrome(service=service, options=options)
+        try:
+            # Используем ChromeDriverManager для автоматического определения версии
+            driver_path = ChromeDriverManager().install()
+            context.log.info(f"Путь к ChromeDriver: {driver_path}")
+            
+            # Устанавливаем права на выполнение для ChromeDriver в Linux
+            if platform.system().lower() == 'linux':
+                try:
+                    os.chmod(driver_path, 0o755)
+                    context.log.info("Установлены права на выполнение для ChromeDriver")
+                except Exception as e:
+                    context.log.warning(f"Не удалось установить права на выполнение для ChromeDriver: {str(e)}")
+            
+            # Получаем версию ChromeDriver
+            try:
+                driver_version = subprocess.check_output([driver_path, '--version']).decode('utf-8').strip()
+                context.log.info(f"Версия ChromeDriver: {driver_version}")
+            except Exception as e:
+                context.log.warning(f"Не удалось определить версию ChromeDriver: {str(e)}")
+            
+            service = ChromeService(driver_path)
+            driver = webdriver.Chrome(service=service, options=options)
+            context.log.info("Chrome драйвер успешно инициализирован")
+        except Exception as e:
+            context.log.error(f"Ошибка при инициализации Chrome драйвера: {str(e)}")
+            raise
     else:
         raise ValueError("Поддерживаются только 'firefox' и 'chrome'")
 
@@ -244,4 +166,3 @@ def selenium_driver_resource(context):
     finally:
         context.log.info("Закрытие браузера.")
         driver.quit()
-        # Больше не нужно удалять директорию, так как мы её не создаем
