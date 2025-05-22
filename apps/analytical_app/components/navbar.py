@@ -1,10 +1,13 @@
 # components/navbar.py
-from dash import html, Output, Input, State, exceptions, dcc
+from dash import html, Output, Input, State, exceptions, dcc, callback_context, ALL
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.query_executor import engine, execute_query
+from sqlalchemy import text
+from datetime import datetime
+import time
 
 
 def get_organization_name():
@@ -72,6 +75,10 @@ def create_modal_goal():
 
 def create_navbar():
     organization_name = get_organization_name()
+    
+    # Создаем offcanvas для обновлений
+    updates_offcanvas = create_updates_offcanvas()
+    
     navbar = dbc.Navbar(
         dbc.Container(
             [
@@ -105,6 +112,19 @@ def create_navbar():
                 # Элементы справа: справка и дата
                 dbc.Row(
                     [
+                        # Кнопка Обновления
+                        dbc.Col(
+                            dbc.Button(
+                                [
+                                    "Обновления"
+                                ],
+                                id="open-updates-offcanvas", 
+                                color="success", 
+                                className="me-2",
+                                size="sm"
+                            ),
+                            width="auto"
+                        ),
                         dbc.Col(
                             dbc.DropdownMenu(
                                 children=[
@@ -137,7 +157,7 @@ def create_navbar():
         fixed="top",
     )
 
-    return navbar
+    return html.Div([navbar, updates_offcanvas])
 
 
 # Добавляем callback для модального окна
@@ -213,36 +233,32 @@ def update_table(n_clicks):
 
 
 sql_query = """
-SELECT 
-    g.code as "Код",
-    g.name as "Наименование",
-    CASE
-        WHEN m.is_active THEN 'Да'
-        ELSE 'Нет'
-    END AS "Действует",
-    COALESCE(STRING_AGG(c.name, ', '), '-') AS "Группа" 
-FROM
-    oms_reference_generalomstarget g
-JOIN
-    oms_reference_medicalorganizationomstarget m
-ON
-    g.id = m.general_target_id
-LEFT JOIN
-    oms_reference_medicalorganizationomstarget_categories l
-ON
-    m.id = l.medicalorganizationomstarget_id
-LEFT JOIN
-    oms_reference_omstargetcategory c
-ON
-    l.omstargetcategory_id = c.id
-GROUP BY
-    g.code, g.name, m.is_active, m.start_date, m.end_date
-ORDER BY
-    CASE
-        WHEN g.code ~ '^[0-9]+$' THEN lpad(g.code, 10, '0')
-        ELSE g.code
-    END
-"""
+            SELECT g.code                                  as "Код",
+                   g.name                                  as "Наименование",
+                   CASE
+                       WHEN m.is_active THEN 'Да'
+                       ELSE 'Нет'
+                       END                                 AS "Действует",
+                   COALESCE(STRING_AGG(c.name, ', '), '-') AS "Группа"
+            FROM oms_reference_generalomstarget g
+                     JOIN
+                 oms_reference_medicalorganizationomstarget m
+                 ON
+                     g.id = m.general_target_id
+                     LEFT JOIN
+                 oms_reference_medicalorganizationomstarget_categories l
+                 ON
+                     m.id = l.medicalorganizationomstarget_id
+                     LEFT JOIN
+                 oms_reference_omstargetcategory c
+                 ON
+                     l.omstargetcategory_id = c.id
+            GROUP BY g.code, g.name, m.is_active, m.start_date, m.end_date
+            ORDER BY CASE
+                         WHEN g.code ~ '^[0-9]+$' THEN lpad(g.code, 10, '0')
+                         ELSE g.code
+                         END \
+            """
 
 
 @app.callback(
@@ -256,3 +272,172 @@ def update_table(n_clicks):
         columns, data = TableUpdater.query_to_df(engine, sql_query)
         return columns, data
     return [], []
+
+
+# Создаем компонент offcanvas для отображения информации об обновлениях
+def create_updates_offcanvas():
+    offcanvas = dbc.Offcanvas(
+        [
+            dbc.Card(
+                [
+                    dbc.CardHeader(
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    html.H5("Информация об обновлении данных", className="mb-0"),
+                                ),
+                                dbc.Col(
+                                    dbc.Button(
+                                        html.I(className="bi bi-arrow-repeat"),  # Используем иконку Bootstrap
+                                        id="refresh-updates-button",
+                                        color="primary",
+                                        size="sm",
+                                        className="float-end"
+                                    ),
+                                    width="auto"
+                                )
+                            ],
+                            align="center"
+                        )
+                    ),
+                    dbc.CardBody(
+                        [
+                            html.P("Последние обновления данных в системе:", className="mb-3"),
+                            html.Div(
+                                id="loading-container",
+                                children=[
+                                    dbc.Spinner(
+                                        color="primary",
+                                        type="border",
+                                        size="lg", 
+                                        spinner_style={"width": "3rem", "height": "3rem"}
+                                    ),
+                                ],
+                                style={"textAlign": "center", "minHeight": "200px", "paddingTop": "70px"}
+                            ),
+                            html.Div(
+                                id="updates-table-container",
+                                style={"display": "none"}
+                            ),
+                            html.Div(id="last-updated-time", className="text-muted mt-3 small")
+                        ]
+                    )
+                ],
+                className="border-0 h-100"
+            )
+        ],
+        id="updates-offcanvas",
+        title="Обновления данных",
+        placement="start",
+        is_open=False,
+    )
+    return offcanvas
+
+
+# Добавляем callback для открытия/закрытия offcanvas с обновлениями
+@app.callback(
+    Output("updates-offcanvas", "is_open"),
+    Input("open-updates-offcanvas", "n_clicks"),
+    State("updates-offcanvas", "is_open"),
+)
+def toggle_updates_offcanvas(n_clicks, is_open):
+    if n_clicks:
+        return not is_open
+    return is_open
+
+
+# Добавляем callback для обновления данных в таблице обновлений
+@app.callback(
+    [
+        Output("updates-table-container", "children"),
+        Output("updates-table-container", "style"),
+        Output("loading-container", "style"),
+        Output("last-updated-time", "children")
+    ],
+    [Input("updates-offcanvas", "is_open"),
+     Input("refresh-updates-button", "n_clicks")]
+)
+def update_updates_data(is_open, n_clicks):
+    # Определяем контекст вызова callback
+    ctx = callback_context
+    
+    # Если callback вызван не открытием offcanvas и не нажатием кнопки обновления, не делаем ничего
+    if not ctx.triggered or (not is_open and ctx.triggered[0]["prop_id"] == "updates-offcanvas.is_open"):
+        return None, {"display": "none"}, {"display": "none"}, ""
+    
+    # Добавим небольшую задержку для демонстрации спиннера
+    time.sleep(1)
+    
+    # Получаем информацию о последних обновлениях таблиц
+    tables_to_check = [
+        {"name": "ОМС: Талоны", "table": "load_data_talons"},
+        {"name": "ОМС: Врачи", "table": "load_data_doctor"},
+        {"name": "ОМС: Отказы", "table": "load_data_error_log_talon"},
+        {"name": "ОМС: Диспансеризация", "table": "load_data_detailed_medical_examination"},
+    ]
+    
+    rows = []
+    
+    try:
+        with engine.connect() as conn:
+            for table_info in tables_to_check:
+                query = f"SELECT MAX(updated_at) FROM {table_info['table']}"
+                result = conn.execute(text(query)).fetchone()
+                if result and result[0]:
+                    # Форматируем дату в нужный формат
+                    update_time = result[0]
+                    formatted_time = update_time.strftime("%d.%m.%Y %H:%M")
+                    rows.append(html.Tr([
+                        html.Td(table_info["name"]),
+                        html.Td(formatted_time)
+                    ]))
+                else:
+                    rows.append(html.Tr([
+                        html.Td(table_info["name"]),
+                        html.Td("Нет данных")
+                    ]))
+    except Exception as e:
+        rows.append(html.Tr([
+            html.Td("Ошибка получения данных"),
+            html.Td(str(e))
+        ]))
+    
+    table_header = [
+        html.Thead(html.Tr([
+            html.Th("Данные"),
+            html.Th("Обновлено")
+        ]))
+    ]
+    
+    table_body = [html.Tbody(rows)]
+    
+    # Создаем таблицу
+    table = dbc.Table(
+        table_header + table_body,
+        bordered=True,
+        hover=True,
+        responsive=True,
+        striped=True
+    )
+    
+    current_time = datetime.now().strftime("%d.%m.%Y %H:%M")
+    last_updated_text = f"Информация актуальна на: {current_time}"
+    
+    # Возвращаем таблицу, стиль для контейнера таблицы (показать), 
+    # стиль для контейнера спиннера (скрыть), и текст с временем
+    return table, {"display": "block"}, {"display": "none"}, last_updated_text
+
+
+# Добавляем callback для показа спиннера при открытии панели
+@app.callback(
+    [
+        Output("loading-container", "style", allow_duplicate=True),
+        Output("updates-table-container", "style", allow_duplicate=True)
+    ],
+    [Input("updates-offcanvas", "is_open")],
+    prevent_initial_call=True
+)
+def show_spinner_on_open(is_open):
+    if is_open:
+        return {"textAlign": "center", "minHeight": "200px", "paddingTop": "70px", "display": "block"}, {"display": "none"}
+    return {"display": "none"}, {"display": "none"}

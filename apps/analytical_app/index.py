@@ -18,9 +18,18 @@ HOST_DASH = os.getenv('HOST_DASH', '0.0.0.0')
 from dash import dcc, html
 from apps.analytical_app.app import app
 from apps.analytical_app.routes import register_routes
-from components.sidebar import create_sidebar
-from components.navbar import create_navbar, create_modal_168n, create_modal_status, create_modal_goal
-from components.footer import create_footer
+from apps.analytical_app.components.sidebar import create_sidebar
+from apps.analytical_app.components.navbar import create_navbar, create_modal_168n, create_modal_status, create_modal_goal
+from apps.analytical_app.components.footer import create_footer, get_content_style
+
+# Стили для основного контейнера
+content_style = {
+    'margin-left': '5rem',  # Отступ для сайдбара
+    'margin-top': '56px',  # Отступ для навбара
+    'padding': '2rem 1rem',
+    'padding-bottom': '60px',  # Отступ снизу для футера
+    'min-height': 'calc(100vh - 96px)'  # Минимальная высота контента
+}
 
 app.layout = html.Div(
     [
@@ -34,7 +43,7 @@ app.layout = html.Div(
         create_modal_status(),
         create_modal_goal(),
         create_sidebar(),
-        html.Div(id='page-content', style={'margin-left': '5rem', 'margin-top': '56px', 'padding': '2rem 1rem'}),
+        html.Div(id='page-content', style=content_style),
         create_footer(),
     ]
 )
