@@ -1,4 +1,4 @@
-# components/sidebar.py
+
 from dash import html, Input, Output, State
 import dash_bootstrap_components as dbc
 
@@ -99,6 +99,13 @@ def create_sidebar():
                         id="registry-link"
                     ),
                     dbc.NavLink(
+                        [html.I(className="bi bi-filter-square"),
+                         html.Span(" Лаборатория", className="ms-2", id="laboratory-label")],
+                        href="/laboratory",
+                        active="exact",
+                        id="laboratory-link"
+                    ),
+                    dbc.NavLink(
                         [html.I(className="bi bi-list"),
                          html.Span(" Главное меню", className="ms-2", id="main-menu-label")],
                         href=main_app_url,
@@ -136,6 +143,7 @@ def create_sidebar():
          # Output("iszl-label", "style"),
          Output("web-talon-label", "style"),
          Output("registry-label", "style"),
+         Output("laboratory-label", "style"),
          Output("main-menu-label", "style")],
         [Input("btn_sidebar", "n_clicks")],
         [State("sidebar-state", "data"),
@@ -151,7 +159,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
-                    {"display": "none"},
+                    {"display": "none"}, {"display": "none"}
                     )
         else:
             # Развернутый вид
@@ -160,7 +168,7 @@ def create_sidebar():
             return (sidebar_style, page_content_style,
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
-                    {"display": "inline"},
+                    {"display": "inline"}, {"display": "inline"}
                     )
 
     @app.callback(
@@ -174,6 +182,7 @@ def create_sidebar():
          # Output("iszl-link", "active"),
          Output("web-talon-link", "active"),
          Output("registry-link", "active"),
+         Output("laboratory-link", "active"),
          ],
         [Input("url", "pathname")]
     )
@@ -189,6 +198,7 @@ def create_sidebar():
             # pathname.startswith("/iszl"),  # Для Помощи
             pathname.startswith("/web_oms"),  # Для Помощи
             pathname.startswith("/registry"),  # Реестры
+            pathname.startswith("/laboratory"),  # Лаборатория
         ]
 
     return sidebar

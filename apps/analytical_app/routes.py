@@ -18,6 +18,7 @@ from apps.analytical_app.pages.head.dn_job.page import head_dn_job
 from apps.analytical_app.pages.head.doctors.page import layout_doctors_goal
 from apps.analytical_app.pages.head.routes import routes_head
 from apps.analytical_app.pages.iszl.main import iszl_main
+from apps.analytical_app.pages.laboratory.routes import routes_laboratory
 from apps.analytical_app.pages.main.page import main_layout
 from apps.analytical_app.pages.registry.routes import routes_registry
 from apps.analytical_app.pages.statistic.cardiology_report.cardiology_report import statistic_cardiology
@@ -267,6 +268,7 @@ routes.update(routes_doctors)
 routes.update(routes_head)
 routes.update(routes_administrator)
 routes.update(routes_registry)
+routes.update(routes_laboratory)
 
 
 def page_not_found(pathname):

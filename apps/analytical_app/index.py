@@ -17,7 +17,7 @@ HOST_DASH = os.getenv('HOST_DASH', '0.0.0.0')
 
 from dash import dcc, html
 from apps.analytical_app.app import app
-from apps.analytical_app.routes import register_routes
+from apps.analytical_app.routes import register_routes, routes
 from apps.analytical_app.components.sidebar import create_sidebar
 from apps.analytical_app.components.navbar import create_navbar, create_modal_168n, create_modal_status, create_modal_goal
 from apps.analytical_app.components.footer import create_footer, get_content_style
@@ -49,5 +49,6 @@ app.layout = html.Div(
 )
 
 register_routes(app)
+
 if __name__ == "__main__":
     app.run(debug=DEBUG_DASH, host=HOST_DASH, port=PORT_DASH)
