@@ -1,0 +1,6 @@
+import os
+
+ISZL_BROWSER = os.getenv("ISZL_BROWSER")
+ISZL_BASE_URL = os.getenv("ISZL_BASE_URL")
+ISZL_USERNAME = os.getenv("ISZL_USERNAME")
+ISZL_PASSWORD = os.getenv("ISZL_PASSWORD")
