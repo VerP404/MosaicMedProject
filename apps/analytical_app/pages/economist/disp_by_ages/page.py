@@ -176,7 +176,7 @@ def update_table(n_clicks, selected_period, selected_type_dv, selected_year, sel
         raise exceptions.PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
-    
+
     # Определяем список статусов в зависимости от выбранного режима
     if status_mode == 'group':
         if selected_status_group is None:
@@ -186,14 +186,14 @@ def update_table(n_clicks, selected_period, selected_type_dv, selected_year, sel
             selected_status_values = status_groups[selected_status_group]
     else:  # status_mode == 'individual'
         selected_status_values = selected_individual_statuses if selected_individual_statuses else []
-    
+
     # Защита от пустых значений
     if not selected_status_values:
         selected_status_values = ['2']  # Используем '2' как значение по умолчанию
-    
+
     selected_status_tuple = tuple(selected_status_values)
     selected_type_dv_tuple = tuple(selected_type_dv)
-    
+
     # Проверяем, что selected_buildings не пустой
     if not selected_buildings:
         # Пытаемся получить список корпусов из БД
@@ -204,7 +204,6 @@ def update_table(n_clicks, selected_period, selected_type_dv, selected_year, sel
                 if not selected_buildings:
                     selected_buildings = ['ГП1']  # Значение по умолчанию, если из БД ничего не получено
         except Exception as e:
-            print(f"Ошибка при получении корпусов: {e}")
             selected_buildings = ['ГП1']  # Значение по умолчанию
 
     # Формируем список месяцев для SQL запроса
@@ -222,53 +221,46 @@ def update_table(n_clicks, selected_period, selected_type_dv, selected_year, sel
                         from datetime import datetime
                         current_year = datetime.now().year
                         sql_months.append(f"'{month_name} {current_year}'")
-            
+
             # Если это текущий месяц, добавим также условие для "-"
             current_month_num, _ = get_current_reporting_month()
             if current_month_num >= selected_months_range[0] and current_month_num <= selected_months_range[1]:
                 sql_months.append("'-'")
-                
+
             sql_cond = ', '.join(sql_months)
         except (TypeError, IndexError) as e:
-            print(f"Ошибка при формировании SQL условия: {e}, selected_months_range: {selected_months_range}")
             sql_cond = ""
     else:
         sql_cond = ""
-    
+
     # Если список месяцев пуст, возьмем все месяцы от 1 до 12
     if not sql_cond:
         from datetime import datetime
         current_year = selected_year or datetime.now().year
-        sql_months = [f"'{months_sql_labels[month]} {current_year}'" for month in range(1, 13) if month in months_sql_labels]
+        sql_months = [f"'{months_sql_labels[month]} {current_year}'" for month in range(1, 13) if
+                      month in months_sql_labels]
         sql_months.append("'-'")  # Добавляем текущий месяц
         sql_cond = ', '.join(sql_months)
-    
-    # Выводим для отладки
-    print(f"selected_months_range: {selected_months_range}")
-    print(f"SQL condition: {sql_cond}")
-    
+
     # Проверяем, что selected_year задан
     if not selected_year:
         from datetime import datetime
         selected_year = datetime.now().year
-    
+
     try:
         # Формируем SQL запрос
         sql_query = sql_query_disp_dv4(sql_cond, selected_year, selected_buildings)
-        print(f"SQL query: {sql_query}")
 
         bind_params = {
             'status_list': selected_status_tuple,
             'dv': selected_type_dv_tuple,
             'building_list': tuple(selected_buildings) if selected_buildings else tuple(['ГП1'])
         }
-        print(f"Bind params: {bind_params}")
 
         columns, data = TableUpdater.query_to_df(engine, sql_query, bind_params)
         if len(data) == 0:
             return [], [], loading_output, True
         return columns, data, loading_output, False
     except Exception as e:
-        print(f"Ошибка выполнения запроса: {e}")
         # Возвращаем пустые данные и показываем уведомление об ошибке
         return [], [], loading_output, True
