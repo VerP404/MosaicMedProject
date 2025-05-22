@@ -7,11 +7,10 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 import tempfile
 import subprocess
-import json
 import platform
 import socket
 
-from mosaic_conductor.selenium.wo.config import CHROME_DRIVER
+from mosaic_conductor.selenium.config import CHROME_DRIVER
 
 
 def get_chrome_version():

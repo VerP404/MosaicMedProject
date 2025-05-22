@@ -5,7 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from mosaic_conductor.selenium.screen import save_screenshot
-from mosaic_conductor.selenium.wo.config import OMS_USERNAME, OMS_PASSWORD
+from mosaic_conductor.selenium.config import OMS_USERNAME, OMS_PASSWORD
 import time
 
 
@@ -13,7 +13,7 @@ import time
     required_resource_keys={"selenium_driver"},
     retry_policy=RetryPolicy(max_retries=3, delay=120)
 )
-def open_site_op(context) -> str:
+def open_site_wo_op(context) -> str:
     driver = None
     try:
         # Получение драйвера из ресурса

@@ -13,7 +13,7 @@ from dagster import op, Field, String, Int, List, Array
         "destination_folders": Field(Array(String), is_required=True)  # удалили default_value
     }
 )
-def move_downloaded_file_op(context, previous_step_result: str = "") -> str:
+def move_wo_downloaded_file_op(context, previous_step_result: str = "") -> str:
     temp_download_folder = context.op_config["temp_download_folder"]
     destination_folders = context.op_config["destination_folders"]
     file_pattern = context.op_config["file_pattern"]

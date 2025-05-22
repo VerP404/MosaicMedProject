@@ -1,12 +1,12 @@
 import os
-from dagster import graph, in_process_executor, Field, Array, String, schedule
+from dagster import graph, in_process_executor, schedule
 
-from mosaic_conductor.selenium.wo.config import OMS_BROWSER, OMS_BASE_URL
-from mosaic_conductor.selenium.wo.ops.wo_start import open_site_op
+from mosaic_conductor.selenium.config import OMS_BROWSER, OMS_BASE_URL
+from mosaic_conductor.selenium.wo.ops.wo_start import open_site_wo_op
 from mosaic_conductor.selenium.wo.ops.wo_filter import filter_input_op, filter_input_doctor_op, filter_input_detail_op, \
     filter_input_error_op
-from mosaic_conductor.selenium.wo.ops.wo_download import move_downloaded_file_op
-from mosaic_conductor.selenium.wo.selenium_driver import selenium_driver_resource
+from mosaic_conductor.selenium.wo.ops.wo_download import move_wo_downloaded_file_op
+from mosaic_conductor.selenium.selenium_driver import selenium_driver_resource
 
 
 def create_download_job(
@@ -16,7 +16,7 @@ def create_download_job(
         temp_download_folder: str,
         destination_folders: list,
         file_pattern: str,
-        filter_input_op_fn,  # функция-оп для фильтрации, например filter_input_op или другая
+        filter_wo_input_op_fn,  # функция-оп для фильтрации, например filter_input_op или другая
         extra_filter_config: dict = None,
 ):
     """
@@ -28,15 +28,15 @@ def create_download_job(
     :param temp_download_folder: временная папка для загрузок.
     :param destination_folders: список конечных папок для копирования файла.
     :param file_pattern: шаблон для поиска загруженного файла (например, "journal_20*.csv").
-    :param filter_input_op_fn: оп-функция, отвечающая за установку фильтров на нужной странице.
+    :param filter_wo_input_op_fn: оп-функция, отвечающая за установку фильтров на нужной странице.
     :param extra_filter_config: дополнительные настройки для фильтра (если требуются).
     """
 
     @graph(name=f"{job_name}_graph")
     def download_graph():
-        site_url = open_site_op()
-        filter_result = filter_input_op_fn(site_url)
-        move_downloaded_file_op(filter_result)
+        site_url = open_site_wo_op()
+        filter_result = filter_wo_input_op_fn(site_url)
+        move_wo_downloaded_file_op(filter_result)
 
     job_config = {
         "resources": {
@@ -50,8 +50,8 @@ def create_download_job(
             }
         },
         "ops": {
-            filter_input_op_fn.__name__: {"config": extra_filter_config or {}},
-            "move_downloaded_file_op": {
+            filter_wo_input_op_fn.__name__: {"config": extra_filter_config or {}},
+            "move_wo_downloaded_file_op": {
                 "config": {
                     "file_pattern": file_pattern,
                     "timeout": 60,
@@ -79,7 +79,7 @@ wo_download_talon_job = create_download_job(
         os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "weboms", "talon", "new")
     ],
     file_pattern="journal_202*.csv",
-    filter_input_op_fn=filter_input_op,
+    filter_wo_input_op_fn=filter_input_op,
     extra_filter_config={},
 )
 wo_download_doctor_job = create_download_job(
@@ -92,7 +92,7 @@ wo_download_doctor_job = create_download_job(
         os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "weboms", "doctor", "new")
     ],
     file_pattern="journal_Doctors*.csv",
-    filter_input_op_fn=filter_input_doctor_op,
+    filter_wo_input_op_fn=filter_input_doctor_op,
     extra_filter_config={},
 )
 
@@ -105,7 +105,7 @@ wo_download_detail_job = create_download_job(
         os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "weboms", "detailed"),
     ],
     file_pattern="journal_Detailed_Medical_Examination*.csv",
-    filter_input_op_fn=filter_input_detail_op,
+    filter_wo_input_op_fn=filter_input_detail_op,
     extra_filter_config={}
 )
 wo_download_error_job = create_download_job(
@@ -117,7 +117,7 @@ wo_download_error_job = create_download_job(
         os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "weboms", "errorlog"),
     ],
     file_pattern="journal_ErrorLog_*.csv",
-    filter_input_op_fn=filter_input_error_op,
+    filter_wo_input_op_fn=filter_input_error_op,
     extra_filter_config={}
 )
 
@@ -156,3 +156,18 @@ def selenium_wo_detail_schedule(_context):
 )
 def selenium_wo_error_schedule(_context):
     return {}
+
+
+wo_selenium_jobs = [
+    wo_download_talon_job,
+    wo_download_doctor_job,
+    wo_download_detail_job,
+    wo_download_error_job
+]
+
+wo_selenium_schedules = [
+    selenium_wo_talon_schedule,
+    selenium_wo_doctor_schedule,
+    selenium_wo_detail_schedule,
+    selenium_wo_error_schedule
+]
