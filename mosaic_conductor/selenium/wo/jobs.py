@@ -1,5 +1,5 @@
 import os
-from dagster import graph, in_process_executor, schedule
+from dagster import graph, in_process_executor, schedule, RetryPolicy, GraphDefinition
 
 from mosaic_conductor.selenium.config import OMS_BROWSER, OMS_BASE_URL
 from mosaic_conductor.selenium.wo.ops.wo_start import open_site_wo_op
@@ -18,6 +18,8 @@ def create_download_job(
         file_pattern: str,
         filter_wo_input_op_fn,  # функция-оп для фильтрации, например filter_input_op или другая
         extra_filter_config: dict = None,
+        retry_attempts: int = 3,
+        retry_delay: int = 300,
 ):
     """
     Создает Dagster job для скачивания файлов из веб-приложения.
@@ -30,6 +32,8 @@ def create_download_job(
     :param file_pattern: шаблон для поиска загруженного файла (например, "journal_20*.csv").
     :param filter_wo_input_op_fn: оп-функция, отвечающая за установку фильтров на нужной странице.
     :param extra_filter_config: дополнительные настройки для фильтра (если требуются).
+    :param retry_attempts: количество повторных попыток выполнения job при ошибке.
+    :param retry_delay: задержка в секундах между повторными попытками.
     """
 
     @graph(name=f"{job_name}_graph")
@@ -66,6 +70,7 @@ def create_download_job(
         resource_defs={"selenium_driver": selenium_driver_resource},
         config=job_config,
         executor_def=in_process_executor,
+        tags={"dagster/max_retries": str(retry_attempts), "dagster/retry_delay": str(retry_delay)}
     )
 
 
@@ -81,6 +86,8 @@ wo_download_talon_job = create_download_job(
     file_pattern="journal_202*.csv",
     filter_wo_input_op_fn=filter_input_op,
     extra_filter_config={},
+    retry_attempts=3,
+    retry_delay=300,
 )
 wo_download_doctor_job = create_download_job(
     job_name="wo_download_doctor_job",
@@ -94,6 +101,8 @@ wo_download_doctor_job = create_download_job(
     file_pattern="journal_Doctors*.csv",
     filter_wo_input_op_fn=filter_input_doctor_op,
     extra_filter_config={},
+    retry_attempts=3,
+    retry_delay=300,
 )
 
 wo_download_detail_job = create_download_job(
@@ -106,7 +115,9 @@ wo_download_detail_job = create_download_job(
     ],
     file_pattern="journal_Detailed_Medical_Examination*.csv",
     filter_wo_input_op_fn=filter_input_detail_op,
-    extra_filter_config={}
+    extra_filter_config={},
+    retry_attempts=3,
+    retry_delay=300,
 )
 wo_download_error_job = create_download_job(
     job_name="wo_download_error_job",
@@ -118,7 +129,9 @@ wo_download_error_job = create_download_job(
     ],
     file_pattern="journal_ErrorLog_*.csv",
     filter_wo_input_op_fn=filter_input_error_op,
-    extra_filter_config={}
+    extra_filter_config={},
+    retry_attempts=3,
+    retry_delay=300,
 )
 
 

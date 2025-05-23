@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
-from dagster import op, Field, String, RetryPolicy, RetryRequested
+from dagster import op, Field, String
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -13,8 +13,7 @@ import time
         "start_date_treatment": Field(String, is_required=False, default_value=""),
         "start_date": Field(String, is_required=False, default_value="")
     },
-    required_resource_keys={"selenium_driver"},
-    retry_policy=RetryPolicy(max_retries=3, delay=30)
+    required_resource_keys={"selenium_driver"}
 )
 def filter_input_op(context, site_url: str):
     driver = context.resources.selenium_driver
@@ -109,35 +108,10 @@ def filter_input_op(context, site_url: str):
     time.sleep(5)
     context.log.info("Выбираем все результаты")
 
-    # Выбираем все результаты с обработкой ошибки и повторными попытками
-    max_attempts = 5
-    for attempt in range(max_attempts):
-        try:
-            context.log.info(f"Попытка нажать на чекбокс (попытка {attempt+1} из {max_attempts})")
-            # Прокрутка до чекбокса для обеспечения видимости
-            select_all_checkbox = driver.find_element(By.XPATH,
+    # Выбираем все результаты
+    select_all_checkbox = driver.find_element(By.XPATH,
                                               '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[2]/table[1]/thead/tr[1]/th[1]/span')
-            # Используем JavaScript для прокрутки к элементу
-            driver.execute_script("arguments[0].scrollIntoView(true);", select_all_checkbox)
-            # Ждем небольшую паузу после прокрутки
-            time.sleep(1)
-            # Проверяем, перекрыт ли элемент
-            if not select_all_checkbox.is_displayed():
-                context.log.info("Чекбокс не отображается, повторная попытка...")
-                time.sleep(2)
-                continue
-                
-            # Пробуем нажать с использованием JavaScript
-            driver.execute_script("arguments[0].click();", select_all_checkbox)
-            context.log.info("Успешно выбран чекбокс 'выбрать все'")
-            break
-        except Exception as e:
-            context.log.error(f"Ошибка при выборе чекбокса: {e}")
-            if attempt == max_attempts - 1:
-                context.log.error(f"Не удалось выбрать чекбокс после {max_attempts} попыток")
-                raise RetryRequested(f"Не удалось выбрать чекбокс после {max_attempts} попыток: {str(e)}")
-            time.sleep(2)
-            
+    select_all_checkbox.click()
     # Скачивание файла
     context.log.info("Начинаем скачивание файла")
     download_button = driver.find_element(By.XPATH, '//*[@id="menu"]/div/div[3]/div/div/div[5]/a/button')
@@ -147,8 +121,7 @@ def filter_input_op(context, site_url: str):
 
 
 @op(
-    required_resource_keys={"selenium_driver"},
-    retry_policy=RetryPolicy(max_retries=3, delay=30)
+    required_resource_keys={"selenium_driver"}
 )
 def filter_input_doctor_op(context, site_url: str):
     time.sleep(5)
@@ -164,40 +137,15 @@ def filter_input_doctor_op(context, site_url: str):
     )
     search_button.click()
 
-    # Обработка выбора всех элементов с повторными попытками
-    max_attempts = 5
-    for attempt in range(max_attempts):
-        try:
-            context.log.info(f"Попытка нажать на чекбокс (попытка {attempt+1} из {max_attempts})")
-            time.sleep(2)  # Даем время для загрузки результатов
-            
-            # Прокрутка до чекбокса для обеспечения видимости
-            select_all_checkbox = driver.find_element(By.XPATH,
-                                            '/html/body/div[1]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
-            
-            # Используем JavaScript для прокрутки к элементу
-            driver.execute_script("arguments[0].scrollIntoView(true);", select_all_checkbox)
-            # Ждем небольшую паузу после прокрутки
-            time.sleep(1)
-            
-            # Проверяем, перекрыт ли элемент
-            if not select_all_checkbox.is_displayed() or not select_all_checkbox.is_enabled():
-                context.log.info("Чекбокс не отображается или недоступен, повторная попытка...")
-                time.sleep(2)
-                continue
-            
-            # Пробуем нажать с использованием JavaScript
-            driver.execute_script("arguments[0].click();", select_all_checkbox)
-            context.log.info("Успешно выбран чекбокс 'выбрать все'")
-            break
-        except Exception as e:
-            context.log.error(f"Ошибка при выборе чекбокса: {e}")
-            if attempt == max_attempts - 1:
-                context.log.error(f"Не удалось выбрать чекбокс после {max_attempts} попыток")
-                raise RetryRequested(f"Не удалось выбрать чекбокс после {max_attempts} попыток: {str(e)}")
-            time.sleep(2)
-    
-    # Скачивание файла
+    try:
+        select_all_checkbox = driver.find_element(By.XPATH,
+                                                  '/html/body/div[1]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
+        select_all_checkbox.click()
+    except:
+        time.sleep(5)
+        select_all_checkbox = driver.find_element(By.XPATH,
+                                                  '/html/body/div[1]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
+        select_all_checkbox.click()
     download_button = wait.until(
         EC.element_to_be_clickable(
             (By.XPATH, '/html/body/div[1]/div/div[2]/div[2]/div[1]/div/div[2]/div/div[2]/div[2]/a/button'))
@@ -211,8 +159,7 @@ def filter_input_doctor_op(context, site_url: str):
         "start_date_treatment": Field(String, is_required=False, default_value=""),
         "start_date": Field(String, is_required=False, default_value="")
     },
-    required_resource_keys={"selenium_driver"},
-    retry_policy=RetryPolicy(max_retries=3, delay=30)
+    required_resource_keys={"selenium_driver"}
 )
 def filter_input_detail_op(context, site_url: str):
     time.sleep(5)
@@ -310,35 +257,10 @@ def filter_input_detail_op(context, site_url: str):
     time.sleep(5)
     context.log.info("Выбираем все результаты")
 
-    # Выбираем все результаты с обработкой ошибки и повторными попытками
-    max_attempts = 5
-    for attempt in range(max_attempts):
-        try:
-            context.log.info(f"Попытка нажать на чекбокс (попытка {attempt+1} из {max_attempts})")
-            # Прокрутка до чекбокса для обеспечения видимости
-            select_all_checkbox = driver.find_element(By.XPATH,
-                                                  '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
-            # Используем JavaScript для прокрутки к элементу
-            driver.execute_script("arguments[0].scrollIntoView(true);", select_all_checkbox)
-            # Ждем небольшую паузу после прокрутки
-            time.sleep(1)
-            # Проверяем, перекрыт ли элемент
-            if not select_all_checkbox.is_displayed() or not select_all_checkbox.is_enabled():
-                context.log.info("Чекбокс не отображается или недоступен, повторная попытка...")
-                time.sleep(2)
-                continue
-                
-            # Пробуем нажать с использованием JavaScript
-            driver.execute_script("arguments[0].click();", select_all_checkbox)
-            context.log.info("Успешно выбран чекбокс 'выбрать все'")
-            break
-        except Exception as e:
-            context.log.error(f"Ошибка при выборе чекбокса: {e}")
-            if attempt == max_attempts - 1:
-                context.log.error(f"Не удалось выбрать чекбокс после {max_attempts} попыток")
-                raise RetryRequested(f"Не удалось выбрать чекбокс после {max_attempts} попыток: {str(e)}")
-            time.sleep(2)
-    
+    # Выбираем все результаты
+    select_all_checkbox = driver.find_element(By.XPATH,
+                                              '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
+    select_all_checkbox.click()
     # Скачивание файла
     context.log.info("Начинаем скачивание файла")
     download_button = driver.find_element(By.XPATH, '//*[@id="menu"]/div/div[4]/div/div[2]/div[2]/a/button')
@@ -351,8 +273,7 @@ def filter_input_detail_op(context, site_url: str):
         "start_date_treatment": Field(String, is_required=False, default_value=""),
         "start_date": Field(String, is_required=False, default_value="")
     },
-    required_resource_keys={"selenium_driver"},
-    retry_policy=RetryPolicy(max_retries=3, delay=30)
+    required_resource_keys={"selenium_driver"}
 )
 def filter_input_error_op(context, site_url: str):
     time.sleep(5)
@@ -437,37 +358,10 @@ def filter_input_error_op(context, site_url: str):
     time.sleep(5)
     context.log.info("Выбираем все результаты")
 
-    # Выбираем все результаты с обработкой ошибки и повторными попытками
-    max_attempts = 5
-    for attempt in range(max_attempts):
-        try:
-            context.log.info(f"Попытка нажать на чекбокс (попытка {attempt+1} из {max_attempts})")
-            # Прокрутка до чекбокса для обеспечения видимости
-            select_all_checkbox = driver.find_element(By.XPATH,
+    # Выбираем все результаты
+    select_all_checkbox = driver.find_element(By.XPATH,
                                               '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
-            
-            # Используем JavaScript для прокрутки к элементу
-            driver.execute_script("arguments[0].scrollIntoView(true);", select_all_checkbox)
-            # Ждем небольшую паузу после прокрутки
-            time.sleep(1)
-            
-            # Проверяем, перекрыт ли элемент
-            if not select_all_checkbox.is_displayed() or not select_all_checkbox.is_enabled():
-                context.log.info("Чекбокс не отображается или недоступен, повторная попытка...")
-                time.sleep(2)
-                continue
-                
-            # Пробуем нажать с использованием JavaScript
-            driver.execute_script("arguments[0].click();", select_all_checkbox)
-            context.log.info("Успешно выбран чекбокс 'выбрать все'")
-            break
-        except Exception as e:
-            context.log.error(f"Ошибка при выборе чекбокса: {e}")
-            if attempt == max_attempts - 1:
-                context.log.error(f"Не удалось выбрать чекбокс после {max_attempts} попыток")
-                raise RetryRequested(f"Не удалось выбрать чекбокс после {max_attempts} попыток: {str(e)}")
-            time.sleep(2)
-    
+    select_all_checkbox.click()
     # Скачивание файла
     context.log.info("Начинаем скачивание файла")
     download_button = driver.find_element(By.XPATH, '//*[@id="menu"]/div/div[6]/div/div/div[4]/a/button')
