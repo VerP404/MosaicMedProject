@@ -276,6 +276,13 @@ def update_table(n_clicks):
 
 # Создаем компонент offcanvas для отображения информации об обновлениях
 def create_updates_offcanvas():
+    # Получаем URL из модуля страницы администратора
+    try:
+        from apps.analytical_app.pages.administrator.update_data.page import dagster_url, filebrowser_url
+    except ImportError:
+        dagster_url = "http://127.0.0.1:3000"
+        filebrowser_url = "http://127.0.0.1:8080"
+        
     offcanvas = dbc.Offcanvas(
         [
             dbc.Card(
@@ -319,7 +326,56 @@ def create_updates_offcanvas():
                                 id="updates-table-container",
                                 style={"display": "none"}
                             ),
-                            html.Div(id="last-updated-time", className="text-muted mt-3 small")
+                            html.Div(id="last-updated-time", className="text-muted mt-3 small"),
+                            
+                            # Добавляем секцию с кнопками управления
+                            html.Hr(className="my-4"),
+                            html.H6("Управление системой:", className="mb-3"),
+                            
+                            # Кнопки без карточек
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        dbc.Button(
+                                            [
+                                                html.I(className="bi bi-robot me-2"),
+                                                "Система автоматизации"
+                                            ],
+                                            color="primary",
+                                            href=dagster_url,
+                                            target="_blank",
+                                            className="w-100"
+                                        ),
+                                        md=6,
+                                        className="mb-3"
+                                    ),
+                                    dbc.Col(
+                                        dbc.Button(
+                                            [
+                                                html.I(className="bi bi-folder2-open me-2"),
+                                                "Файловый браузер"
+                                            ],
+                                            color="warning",
+                                            href=filebrowser_url,
+                                            target="_blank",
+                                            className="w-100"
+                                        ),
+                                        md=6,
+                                        className="mb-3"
+                                    ),
+                                ],
+                                className="mt-3"
+                            ),
+                            
+                            # Добавляем информационный блок с подсказкой
+                            dbc.Alert(
+                                [
+                                    html.I(className="bi bi-info-circle-fill me-2"),
+                                    "Имя пользователя и пароль по умолчанию: admin"
+                                ],
+                                color="info",
+                                className="mt-3 small py-2"
+                            ),
                         ]
                     )
                 ],
