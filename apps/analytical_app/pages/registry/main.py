@@ -1,4 +1,5 @@
-from dash import html, callback_context, no_update, Output, Input
+from dash import html, Input, Output, callback_context, dcc
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.components.cards import create_card
@@ -17,33 +18,31 @@ cards_row_1 = dbc.Row(
 )
 
 registry_main = html.Div([
-    dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
-        {"label": label, "active": True},
-    ]),
+    dbc.Breadcrumb(
+        id=f"breadcrumb-{type_page}",
+        items=[{"label": label, "active": True}]
+    ),
     html.Hr(),
+    dcc.Location(id=f'url-{type_page}', refresh=True),
     html.Div(cards_row_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
 ])
 
-
+# Обновленный callback для навигации
 @app.callback(
-    [Output('url', 'pathname', allow_duplicate=True),
-     Output(f'breadcrumb-{type_page}', 'items'),
-     ],
-    [Input(f'open-report-1-{type_page}', 'n_clicks'),
-     ],
+    Output(f'url-{type_page}', 'pathname'),
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1]],
     prevent_initial_call=True
 )
-def navigate_pages(open_report_1):
+def navigate_pages(*n_clicks):
     ctx = callback_context
     if not ctx.triggered:
-        return no_update, no_update
-
+        raise PreventUpdate
+    
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
-    breadcrumb_items = [{"label": label, "href": f"/{main_link}", "active": True}]
-
-    if button_id.startswith("open-report-") and main_link in button_id:
-        if button_id == f'open-report-1-{type_page}' and open_report_1:
-            breadcrumb_items.append({"label": "Не госпитализированные", "active": True})
-            return f'/{main_link}/not_hospitalized', breadcrumb_items
-    return f'/{main_link}', breadcrumb_items
+    report_num = int(button_id.split('-')[2])
+    
+    route_map = {
+        1: f"/{main_link}/not_hospitalized"
+    }
+    
+    return route_map[report_num]

@@ -1,4 +1,4 @@
-from dash import html, Input, Output, callback_context
+from dash import html, Input, Output, callback_context, dcc
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
@@ -49,44 +49,36 @@ cards_row_2 = dbc.Row(
 )
 # Основной layout
 head_adults_dd_main = html.Div([
-    dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
-        {"label": label, "active": True},
-    ]),
+    dbc.Breadcrumb(
+        id=f"breadcrumb-{type_page}",
+        items=[{"label": label, "active": True}]
+    ),
     html.Hr(),
+    dcc.Location(id=f'url-{type_page}', refresh=True),
     cards_row_1,
     cards_row_2
 ])
 
-
-# Callback навигации: n_clicks_timestamp + allow_duplicate
+# Обновленный callback для навигации
 @app.callback(
-    [Output('url', 'pathname', allow_duplicate=True),
-     Output(f'breadcrumb-{type_page}', 'items')],
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in [1, 3, 8, 9, 10]],
+    Output(f'url-{type_page}', 'pathname'),
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 3, 8, 9, 10]],
     prevent_initial_call=True
 )
-def navigate_adults(ts1, ts3, ts8, ts9, ts10):
-    timestamps = [ts1, ts3, ts8, ts9, ts10]
-    if not any(timestamps):
+def navigate_pages(*n_clicks):
+    ctx = callback_context
+    if not ctx.triggered:
         raise PreventUpdate
-
-    # Определяем индекс последней нажатой кнопки
-    idx = max(range(len(timestamps)), key=lambda i: timestamps[i] or 0)
-
-    # Подписи и сегменты маршрутов
-    mapping = {
-        0: ("Отчет по видам диспансеризации", "dv1"),
-        1: ("Диспансеризация по возрастам", "dv3"),
-        2: ("Диспансеризация по стоимости", "dv8"),
-        3: ("РЭМД диспансеризации", "dv9"),
-        4: ("РЭМД диспансеризации", "dv10"),
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    report_num = int(button_id.split('-')[2])
+    
+    route_map = {
+        1: f"/{main_link}/dv1",
+        3: f"/{main_link}/dv3",
+        8: f"/{main_link}/dv8",
+        9: f"/{main_link}/dv9",
+        10: f"/{main_link}/dv10"
     }
-    label_text, segment = mapping[idx]
-    new_path = f"/{main_link}/{segment}"
-
-    # Хлебные крошки
-    breadcrumbs = [
-        {"label": label, "href": f"/{main_link}", "active": False},
-        {"label": label_text, "active": True}
-    ]
-    return new_path, breadcrumbs
+    
+    return route_map[report_num]

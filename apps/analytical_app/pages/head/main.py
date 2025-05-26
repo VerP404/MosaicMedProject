@@ -1,4 +1,4 @@
-from dash import html, Input, Output, callback_context
+from dash import html, Input, Output, callback_context, dcc
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
@@ -32,7 +32,7 @@ cards_row_2 = dbc.Row(
 
 cards_row_3 = dbc.Row(
     [
-        dbc.Col(create_card(9, type_page, "Талоны по врачам (помесячно)", "Талоны ОМС по врачам в разрезе по месяцям.")),
+        dbc.Col(create_card(9, type_page, "Талоны по врачам (помесячно)", "Талоны ОМС по врачам в разрезе по месяцам.")),
         dbc.Col(create_card(10, type_page, "Талоны по врачам (по целям)", "Талоны ОМС по врачам и целям.")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
@@ -40,39 +40,31 @@ cards_row_3 = dbc.Row(
 
 # Основной layout
 head_main = html.Div([
-    dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[{"label": label, "active": True}]),
+    dbc.Breadcrumb(
+        id=f"breadcrumb-{type_page}",
+        items=[{"label": label, "active": True}]
+    ),
     html.Hr(),
+    dcc.Location(id=f'url-{type_page}', refresh=True),
     cards_row_1,
     cards_row_2,
     cards_row_3,
 ])
 
-# Навигация по карточкам: n_clicks_timestamp + allow_duplicate
+# Обновленный callback для навигации
 @app.callback(
-    [Output('url', 'pathname', allow_duplicate=True),
-     Output(f'breadcrumb-{type_page}', 'items')],
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 11)],
+    Output(f'url-{type_page}', 'pathname'),
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 11)],
     prevent_initial_call=True
 )
-def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8, ts9, ts10):
-    timestamps = [ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8, ts9, ts10]
-    if not any(timestamps):
+def navigate_pages(*n_clicks):
+    ctx = callback_context
+    if not ctx.triggered:
         raise PreventUpdate
-
-    idx = max(range(len(timestamps)), key=lambda i: timestamps[i] or 0) + 1
-
-    label_map = {
-        1: "Диспансеризация взрослых",
-        2: "Диспансеризация детей",
-        3: "Репродуктивное здоровье",
-        4: "Диспансерное наблюдение работающих",
-        5: "Отчет Шараповой по ДН",
-        6: "131 форма",
-        7: "Диспансерное наблюдение",
-        8: "Обращения граждан",
-        9: "Талоны по врачам (помесячно)",
-        10: "Талоны по врачам (по целям)",
-    }
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    report_num = int(button_id.split('-')[2])
+    
     route_map = {
         1: f"/{main_link}/adults",
         2: f"/{main_link}/children",
@@ -85,12 +77,5 @@ def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8, ts9, ts10):
         9: f"/{main_link}/doctors_talon",
         10: f"/{main_link}/doctors_talon_goals",
     }
-
-    selected_label = label_map[idx]
-    selected_route = route_map[idx]
-
-    breadcrumbs = [
-        {"label": label, "href": f"/{main_link}", "active": False},
-        {"label": selected_label, "active": True}
-    ]
-    return selected_route, breadcrumbs
+    
+    return route_map[report_num]

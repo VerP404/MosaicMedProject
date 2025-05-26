@@ -1,4 +1,4 @@
-from dash import html, Input, Output, callback_context
+from dash import html, Input, Output, callback_context, dcc
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
@@ -48,38 +48,30 @@ cards_row_2 = dbc.Row(
 
 # Основной layout
 statistic_main = html.Div([
-    dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[{"label": label, "active": True}]),
+    dbc.Breadcrumb(
+        id=f"breadcrumb-{type_page}",
+        items=[{"label": label, "active": True}]
+    ),
     html.Hr(),
+    dcc.Location(id=f'url-{type_page}', refresh=True),
     cards_row_1,
     cards_row_2,
 ])
 
-# Колбэк навигации: n_clicks_timestamp + allow_duplicate
+# Обновленный callback для навигации
 @app.callback(
-    [Output('url', 'pathname', allow_duplicate=True),
-     Output(f'breadcrumb-{type_page}', 'items')],
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 9)],
+    Output(f'url-{type_page}', 'pathname'),
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 9)],
     prevent_initial_call=True
 )
-def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8):
-    timestamps = [ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8]
-    if not any(timestamps):
+def navigate_pages(*n_clicks):
+    ctx = callback_context
+    if not ctx.triggered:
         raise PreventUpdate
-
-    # Определяем последнюю нажатую кнопку
-    idx = max(range(len(timestamps)), key=lambda i: timestamps[i] or 0) + 1
-
-    # Словари меток и маршрутов
-    label_map = {
-        1: "Отчет Шараповой по ДН",
-        2: "Кардиологический отчет",
-        3: "Пневмонии",
-        4: "Посещения в диспансеризации",
-        5: "Посещения в талонах",
-        6: "Отчет по ВОП",
-        7: "Листы нетрудоспособности",
-        8: "РЭМД 500",
-    }
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    report_num = int(button_id.split('-')[2])
+    
     route_map = {
         1: f"/{main_link}/statistic-sharapova",
         2: f"/{main_link}/cardiology",
@@ -90,13 +82,5 @@ def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8):
         7: f"/{main_link}/eln",
         8: f"/{main_link}/remd500",
     }
-
-    selected_label = label_map[idx]
-    selected_route = route_map[idx]
-
-    # Формируем хлебные крошки
-    breadcrumbs = [
-        {"label": label, "href": f"/{main_link}", "active": False},
-        {"label": selected_label, "active": True}
-    ]
-    return selected_route, breadcrumbs
+    
+    return route_map[report_num]

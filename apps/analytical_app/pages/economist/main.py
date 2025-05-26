@@ -1,4 +1,4 @@
-from dash import html, Input, Output, callback_context
+from dash import html, Input, Output, callback_context, dcc
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
@@ -37,48 +37,37 @@ cards_row_2 = dbc.Row(
         dbc.Col(create_card(6, type_page,
                             "Стационары: по врачам",
                             "Отчет по стационарным случаям по врачам.")),
-        dbc.Col(create_card(7, type_page, "Талоны по врачам", "Талоны ОМС по врачам в разрезе по месяцям.")),
-
+        dbc.Col(create_card(7, type_page, "Талоны по врачам", "Талоны ОМС по врачам в разрезе по месяцам.")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
 
 # Основной layout
 economist_main = html.Div([
-    dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
-        {"label": label, "active": True},
-    ]),
+    dbc.Breadcrumb(
+        id=f"breadcrumb-{type_page}",
+        items=[{"label": label, "active": True}]
+    ),
     html.Hr(),
+    dcc.Location(id=f'url-{type_page}', refresh=True),
     cards_row_1,
     cards_row_2,
 ])
 
-# Callback навигации по карточкам: с n_clicks_timestamp, без ложных срабатываний
+# Обновленный callback для навигации
 @app.callback(
-    [Output('url', 'pathname'),
-     Output(f'breadcrumb-{type_page}', 'items')],
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 8)],
+    Output(f'url-{type_page}', 'pathname'),
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 8)],
     prevent_initial_call=True
 )
-def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7):
-    timestamps = [ts1, ts2, ts3, ts4, ts5, ts6, ts7]
-    # если ни одна кнопка не была нажата — не обновляем
-    if not any(timestamps):
+def navigate_pages(*n_clicks):
+    ctx = callback_context
+    if not ctx.triggered:
         raise PreventUpdate
-
-    # определяем индекс последней нажатой кнопки
-    idx = max(range(len(timestamps)), key=lambda i: timestamps[i] or 0) + 1
-
-    # словари меток и маршрутов
-    label_map = {
-        1: "Сверхподушевое финансирование",
-        2: "По врачам",
-        3: "Диспансеризация по возрастам",
-        4: "Стационары",
-        5: "Показатели: сводная по индикаторам",
-        6: "Стационары: по врачам",
-        7: "Талоны по врачам помесячно",
-    }
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    report_num = int(button_id.split('-')[2])
+    
     route_map = {
         1: f"/{main_link}/svpod",
         2: f"/{main_link}/doctors",
@@ -87,15 +76,6 @@ def navigate_pages(ts1, ts2, ts3, ts4, ts5, ts6, ts7):
         5: f"/{main_link}/indicators",
         6: f"/{main_link}/doctor-stac",
         7: f"/{main_link}/doctors_talon",
-
     }
-
-    selected_label = label_map[idx]
-    selected_route = route_map[idx]
-
-    # формируем хлебные крошки
-    breadcrumbs = [
-        {"label": label, "href": f"/{main_link}", "active": False},
-        {"label": selected_label, "active": True}
-    ]
-    return selected_route, breadcrumbs
+    
+    return route_map[report_num]

@@ -1,4 +1,4 @@
-from dash import html, Input, Output, callback_context
+from dash import html, Input, Output, callback_context, dcc
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
@@ -42,46 +42,34 @@ cards_row_1 = dbc.Row(
 
 # Основной layout
 head_children_dd_main = html.Div([
-    dbc.Breadcrumb(id=f"breadcrumb-{type_page}", items=[
-        {"label": label, "active": True},
-    ]),
+    dbc.Breadcrumb(
+        id=f"breadcrumb-{type_page}",
+        items=[{"label": label, "active": True}]
+    ),
     html.Hr(),
+    dcc.Location(id=f'url-{type_page}', refresh=True),
     cards_row_1,
 ])
 
-# Callback навигации: n_clicks_timestamp + allow_duplicate
+# Обновленный callback для навигации
 @app.callback(
-    [Output('url', 'pathname', allow_duplicate=True), Output(f'breadcrumb-{type_page}', 'items')],
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks_timestamp') for i in range(1, 5)],
+    Output(f'url-{type_page}', 'pathname'),
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 5)],
     prevent_initial_call=True
 )
-def navigate_children(ts1, ts2, ts3, ts4):
-    timestamps = [ts1, ts2, ts3, ts4]
-    if not any(timestamps):
+def navigate_pages(*n_clicks):
+    ctx = callback_context
+    if not ctx.triggered:
         raise PreventUpdate
-
-    # Определяем индекс последней нажатой кнопки
-    idx = max(range(len(timestamps)), key=lambda i: timestamps[i] or 0) + 1
-
-    # Подписи и сегменты маршрутов
-    label_map = {
-        1: "Отчет по видам диспансеризации детей",
-        2: "Диспансеризация детей по возрастам",
-        3: "Список прикрепленных детей",
-        4: "Уникальные дети в ПН",
-    }
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    report_num = int(button_id.split('-')[2])
+    
     route_map = {
         1: f"/{main_link}/pn1",
         2: f"/{main_link}/pn2",
         3: f"/{main_link}/pn3",
-        4: f"/{main_link}/pn4",
+        4: f"/{main_link}/pn4"
     }
-    selected_label = label_map[idx]
-    selected_route = route_map[idx]
-
-    # Хлебные крошки
-    breadcrumbs = [
-        {"label": label, "href": f"/{main_link}", "active": False},
-        {"label": selected_label, "active": True}
-    ]
-    return selected_route, breadcrumbs
+    
+    return route_map[report_num]
