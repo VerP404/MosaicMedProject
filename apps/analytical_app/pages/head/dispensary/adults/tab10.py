@@ -18,6 +18,7 @@ from apps.analytical_app.components.filters import (
     get_current_reporting_month,
     filter_status,
     status_groups, filter_health_group,
+    filter_icd_codes
 )
 
 type_page = "tab10-da"
@@ -64,8 +65,8 @@ adults_dv10 = html.Div(
                             ),
                             dbc.Row(
                                 [
-                                    dbc.Col(filter_months(type_page), width=8),
-                                    dbc.Col(filter_health_group(type_page), width=4),
+                                    dbc.Col(filter_months(type_page), width=6),
+                                    dbc.Col(filter_health_group(type_page), width=6),
                                     dbc.Col(
                                         html.Label(
                                             "Выберите дату",
@@ -93,6 +94,7 @@ adults_dv10 = html.Div(
                             dbc.Row(
                                 [
                                     dbc.Col(filter_status(type_page), width=6),
+                                    dbc.Col(filter_icd_codes(type_page), width=6),
                                 ]
                             ),
                             dbc.Row(
@@ -223,6 +225,7 @@ from apps.analytical_app.query_executor import engine
         State(f"status-group-radio-{type_page}", "value"),
         State(f"status-individual-dropdown-{type_page}", "value"),
         State(f"dropdown-health-group-{type_page}", "value"),
+        State(f"dropdown-icd-{type_page}", "value"),
     ],
     prevent_initial_call=True
 )
@@ -231,7 +234,7 @@ def render_tab10_table_and_export(
         selected_months, year, inog, sanc, amt_null,
         start_input, end_input, start_treat, end_treat,
         report_type, status_mode, status_group, status_indiv,
-        health_groups
+        health_groups, icd_codes
 ):
     ctx = callback_context
     if not ctx.triggered:
@@ -240,6 +243,15 @@ def render_tab10_table_and_export(
 
     # --- собираем WHERE-условия ---
     conds = [f"report_year = {int(year)}", "age > 17"]
+    
+    # Добавляем условие для кодов МКБ
+    if icd_codes:
+        icd_conditions = []
+        for code in icd_codes:
+            icd_conditions.append(f"main_diagnosis_code = '{code}'")
+        if icd_conditions:
+            conds.append(f"({' OR '.join(icd_conditions)})")
+
     if report_type == "month" and selected_months:
         start, end = selected_months
         conds.append(f"report_month BETWEEN {start} AND {end}")
@@ -357,6 +369,11 @@ def render_tab10_table_and_export(
 
     # --- возвращаем результат в зависимости от кнопки ---
     if trigger == f"update-button-{type_page}":
+        # Добавляем строку 'Итого' с суммой по столбцам
+        if not df.empty:
+            total_row = df.sum(numeric_only=True)
+            total_row.name = 'Итого'
+            df = pd.concat([pd.DataFrame([total_row], columns=df.columns), df])
         table = dbc.Table.from_dataframe(
             df, striped=True, bordered=True, hover=True, index=True, responsive=True
         )
@@ -397,3 +414,25 @@ def render_tab10_table_and_export(
         return no_update, send_bytes(to_excel, filename)
     else:
         raise PreventUpdate
+
+@app.callback(
+    Output(f"dropdown-icd-{type_page}", "value"),
+    [
+        Input(f"btn-apply-icd-pattern-{type_page}", "n_clicks"),
+    ],
+    [
+        State(f"input-icd-pattern-{type_page}", "value"),
+        State(f"dropdown-icd-{type_page}", "options"),
+        State(f"dropdown-icd-{type_page}", "value"),
+    ],
+    prevent_initial_call=True
+)
+def add_icd_by_pattern(n_clicks, pattern, options, current_values):
+    from dash import no_update
+    if not pattern:
+        return no_update
+    pattern = pattern.upper()
+    matched = [opt['value'] for opt in options if opt['value'].startswith(pattern)]
+    # Объединяем с уже выбранными, убираем дубли
+    result = list(sorted(set(current_values or []) | set(matched)))
+    return result

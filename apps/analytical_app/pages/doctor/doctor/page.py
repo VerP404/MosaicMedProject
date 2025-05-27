@@ -96,12 +96,96 @@ doctor_talon = html.Div(
             ),
             style={"margin": "0 auto", "padding": "0rem"}
         ),
-        dcc.Loading(id=f'loading-output-{type_page}', type='default'),
-        card_table(f'result-table1-{type_page}', "По категориям"),
-        card_table(f'result-table2-{type_page}', "По целям"),
+        dcc.Loading(
+            children=[
+                card_table(f'result-table1-{type_page}', "По категориям"),
+                card_table(f'result-table2-{type_page}', "По целям"),
+            ],
+            type="circle",
+            fullscreen=True,
+            color="#0d6efd",
+            style={"backgroundColor": "rgba(255,255,255,0.8)"}
+        ),
     ],
     style={"padding": "0rem"}
 )
+
+
+# Колбэк возвращает только данные для таблиц, без текста загрузки
+@app.callback(
+    [Output(f'result-table1-{type_page}', 'columns'),
+     Output(f'result-table1-{type_page}', 'data'),
+     Output(f'result-table2-{type_page}', 'columns'),
+     Output(f'result-table2-{type_page}', 'data')],
+    [Input(f'update-button-{type_page}', 'n_clicks')],
+    [State(f'dropdown-doctor-{type_page}', 'value'),
+     State(f'dropdown-profile-{type_page}', 'value'),
+     State(f'range-slider-month-{type_page}', 'value'),
+     State(f'dropdown-year-{type_page}', 'value'),
+     State(f'dropdown-inogorodniy-{type_page}', 'value'),
+     State(f'dropdown-sanction-{type_page}', 'value'),
+     State(f'dropdown-amount-null-{type_page}', 'value'),
+     State(f'dropdown-building-{type_page}', 'value'),
+     State(f'dropdown-department-{type_page}', 'value'),
+     State(f'date-picker-range-input-{type_page}', 'start_date'),
+     State(f'date-picker-range-input-{type_page}', 'end_date'),
+     State(f'date-picker-range-treatment-{type_page}', 'start_date'),
+     State(f'date-picker-range-treatment-{type_page}', 'end_date'),
+     State(f'dropdown-report-type-{type_page}', 'value')]
+)
+def update_table(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
+                 amount_null, building_ids, department_ids, start_date_input, end_date_input,
+                 start_date_treatment, end_date_treatment, report_type):
+    if not n_clicks:
+        raise exceptions.PreventUpdate
+
+    selected_doctor_ids = parse_doctor_ids(value_doctor)
+
+    start_date_input_formatted, end_date_input_formatted = None, None
+    start_date_treatment_formatted, end_date_treatment_formatted = None, None
+
+    if report_type == 'month':
+        pass
+    elif report_type == 'initial_input':
+        selected_period = (1, 12)
+        start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+    elif report_type == 'treatment':
+        selected_period = (1, 12)
+        start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
+            '%d-%m-%Y')
+        end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
+            '%d-%m-%Y')
+
+    columns1, data1 = TableUpdater.query_to_df(
+        engine,
+        sql_query_amb_def(
+            selected_year,
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy, sanction, amount_null,
+            building_ids, department_ids,
+            value_profile,
+            selected_doctor_ids,
+            start_date_input_formatted, end_date_input_formatted,
+            start_date_treatment_formatted, end_date_treatment_formatted
+        )
+    )
+
+    columns2, data2 = TableUpdater.query_to_df(
+        engine,
+        sql_query_dd_def(
+            selected_year,
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy, sanction, amount_null,
+            building_ids, department_ids,
+            value_profile,
+            selected_doctor_ids,
+            start_date_input_formatted, end_date_input_formatted,
+            start_date_treatment_formatted, end_date_treatment_formatted
+        )
+    )
+
+    return columns1, data1, columns2, data2
 
 
 @app.callback(
@@ -181,8 +265,6 @@ def update_current_month(n_intervals):
     ]
 )
 def update_filters(building_id, department_id, profile_id, doctor_id, selected_year):
-
-
     if not selected_year:
         selected_year = datetime.now().year
 
@@ -274,86 +356,3 @@ def update_selected_filters(doctor_ids):
 )
 def update_selected_period_list(selected_months_range, selected_year, current_month_name):
     return selected_months_range
-
-
-@app.callback(
-    [Output(f'result-table1-{type_page}', 'columns'),
-     Output(f'result-table1-{type_page}', 'data'),
-     Output(f'result-table2-{type_page}', 'columns'),
-     Output(f'result-table2-{type_page}', 'data'),
-     Output(f'loading-output-{type_page}', 'children')],
-    [Input(f'update-button-{type_page}', 'n_clicks')],
-    [State(f'dropdown-doctor-{type_page}', 'value'),
-     State(f'dropdown-profile-{type_page}', 'value'),
-     State(f'range-slider-month-{type_page}', 'value'),
-     State(f'dropdown-year-{type_page}', 'value'),
-     State(f'dropdown-inogorodniy-{type_page}', 'value'),
-     State(f'dropdown-sanction-{type_page}', 'value'),
-     State(f'dropdown-amount-null-{type_page}', 'value'),
-     State(f'dropdown-building-{type_page}', 'value'),
-     State(f'dropdown-department-{type_page}', 'value'),
-     State(f'date-picker-range-input-{type_page}', 'start_date'),
-     State(f'date-picker-range-input-{type_page}', 'end_date'),
-     State(f'date-picker-range-treatment-{type_page}', 'start_date'),
-     State(f'date-picker-range-treatment-{type_page}', 'end_date'),
-     State(f'dropdown-report-type-{type_page}', 'value')]
-)
-def update_table(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
-                 amount_null, building_ids, department_ids, start_date_input, end_date_input,
-                 start_date_treatment, end_date_treatment, report_type):
-    if n_clicks is None:
-        raise exceptions.PreventUpdate
-
-    loading_output = html.Div([dcc.Loading(type="default")])
-
-    # Используем нашу функцию для корректного разбора значения врача
-    selected_doctor_ids = parse_doctor_ids(value_doctor)
-
-    # Форматирование дат и определение периода остаются без изменений
-    start_date_input_formatted, end_date_input_formatted = None, None
-    start_date_treatment_formatted, end_date_treatment_formatted = None, None
-
-    if report_type == 'month':
-        pass
-    elif report_type == 'initial_input':
-        selected_period = (1, 12)
-        start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
-        end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
-    elif report_type == 'treatment':
-        selected_period = (1, 12)
-        start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
-            '%d-%m-%Y')
-        end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
-            '%d-%m-%Y')
-
-    # Передаём корректно разобранный список selected_doctor_ids в SQL-запрос
-    columns1, data1 = TableUpdater.query_to_df(
-        engine,
-        sql_query_amb_def(
-            selected_year,
-            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
-            inogorodniy, sanction, amount_null,
-            building_ids, department_ids,
-            value_profile,
-            selected_doctor_ids,
-            start_date_input_formatted, end_date_input_formatted,
-            start_date_treatment_formatted, end_date_treatment_formatted
-        )
-    )
-
-    columns2, data2 = TableUpdater.query_to_df(
-        engine,
-        sql_query_dd_def(
-            selected_year,
-            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
-            inogorodniy, sanction, amount_null,
-            building_ids, department_ids,
-            value_profile,
-            selected_doctor_ids,
-            start_date_input_formatted, end_date_input_formatted,
-            start_date_treatment_formatted, end_date_treatment_formatted
-        )
-    )
-
-    return columns1, data1, columns2, data2, loading_output
-

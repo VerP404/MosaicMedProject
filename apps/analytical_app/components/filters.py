@@ -626,3 +626,62 @@ def filter_health_group(page):
             optionHeight=70
         )
     ])
+
+
+def filter_icd_codes(type_page):
+    # Получаем все коды МКБ сразу
+    query = """
+        SELECT DISTINCT main_diagnosis_code
+        FROM load_data_oms_data
+        WHERE main_diagnosis_code IS NOT NULL
+        AND main_diagnosis_code != '-'
+        ORDER BY main_diagnosis_code
+    """
+    with engine.connect() as connection:
+        result = connection.execute(text(query))
+        codes = [row[0] for row in result.fetchall()]
+    options = [{'label': code, 'value': code} for code in codes]
+
+    return html.Div([
+        html.Label("Код МКБ (конкретные)", style={"font-weight": "bold"}),
+        dcc.Dropdown(
+            id=f"dropdown-icd-{type_page}",
+            options=options,
+            value=[],
+            multi=True,
+            clearable=True,
+            placeholder="Выберите код МКБ...",
+            style={"whiteSpace": "normal"},
+            optionHeight=70,
+            searchable=True
+        ),
+        html.Br(),
+        html.Label("По шаблону МКБ", style={"font-weight": "bold"}),
+        dcc.Input(
+            id=f"input-icd-pattern-{type_page}",
+            type="text",
+            placeholder="Например: I11",
+            style={"marginRight": "10px"}
+        ),
+        dbc.Button("Применить", id=f"btn-apply-icd-pattern-{type_page}", n_clicks=0, color="primary")
+    ])
+
+
+def get_icd_codes():
+    """
+    Получает все уникальные коды МКБ из базы данных.
+    """
+    query = """
+        SELECT DISTINCT main_diagnosis_code
+        FROM load_data_oms_data
+        WHERE main_diagnosis_code IS NOT NULL
+        AND main_diagnosis_code != '-'
+        ORDER BY main_diagnosis_code
+    """
+    
+    with engine.connect() as connection:
+        result = connection.execute(text(query))
+        codes = [row[0] for row in result.fetchall()]
+    
+    # Создаем простой список опций
+    return [{'label': code, 'value': code} for code in codes]
