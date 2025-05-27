@@ -123,7 +123,11 @@ adults_dv10 = html.Div(
             style={"marginBottom": "1rem"},
         ),
         dcc.Loading(id=f"loading-output-{type_page}", type="default"),
-        html.Div(id=f"table-container-{type_page}"),
+        dcc.Loading(
+            id=f"loading-table-{type_page}",
+            type="default",
+            children=html.Div(id=f"table-container-{type_page}")
+        ),
     ],
     style={"padding": "0rem"},
 )
