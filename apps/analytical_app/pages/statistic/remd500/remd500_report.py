@@ -778,15 +778,10 @@ def generate_remd500_report(n_clicks, start_date, end_date, emd_date_type, emd_s
 
         # 4) Смертность (формат "YYYY-MM-DD")
         query_death = f"""
-            SELECT
-                doctor,
-                emd_sending_status AS status,
-                'Смертность' AS type,
-                issue_date AS document_date
-            FROM load_data_death
-            WHERE to_date(issue_date, 'YYYY-MM-DD')
-                  BETWEEN to_date('{start_date_str}', 'YYYY-MM-DD')
-                      AND to_date('{end_date_str}', 'YYYY-MM-DD')
+            SELECT doctor, emd_sending_status AS status, 'Смертность' AS type, issue_date AS document_date 
+            FROM load_data_death 
+            WHERE issue_date != '-' 
+            AND to_date(issue_date, 'YYYY-MM-DD') BETWEEN to_date('{start_date_str}', 'YYYY-MM-DD') AND to_date('{end_date_str}', 'YYYY-MM-DD')
         """
         df_death = pd.read_sql(query_death, con=engine)
 

@@ -21,6 +21,9 @@ cards_row_1 = dbc.Row(
         dbc.Col(create_card(3, type_page,
                             "Обновление данных",
                             "Страница обновления данных в базе данных.")),
+        dbc.Col(create_card(4, type_page,
+                            "SQL Редактор",
+                            "Тестирование SQL запросов (только SELECT)")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
@@ -39,7 +42,7 @@ admin_main = html.Div([
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 4)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 5)],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -53,7 +56,8 @@ def navigate_pages(*n_clicks):
     route_map = {
         1: f"/{main_link}/gen_invoices",
         2: f"/{main_link}/admin_delete_emd",
-        3: f"/{main_link}/admin_update_data"
+        3: f"/{main_link}/admin_update_data",
+        4: f"/{main_link}/sql_editor"
     }
     
     return route_map[report_num]
