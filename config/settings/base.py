@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'apps.person',
     'apps.talon',
     'apps.dn_app',
+    'apps.beneficiaries',
+    'apps.references',
 
 
     'import_export',
