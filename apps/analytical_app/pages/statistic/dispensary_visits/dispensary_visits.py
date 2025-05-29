@@ -9,20 +9,26 @@ from apps.analytical_app.query_executor import engine
 def uniq_dd_visit(eng):
     with eng.connect() as conn:
         sql_query = """
-            select distinct enp,
-                            case when goal = 'ДВ4' then 'Д' else 'П' end as "Тип",
-                            case
-                                when TO_DATE(treatment_end, 'DD-MM-YYYY') - TO_DATE(treatment_start, 'DD-MM-YYYY') = 0
-                                    then '1'
-                                when TO_DATE(treatment_end, 'DD-MM-YYYY') - TO_DATE(treatment_start, 'DD-MM-YYYY') in
-                                     (1, 2, 3) then '2'
-                                else '3' end                               as "Посещения",
-                        SUBSTRING(treatment_end, 4, 2) AS "Месяц",
-                            department
-            from data_loader_omsdata
-            where goal in ('ДВ4', 'ОПВ') and enp not like '0%' and enp not like '%0'
-            order by department
-        """
+                    select distinct enp,
+                                    case when goal = 'ДВ4' then 'Д' else 'П' end as "Тип",
+                                    case
+                                        when TO_DATE(treatment_end, 'DD-MM-YYYY') -
+                                             TO_DATE(treatment_start, 'DD-MM-YYYY') = 0
+                                            then '1'
+                                        when TO_DATE(treatment_end, 'DD-MM-YYYY') -
+                                             TO_DATE(treatment_start, 'DD-MM-YYYY') in
+                                             (1, 2, 3) then '2'
+                                        else '3' end                             as "Посещения",
+                                    SUBSTRING(treatment_end, 4, 2)               AS "Месяц",
+                                    department
+                    from data_loader_omsdata
+                    where goal in ('ДВ4', 'ОПВ')
+                      and enp not like '0%'
+                      and enp not like '%0'
+                      and treatment_start != '-'
+                      and treatment_end != '-'
+                    order by department \
+                    """
         query = text(sql_query)
         result = conn.execute(query)
         columns = [desc[0] for desc in result.cursor.description]
