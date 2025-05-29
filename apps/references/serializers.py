@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import MKB10
+from .models import MKB10, InsuranceCompany
 
 class MKB10Serializer(serializers.ModelSerializer):
     parent_code = serializers.CharField(source='parent.code', read_only=True)
@@ -24,4 +24,9 @@ class MKB10TreeSerializer(serializers.ModelSerializer):
 
     def get_children(self, obj):
         children = obj.children.filter(is_active=True)
-        return MKB10TreeSerializer(children, many=True).data 
+        return MKB10TreeSerializer(children, many=True).data
+
+class InsuranceCompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InsuranceCompany
+        fields = '__all__' 

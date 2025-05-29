@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 
 class CategorySQLQuery(models.Model):
@@ -37,3 +38,21 @@ class SQLQuery(models.Model):
     class Meta:
         verbose_name = "Запрос"
         verbose_name_plural = "Запросы"
+
+
+class SavedQuery(models.Model):
+    name = models.CharField("Название запроса", max_length=255)
+    query = models.TextField("SQL запрос")
+    description = models.TextField("Описание", blank=True, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Создал")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата обновления")
+    is_public = models.BooleanField("Публичный запрос", default=False)
+
+    class Meta:
+        verbose_name = "Сохраненный запрос"
+        verbose_name_plural = "Сохраненные запросы"
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return self.name

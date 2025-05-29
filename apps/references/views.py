@@ -3,8 +3,8 @@ from rest_framework import viewsets, filters, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import MKB10
-from .serializers import MKB10Serializer, MKB10TreeSerializer
+from .models import MKB10, InsuranceCompany
+from .serializers import MKB10Serializer, MKB10TreeSerializer, InsuranceCompanySerializer
 from django.db import models
 
 # Create your views here.
@@ -105,3 +105,55 @@ class MKB10ChildrenView(generics.ListAPIView):
         code = self.kwargs['code']
         parent = get_object_or_404(MKB10, code=code)
         return MKB10.objects.filter(parent=parent).select_related('parent')
+
+
+class InsuranceCompanyListView(generics.ListAPIView):
+    """
+    API для получения списка СМО.
+    
+    Параметры запроса:
+    - search: поиск по коду, названию, ИНН или ОГРН
+    - is_active: фильтр по активности (true/false)
+    - is_default: фильтр по СМО по умолчанию (true/false)
+    """
+    serializer_class = InsuranceCompanySerializer
+    
+    def get_queryset(self):
+        queryset = InsuranceCompany.objects.all()
+        
+        # Поиск
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                models.Q(smocod__icontains=search) |
+                models.Q(nam_smok__icontains=search) |
+                models.Q(nam_smop__icontains=search) |
+                models.Q(inn__icontains=search) |
+                models.Q(ogrn__icontains=search)
+            )
+        
+        # Фильтр по активности
+        is_active = self.request.query_params.get('is_active', None)
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
+        # Фильтр по СМО по умолчанию
+        is_default = self.request.query_params.get('is_default', None)
+        if is_default is not None:
+            queryset = queryset.filter(is_default=is_default.lower() == 'true')
+        
+        return queryset
+
+
+class InsuranceCompanyDetailView(generics.RetrieveAPIView):
+    """
+    API для получения детальной информации о СМО.
+    
+    Параметры URL:
+    - code: код СМО
+    """
+    serializer_class = InsuranceCompanySerializer
+    
+    def get_object(self):
+        code = self.kwargs['code']
+        return get_object_or_404(InsuranceCompany, smocod=code)

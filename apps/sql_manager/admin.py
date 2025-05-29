@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import SQLQuery, CategorySQLQuery, TypeSQLQuery
+from .models import SQLQuery, CategorySQLQuery, TypeSQLQuery, SavedQuery
 from django import forms
 from django.utils.safestring import mark_safe
 import json
@@ -45,3 +45,20 @@ class CategorySQLQueryAdmin(admin.ModelAdmin):
 class TypeSQLQueryAdmin(admin.ModelAdmin):
     search_fields = ['name']
     list_display = ['name']
+
+
+@admin.register(SavedQuery)
+class SavedQueryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'created_by', 'created_at', 'updated_at', 'is_public')
+    list_filter = ('is_public', 'created_by')
+    search_fields = ('name', 'query', 'description')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Основная информация', {
+            'fields': ('name', 'query', 'description', 'is_public')
+        }),
+        ('Системная информация', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
