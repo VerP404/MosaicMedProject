@@ -37,6 +37,7 @@ from apps.analytical_app.pages.web_oms.status_talon.tab3 import web_oms_3
 from apps.analytical_app.pages.web_oms.status_talon.tab4 import web_oms_4
 from apps.analytical_app.pages.web_oms.status_talon.tab5 import web_oms_5
 from apps.analytical_app.pages.web_oms.status_talon.tab6 import web_oms_6
+from apps.analytical_app.pages.web_oms.status_talon.tab7 import adults_dv10 as web_oms_7
 
 # Все маршруты для страниц
 routes = {
@@ -91,9 +92,6 @@ routes = {
         ]),
         layout_doctors_goal
     ]),
-
-
-
 
     "/statistic": statistic_main,
     "/statistic/statistic-sharapova": html.Div([
@@ -153,41 +151,6 @@ routes = {
         layout_remd500
     ]),
 
-
-
-
-
-    # "/chief": chief_main,
-    # "/chief/svpod": html.Div([
-    #     dbc.Breadcrumb(items=[
-    #         {"label": "Главный врач", "href": "/chief"},
-    #         {"label": "Диспансеризация взрослых", "active": True},
-    #     ]),
-    #     economist_sv_pod
-    # ]),
-    # "/chief/doctors": html.Div([
-    #     dbc.Breadcrumb(items=[
-    #         {"label": "Главный врач", "href": "/chief"},
-    #         {"label": "Диспансеризация детей", "active": True},
-    #     ]),
-    #     economist_doctors_talon_list
-    # ]),
-    # "/chief/disp_by_ages": html.Div([
-    #     dbc.Breadcrumb(items=[
-    #         {"label": "Главный врач", "href": "/chief"},
-    #         {"label": "Диспансерное наблюдение", "active": True},
-    #     ]),
-    #     economist_dispensary_age
-    # ]),
-    # "/chief/dn_job": html.Div([
-    #     dbc.Breadcrumb(items=[
-    #         {"label": "Главный врач", "href": "/chief"},
-    #         {"label": "Диспансерное наблюдение работающих", "active": True},
-    #     ]),
-    #     head_dn_job
-    # ]),
-
-
     "/web_oms": web_oms_main,
     "/web_oms/web_oms_rep1": html.Div([
         dbc.Breadcrumb(items=[
@@ -231,7 +194,13 @@ routes = {
         ]),
         web_oms_6
     ]),
-
+    "/web_oms/web_oms_rep7": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "WEB.ОМС", "href": "/web_oms"},
+            {"label": "Отчет 7 - Уникальные талоны по диагнозам", "active": True},
+        ]),
+        web_oms_7
+    ]),
 
     "/iszl": iszl_main,
     "/iszl/svpod": html.Div([
