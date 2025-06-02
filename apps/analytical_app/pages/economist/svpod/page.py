@@ -274,7 +274,7 @@ def update_table_with_plan_and_balance(n_clicks,
     plan_data = fetch_plan_data(selected_level, selected_year, mode)
 
     today = datetime.today()
-    default_month = today.month
+    default_month = today.month - 1 if today.day <= 5 else today.month  # До 5 числа показываем предыдущий месяц
     current_day = today.day
     # Если пользователь выбрал месяц вручную, берём его, иначе - текущий
     current_month = selected_month if selected_month is not None else default_month
