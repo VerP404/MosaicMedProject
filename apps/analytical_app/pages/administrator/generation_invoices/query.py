@@ -18,7 +18,7 @@ SELECT TO_CHAR(TO_DATE(initial_input_date, 'DD-MM-YYYY'), 'DD-MM-YYYY')         
        COUNT(CASE WHEN goal = '1' THEN 1 END)                                                 AS "1",
        COUNT(CASE WHEN goal = '3' THEN 1 END)                                                 AS "3",
        COUNT(CASE WHEN goal in ('305', '307') THEN 1 END)                                     AS "305,307 D",
-       COUNT(CASE WHEN goal in ('13', '14', '140') THEN 1 END)                                AS "13,14,140 Z",
+       COUNT(CASE WHEN goal in ('113', '114', '14') THEN 1 END)                                AS "113,114,14 Z",
        COUNT(CASE WHEN goal in ('64', '640') THEN 1 END)                                      AS "64 G",
        COUNT(CASE WHEN goal in ('541', '561') THEN 1 END)                                     AS "541,561 E",
        COUNT(CASE WHEN goal = '22' THEN 1 END)                                                AS "22 N",
