@@ -27,11 +27,16 @@ def is_firebird_available():
     """Проверяет доступность библиотеки Firebird"""
     try:
         import fdb
-        # Пробуем создать тестовое подключение
-        fdb.connect()
+        print(f"DEBUG: Firebird модуль импортирован успешно")
+        # Просто проверяем, что модуль импортируется без ошибок
         return True
-    except Exception:
+    except ImportError as e:
+        print(f"DEBUG: Ошибка импорта Firebird: {e}")
         return False
+    except Exception as e:
+        print(f"DEBUG: Другая ошибка при проверке Firebird: {e}")
+        # Если есть другие ошибки, но модуль импортировался - считаем что доступен
+        return True
 
 # Функция для проверки подключения к Firebird
 def check_firebird_connection():
@@ -86,6 +91,9 @@ sql_editor_layout = html.Div([
     ),
     html.Hr(),
     
+    # Отладочная информация
+    html.Div(f"DEBUG: Firebird доступен: {is_firebird_available()}", style={'color': 'red', 'fontSize': '12px'}),
+    
     # SQL редактор
     dbc.Card([
         dbc.CardHeader("SQL Редактор"),
@@ -97,9 +105,6 @@ sql_editor_layout = html.Div([
                     dcc.RadioItems(
                         id=f'database-selector-{type_page}',
                         options=[
-                            {'label': 'PostgreSQL', 'value': 'postgresql'},
-                            {'label': 'Firebird (КАУЗ)', 'value': 'firebird'}
-                        ] if is_firebird_available() else [
                             {'label': 'PostgreSQL', 'value': 'postgresql'}
                         ],
                         value='postgresql',
@@ -247,18 +252,27 @@ def is_safe_query(query):
 
 # Callback для отображения статуса подключения
 @app.callback(
-    Output(f'connection-status-{type_page}', 'children'),
+    [Output(f'connection-status-{type_page}', 'children'),
+     Output(f'database-selector-{type_page}', 'options')],
     Input(f'database-selector-{type_page}', 'value')
 )
 def update_connection_status(database_type):
+    # Формируем опции динамически
+    options = [{'label': 'PostgreSQL', 'value': 'postgresql'}]
+    if is_firebird_available():
+        options.append({'label': 'Firebird (КАУЗ)', 'value': 'firebird'})
+    
+    # Определяем статус подключения
     if database_type == 'firebird':
         is_available, message = check_firebird_connection()
         if is_available:
-            return dbc.Alert("✅ Firebird доступен", color="success", className="mb-0")
+            status = dbc.Alert("✅ Firebird доступен", color="success", className="mb-0")
         else:
-            return dbc.Alert(f"❌ {message}", color="danger", className="mb-0")
+            status = dbc.Alert(f"❌ {message}", color="danger", className="mb-0")
     else:
-        return dbc.Alert("✅ PostgreSQL доступен", color="success", className="mb-0")
+        status = dbc.Alert("✅ PostgreSQL доступен", color="success", className="mb-0")
+    
+    return status, options
 
 # Callback для загрузки сохраненных запросов
 @app.callback(
