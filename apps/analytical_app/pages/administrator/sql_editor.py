@@ -22,6 +22,17 @@ type_page = 'sql_editor'
 main_link = 'admin'
 label = 'SQL Редактор'
 
+# Функция для проверки доступности библиотеки Firebird
+def is_firebird_available():
+    """Проверяет доступность библиотеки Firebird"""
+    try:
+        import fdb
+        # Пробуем создать тестовое подключение
+        fdb.connect()
+        return True
+    except Exception:
+        return False
+
 # Функция для проверки подключения к Firebird
 def check_firebird_connection():
     try:
@@ -36,14 +47,13 @@ def check_firebird_connection():
         
         dsn = f"{settings.kauz_server_ip}:{settings.kauz_database_path}"
         
-        # Пробуем подключиться с таймаутом
+        # Пробуем подключиться
         con = fdb.connect(
             dsn=dsn,
             user=settings.kauz_user,
             password=settings.kauz_password,
             charset='WIN1251',
-            port=settings.kauz_port,
-            timeout=10  # Добавляем таймаут
+            port=settings.kauz_port
         )
         
         # Проверяем, что подключение действительно работает
@@ -89,6 +99,8 @@ sql_editor_layout = html.Div([
                         options=[
                             {'label': 'PostgreSQL', 'value': 'postgresql'},
                             {'label': 'Firebird (КАУЗ)', 'value': 'firebird'}
+                        ] if is_firebird_available() else [
+                            {'label': 'PostgreSQL', 'value': 'postgresql'}
                         ],
                         value='postgresql',
                         inline=True,
@@ -133,7 +145,7 @@ sql_editor_layout = html.Div([
             dbc.Row([
                 dbc.Col([
                     dbc.Button(
-                        "Выполнить запрос1",
+                        "Выполнить запрос",
                         id=f'execute-query-{type_page}',
                         color="primary",
                         className="me-2"
@@ -388,8 +400,7 @@ def execute_query(n_clicks, query, database_type):
                 user=settings.kauz_user,
                 password=settings.kauz_password,
                 charset='WIN1251',
-                port=settings.kauz_port,
-                timeout=10
+                port=settings.kauz_port
             )
             
             cursor = con.cursor()
