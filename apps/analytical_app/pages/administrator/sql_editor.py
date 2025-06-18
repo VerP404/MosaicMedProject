@@ -378,7 +378,18 @@ def execute_query(n_clicks, query, database_type):
             df = pd.DataFrame(results, columns=columns)
         else:
             # Выполнение запроса к PostgreSQL
-            df = pd.read_sql(query, engine)
+            with engine.connect() as connection:
+                result = connection.execute(text(query))
+                # Получаем названия колонок
+                columns = list(result.keys())
+                # Получаем данные - правильно преобразуем Row объекты в словари
+                data = []
+                for row in result:
+                    row_dict = {}
+                    for i, col in enumerate(columns):
+                        row_dict[col] = row[i]
+                    data.append(row_dict)
+                df = pd.DataFrame(data)
         
         # Проверяем, что есть данные
         if df.empty:
