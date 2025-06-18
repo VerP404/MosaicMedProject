@@ -248,7 +248,16 @@ def is_safe_query(query):
         'GRANT', 'REVOKE', 'COMMIT', 'ROLLBACK', 'MERGE', 'UPSERT'
     ]
     query_upper = query.upper()
-    return all(keyword not in query_upper for keyword in dangerous_keywords)
+    
+    # Проверяем каждое опасное ключевое слово как отдельное слово
+    for keyword in dangerous_keywords:
+        # Ищем ключевое слово как отдельное слово (с пробелами или в начале/конце)
+        import re
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        if re.search(pattern, query_upper):
+            return False
+    
+    return True
 
 # Callback для отображения статуса подключения
 @app.callback(
