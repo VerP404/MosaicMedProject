@@ -10,15 +10,37 @@ import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 import pandas as pd
 from sqlalchemy import text
+import fdb
 from apps.analytical_app.app import app
 from apps.analytical_app.query_executor import engine
 from apps.analytical_app.elements import card_table
 from apps.sql_manager.models import SavedQuery
+from apps.home.models import MainSettings
 from django.contrib.auth.models import User
 
 type_page = 'sql_editor'
 main_link = 'admin'
 label = 'SQL Редактор'
+
+# Функция для проверки подключения к Firebird
+def check_firebird_connection():
+    try:
+        settings = MainSettings.objects.first()
+        if not settings:
+            return False, "Настройки подключения к КАУЗ не найдены"
+        
+        dsn = f"{settings.kauz_server_ip}:{settings.kauz_database_path}"
+        con = fdb.connect(
+            dsn=dsn,
+            user=settings.kauz_user,
+            password=settings.kauz_password,
+            charset='WIN1251',
+            port=settings.kauz_port
+        )
+        con.close()
+        return True, "Подключение доступно"
+    except Exception as e:
+        return False, f"Ошибка подключения: {str(e)}"
 
 # Основной layout
 sql_editor_layout = html.Div([
@@ -35,6 +57,26 @@ sql_editor_layout = html.Div([
     dbc.Card([
         dbc.CardHeader("SQL Редактор"),
         dbc.CardBody([
+            # Переключатель баз данных
+            dbc.Row([
+                dbc.Col([
+                    dbc.Label("База данных:"),
+                    dcc.RadioItems(
+                        id=f'database-selector-{type_page}',
+                        options=[
+                            {'label': 'PostgreSQL', 'value': 'postgresql'},
+                            {'label': 'Firebird (КАУЗ)', 'value': 'firebird'}
+                        ],
+                        value='postgresql',
+                        inline=True,
+                        className='mb-3'
+                    )
+                ], width=6),
+                dbc.Col([
+                    html.Div(id=f'connection-status-{type_page}', className='mt-4')
+                ], width=6)
+            ]),
+            
             # Выпадающий список сохраненных запросов
             dbc.Row([
                 dbc.Col([
@@ -168,6 +210,21 @@ def is_safe_query(query):
     query_upper = query.upper()
     return all(keyword not in query_upper for keyword in dangerous_keywords)
 
+# Callback для отображения статуса подключения
+@app.callback(
+    Output(f'connection-status-{type_page}', 'children'),
+    Input(f'database-selector-{type_page}', 'value')
+)
+def update_connection_status(database_type):
+    if database_type == 'firebird':
+        is_available, message = check_firebird_connection()
+        if is_available:
+            return dbc.Alert("✅ Firebird доступен", color="success", className="mb-0")
+        else:
+            return dbc.Alert(f"❌ {message}", color="danger", className="mb-0")
+    else:
+        return dbc.Alert("✅ PostgreSQL доступен", color="success", className="mb-0")
+
 # Callback для загрузки сохраненных запросов
 @app.callback(
     Output(f'saved-queries-{type_page}', 'options'),
@@ -280,16 +337,54 @@ def save_query(n_clicks, query, name, description, is_public):
     [Output(f'query-results-{type_page}', 'children'),
      Output(f'error-message-{type_page}', 'children', allow_duplicate=True)],
     [Input(f'execute-query-{type_page}', 'n_clicks')],
-    [State(f'sql-query-{type_page}', 'value')],
+    [State(f'sql-query-{type_page}', 'value'),
+     State(f'database-selector-{type_page}', 'value')],
     prevent_initial_call=True
 )
-def execute_query(n_clicks, query):
+def execute_query(n_clicks, query, database_type):
     if not query:
         return None, "Введите SQL запрос"
     if not is_safe_query(query):
         return None, "Запрос содержит опасные команды. Разрешены только SELECT запросы"
+    
     try:
-        df = pd.read_sql(query, engine)
+        if database_type == 'firebird':
+            # Проверяем доступность Firebird перед выполнением запроса
+            is_available, message = check_firebird_connection()
+            if not is_available:
+                return None, f"Firebird недоступен: {message}"
+            
+            # Выполнение запроса к Firebird
+            settings = MainSettings.objects.first()
+            if not settings:
+                return None, "Настройки подключения к КАУЗ не найдены"
+            
+            dsn = f"{settings.kauz_server_ip}:{settings.kauz_database_path}"
+            con = fdb.connect(
+                dsn=dsn,
+                user=settings.kauz_user,
+                password=settings.kauz_password,
+                charset='WIN1251',
+                port=settings.kauz_port
+            )
+            
+            cursor = con.cursor()
+            cursor.execute(query)
+            results = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            con.close()
+            
+            # Преобразуем результаты в DataFrame
+            df = pd.DataFrame(results, columns=columns)
+        else:
+            # Выполнение запроса к PostgreSQL
+            df = pd.read_sql(query, engine)
+        
+        # Проверяем, что есть данные
+        if df.empty:
+            return dbc.Alert("Запрос выполнен успешно, но данных не найдено", color="warning"), ""
+        
+        # Создаем таблицу с результатами
         columns = [{"name": col, "id": col} for col in df.columns]
         data = df.to_dict('records')
         table = dash_table.DataTable(
@@ -305,7 +400,7 @@ def execute_query(n_clicks, query):
             style_cell={'minWidth': '0px', 'maxWidth': '180px', 'whiteSpace': 'normal'},
         )
         card = dbc.Card([
-            dbc.CardHeader("Результаты запроса"),
+            dbc.CardHeader(f"Результаты запроса ({database_type.upper()}) - {len(data)} записей"),
             dbc.CardBody([table])
         ])
         return card, ""
