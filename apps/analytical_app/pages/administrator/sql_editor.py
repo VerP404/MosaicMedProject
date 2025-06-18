@@ -29,16 +29,39 @@ def check_firebird_connection():
         if not settings:
             return False, "Настройки подключения к КАУЗ не найдены"
         
+        # Проверяем, что все необходимые настройки заполнены
+        if not all([settings.kauz_server_ip, settings.kauz_database_path, 
+                   settings.kauz_user, settings.kauz_password]):
+            return False, "Не все настройки подключения заполнены"
+        
         dsn = f"{settings.kauz_server_ip}:{settings.kauz_database_path}"
+        
+        # Пробуем подключиться с таймаутом
         con = fdb.connect(
             dsn=dsn,
             user=settings.kauz_user,
             password=settings.kauz_password,
             charset='WIN1251',
-            port=settings.kauz_port
+            port=settings.kauz_port,
+            timeout=10  # Добавляем таймаут
         )
+        
+        # Проверяем, что подключение действительно работает
+        cursor = con.cursor()
+        cursor.execute("SELECT 1 FROM RDB$DATABASE")
+        cursor.fetchone()
+        cursor.close()
         con.close()
+        
         return True, "Подключение доступно"
+    except fdb.Error as e:
+        error_msg = str(e)
+        if "SQLCODE: -902" in error_msg:
+            return False, "Сервер Firebird недоступен или база данных заблокирована"
+        elif "SQLCODE: -902" in error_msg and "connection shutdown" in error_msg:
+            return False, "Соединение с сервером прервано"
+        else:
+            return False, f"Ошибка Firebird: {error_msg}"
     except Exception as e:
         return False, f"Ошибка подключения: {str(e)}"
 
@@ -365,31 +388,22 @@ def execute_query(n_clicks, query, database_type):
                 user=settings.kauz_user,
                 password=settings.kauz_password,
                 charset='WIN1251',
-                port=settings.kauz_port
+                port=settings.kauz_port,
+                timeout=10
             )
             
             cursor = con.cursor()
             cursor.execute(query)
             results = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
+            cursor.close()
             con.close()
             
             # Преобразуем результаты в DataFrame
             df = pd.DataFrame(results, columns=columns)
         else:
             # Выполнение запроса к PostgreSQL
-            with engine.connect() as connection:
-                result = connection.execute(text(query))
-                # Получаем названия колонок
-                columns = list(result.keys())
-                # Получаем данные - правильно преобразуем Row объекты в словари
-                data = []
-                for row in result:
-                    row_dict = {}
-                    for i, col in enumerate(columns):
-                        row_dict[col] = row[i]
-                    data.append(row_dict)
-                df = pd.DataFrame(data)
+            df = pd.read_sql(text(query), engine)
         
         # Проверяем, что есть данные
         if df.empty:
@@ -415,5 +429,13 @@ def execute_query(n_clicks, query, database_type):
             dbc.CardBody([table])
         ])
         return card, ""
+    except fdb.Error as e:
+        error_msg = str(e)
+        if "SQLCODE: -902" in error_msg:
+            return None, "Сервер Firebird недоступен или база данных заблокирована. Попробуйте позже."
+        elif "connection shutdown" in error_msg:
+            return None, "Соединение с сервером Firebird прервано. Проверьте настройки подключения."
+        else:
+            return None, f"Ошибка Firebird: {error_msg}"
     except Exception as e:
         return None, f"Ошибка выполнения запроса: {str(e)}" 
