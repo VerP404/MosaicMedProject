@@ -133,7 +133,7 @@ sql_editor_layout = html.Div([
             dbc.Row([
                 dbc.Col([
                     dbc.Button(
-                        "Выполнить запрос",
+                        "Выполнить запрос1",
                         id=f'execute-query-{type_page}',
                         color="primary",
                         className="me-2"
