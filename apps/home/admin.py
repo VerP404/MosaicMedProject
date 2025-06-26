@@ -7,6 +7,7 @@ from unfold.admin import ModelAdmin, forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from apps.reports.models import UserGroupAccess
 from apps.reports.models import Group as PatientGroup, UserGroupAccess
+from django.contrib.auth.forms import UserCreationForm
 
 
 class UserGroupsForm(forms.ModelForm):
@@ -49,6 +50,12 @@ class UserGroupsForm(forms.ModelForm):
         return user
 
 
+class CustomUserCreationForm(UserCreationForm, forms.ModelForm):
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ("username", "password1", "password2")
+
+
 # Отменяем стандартную регистрацию
 admin.site.unregister(User)
 admin.site.unregister(Group)
@@ -56,17 +63,15 @@ admin.site.unregister(Group)
 
 @admin.register(User)
 class CustomUserAdmin(ModelAdmin, BaseUserAdmin):
-    # берем стандартные формы
     form = UserGroupsForm
-    add_form = BaseUserAdmin.add_form
+    add_form = CustomUserCreationForm  # теперь Unfold-стиль для создания
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Доступ к группам пациентов', {
             'classes': ('collapse',),
             'fields': ('patient_groups',),
         }),
     )
-    # на add: тоже показываем все секции сразу
-    add_fieldsets = BaseUserAdmin.fieldsets
+    add_fieldsets = BaseUserAdmin.add_fieldsets
 
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'get_patient_groups')
     search_fields = ('username', 'email', 'first_name', 'last_name')
