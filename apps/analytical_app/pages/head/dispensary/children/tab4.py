@@ -38,16 +38,13 @@ children_unique = html.Div([
             "filter": True,
             "resizable": True,
             "suppressAggFuncInHeader": True,
-            "flex": 1,
-            "minWidth": 130
+            "minWidth": 50
         },
         enableEnterpriseModules=True,
 
         # Дополнительные опции задаем через dashGridOptions
         dashGridOptions={
             "suppressAggFuncInHeader": True,
-            # Настраиваем autoGroupColumnDef через dashGridOptions,
-            # чтобы сделать первый групповой столбец шире:
             "autoGroupColumnDef": {
                 "headerName": "Группа",
                 "minWidth": 250
@@ -78,6 +75,19 @@ def update_table_dd(n_clicks, selected_year):
 
     loading_output = dcc.Loading(type="default")
     columns, data = TableUpdater.query_to_df(engine, query_uniq(selected_year))
+
+    # Приводим названия колонок к короткому виду (убираем sum(...))
+    if columns and isinstance(columns, list) and isinstance(columns[0], dict):
+        for col in columns:
+            if 'headerName' in col and isinstance(col['headerName'], str) and col['headerName'].startswith('sum(') and col['headerName'].endswith(')'):
+                col['headerName'] = col['headerName'][4:-1]
+            if 'field' in col and isinstance(col['field'], str) and col['field'].startswith('sum(') and col['field'].endswith(')'):
+                col['field'] = col['field'][4:-1]
+    if data and isinstance(data, list) and isinstance(data[0], dict):
+        for row in data:
+            for k in list(row.keys()):
+                if k.startswith('sum(') and k.endswith(')'):
+                    row[k[4:-1]] = row.pop(k)
 
     if data:
         column_defs = [
