@@ -51,7 +51,7 @@ economist_stationary = html.Div(
                                     dbc.Label("Выберите тип стационара:"),
                                     dbc.Checklist(
                                         options=[{'label': group, 'value': group} for group in cel_groups.keys()],
-                                        value=['Дневные'],
+                                        value=['В дневном стационаре'],
                                         id=f"checklist-input-{type_page}",
                                         inline=True,
                                     ),
@@ -157,7 +157,7 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
      Output(f'no-data-toast-{type_page}', 'is_open')],
     [Input(f'get-data-button-{type_page}', 'n_clicks')],
     [State(f'selected-period-{type_page}', 'children'),
-
+     State(f'range-slider-month-{type_page}', 'value'),
      State(f'checklist-input-{type_page}', 'value'),
      State(f'dropdown-year-{type_page}', 'value'),
      State(f'building-checklist-{type_page}', 'value'),
@@ -166,8 +166,8 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
      State(f'status-individual-dropdown-{type_page}', 'value'),
      ]  # Добавляем состояние для выбранных корпусов
 )
-def update_table(n_clicks, selected_period, selected_type_dv, selected_year, selected_buildings, status_mode, selected_status_group, selected_individual_statuses):
-    if n_clicks is None or not selected_period or not selected_type_dv:
+def update_table(n_clicks, selected_period, selected_months_range, selected_type_dv, selected_year, selected_buildings, status_mode, selected_status_group, selected_individual_statuses):
+    if n_clicks is None or not selected_type_dv:
         raise exceptions.PreventUpdate
 
     loading_output = html.Div([dcc.Loading(type="default")])
@@ -179,8 +179,42 @@ def update_table(n_clicks, selected_period, selected_type_dv, selected_year, sel
     selected_status_tuple = tuple(selected_status_values)
     selected_type_dv_tuple = tuple(selected_type_dv)
 
-    # Передаем также selected_buildings в функцию sql_query_disp_dv4
-    sql_cond = ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)])
+    # Формируем SQL условие для месяцев
+    if selected_months_range and selected_year:
+        try:
+            # Используем названия месяцев из months_sql_labels и добавляем год
+            sql_months = []
+            for month in range(selected_months_range[0], selected_months_range[1] + 1):
+                if month in months_sql_labels:
+                    month_name = months_sql_labels[month]
+                    sql_months.append(f"'{month_name} {selected_year}'")
+
+            # Если это текущий месяц, добавим также условие для "-"
+            current_month_num, _ = get_current_reporting_month()
+            if current_month_num >= selected_months_range[0] and current_month_num <= selected_months_range[1]:
+                sql_months.append("'-'")
+
+            sql_cond = ', '.join(sql_months)
+        except (TypeError, IndexError) as e:
+            sql_cond = ""
+    else:
+        sql_cond = ""
+
+    # Если список месяцев пуст, возьмем все месяцы от 1 до 12
+    if not sql_cond:
+        from datetime import datetime
+        current_year = selected_year or datetime.now().year
+        sql_months = [f"'{months_sql_labels[month]} {current_year}'" for month in range(1, 13) if
+                      month in months_sql_labels]
+        sql_months.append("'-'")  # Добавляем текущий месяц
+        sql_cond = ', '.join(sql_months)
+
+    # Проверяем, что selected_year задан
+    if not selected_year:
+        from datetime import datetime
+        selected_year = datetime.now().year
+
+    # Передаем также selected_buildings в функцию sql_query_stac
     sql_query = sql_query_stac(sql_cond, selected_year, selected_buildings)
 
     bind_params = {
