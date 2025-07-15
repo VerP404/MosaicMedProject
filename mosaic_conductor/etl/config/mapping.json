@@ -142,7 +142,6 @@
         "Период нетрудоспособности: дата начала": "incapacity_start_date",
         "Период нетрудоспособности: дата окончания": "incapacity_end_date",
         "Количество дней": "days_count",
-        "ТВСП": "tvsp",
         "Выдавший врач": "issuing_doctor",
         "Закрывший врач": "closing_doctor",
         "Дата закрытия": "closing_date",
