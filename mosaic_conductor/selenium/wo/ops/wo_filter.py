@@ -114,7 +114,7 @@ def filter_input_op(context, site_url: str):
     select_all_checkbox.click()
     # Скачивание файла
     context.log.info("Начинаем скачивание файла")
-    download_button = driver.find_element(By.XPATH, '//*[@id="menu"]/div/div[3]/div/div/div[5]/a/button')
+    download_button = driver.find_element(By.XPATH, '//*[@id="menu"]/div/div[3]/div/div/div[4]/a/button')
     download_button.click()
     time.sleep(5)
     return "Данные выгруженны в csv."
