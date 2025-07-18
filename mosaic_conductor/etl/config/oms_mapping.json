@@ -170,7 +170,6 @@
         "Дата рождения": "birth_date",
         "Начало лечения": "treatment_start",
         "Окончание лечения": "treatment_end",
-        "Страховая": "insurance",
         "ЕНП": "enp",
         "Оператор": "operator",
         "Врач": "doctor",
@@ -181,7 +180,6 @@
         "Поле с ошибкой": "field_with_error",
         "Базовый элемент": "base_element",
         "Сумма санкций": "sanctions_amount",
-        "Исходный файл с загрузкой": "source_file",
         "Номер счета": "account_number",
         "Дата счета": "account_date",
         "Дата редактирования": "edit_date"
