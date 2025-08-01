@@ -40,9 +40,9 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
         inogorodniy_filter = f"AND inogorodniy = true"
 
     if sanction == '1':
-        sanction_filter = f"AND sanctions = '-'"
+        sanction_filter = f"AND sanctions IN ('-', '0')"
     if sanction == '2':
-        sanction_filter = f"AND sanctions != '-'"
+        sanction_filter = f"AND sanctions NOT IN ('-', '0')"
 
     if amount_null == '1':
         amount_null_filter = f"AND amount_numeric != '0'"

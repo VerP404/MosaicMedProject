@@ -491,9 +491,9 @@ def render_tab7_table_and_export(
         conds.append("inogorodniy = TRUE")
 
     if sanc == '1':
-        conds.append("(sanctions = '-' OR sanctions IS NULL)")
+        conds.append("(sanctions IN ('-', '0') OR sanctions IS NULL)")
     elif sanc == '2':
-        conds.append("sanctions <> '-'")
+        conds.append("sanctions NOT IN ('-', '0')")
 
     if amt_null == '1':
         conds.append("amount_numeric IS NOT NULL")
@@ -722,9 +722,9 @@ def show_details_tab7(active_cell, table_data, selected_months, year, inog, sanc
     elif inog == '2':
         conds.append("inogorodniy = TRUE")
     if sanc == '1':
-        conds.append("(sanctions = '-' OR sanctions IS NULL)")
+        conds.append("(sanctions IN ('-', '0') OR sanctions IS NULL)")
     elif sanc == '2':
-        conds.append("sanctions <> '-'")
+        conds.append("sanctions NOT IN ('-', '0')")
     if amt_null == '1':
         conds.append("amount_numeric IS NOT NULL")
     elif amt_null == '2':

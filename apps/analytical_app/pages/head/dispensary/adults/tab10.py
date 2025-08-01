@@ -274,9 +274,9 @@ def render_tab10_table_and_export(
         conds.append("inogorodniy = TRUE")
 
     if sanc == '1':
-        conds.append("(sanctions = '-' OR sanctions IS NULL)")
+        conds.append("(sanctions IN ('-', '0') OR sanctions IS NULL)")
     elif sanc == '2':
-        conds.append("sanctions <> '-'")
+        conds.append("sanctions NOT IN ('-', '0') AND sanctions IS NOT NULL")
 
     if amt_null == '1':
         conds.append("amount_numeric IS NOT NULL")
