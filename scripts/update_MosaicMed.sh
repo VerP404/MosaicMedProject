@@ -13,6 +13,21 @@ echo "=============================================="
 echo "[INFO] Очистка /tmp..."
 find /tmp -mindepth 1 -not -name "$(basename "$LOG_FILE")" -exec rm -rf {} + 2>/dev/null
 echo "[INFO] Очистка /tmp завершена."
+echo "[INFO] Проверка состояния PostgreSQL..."
+
+# Проверка состояния
+if systemctl is-active --quiet postgresql; then
+    echo "[INFO] PostgreSQL уже запущен."
+else
+    echo "[WARN] PostgreSQL не запущен. Попытка запуска..."
+    if sudo systemctl start postgresql; then
+        echo "[INFO] PostgreSQL успешно запущен."
+    else
+        echo "[ERROR] Не удалось запустить PostgreSQL. Проверьте конфигурацию службы."
+        systemctl status postgresql --no-pager
+        exit 1
+    fi
+fi
 # Определение директории, в которой находится скрипт
 echo "[INFO] Определяем директорию скрипта..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -71,7 +86,7 @@ echo "[INFO] Активация виртуального окружения..."
 source .venv/bin/activate
 if [ $? -ne 0 ]; then
     echo "[ERROR] Не удалось активировать виртуальное окружение!"
-    exit 1
+    exit 1ro
 fi
 
 # Обновление кода
