@@ -159,7 +159,7 @@
       },
       "mapping_fields": {
         "Источник": "source",
-        "Ошибка": "error",
+        "ID ошибки": "error",
         "Статус ошибки": "error_status",
         "Статус талона": "talon_status",
         "Талон": "talon",
