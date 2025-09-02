@@ -17,7 +17,9 @@ from apps.analytical_app.components.filters import (
     get_current_reporting_month,
     filter_status,
     status_groups, filter_health_group,
-    filter_icd_codes
+    filter_icd_codes,
+    filter_gender,
+    filter_age_range
 )
 from apps.analytical_app.query_executor import execute_query
 
@@ -199,9 +201,16 @@ adults_dv10 = html.Div(
                             ),
                             dbc.Row(
                                 [
-                                    dbc.Col(filter_goals(type_page), width=4),
-                                    dbc.Col(filter_buildings(type_page), width=4),
-                                    dbc.Col(filter_profiles(type_page), width=4),
+                                    dbc.Col(filter_goals(type_page), width=3),
+                                    dbc.Col(filter_buildings(type_page), width=3),
+                                    dbc.Col(filter_profiles(type_page), width=3),
+                                    dbc.Col(filter_gender(type_page), width=3),
+                                ]
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(filter_age_range(type_page), width=6),
+                                    dbc.Col(html.Div(), width=6),  # Пустая колонка для выравнивания
                                 ]
                             ),
                             dbc.Row(
@@ -262,7 +271,39 @@ adults_dv10 = html.Div(
                     export_format="xlsx",  # позволяет экспортировать в Excel (кнопка появляется при наведении)
                 ),
             ])
-        ])
+        ]),
+        # Скрытая область с SQL запросом
+        dbc.Collapse(
+            dbc.Card([
+                dbc.CardHeader("SQL Запрос"),
+                dbc.CardBody([
+                    html.Pre(
+                        id=f"sql-query-{type_page}",
+                        style={
+                            "background-color": "#f8f9fa",
+                            "border": "1px solid #dee2e6",
+                            "border-radius": "0.375rem",
+                            "padding": "1rem",
+                            "font-size": "0.875rem",
+                            "white-space": "pre-wrap",
+                            "word-break": "break-all",
+                            "max-height": "400px",
+                            "overflow-y": "auto"
+                        }
+                    )
+                ])
+            ]),
+            id=f"sql-collapse-{type_page}",
+            is_open=False
+        ),
+        # Кнопка для показа/скрытия SQL
+        dbc.Button(
+            "Показать SQL запрос",
+            id=f"sql-toggle-{type_page}",
+            color="secondary",
+            size="sm",
+            className="mt-2"
+        )
     ],
     style={"padding": "0rem"},
 )
@@ -423,6 +464,7 @@ from apps.analytical_app.query_executor import engine
     [
         Output(f"table-container-{type_page}", "children"),
         Output(f"download-{type_page}", "data"),
+        Output(f"sql-query-{type_page}", "children"),
     ],
     [
         Input(f"update-button-{type_page}", "n_clicks"),
@@ -447,6 +489,9 @@ from apps.analytical_app.query_executor import engine
         State(f"dropdown-goals-{type_page}", "value"),
         State(f"dropdown-buildings-{type_page}", "value"),
         State(f"dropdown-profiles-{type_page}", "value"),
+        State(f"dropdown-gender-{type_page}", "value"),
+        State(f"age-from-{type_page}", "value"),
+        State(f"age-to-{type_page}", "value"),
     ],
     prevent_initial_call=True
 )
@@ -455,7 +500,8 @@ def render_tab7_table_and_export(
         selected_months, year, inog, sanc, amt_null,
         start_input, end_input, start_treat, end_treat,
         report_type, status_mode, status_group, status_indiv,
-        health_groups, icd_codes, goals, buildings, profiles
+        health_groups, icd_codes, goals, buildings, profiles, gender,
+        age_from, age_to
 ):
     ctx = callback_context
     if not ctx.triggered:
@@ -534,19 +580,33 @@ def render_tab7_table_and_export(
         values = ", ".join(f"'{p}'" for p in profiles)
         conds.append(f"profile IN ({values})")
 
+    # gender
+    if gender and gender != "all":
+        conds.append(f"gender = '{gender}'")
+
     where = " AND ".join(conds)
 
     # --- основной SQL для подсчета уникальных талонов ---
+    # Добавляем фильтрацию по возрасту в WHERE условие
+    age_filter = ""
+    if (age_from is not None and age_from != '') or (age_to is not None and age_to != ''):
+        age_conditions = []
+        if age_from is not None and age_from != '':
+            age_conditions.append(f"age >= {age_from}")
+        if age_to is not None and age_to != '':
+            age_conditions.append(f"age <= {age_to}")
+        age_filter = f" AND ({' AND '.join(age_conditions)})"
+    
     sql = f"""
     WITH filtered_data AS (
         SELECT DISTINCT enp, main_diagnosis_code
         FROM load_data_oms_data
-        WHERE {where}
+        WHERE {where}{age_filter}
     )
     SELECT 
         main_diagnosis_code,
         COUNT(DISTINCT enp) as unique_patients,
-        (SELECT COUNT(*) FROM load_data_oms_data WHERE {where} AND main_diagnosis_code = fd.main_diagnosis_code) as total_talons
+        COUNT(*) as total_talons
     FROM filtered_data fd
     GROUP BY main_diagnosis_code
     ORDER BY unique_patients DESC;
@@ -581,7 +641,7 @@ def render_tab7_table_and_export(
             style_cell={"textAlign": "left", "minWidth": "120px", "maxWidth": "400px", "whiteSpace": "normal"},
             style_header={"fontWeight": "bold"},
         )
-        return table, no_update
+        return table, no_update, sql
 
     elif trigger == f"btn-export-{type_page}":
         # подготавливаем табличные данные
@@ -602,6 +662,8 @@ def render_tab7_table_and_export(
             "Цели": ", ".join(goals) if goals and "all" not in goals else "Все",
             "Корпуса": ", ".join(buildings) if buildings and "all" not in buildings else "Все",
             "Профили": ", ".join(profiles) if profiles and "all" not in profiles else "Все",
+            "Пол": "Мужской" if gender == "М" else "Женский" if gender == "Ж" else "Все",
+            "Возраст": f"от {age_from}" if (age_from and age_from != '') else "от 0" if (age_to and age_to != '') else "все" + (f" до {age_to}" if (age_to and age_to != '') else ""),
         }
 
         def to_excel(buffer):
@@ -614,7 +676,7 @@ def render_tab7_table_and_export(
             buffer.seek(0)
 
         filename = f"unique_talons_{datetime.datetime.now():%Y%m%d_%H%M}.xlsx"
-        return no_update, send_bytes(to_excel, filename)
+        return no_update, send_bytes(to_excel, filename), sql
     else:
         raise PreventUpdate
 
@@ -689,12 +751,15 @@ def load_health_groups(n):
         State(f"dropdown-goals-{type_page}", "value"),
         State(f"dropdown-buildings-{type_page}", "value"),
         State(f"dropdown-profiles-{type_page}", "value"),
+        State(f"dropdown-gender-{type_page}", "value"),
+        State(f"age-from-{type_page}", "value"),
+        State(f"age-to-{type_page}", "value"),
     ],
     prevent_initial_call=True
 )
 def show_details_tab7(active_cell, table_data, selected_months, year, inog, sanc, amt_null,
                      start_input, end_input, start_treat, end_treat, report_type, status_mode, status_group, status_indiv,
-                     health_groups, goals, buildings, profiles):
+                     health_groups, goals, buildings, profiles, gender, age_from, age_to):
     if not active_cell or not table_data:
         return [], [], [], None
     row = table_data[active_cell["row"]]
@@ -753,9 +818,22 @@ def show_details_tab7(active_cell, table_data, selected_months, year, inog, sanc
     if profiles and "all" not in profiles:
         values = ", ".join(f"'{p}'" for p in profiles)
         conds.append(f"profile IN ({values})")
+    if gender and gender != "all":
+        conds.append(f"gender = '{gender}'")
+    
+    # age range
+    age_conditions = []
+    if age_from is not None and age_from != '':
+        age_conditions.append(f"age >= {age_from}")
+    if age_to is not None and age_to != '':
+        age_conditions.append(f"age <= {age_to}")
+    if age_conditions:
+        conds.append(f"({' AND '.join(age_conditions)})")
+    
     where = " AND ".join(conds)
     sql = f'''
-        SELECT talon, enp, report_month, report_year, status, goal, patient, birth_date, treatment_start, treatment_end, main_diagnosis_code, additional_diagnosis_codes
+        SELECT talon, enp, report_month, report_year, status, goal, patient, birth_date, gender, age,
+        treatment_start, treatment_end, main_diagnosis_code, additional_diagnosis_codes
         FROM load_data_oms_data
         WHERE {where}
     '''
@@ -769,11 +847,63 @@ def show_details_tab7(active_cell, table_data, selected_months, year, inog, sanc
         {"name": "Цель", "id": "goal"},
         {"name": "Пациент", "id": "patient"},
         {"name": "Дата рождения", "id": "birth_date"},
+        {"name": "Пол", "id": "gender"},
+        {"name": "Возраст", "id": "age"},
         {"name": "Начало лечения", "id": "treatment_start"},
         {"name": "Окончание лечения", "id": "treatment_end"},
         {"name": "Основной диагноз", "id": "main_diagnosis_code"},
         {"name": "Доп. диагнозы", "id": "additional_diagnosis_codes"},
     ]
     return columns, df.to_dict("records"), [], None
+
+
+# Callback для загрузки списка полов
+@app.callback(
+    Output(f"dropdown-gender-{type_page}", "options"),
+    Input("date-interval", "n_intervals"),
+    prevent_initial_call=False
+)
+def load_gender_options(n):
+    """
+    Загружает доступные значения пола из базы данных.
+    """
+    sql = text("""
+        SELECT DISTINCT gender 
+        FROM load_data_oms_data 
+        WHERE gender IS NOT NULL 
+        ORDER BY gender
+    """)
+    with engine.connect() as conn:
+        genders = [row[0] for row in conn.execute(sql).fetchall()]
+    
+    # Создаем опции с человекочитаемыми названиями
+    options = [
+        {'label': 'Все', 'value': 'all'},
+        {'label': 'Мужской', 'value': 'М'},
+        {'label': 'Женский', 'value': 'Ж'}
+    ]
+    
+    # Фильтруем только те опции, которые есть в базе
+    available_genders = set(genders)
+    filtered_options = [opt for opt in options if opt['value'] == 'all' or opt['value'] in available_genders]
+    
+    return filtered_options
+
+
+# Callback для показа/скрытия SQL запроса
+@app.callback(
+    Output(f"sql-collapse-{type_page}", "is_open"),
+    Output(f"sql-toggle-{type_page}", "children"),
+    Input(f"sql-toggle-{type_page}", "n_clicks"),
+    State(f"sql-collapse-{type_page}", "is_open"),
+    prevent_initial_call=True
+)
+def toggle_sql_query(n_clicks, is_open):
+    if n_clicks:
+        if is_open:
+            return False, "Показать SQL запрос"
+        else:
+            return True, "Скрыть SQL запрос"
+    return is_open, "Показать SQL запрос"
 
 

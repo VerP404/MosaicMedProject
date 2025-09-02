@@ -685,3 +685,59 @@ def get_icd_codes():
     
     # Создаем простой список опций
     return [{'label': code, 'value': code} for code in codes]
+
+
+def filter_gender(type_page):
+    """
+    Создает фильтр по полу пациента.
+    """
+    return html.Div([
+        html.Label("Пол", style={"font-weight": "bold"}),
+        dcc.Dropdown(
+            id=f"dropdown-gender-{type_page}",
+            options=[
+                {'label': 'Все', 'value': 'all'},
+                {'label': 'Мужской', 'value': 'М'},
+                {'label': 'Женский', 'value': 'Ж'}
+            ],
+            value='all',
+            clearable=False,
+            placeholder="Выберите пол...",
+            style={"whiteSpace": "normal"},
+            optionHeight=50,
+            searchable=False
+        )
+    ])
+
+
+def filter_age_range(type_page):
+    """
+    Создает фильтр по возрасту пациента.
+    """
+    return html.Div([
+        html.Label("Возраст", style={"font-weight": "bold"}),
+        dbc.Row([
+            dbc.Col([
+                html.Label("От", style={"font-size": "0.9rem", "margin-bottom": "2px"}),
+                dcc.Input(
+                    id=f"age-from-{type_page}",
+                    type="number",
+                    placeholder="18",
+                    min=0,
+                    max=120,
+                    style={"width": "100%", "height": "38px"}
+                )
+            ], width=6),
+            dbc.Col([
+                html.Label("До", style={"font-size": "0.9rem", "margin-bottom": "2px"}),
+                dcc.Input(
+                    id=f"age-to-{type_page}",
+                    type="number", 
+                    placeholder="65",
+                    min=0,
+                    max=120,
+                    style={"width": "100%", "height": "38px"}
+                )
+            ], width=6)
+        ])
+    ])
