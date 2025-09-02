@@ -160,9 +160,7 @@ adults_dv10 = html.Div(
                                     dbc.Col(filter_inogorod(type_page), width=2),
                                     dbc.Col(filter_sanction(type_page), width=2),
                                     dbc.Col(filter_amount_null(type_page), width=2),
-                                    dbc.Col(html.Button("Выгрузить в Excel", id=f"btn-export-{type_page}", n_clicks=0,
-                                                        className="btn btn-outline-primary"), width="auto"),
-                                    dcc.Download(id=f"download-{type_page}")
+
                                 ]
                             ),
                             dbc.Row(
@@ -210,7 +208,33 @@ adults_dv10 = html.Div(
                             dbc.Row(
                                 [
                                     dbc.Col(filter_age_range(type_page), width=6),
-                                    dbc.Col(html.Div(), width=6),  # Пустая колонка для выравнивания
+                                    dbc.Col(
+                                        html.Div([
+                                            html.Label("Действия", style={"font-weight": "bold"}),
+                                            dbc.Row([
+                                                dbc.Col([
+                                                    dbc.Button(
+                                                        "Обновить",
+                                                        id=f"update-button-{type_page}",
+                                                        color="primary",
+                                                        size="sm",
+                                                        className="mt-2"
+                                                    )
+                                                ], width=6),
+                                                dbc.Col([
+                                                    dbc.Button(
+                                                        "Выгрузить в Excel",
+                                                        id=f"btn-export-{type_page}",
+                                                        color="outline-primary",
+                                                        size="sm",
+                                                        className="mt-2"
+                                                    )
+                                                ], width=6)
+                                            ]),
+                                            dcc.Download(id=f"download-{type_page}")
+                                        ]), 
+                                        width=6
+                                    ),
                                 ]
                             ),
                             dbc.Row(
