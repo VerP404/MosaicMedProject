@@ -31,3 +31,4 @@ selenium==4.32.0
 setuptools==80.7.1
 SQLAlchemy==2.0.35
 webdriver-manager==4.0.2
+chardet==5.2.0
