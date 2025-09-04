@@ -34,22 +34,22 @@ def read_csv_with_encoding(file_content, encoding):
             
     raise Exception("Не удалось прочитать CSV файл ни с одной кодировкой")
 
-def process_data(enp_df, requests_df):
+def process_data(enp_df, requests_df, enp_field='ЕНП'):
     """Обрабатывает данные и находит пересечения"""
     try:
-        # Проверяем наличие колонки ЕНП
-        if 'ЕНП' not in enp_df.columns:
-            return None, f"Ошибка: В файле с ЕНП нет колонки 'ЕНП'. Доступные колонки: {enp_df.columns.tolist()}"
+        # Проверяем наличие колонки ЕНП в Excel файле
+        if enp_field not in enp_df.columns:
+            return None, f"Ошибка: В файле с ЕНП нет колонки '{enp_field}'. Доступные колонки: {enp_df.columns.tolist()}"
             
         if 'ЕНП' not in requests_df.columns:
             return None, f"Ошибка: В файле с обращениями нет колонки 'ЕНП'. Доступные колонки: {requests_df.columns.tolist()}"
         
         # Очищаем данные от пустых ЕНП
-        enp_clean = enp_df.dropna(subset=['ЕНП'])
+        enp_clean = enp_df.dropna(subset=[enp_field])
         requests_clean = requests_df.dropna(subset=['ЕНП'])
         
         # Находим пересечения
-        enp_set = set(enp_clean['ЕНП'].astype(str).str.replace('.0', '').str.strip())
+        enp_set = set(enp_clean[enp_field].astype(str).str.replace('.0', '').str.strip())
         requests_set = set(requests_clean['ЕНП'].astype(str).str.replace('.0', '').str.strip())
         common_enp = enp_set.intersection(requests_set)
         
@@ -61,7 +61,7 @@ def process_data(enp_df, requests_df):
         requests_clean['ЕНП_str'] = requests_clean['ЕНП'].astype(str).str.replace('.0', '').str.strip()
         result_df = requests_clean[requests_clean['ЕНП_str'].isin(common_enp)]
         
-        # Добавляем поле "Запись" с датой
+        # Добавляем поле "Прием" с датой
         if 'Дата приема' in result_df.columns:
             result_df = result_df.copy()
             result_df['Прием'] = pd.to_datetime(result_df['Дата приема'], format='%Y-%m-%dT%H:%M', errors='coerce').dt.date
@@ -77,7 +77,8 @@ def process_data(enp_df, requests_df):
             'unique_enp_in_file': len(enp_set),
             'unique_requests_in_file': len(requests_set),
             'common_enp': len(common_enp),
-            'result_records': len(result_df)
+            'result_records': len(result_df),
+            'enp_field_used': enp_field
         }
         
         return result_df, stats
@@ -125,7 +126,8 @@ appointment_analysis_page = html.Div([
                                 accept=".xlsx,.xls"
                             ),
                             html.Div(id=f"enp-loading-{type_page}", className="mt-2"),
-                            html.Div(id=f"enp-file-info-{type_page}", className="mt-2")
+                            html.Div(id=f"enp-file-info-{type_page}", className="mt-2"),
+                            html.Div(id=f"enp-field-selector-{type_page}", className="mt-2")
                         ], width=12, md=6, className="mb-3 mb-md-0"),
                         dbc.Col([
                             html.Label("Файл из модуля Обращения Квазар (CSV)", style={"font-weight": "bold"}),
@@ -213,6 +215,7 @@ def show_enp_loading(contents):
 @app.callback(
     Output(f"enp-loading-{type_page}", "children", allow_duplicate=True),
     Output(f"enp-file-info-{type_page}", "children"),
+    Output(f"enp-field-selector-{type_page}", "children"),
     Output(f"analyze-button-{type_page}", "disabled"),
     Input(f"upload-enp-{type_page}", "contents"),
     State(f"upload-enp-{type_page}", "filename"),
@@ -220,7 +223,7 @@ def show_enp_loading(contents):
 )
 def handle_enp_upload(contents, filename):
     if contents is None:
-        return "", "", True
+        return "", "", "", True
     
     try:
         # Декодируем файл
@@ -238,7 +241,21 @@ def handle_enp_upload(contents, filename):
             f"Колонки: {', '.join(df.columns.tolist())}"
         ], color="success", className="mb-0")
         
-        return "", info, False
+        # Создаем селектор полей
+        field_options = [{'label': col, 'value': col} for col in df.columns.tolist()]
+        field_selector = html.Div([
+            html.Label("Выберите поле с ЕНП:", style={"font-weight": "bold", "font-size": "0.9rem"}),
+            dcc.Dropdown(
+                id=f"enp-field-dropdown-{type_page}",
+                options=field_options,
+                value=field_options[0]['value'] if field_options else None,
+                clearable=False,
+                placeholder="Выберите поле...",
+                style={"font-size": "0.9rem"}
+            )
+        ])
+        
+        return "", info, field_selector, False
         
     except Exception as e:
         error = dbc.Alert([
@@ -246,7 +263,7 @@ def handle_enp_upload(contents, filename):
             html.Br(),
             str(e)
         ], color="danger", className="mb-0")
-        return "", error, True
+        return "", error, "", True
 
 # Callback для показа индикатора загрузки при загрузке CSV файла
 @app.callback(
@@ -340,9 +357,10 @@ def show_loading_indicator(n_clicks):
     Input(f"analyze-button-{type_page}", "n_clicks"),
     State(f"upload-enp-{type_page}", "contents"),
     State(f"upload-requests-{type_page}", "contents"),
+    State(f"enp-field-dropdown-{type_page}", "value"),
     prevent_initial_call=True
 )
-def analyze_data(n_clicks, enp_contents, requests_contents):
+def analyze_data(n_clicks, enp_contents, requests_contents, enp_field):
     if n_clicks is None or enp_contents is None or requests_contents is None:
         raise PreventUpdate
     
@@ -358,7 +376,7 @@ def analyze_data(n_clicks, enp_contents, requests_contents):
         requests_df = read_csv_with_encoding(requests_decoded, encoding)
         
         # Обрабатываем данные
-        result_df, stats = process_data(enp_df, requests_df)
+        result_df, stats = process_data(enp_df, requests_df, enp_field)
         
         if result_df is None:
             # Ошибка обработки
@@ -378,6 +396,7 @@ def analyze_data(n_clicks, enp_contents, requests_contents):
                         html.P([
                             html.Strong("Записей в файле с ЕНП: "), str(stats['total_enp_records']), html.Br(),
                             html.Strong("Записей в файле с обращениями: "), str(stats['total_requests_records']), html.Br(),
+                            html.Strong("Поле для поиска ЕНП: "), str(stats.get('enp_field_used', 'ЕНП')), html.Br(),
                             html.Strong("Уникальных ЕНП в файле с ЕНП: "), str(stats['unique_enp_in_file']), html.Br(),
                             html.Strong("Уникальных ЕНП в файле с обращениями: "), str(stats['unique_requests_in_file']), html.Br(),
                             html.Strong("Общих ЕНП: "), str(stats['common_enp']), html.Br(),
