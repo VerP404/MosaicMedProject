@@ -5,6 +5,7 @@ import dash_bootstrap_components as dbc
 from apps.analytical_app.pages.registry.main import registry_main
 from apps.analytical_app.pages.registry.not_hospitalized.page import not_hospitalized_page
 from apps.analytical_app.pages.registry.appointment_analysis.page import appointment_analysis_page
+from apps.analytical_app.pages.registry.health_schools.page import health_schools_page
 
 routes_registry = {
     "/registry": registry_main,
@@ -21,5 +22,12 @@ routes_registry = {
             {"label": "Анализ записанных на прием", "active": True},
         ]),
         appointment_analysis_page
+    ]),
+    "/registry/health_schools": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Реестры", "href": "/registry"},
+            {"label": "Анализ школ здоровья", "active": True},
+        ]),
+        health_schools_page
     ]),
 }

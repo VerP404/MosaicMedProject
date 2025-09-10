@@ -16,6 +16,9 @@ cards_row_1 = dbc.Row(
         dbc.Col(create_card(2, type_page,
                             "Анализ записанных на прием",
                             "Анализ пересечений между списком ЕНП и обращениями пациентов.")),
+        dbc.Col(create_card(3, type_page,
+                            "Анализ школ здоровья",
+                            "Отслеживание плановых явок пациентов в школах здоровья.")),
     ],
     className="mb-4 align-items-stretch",
 )
@@ -33,7 +36,7 @@ registry_main = html.Div([
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 2]],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 2, 3]],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -46,7 +49,8 @@ def navigate_pages(*n_clicks):
     
     route_map = {
         1: f"/{main_link}/not_hospitalized",
-        2: f"/{main_link}/appointment_analysis"
+        2: f"/{main_link}/appointment_analysis",
+        3: f"/{main_link}/health_schools"
     }
     
     return route_map[report_num]
