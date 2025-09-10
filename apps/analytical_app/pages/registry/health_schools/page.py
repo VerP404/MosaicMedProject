@@ -6,6 +6,7 @@ Dash-приложение для анализа школ здоровья пац
 """
 
 import pandas as pd
+import time
 from datetime import datetime, date, timedelta
 from dash import html, dcc, Input, Output, State, callback_context, dash_table, no_update
 from dash.exceptions import PreventUpdate
@@ -15,6 +16,11 @@ from apps.analytical_app.query_executor import execute_query
 
 type_page = "health_schools"
 
+# Кэш для оптимизации
+_talons_cache = {}
+_df_processed_cache = None
+_last_data_load_time = 0
+
 # Определение групп заболеваний
 DISEASE_GROUPS = {
     'I1%': 'Артериальная гипертония',
@@ -23,8 +29,8 @@ DISEASE_GROUPS = {
     'E1%': 'Сахарный диабет'
 }
 
-def get_health_schools_data():
-    """Получает данные школ здоровья из базы данных"""
+def get_health_schools_data(limit=5000):
+    """Получает данные школ здоровья из базы данных с ограничением"""
     query = """
     SELECT 
         enp,
@@ -41,8 +47,9 @@ def get_health_schools_data():
         treatment_start
     FROM load_data_oms_data 
     WHERE goal = '307'
-    ORDER BY enp, treatment_end DESC
-    """
+    ORDER BY treatment_end DESC
+    LIMIT {}
+    """.format(limit)
     
     try:
         result = execute_query(query)
@@ -90,6 +97,8 @@ def process_health_schools_data(df):
     
     if df_filtered.empty:
         return pd.DataFrame()
+    
+    # Группируем данные для обработки
     
     # Группируем по ЕНП и группе заболевания
     result_data = []
@@ -148,6 +157,81 @@ def process_health_schools_data(df):
         })
     
     return pd.DataFrame(result_data)
+
+def fast_search_patients(df, search_term):
+    """Оптимизированный поиск пациентов"""
+    if not search_term or len(search_term.strip()) < 2:
+        return df.head(0)  # Пустой результат для коротких запросов
+    
+    search_term = search_term.strip()
+    search_term_lower = search_term.lower()
+    
+    # Создаем временные поля для поиска
+    df_search = df.copy()
+    df_search['enp_str'] = df_search['enp'].astype(str)
+    df_search['talon_str'] = df_search['talon'].astype(str)
+    df_search['patient_lower'] = df_search['patient'].str.lower()
+    
+    # Сначала ищем точное совпадение по ЕНП
+    enp_mask = df_search['enp_str'].str.contains(search_term, na=False)
+    if enp_mask.any():
+        return df[enp_mask].head(50)  # Ограничиваем результат
+    
+    # Потом по номеру талона
+    talon_mask = df_search['talon_str'].str.contains(search_term, na=False)
+    if talon_mask.any():
+        return df[talon_mask].head(50)
+    
+    # В конце по ФИО (только если больше 2 символов)
+    if len(search_term) >= 3:
+        patient_mask = df_search['patient_lower'].str.contains(search_term_lower, na=False)
+        if patient_mask.any():
+            return df[patient_mask].head(50)
+    
+    return df.head(0)
+
+def get_talons_cached(enp, disease_group, diagnosis_code):
+    """Получает талоны с кэшированием"""
+    cache_key = f"{enp}_{diagnosis_code}"
+    
+    if cache_key in _talons_cache:
+        return _talons_cache[cache_key]
+    
+    talons_df = get_talons_by_direction(enp, disease_group, diagnosis_code)
+    _talons_cache[cache_key] = talons_df
+    
+    # Ограничиваем размер кэша
+    if len(_talons_cache) > 100:
+        # Удаляем самые старые записи
+        oldest_key = next(iter(_talons_cache))
+        del _talons_cache[oldest_key]
+    
+    return talons_df
+
+def update_data():
+    """Обновляет данные школ здоровья с кэшированием"""
+    global _df_processed_cache, _last_data_load_time
+    
+    current_time = time.time()
+    
+    # Кэшируем данные на 5 минут
+    if (_df_processed_cache is not None and 
+        current_time - _last_data_load_time < 300):  # 5 минут
+        return _df_processed_cache
+    
+    try:
+        df_raw = get_health_schools_data()
+        if df_raw.empty:
+            _df_processed_cache = pd.DataFrame()
+            return _df_processed_cache
+        
+        _df_processed_cache = process_health_schools_data(df_raw)
+        _last_data_load_time = current_time
+        return _df_processed_cache
+    except Exception as e:
+        print(f"Ошибка обновления данных: {e}")
+        _df_processed_cache = pd.DataFrame()
+        return _df_processed_cache
 
 def build_search_card():
     """Создает карточку поиска пациентов"""
@@ -558,7 +642,7 @@ def search_patients(search_clicks, clear_clicks, search_term):
     if trigger_id == f"clear-button-{type_page}":
         return html.Div()
     
-    # Поиск пациентов
+    # Поиск пациентов только по кнопке
     if trigger_id == f"search-patients-button-{type_page}":
         if not search_term or len(search_term.strip()) < 2:
             return dbc.Alert([
@@ -567,29 +651,16 @@ def search_patients(search_clicks, clear_clicks, search_term):
             ], color="warning", className="text-center")
         
         try:
-            # Получаем данные
-            df_raw = get_health_schools_data()
-            if df_raw.empty:
+            # Получаем данные с кэшированием
+            df_processed = update_data()
+            if df_processed.empty:
                 return dbc.Alert([
                     html.I(className="fas fa-database me-2"),
                     "Данные не найдены в базе данных"
                 ], color="danger", className="text-center")
             
-            df_processed = process_health_schools_data(df_raw)
-            if df_processed.empty:
-                return dbc.Alert([
-                    html.I(className="fas fa-hospital me-2"),
-                    "Нет данных по школам здоровья (goal='307')"
-                ], color="info", className="text-center")
-            
-            # Поиск по ФИО, ЕНП или номеру талона
-            search_term_lower = search_term.lower()
-            mask = (
-                df_processed['patient'].str.lower().str.contains(search_term_lower, na=False) |
-                df_processed['enp'].str.contains(search_term, na=False) |
-                df_processed['talon'].str.contains(search_term, na=False)
-            )
-            found_patients = df_processed[mask]
+            # Оптимизированный поиск
+            found_patients = fast_search_patients(df_processed, search_term)
             
             # Строим список пациентов с передачей поискового запроса
             patients_list = build_patients_list(found_patients, search_term)
@@ -659,19 +730,12 @@ def show_patient_records(show_clicks, selected_rows, patients_data, disease_filt
             selected_enp = selected_patient['enp']
             
             # Получаем все данные
-            df_raw = get_health_schools_data()
-            if df_raw.empty:
+            df_processed = update_data()
+            if df_processed.empty:
                 return dbc.Alert([
                     html.I(className="fas fa-database me-2"),
                     "Данные не найдены в базе данных"
                 ], color="danger", className="text-center"), html.Div()
-            
-            df_processed = process_health_schools_data(df_raw)
-            if df_processed.empty:
-                return dbc.Alert([
-                    html.I(className="fas fa-hospital me-2"),
-                    "Нет данных по школам здоровья"
-                ], color="info", className="text-center"), html.Div()
             
             # Фильтруем по выбранному пациенту
             patient_records = df_processed[df_processed['enp'] == selected_enp]
@@ -733,8 +797,8 @@ def show_talons_for_record(active_cell, records_data, selected_patient_rows, pat
     disease_group = selected_record['disease_group']
     diagnosis_code = selected_record['diagnosis_code']
     
-    # Получаем талоны по направлению
-    talons_df = get_talons_by_direction(selected_enp, disease_group, diagnosis_code)
+    # Получаем талоны по направлению с кэшированием
+    talons_df = get_talons_cached(selected_enp, disease_group, diagnosis_code)
     
     if talons_df.empty:
         return dbc.Alert([
