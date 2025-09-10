@@ -33,9 +33,12 @@ def get_health_schools_data():
         treatment_end,
         main_diagnosis_code,
         goal,
-        department,
+        building,
         doctor,
-        specialty
+        specialty,
+        talon,
+        status,
+        treatment_start
     FROM load_data_oms_data 
     WHERE goal = '307'
     ORDER BY enp, treatment_end DESC
@@ -49,12 +52,13 @@ def get_health_schools_data():
         
         # Преобразуем результат в DataFrame
         columns = ['enp', 'patient', 'birth_date', 'treatment_end', 'main_diagnosis_code', 
-                  'goal', 'department', 'doctor', 'specialty']
+                  'goal', 'building', 'doctor', 'specialty', 'talon', 'status', 'treatment_start']
         df = pd.DataFrame(result, columns=columns)
         
         # Преобразуем даты
         df['treatment_end'] = pd.to_datetime(df['treatment_end'], errors='coerce')
         df['birth_date'] = pd.to_datetime(df['birth_date'], errors='coerce')
+        df['treatment_start'] = pd.to_datetime(df['treatment_start'], errors='coerce')
         
         return df
     except Exception as e:
@@ -91,32 +95,56 @@ def process_health_schools_data(df):
     result_data = []
     
     for (enp, disease_group), group_df in df_filtered.groupby(['enp', 'disease_group']):
-        # Берем последнюю запись для каждого пациента в каждой группе
-        latest_record = group_df.iloc[0]
+        # Фильтруем только оплаченные талоны (статус 3)
+        paid_talons = group_df[group_df['status'] == '3'].copy()
         
-        # Вычисляем плановую дату следующей явки (через год)
-        last_visit = latest_record['treatment_end']
-        if pd.notna(last_visit):
-            planned_visit = last_visit + timedelta(days=365)
-            days_until_planned = (planned_visit.date() - date.today()).days
-        else:
+        if paid_talons.empty:
+            # Если нет оплаченных талонов, берем последнюю запись
+            latest_record = group_df.iloc[0]
+            last_paid_visit = None
             planned_visit = None
             days_until_planned = None
+            status = 'Нет оплаченных талонов'
+        else:
+            # Сортируем оплаченные талоны по дате окончания лечения
+            paid_talons = paid_talons.sort_values('treatment_end', ascending=False)
+            latest_paid_record = paid_talons.iloc[0]
+            
+            # Вычисляем плановую дату следующей явки (через год после последней оплаченной)
+            last_paid_visit = latest_paid_record['treatment_end']
+            if pd.notna(last_paid_visit):
+                planned_visit = last_paid_visit + timedelta(days=365)
+                days_until_planned = (planned_visit.date() - date.today()).days
+                
+                # Определяем статус
+                if days_until_planned < 0:
+                    status = 'Просрочено'
+                elif days_until_planned <= 30:
+                    status = 'Скоро'
+                else:
+                    status = 'В срок'
+            else:
+                planned_visit = None
+                days_until_planned = None
+                status = 'Дата не определена'
+            
+            # Берем последнюю запись для отображения основной информации
+            latest_record = group_df.iloc[0]
         
         result_data.append({
             'enp': enp,
             'patient': latest_record['patient'],
             'birth_date': latest_record['birth_date'].strftime('%d.%m.%Y') if pd.notna(latest_record['birth_date']) else '',
             'disease_group': disease_group,
-            'last_visit': last_visit.strftime('%d.%m.%Y') if pd.notna(last_visit) else '',
+            'diagnosis_code': latest_record['main_diagnosis_code'],
+            'last_paid_visit': last_paid_visit.strftime('%d.%m.%Y') if pd.notna(last_paid_visit) else 'Нет оплаченных',
             'planned_visit': planned_visit.strftime('%d.%m.%Y') if planned_visit else '',
             'days_until_planned': days_until_planned,
-            'department': latest_record['department'],
+            'building': latest_record['building'],
             'doctor': latest_record['doctor'],
             'specialty': latest_record['specialty'],
-            'status': 'Просрочено' if days_until_planned and days_until_planned < 0 else 
-                     'Скоро' if days_until_planned and days_until_planned <= 30 else 
-                     'В срок' if days_until_planned else 'Не определено'
+            'talon': latest_record['talon'],
+            'status': status
         })
     
     return pd.DataFrame(result_data)
@@ -130,11 +158,11 @@ def build_search_card():
         dbc.CardBody([
             dbc.Row([
                 dbc.Col([
-                    html.Label("Поиск по ФИО или ЕНП:", style={"font-weight": "bold"}),
+                    html.Label("Поиск по ФИО, ЕНП или номеру талона:", style={"font-weight": "bold"}),
                     dbc.InputGroup([
                         dbc.Input(
                             id=f"search-input-{type_page}",
-                            placeholder="Введите ФИО или ЕНП...",
+                            placeholder="Введите ФИО, ЕНП или номер талона...",
                             type="text"
                         ),
                         dbc.Button(
@@ -176,31 +204,27 @@ def build_records_filter_card():
             html.H5("🏥 Фильтр записей по школам здоровья", className="mb-0")
         ]),
         dbc.CardBody([
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Группа заболевания:", style={"font-weight": "bold"}),
-                    dcc.Dropdown(
-                        id=f"disease-group-filter-{type_page}",
-                        options=[
-                            {'label': 'Все группы', 'value': 'all'},
-                            {'label': 'Артериальная гипертония', 'value': 'I1%'},
-                            {'label': 'Сердечная недостаточность', 'value': 'I5%'},
-                            {'label': 'Бронхиальная астма', 'value': 'J4%'},
-                            {'label': 'Сахарный диабет', 'value': 'E1%'}
-                        ],
-                        value='all',
-                        clearable=False
-                    )
-                ], width=12, md=6),
-                dbc.Col([
-                    dbc.Button(
-                        "Показать записи",
-                        id=f"show-records-button-{type_page}",
-                        color="success",
-                        className="mt-4"
-                    )
-                ], width=12, md=6)
-            ])
+            html.Label("Группа заболевания:", style={"font-weight": "bold"}),
+            dcc.Dropdown(
+                id=f"disease-group-filter-{type_page}",
+                options=[
+                    {'label': 'Все группы', 'value': 'all'},
+                    {'label': 'Артериальная гипертония', 'value': 'I1%'},
+                    {'label': 'Сердечная недостаточность', 'value': 'I5%'},
+                    {'label': 'Бронхиальная астма', 'value': 'J4%'},
+                    {'label': 'Сахарный диабет', 'value': 'E1%'}
+                ],
+                value='all',
+                clearable=False,
+                className="mb-3"
+            ),
+            dbc.Button(
+                "Показать записи",
+                id=f"show-records-button-{type_page}",
+                color="success",
+                size="lg",
+                className="w-100"
+            )
         ])
     ], className="mb-4")
 
@@ -240,17 +264,23 @@ def build_stats_cards(df):
         ], width=4)
     ], className="mb-4")
 
-def build_patients_list(patients_df):
+def build_patients_list(patients_df, search_term=""):
     """Создает список найденных пациентов"""
     if patients_df.empty:
-        return dbc.Alert("Пациенты не найдены", color="info")
+        return dbc.Alert([
+            html.I(className="fas fa-search me-2"),
+            f"По запросу '{search_term}' пациенты не найдены. Попробуйте изменить поисковый запрос."
+        ], color="warning", className="text-center")
     
     # Группируем по ЕНП и берем уникальных пациентов
     unique_patients = patients_df.groupby('enp').first().reset_index()
     
     return dbc.Card([
         dbc.CardHeader([
-            html.H5(f"👥 Найдено пациентов: {len(unique_patients)}", className="mb-0")
+            html.H5([
+                html.I(className="fas fa-users me-2"),
+                f"Найдено пациентов: {len(unique_patients)}"
+            ], className="mb-0")
         ]),
         dbc.CardBody([
             dash_table.DataTable(
@@ -299,11 +329,11 @@ def build_patient_records_table(records_df):
         data=records_df_sorted.to_dict('records'),
         columns=[
             {"name": "Группа заболевания", "id": "disease_group", "type": "text"},
-            {"name": "Последняя явка", "id": "last_visit", "type": "text"},
+            {"name": "Последняя оплаченная явка", "id": "last_paid_visit", "type": "text"},
             {"name": "Плановая явка", "id": "planned_visit", "type": "text"},
             {"name": "Дней до явки", "id": "days_until_planned", "type": "numeric"},
             {"name": "Статус", "id": "status", "type": "text"},
-            {"name": "Отделение", "id": "department", "type": "text"},
+            {"name": "Корпус", "id": "building", "type": "text"},
             {"name": "Врач", "id": "doctor", "type": "text"},
             {"name": "Специальность", "id": "specialty", "type": "text"}
         ],
@@ -344,6 +374,90 @@ def build_patient_records_table(records_df):
         fixed_rows={"headers": True}
     )
 
+def get_talons_by_direction(enp, disease_group, diagnosis_code):
+    """Получает все талоны по направлению для конкретного пациента"""
+    query = """
+    SELECT 
+        talon,
+        treatment_start,
+        treatment_end,
+        main_diagnosis_code,
+        status,
+        building,
+        doctor,
+        specialty
+    FROM load_data_oms_data 
+    WHERE enp = '{}' AND goal = '307' AND main_diagnosis_code = '{}'
+    ORDER BY treatment_end DESC
+    """
+    
+    try:
+        # Формируем запрос с конкретным диагнозом
+        formatted_query = query.format(enp, diagnosis_code)
+        result = execute_query(formatted_query)
+        
+        if not result:
+            return pd.DataFrame()
+        
+        columns = ['talon', 'treatment_start', 'treatment_end', 'main_diagnosis_code', 
+                  'status', 'building', 'doctor', 'specialty']
+        df = pd.DataFrame(result, columns=columns)
+        
+        # Преобразуем даты
+        df['treatment_start'] = pd.to_datetime(df['treatment_start'], errors='coerce')
+        df['treatment_end'] = pd.to_datetime(df['treatment_end'], errors='coerce')
+        
+        return df
+    except Exception as e:
+        print(f"Ошибка получения талонов: {e}")
+        return pd.DataFrame()
+
+def build_talons_table(talons_df):
+    """Создает таблицу с талонами"""
+    if talons_df.empty:
+        return dbc.Alert("Талонов не найдено", color="info")
+    
+    # Форматируем даты
+    talons_df = talons_df.copy()
+    talons_df['treatment_start'] = talons_df['treatment_start'].dt.strftime('%d.%m.%Y') if not talons_df['treatment_start'].isna().all() else ''
+    talons_df['treatment_end'] = talons_df['treatment_end'].dt.strftime('%d.%m.%Y') if not talons_df['treatment_end'].isna().all() else ''
+    
+    return dash_table.DataTable(
+        id=f"talons-table-{type_page}",
+        data=talons_df.to_dict('records'),
+        columns=[
+            {"name": "Номер талона", "id": "talon", "type": "text"},
+            {"name": "Дата начала лечения", "id": "treatment_start", "type": "text"},
+            {"name": "Дата окончания лечения", "id": "treatment_end", "type": "text"},
+            {"name": "Диагноз", "id": "main_diagnosis_code", "type": "text"},
+            {"name": "Статус", "id": "status", "type": "text"},
+            {"name": "Корпус", "id": "building", "type": "text"},
+            {"name": "Врач", "id": "doctor", "type": "text"},
+            {"name": "Специальность", "id": "specialty", "type": "text"}
+        ],
+        page_size=10,
+        sort_action="native",
+        style_cell={
+            "textAlign": "left",
+            "minWidth": "120px",
+            "maxWidth": "200px",
+            "whiteSpace": "normal",
+            "fontSize": "12px"
+        },
+        style_header={
+            "fontWeight": "bold",
+            "backgroundColor": "#f8f9fa"
+        },
+        style_table={
+            "height": "300px",
+            "overflowY": "auto",
+            "overflowX": "auto",
+            "border": "1px solid #dee2e6",
+            "borderRadius": "0.375rem"
+        },
+        fixed_rows={"headers": True}
+    )
+
 # Layout страницы
 health_schools_page = html.Div([
     # Заголовок
@@ -362,18 +476,14 @@ health_schools_page = html.Div([
         ], width=12)
     ], className="px-3"),
     
-    # Карточка выбора пациента
+    # Карточка выбора пациента и фильтрации записей
     dbc.Row([
         dbc.Col([
             build_patient_selection_card()
-        ], width=12)
-    ], className="px-3"),
-    
-    # Карточка фильтрации записей
-    dbc.Row([
+        ], width=12, md=6),
         dbc.Col([
             build_records_filter_card()
-        ], width=12)
+        ], width=12, md=6)
     ], className="px-3"),
     
     # Записи выбранного пациента
@@ -388,12 +498,50 @@ health_schools_page = html.Div([
                 ])
             ])
         ], width=12)
+    ], className="px-3"),
+    
+    # Талоны по выбранной записи
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("🎫 Талоны по выбранному направлению", className="mb-0")
+                ]),
+                dbc.CardBody([
+                    html.Div(id=f"talons-container-{type_page}")
+                ])
+            ])
+        ], width=12)
     ], className="px-3")
 ])
 
-# Callback для поиска пациентов
+# Callback для показа спиннера при поиске
 @app.callback(
     Output(f"patients-list-container-{type_page}", "children"),
+    Input(f"search-patients-button-{type_page}", "n_clicks"),
+    prevent_initial_call=True
+)
+def show_search_loading(n_clicks):
+    if n_clicks:
+        return dbc.Card([
+            dbc.CardBody([
+                dbc.Spinner(
+                    html.Div([
+                        html.I(className="fas fa-search me-2"),
+                        "Поиск пациентов...",
+                        html.Br(),
+                        html.Small("Пожалуйста, подождите", className="text-muted")
+                    ], className="text-center"),
+                    size="lg",
+                    color="primary"
+                )
+            ])
+        ], className="mb-4")
+    raise PreventUpdate
+
+# Callback для поиска пациентов
+@app.callback(
+    Output(f"patients-list-container-{type_page}", "children", allow_duplicate=True),
     Input(f"search-patients-button-{type_page}", "n_clicks"),
     Input(f"clear-button-{type_page}", "n_clicks"),
     State(f"search-input-{type_page}", "value"),
@@ -413,38 +561,77 @@ def search_patients(search_clicks, clear_clicks, search_term):
     # Поиск пациентов
     if trigger_id == f"search-patients-button-{type_page}":
         if not search_term or len(search_term.strip()) < 2:
-            return dbc.Alert("Введите минимум 2 символа для поиска", color="warning")
+            return dbc.Alert([
+                html.I(className="fas fa-exclamation-triangle me-2"),
+                "Введите минимум 2 символа для поиска"
+            ], color="warning", className="text-center")
         
-        # Получаем данные
-        df_raw = get_health_schools_data()
-        if df_raw.empty:
-            return dbc.Alert("Данные не найдены в базе данных", color="info")
-        
-        df_processed = process_health_schools_data(df_raw)
-        if df_processed.empty:
-            return dbc.Alert("Нет данных по школам здоровья", color="info")
-        
-        # Поиск по ФИО или ЕНП
-        search_term_lower = search_term.lower()
-        mask = (
-            df_processed['patient'].str.lower().str.contains(search_term_lower, na=False) |
-            df_processed['enp'].str.contains(search_term, na=False)
-        )
-        found_patients = df_processed[mask]
-        
-        if found_patients.empty:
-            return dbc.Alert("Пациенты не найдены", color="info")
-        
-        # Строим список пациентов
-        patients_list = build_patients_list(found_patients)
-        
-        return patients_list
+        try:
+            # Получаем данные
+            df_raw = get_health_schools_data()
+            if df_raw.empty:
+                return dbc.Alert([
+                    html.I(className="fas fa-database me-2"),
+                    "Данные не найдены в базе данных"
+                ], color="danger", className="text-center")
+            
+            df_processed = process_health_schools_data(df_raw)
+            if df_processed.empty:
+                return dbc.Alert([
+                    html.I(className="fas fa-hospital me-2"),
+                    "Нет данных по школам здоровья (goal='307')"
+                ], color="info", className="text-center")
+            
+            # Поиск по ФИО, ЕНП или номеру талона
+            search_term_lower = search_term.lower()
+            mask = (
+                df_processed['patient'].str.lower().str.contains(search_term_lower, na=False) |
+                df_processed['enp'].str.contains(search_term, na=False) |
+                df_processed['talon'].str.contains(search_term, na=False)
+            )
+            found_patients = df_processed[mask]
+            
+            # Строим список пациентов с передачей поискового запроса
+            patients_list = build_patients_list(found_patients, search_term)
+            
+            return patients_list
+            
+        except Exception as e:
+            return dbc.Alert([
+                html.I(className="fas fa-exclamation-circle me-2"),
+                f"Ошибка при поиске: {str(e)}"
+            ], color="danger", className="text-center")
     
     return no_update
 
-# Callback для показа записей выбранного пациента
+# Callback для показа спиннера при загрузке записей
 @app.callback(
     Output(f"patient-records-container-{type_page}", "children"),
+    Input(f"show-records-button-{type_page}", "n_clicks"),
+    prevent_initial_call=True
+)
+def show_records_loading(n_clicks):
+    if n_clicks:
+        return dbc.Card([
+            dbc.CardBody([
+                dbc.Spinner(
+                    html.Div([
+                        html.I(className="fas fa-file-medical me-2"),
+                        "Загрузка записей пациента...",
+                        html.Br(),
+                        html.Small("Пожалуйста, подождите", className="text-muted")
+                    ], className="text-center"),
+                    size="lg",
+                    color="success"
+                )
+            ])
+        ])
+    raise PreventUpdate
+
+# Callback для показа записей выбранного пациента
+@app.callback(
+    Output(f"patient-records-container-{type_page}", "children", allow_duplicate=True),
+    Output(f"talons-container-{type_page}", "children"),
     Input(f"show-records-button-{type_page}", "n_clicks"),
     Input(f"patients-list-{type_page}", "selected_rows"),
     State(f"patients-list-{type_page}", "data"),
@@ -461,43 +648,110 @@ def show_patient_records(show_clicks, selected_rows, patients_data, disease_filt
     # Если нажата кнопка "Показать записи"
     if trigger_id == f"show-records-button-{type_page}":
         if not selected_rows or not patients_data:
-            return dbc.Alert("Сначала выберите пациента из списка", color="warning")
+            return dbc.Alert([
+                html.I(className="fas fa-user-plus me-2"),
+                "Сначала выберите пациента из списка выше"
+            ], color="warning", className="text-center"), html.Div()
         
-        # Получаем данные выбранного пациента
-        selected_patient = patients_data[selected_rows[0]]
-        selected_enp = selected_patient['enp']
-        
-        # Получаем все данные
-        df_raw = get_health_schools_data()
-        if df_raw.empty:
-            return dbc.Alert("Данные не найдены", color="info")
-        
-        df_processed = process_health_schools_data(df_raw)
-        if df_processed.empty:
-            return dbc.Alert("Нет данных по школам здоровья", color="info")
-        
-        # Фильтруем по выбранному пациенту
-        patient_records = df_processed[df_processed['enp'] == selected_enp]
-        
-        if patient_records.empty:
-            return dbc.Alert(f"Записи для пациента {selected_patient['patient']} не найдены", color="info")
-        
-        # Применяем фильтр по группе заболевания
-        if disease_filter != 'all':
-            patient_records = patient_records[patient_records['disease_group'] == DISEASE_GROUPS[disease_filter]]
-        
-        if patient_records.empty:
-            return dbc.Alert(f"Записи для пациента {selected_patient['patient']} в группе {DISEASE_GROUPS[disease_filter]} не найдены", color="info")
-        
-        # Строим таблицу записей
-        records_table = build_patient_records_table(patient_records)
-        
-        return html.Div([
-            html.H6(f"Пациент: {selected_patient['patient']} (ЕНП: {selected_enp})", className="mb-3"),
-            records_table
-        ])
+        try:
+            # Получаем данные выбранного пациента
+            selected_patient = patients_data[selected_rows[0]]
+            selected_enp = selected_patient['enp']
+            
+            # Получаем все данные
+            df_raw = get_health_schools_data()
+            if df_raw.empty:
+                return dbc.Alert([
+                    html.I(className="fas fa-database me-2"),
+                    "Данные не найдены в базе данных"
+                ], color="danger", className="text-center"), html.Div()
+            
+            df_processed = process_health_schools_data(df_raw)
+            if df_processed.empty:
+                return dbc.Alert([
+                    html.I(className="fas fa-hospital me-2"),
+                    "Нет данных по школам здоровья"
+                ], color="info", className="text-center"), html.Div()
+            
+            # Фильтруем по выбранному пациенту
+            patient_records = df_processed[df_processed['enp'] == selected_enp]
+            
+            if patient_records.empty:
+                return dbc.Alert([
+                    html.I(className="fas fa-user-times me-2"),
+                    f"Записи для пациента {selected_patient['patient']} не найдены"
+                ], color="info", className="text-center"), html.Div()
+            
+            # Применяем фильтр по группе заболевания
+            if disease_filter != 'all':
+                patient_records = patient_records[patient_records['disease_group'] == DISEASE_GROUPS[disease_filter]]
+            
+            if patient_records.empty:
+                return dbc.Alert([
+                    html.I(className="fas fa-filter me-2"),
+                    f"Записи для пациента {selected_patient['patient']} в группе '{DISEASE_GROUPS[disease_filter]}' не найдены"
+                ], color="info", className="text-center"), html.Div()
+            
+            # Строим таблицу записей
+            records_table = build_patient_records_table(patient_records)
+            
+            return html.Div([
+                html.H6([
+                    html.I(className="fas fa-user me-2"),
+                    f"Пациент: {selected_patient['patient']} (ЕНП: {selected_enp})"
+                ], className="mb-3"),
+                records_table
+            ]), html.Div()
+            
+        except Exception as e:
+            return dbc.Alert([
+                html.I(className="fas fa-exclamation-circle me-2"),
+                f"Ошибка при загрузке записей: {str(e)}"
+            ], color="danger", className="text-center"), html.Div()
     
-    return no_update
+    return no_update, no_update
+
+# Callback для показа талонов при клике на запись
+@app.callback(
+    Output(f"talons-container-{type_page}", "children", allow_duplicate=True),
+    Input(f"patient-records-table-{type_page}", "active_cell"),
+    State(f"patient-records-table-{type_page}", "data"),
+    State(f"patients-list-{type_page}", "selected_rows"),
+    State(f"patients-list-{type_page}", "data"),
+    prevent_initial_call=True
+)
+def show_talons_for_record(active_cell, records_data, selected_patient_rows, patients_data):
+    if not active_cell or not records_data or not selected_patient_rows or not patients_data:
+        return html.Div()
+    
+    # Получаем данные выбранного пациента
+    selected_patient = patients_data[selected_patient_rows[0]]
+    selected_enp = selected_patient['enp']
+    
+    # Получаем выбранную запись
+    selected_record = records_data[active_cell['row']]
+    disease_group = selected_record['disease_group']
+    diagnosis_code = selected_record['diagnosis_code']
+    
+    # Получаем талоны по направлению
+    talons_df = get_talons_by_direction(selected_enp, disease_group, diagnosis_code)
+    
+    if talons_df.empty:
+        return dbc.Alert([
+            html.I(className="fas fa-file-medical-alt me-2"),
+            f"Талонов по направлению '{disease_group}' не найдено"
+        ], color="info", className="text-center")
+    
+    # Строим таблицу талонов
+    talons_table = build_talons_table(talons_df)
+    
+    return html.Div([
+        html.H6([
+            html.I(className="fas fa-ticket-alt me-2"),
+            f"Талоны по направлению: {disease_group}"
+        ], className="mb-3"),
+        talons_table
+    ])
 
 # Callback для очистки поля поиска
 @app.callback(
