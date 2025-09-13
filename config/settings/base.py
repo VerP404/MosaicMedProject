@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 import environ
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 env = environ.Env(
@@ -156,3 +158,126 @@ absolute_dagster_home = BASE_DIR / relative_dagster_home
 os.environ['DAGSTER_HOME'] = str(absolute_dagster_home)
 # для работы с дагстером загрузки в базу данных
 ORGANIZATIONS = os.environ.get('ORGANIZATIONS', 'МозаикаМед')
+
+# Настройка Unfold: аккуратный сайдбар с группами и сворачиваемыми разделами
+UNFOLD = {
+    "SITE_TITLE": "Панель МозаикаМед",
+    "SITE_HEADER": "Панель МозаикаМед",
+    "SITE_SUBHEADER": ORGANIZATIONS,
+    "SITE_URL": "/admin/",
+    "DASHBOARD_CALLBACK": "config.dashboard.dashboard_callback",
+    "SIDEBAR": {
+        "show_search": False,
+        "command_search": False,
+        # Показываем выпадающий список со всеми приложениями по умолчанию
+        "show_all_applications": True,
+        # Основная навигация и группы приложений
+        "navigation": [
+            {
+                "title": _("Навигация"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Главная админки"),
+                        "icon": "dashboard",
+                        "link": reverse_lazy("admin:index"),
+                    },
+                ],
+            },
+            {
+                "title": _("Доступ"),
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Пользователи"),
+                        "icon": "person",
+                        "link": reverse_lazy("admin:auth_user_changelist"),
+                    },
+                    {
+                        "title": _("Группы"),
+                        "icon": "group",
+                        "link": reverse_lazy("admin:auth_group_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Настройки системы"),
+                "collapsible": True,
+                "items": [
+                    {"title": "Система", "icon": "settings", "link": "/admin/home/"},
+                ],
+            },
+            {
+                "title": _("Кадры"),
+                "collapsible": True,
+                "items": [
+                    {"title": "Сотрудники", "icon": "settings", "link": "/admin/personnel/"},
+                    {"title": "Организация", "icon": "domain", "link": "/admin/organization/"},
+                ],
+            },
+            {
+                "title": _("Пациенты и население"),
+                "collapsible": True,
+                "items": [
+                    {"title": "Население (ИСЗЛ)", "icon": "groups", "link": "/admin/people/"},
+                    {"title": "Персоны", "icon": "person_search", "link": "/admin/person/"},
+                ],
+            },
+            {
+                "title": _("Льготное лекарственное обеспечение"),
+                "collapsible": True,
+                "items": [
+                    {"title": "Льготники", "icon": "medication", "link": "/admin/beneficiaries/"},
+                ],
+            },
+            {
+                "title": _("ОМС и талоны"),
+                "collapsible": True,
+                "items": [
+                    {"title": "Талоны ОМС", "icon": "assignment", "link": "/admin/talon/"},
+                    {"title": "Справочники ОМС", "icon": "menu_book", "link": "/admin/oms_reference/"},
+                ],
+            },
+            {
+                "title": _("Данные и загрузка"),
+                "collapsible": True,
+                "items": [
+                    {"title": "Оперативные данные", "icon": "table", "link": "/admin/data/"},
+                    {"title": "Загрузка данных", "icon": "history", "link": "/admin/load_data/"},
+                    {"title": "Загрузчики", "icon": "upload", "link": "/admin/data_loader/"},
+                    {"title": "SQL-конструктор", "icon": "dataset", "link": "/admin/sql_manager/"},
+                ],
+            },
+            {
+                "title": _("Диспансерное наблюдение"),
+                "collapsible": True,
+                "items": [
+                    {"title": "ДН-модуль", "icon": "monitor_heart", "link": "/admin/dn_app/"},
+                ],
+            },
+            {
+                "title": _("Планирование"),
+                "collapsible": True,
+                "items": [
+                    {"title": "План", "icon": "event_note", "link": "/admin/plan/"},
+                ],
+            },
+            {
+                "title": _("Отчёты и журналы"),
+                "collapsible": True,
+                "items": [
+                    {"title": "Отчёты", "icon": "bar_chart", "link": "/admin/reports/"},
+                    {"title": "Журнал", "icon": "article", "link": "/admin/journal/"},
+                ],
+            },
+            {
+                "title": _("Справочники"),
+                "collapsible": True,
+                "items": [
+                    {"title": "Общие справочники", "icon": "library_books", "link": "/admin/references/"},
+                ],
+            },
+        ],
+    },
+}

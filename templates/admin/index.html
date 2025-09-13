@@ -1,0 +1,144 @@
+{% extends 'admin/base.html' %}
+{% load i18n %}
+
+{% block title %}
+    {{ title }} | {{ site_title|default:_('Django site admin') }}
+{% endblock %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+<div>
+    <style>
+      .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;align-items:stretch}
+      .kpi-card{position:relative;padding:16px;border-radius:12px;background:var(--color-surface,#fff);box-shadow:0 1px 2px rgba(0,0,0,.06);color:inherit}
+      .kpi-card .kpi-title{font-weight:600;margin-bottom:4px}
+      .kpi-card .kpi-value{font-size:32px;line-height:1;font-weight:800;margin:6px 0 4px}
+      .kpi-muted{opacity:.65}
+      .accent-primary{border-left:6px solid #3b82f6;padding-left:10px}
+      .accent-emerald{border-left:6px solid #10b981;padding-left:10px}
+      .accent-amber{border-left:6px solid #f59e0b;padding-left:10px}
+      html.dark .kpi-card, html[data-theme="dark"] .kpi-card, [data-theme="dark"] .kpi-card{background:#0f172a;box-shadow:0 1px 2px rgba(0,0,0,.4);color:#e5e7eb}
+    </style>
+    <!-- Верхняя зона: описание слева, статус справа -->
+    <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items:start;">
+        <fieldset style="padding:16px; border-radius:8px;">
+            <legend style="padding:0 6px; font-weight:600;">МозаикаМед — аналитическая система</legend>
+            <p style="margin:0 0 8px 0;">Единая платформа для анализа медицинских данных, мониторинга показателей и оперативной отчётности.</p>
+            <ul style="margin:0; padding-left:18px; line-height:1.5;">
+                <li>Дашборды: врачи, статистика, экономика, WEB.ОМС</li>
+                <li>Интеграция с БД проекта и загрузчиками данных</li>
+                <li>Инструменты администрирования и справочники</li>
+            </ul>
+        </fieldset>
+
+        <fieldset style="padding:16px; border-radius:8px;">
+            <legend style="padding:0 6px; font-weight:600;">Состояние системы</legend>
+            <div style="display:grid; row-gap:6px; font-size:0.95rem;">
+                <div><span style="font-weight:600;">Организация:</span> {{ org_name }}</div>
+                <div><span style="font-weight:600;">Версия:</span> {{ app_version }}</div>
+                <div><span style="font-weight:600;">Дата:</span> {{ current_date }}</div>
+                <div><span style="font-weight:600;">Активных врачей:</span> {{ doctors_count }}</div>
+                <div><span style="font-weight:600;">Талонов ОМС (всего):</span> {{ talons_total }}</div>
+            </div>
+        </fieldset>
+    </div>
+
+    <!-- Нижняя зона: метрики и быстрые ссылки -->
+    <div class="kpi-grid" style="margin-top:16px;">
+        <div class="kpi-card accent-emerald">
+            <div class="kpi-title">Активные врачи</div>
+            <div class="kpi-value">{{ doctors_count }}</div>
+            <div class="kpi-muted">Количество сотрудников со статусом действующего врача</div>
+        </div>
+        <div class="kpi-card accent-primary">
+            <div class="kpi-title">Талоны ОМС (всего)</div>
+            <div class="kpi-value">{{ talons_total }}</div>
+            <div class="kpi-muted">Количество записей по всем годам</div>
+        </div>
+        <a href="/admin/reports/" style="text-decoration:none;">
+          <div class="kpi-card accent-amber">
+              <div class="kpi-title">Отчёты</div>
+              <div class="kpi-muted">Быстрый переход к разделу отчётности</div>
+          </div>
+        </a>
+        <a href="/admin/home/" style="text-decoration:none;">
+          <div class="kpi-card accent-amber">
+              <div class="kpi-title">Настройки</div>
+              <div class="kpi-muted">Параметры сервисов и интеграций</div>
+          </div>
+        </a>
+    </div>
+
+    <!-- Диаграмма: талоны по годам (Chart.js из Unfold) -->
+    <div style="margin-top: 24px;">
+        <fieldset style="padding:16px; border-radius:8px;">
+            <legend style="padding:0 6px; font-weight:600;">Талоны ОМС по годам</legend>
+            <canvas id="talonsChart" height="120"></canvas>
+            <script>
+                (function() {
+                  var data = {{ talons_yearly|safe }} || [];
+                  var labels = data.map(function(d){ return d.year; });
+                  var values = data.map(function(d){ return d.total; });
+                  var ctx = document.getElementById('talonsChart');
+                  if (!ctx || !labels.length) return;
+
+                  function isDark(){
+                    return document.documentElement.classList.contains('dark') || window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  }
+                  function palette(){
+                    var dark = isDark();
+                    return {
+                      barBg: dark ? 'rgba(96,165,250,.75)' : 'rgba(59,130,246,.65)',
+                      barBorder: dark ? 'rgba(147,197,253,1)' : 'rgba(59,130,246,1)',
+                      grid: dark ? 'rgba(148,163,184,.25)' : 'rgba(148,163,184,.35)',
+                      tick: dark ? '#e5e7eb' : '#334155'
+                    };
+                  }
+
+                  var colors = palette();
+                  var chart = new window.Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                      labels: labels,
+                      datasets: [{
+                        label: 'Количество талонов',
+                        data: values,
+                        backgroundColor: colors.barBg,
+                        borderColor: colors.barBorder,
+                        borderWidth: 1,
+                        borderRadius: 6
+                      }]
+                    },
+                    options: {
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      scales: {
+                        y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.tick } },
+                        x: { grid: { display:false }, ticks: { color: colors.tick } }
+                      },
+                      plugins: { legend: { display: false } }
+                    }
+                  });
+
+                  // Реакция на переключение темы (наблюдаем за классом .dark на <html>)
+                  var mo = new MutationObserver(function(){
+                    var c = palette();
+                    chart.data.datasets[0].backgroundColor = c.barBg;
+                    chart.data.datasets[0].borderColor = c.barBorder;
+                    chart.options.scales.y.grid.color = c.grid;
+                    chart.options.scales.x.ticks.color = c.tick;
+                    chart.options.scales.y.ticks.color = c.tick;
+                    chart.update();
+                  });
+                  mo.observe(document.documentElement, { attributes:true, attributeFilter:['class'] });
+                })();
+            </script>
+        </fieldset>
+    </div>
+</div>
+{% endblock %}
+
+

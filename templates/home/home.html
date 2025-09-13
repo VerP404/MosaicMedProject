@@ -17,7 +17,7 @@
                     <div class="card-body">
                         <h5 class="card-title">Аналитическая система</h5>
                         <p class="card-text">МозаикаМед-Аналитика</p>
-                        <a href="{{ main_settings.get_dash_url }}" class="btn btn-primary">Открыть</a>
+                        <a href="{{ dash_url }}" class="btn btn-primary">Открыть</a>
                     </div>
                 </div>
             </div>
@@ -35,7 +35,7 @@
                     <div class="card-body">
                         <h5 class="card-title">Панель главного врача</h5>
                         <p class="card-text">Панель главного врача для информационного табло</p>
-                        <a href="{{ main_settings.get_dash_chief_url }}" class="btn btn-primary">Открыть</a>
+                        <a href="{{ dash_chief_url }}" class="btn btn-primary">Открыть</a>
                     </div>
                 </div>
             </div>
@@ -63,7 +63,7 @@
                         <h5 class="card-title">Обновление данных</h5>
                         <p class="card-text">Управление загрузкой данных в базу данных</p>
                         {#<a href="{% url 'data_loader:data_upload_dashboard' %}" class="btn btn-primary">Перейти</a>#}
-                        <a href="{{ main_settings.get_dash_url }}/admin/admin_update_data" class="btn btn-primary">Открыть</a>
+                        <a href="{{ dash_url }}/admin/admin_update_data" class="btn btn-primary">Открыть</a>
                     </div>
                 </div>
             </div>

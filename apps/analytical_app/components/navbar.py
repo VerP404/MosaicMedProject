@@ -8,6 +8,7 @@ from apps.analytical_app.query_executor import engine, execute_query
 from sqlalchemy import text
 from datetime import datetime
 import time
+from urllib.parse import urlparse
 
 
 def get_organization_name():
@@ -158,6 +159,9 @@ def create_navbar():
     )
 
     return html.Div([navbar, updates_offcanvas])
+
+
+# (удалено) Ненужный колбэк, который пытался обновлять href у кнопки
 
 
 # Добавляем callback для модального окна

@@ -1,23 +1,24 @@
 
 from dash import html, Input, Output, State
 import dash_bootstrap_components as dbc
+from dash.exceptions import PreventUpdate
+from urllib.parse import urlparse
 
 from apps.analytical_app.app import app
 from apps.analytical_app.query_executor import execute_query
 
 
-# Получаем данные для главного меню
-def get_main_app_url():
-    query = "SELECT main_app_ip, main_app_port FROM home_mainsettings LIMIT 1"
+# Получаем порт основного приложения
+def get_main_app_port():
+    query = "SELECT main_app_port FROM home_mainsettings LIMIT 1"
     result = execute_query(query)
-    if result:
-        ip, port = result[0]
-        return f"http://{ip}:{port}"
-    return "#"
+    if result and result[0] and result[0][0] is not None:
+        return int(result[0][0])
+    return 8000
 
 
 def create_sidebar():
-    main_app_url = get_main_app_url()
+    main_app_url = "#"
     sidebar = html.Div(
         [
             # Кнопка сворачивания рядом с пунктами навигации
@@ -109,7 +110,7 @@ def create_sidebar():
                         [html.I(className="bi bi-list"),
                          html.Span(" Главное меню", className="ms-2", id="main-menu-label")],
                         href=main_app_url,
-                        active="exact",
+                        active=False,
                         id="main-menu-link"
                     ),
                 ],
@@ -188,17 +189,28 @@ def create_sidebar():
     )
     def update_active_links(pathname):
         return [
-            pathname == "/",  # Для главной страницы
-            pathname.startswith("/doctor"),  # Для Врача
-            pathname.startswith("/head"),  # Для Заведующего
-            # pathname.startswith("/chief"),  # Для Главного врача
-            pathname.startswith("/statistic"),  # Для Статистика
-            pathname.startswith("/economist"),  # Для Экономиста, включая вложенные страницы
-            pathname.startswith("/admin"),  # Для Администратора
-            # pathname.startswith("/iszl"),  # Для Помощи
-            pathname.startswith("/web_oms"),  # Для Помощи
-            pathname.startswith("/registry"),  # Реестры
-            pathname.startswith("/laboratory"),  # Лаборатория
+            pathname == "/",  # Для главной страницы Dash
+            pathname.startswith("/doctor"),
+            pathname.startswith("/head"),
+            pathname.startswith("/statistic"),
+            pathname.startswith("/economist"),
+            pathname.startswith("/admin"),
+            pathname.startswith("/web_oms"),
+            pathname.startswith("/registry"),
+            pathname.startswith("/laboratory"),
         ]
+
+    @app.callback(
+        Output("main-menu-link", "href"),
+        Input("url", "href")
+    )
+    def update_main_menu_href(current_href):
+        if not current_href:
+            raise PreventUpdate
+        parsed = urlparse(current_href)
+        hostname = parsed.hostname or "127.0.0.1"
+        scheme = parsed.scheme or "http"
+        port = get_main_app_port()
+        return f"{scheme}://{hostname}:{port}"
 
     return sidebar
