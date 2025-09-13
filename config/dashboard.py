@@ -1,4 +1,5 @@
 from datetime import datetime, date
+import json
 
 from django.db import models
 from django.db.models import Count
@@ -47,7 +48,7 @@ def dashboard_callback(request, context):
         "current_date": datetime.now().strftime("%d.%m.%Y %H:%M"),
         "doctors_count": doctors_count,
         "talons_total": talons_total,
-        "talons_yearly": talons_yearly,
+        "talons_yearly": json.dumps(talons_yearly),
     })
     return context
 

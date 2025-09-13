@@ -85,7 +85,13 @@
                 (function() {
                   var raw = (document.getElementById('talonsYearlyData') || {}).textContent || '[]';
                   var data = [];
-                  try { data = JSON.parse(raw) || []; } catch(e) { data = []; }
+                  try { 
+                    data = JSON.parse(raw) || []; 
+                    console.log('Talons data loaded:', data);
+                  } catch(e) { 
+                    console.error('Error parsing talons data:', e);
+                    data = []; 
+                  }
                   var labels = data.map(function(d){ return d.year; });
                   var values = data.map(function(d){ return d.total; });
                   var ctx = document.getElementById('talonsChart');
