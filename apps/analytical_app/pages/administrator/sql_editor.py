@@ -31,7 +31,6 @@ def is_firebird_available():
         # Просто проверяем, что модуль импортируется без ошибок
         return True
     except ImportError as e:
-        print(f"DEBUG: Ошибка импорта Firebird: {e}")
         return False
     except Exception as e:
         print(f"DEBUG: Другая ошибка при проверке Firebird: {e}")

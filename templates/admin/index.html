@@ -21,6 +21,7 @@
       .accent-emerald{border-left:6px solid #10b981;padding-left:10px}
       .accent-amber{border-left:6px solid #f59e0b;padding-left:10px}
       html.dark .kpi-card, html[data-theme="dark"] .kpi-card, [data-theme="dark"] .kpi-card{background:#0f172a;box-shadow:0 1px 2px rgba(0,0,0,.4);color:#e5e7eb}
+      .chart-fixed{position:relative;width:100%;height:320px;max-height:320px}
     </style>
     <!-- Верхняя зона: описание слева, статус справа -->
     <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items:start;">
@@ -76,10 +77,15 @@
     <div style="margin-top: 24px;">
         <fieldset style="padding:16px; border-radius:8px;">
             <legend style="padding:0 6px; font-weight:600;">Талоны ОМС по годам</legend>
-            <canvas id="talonsChart" height="120"></canvas>
+            <div class="chart-fixed">
+                <canvas id="talonsChart"></canvas>
+            </div>
+            <script id="talonsYearlyData" type="application/json">{{ talons_yearly|safe }}</script>
             <script>
                 (function() {
-                  var data = {{ talons_yearly|safe }} || [];
+                  var raw = (document.getElementById('talonsYearlyData') || {}).textContent || '[]';
+                  var data = [];
+                  try { data = JSON.parse(raw) || []; } catch(e) { data = []; }
                   var labels = data.map(function(d){ return d.year; });
                   var values = data.map(function(d){ return d.total; });
                   var ctx = document.getElementById('talonsChart');
@@ -108,6 +114,11 @@
                       if (v >= 1e3) return (Math.round(v/100)/10) + ' тыс.';
                       return String(v);
                     }
+                  }
+
+                  // уничтожаем предыдущий экземпляр при повторном монтировании страницы
+                  if (window.talonsChart && typeof window.talonsChart.destroy === 'function') {
+                    try { window.talonsChart.destroy(); } catch(e) {}
                   }
 
                   var chart = new window.Chart(ctx, {
@@ -144,7 +155,13 @@
                     }
                   });
 
+                  // сохраняем ссылку глобально
+                  window.talonsChart = chart;
+
                   // Реакция на переключение темы (наблюдаем за классом .dark на <html>)
+                  if (window.talonsMo && typeof window.talonsMo.disconnect === 'function') {
+                    try { window.talonsMo.disconnect(); } catch(e) {}
+                  }
                   var mo = new MutationObserver(function(){
                     var c = palette();
                     chart.data.datasets[0].backgroundColor = c.barBg;
@@ -155,6 +172,7 @@
                     chart.update();
                   });
                   mo.observe(document.documentElement, { attributes:true, attributeFilter:['class'] });
+                  window.talonsMo = mo;
                 })();
             </script>
         </fieldset>
