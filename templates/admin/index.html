@@ -99,6 +99,17 @@
                   }
 
                   var colors = palette();
+                  function formatNum(v){
+                    try {
+                      return new Intl.NumberFormat('ru-RU', { notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 1 }).format(v);
+                    } catch(e){
+                      // Fallback: вручную в тыс/млн
+                      if (v >= 1e6) return (Math.round(v/1e5)/10) + ' млн';
+                      if (v >= 1e3) return (Math.round(v/100)/10) + ' тыс.';
+                      return String(v);
+                    }
+                  }
+
                   var chart = new window.Chart(ctx, {
                     type: 'bar',
                     data: {
@@ -116,10 +127,20 @@
                       responsive: true,
                       maintainAspectRatio: false,
                       scales: {
-                        y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.tick } },
+                        y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.tick, callback: function(value){ return formatNum(value); } } },
                         x: { grid: { display:false }, ticks: { color: colors.tick } }
                       },
-                      plugins: { legend: { display: false } }
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          callbacks: {
+                            label: function(ctx){
+                              var v = ctx.parsed.y || 0;
+                              return ' ' + formatNum(v);
+                            }
+                          }
+                        }
+                      }
                     }
                   });
 
