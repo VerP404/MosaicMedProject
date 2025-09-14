@@ -1,4 +1,6 @@
 from datetime import datetime
+import time
+from functools import lru_cache
 
 from dash import dcc, html, Output, Input, exceptions, State
 import dash_bootstrap_components as dbc
@@ -12,10 +14,37 @@ from apps.analytical_app.components.filters import filter_years, filter_months, 
     get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
     update_buttons, filter_status, status_groups
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.economist.indicators.query import sql_query_indicators
+from apps.analytical_app.pages.economist.indicators.query import sql_query_indicators, clear_cache
 from apps.analytical_app.query_executor import engine
 
 type_page = "econ-indicators"
+
+
+# Кэшированная функция для SQL-запроса
+@lru_cache(maxsize=64)
+def get_cached_indicators_query(selected_year, months_placeholder, inogorod, sanction, amount_null, 
+                               building_ids_tuple, department_ids_tuple, value_profile_tuple, selected_doctor_ids_tuple,
+                               start_date_input_formatted, end_date_input_formatted,
+                               start_date_treatment_formatted, end_date_treatment_formatted,
+                               selected_status_tuple, cache_key):
+    """Кэшированный результат SQL-запроса для ускорения повторных запросов"""
+    # Преобразуем кортежи обратно в списки для передачи в SQL-функции
+    building_ids = list(building_ids_tuple) if building_ids_tuple else None
+    department_ids = list(department_ids_tuple) if department_ids_tuple else None
+    value_profile = list(value_profile_tuple) if value_profile_tuple else None
+    selected_doctor_ids = list(selected_doctor_ids_tuple) if selected_doctor_ids_tuple else None
+    
+    return sql_query_indicators(
+        selected_year,
+        months_placeholder,
+        inogorod, sanction, amount_null,
+        building_ids, department_ids,
+        value_profile,
+        selected_doctor_ids,
+        start_date_input_formatted, end_date_input_formatted,
+        start_date_treatment_formatted, end_date_treatment_formatted,
+        status_list=selected_status_tuple
+    )
 
 econ_indicators = html.Div(
     [
@@ -102,8 +131,24 @@ econ_indicators = html.Div(
             ),
             style={"margin": "0 auto", "padding": "0rem"}
         ),
-        dcc.Loading(id=f'loading-output-{type_page}', type='default'),
-        card_table(f'result-table1-{type_page}', "Индикаторные показатели", page_size=25),
+         # Улучшенная индикация загрузки с прогресс-баром
+         dbc.Row([
+             dbc.Col([
+                 dbc.Progress(
+                     id=f'progress-bar-{type_page}',
+                     value=0,
+                     striped=True,
+                     animated=True,
+                     style={'display': 'none'}
+                 ),
+                 html.Div(id=f'loading-status-{type_page}', style={'text-align': 'center', 'margin': '10px 0'}),
+             ], width=12)
+         ]),
+         dcc.Loading(
+             id=f'loading-output-{type_page}', 
+             type='default',
+             children=[card_table(f'result-table1-{type_page}', "Индикаторные показатели", page_size=25)]
+         ),
     ],
     style={"padding": "0rem"}
 )
@@ -309,9 +354,11 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
 
 
 @app.callback(
-    [Output(f'result-table1-{type_page}', 'columns'),
-     Output(f'result-table1-{type_page}', 'data'),
-     Output(f'loading-output-{type_page}', 'children')],
+     [Output(f'result-table1-{type_page}', 'columns'),
+      Output(f'result-table1-{type_page}', 'data'),
+      Output(f'progress-bar-{type_page}', 'value'),
+      Output(f'progress-bar-{type_page}', 'style'),
+      Output(f'loading-status-{type_page}', 'children')],
     [Input(f'update-button-{type_page}', 'n_clicks')],
     [State(f'dropdown-doctor-{type_page}', 'value'),
      State(f'dropdown-profile-{type_page}', 'value'),
@@ -340,57 +387,96 @@ def update_table(n_clicks, value_doctor, value_profile, selected_period, selecte
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
-    loading_output = html.Div([dcc.Loading(type="default")])
+    # Проверяем, что год выбран
+    if not selected_year:
+        return [], [], 0, {'display': 'none'}, "Ошибка: Выберите год"
 
-    # Определяем список статусов в зависимости от выбранного режима
-    if status_mode == 'group':
-        selected_status_values = status_groups[selected_status_group]
-    else:  # status_mode == 'individual'
-        selected_status_values = selected_individual_statuses if selected_individual_statuses else []
+    try:
+        # Показываем прогресс-бар и начинаем анимацию
+        progress_style = {'display': 'block'}
+        status_text = "Подготовка запроса..."
+        progress_value = 10
 
-    selected_status_tuple = tuple(selected_status_values)
+        # Определяем список статусов в зависимости от выбранного режима
+        status_text = "Обработка фильтров..."
+        progress_value = 20
+        
+        if status_mode == 'group':
+            selected_status_values = status_groups[selected_status_group]
+        else:  # status_mode == 'individual'
+            selected_status_values = selected_individual_statuses if selected_individual_statuses else []
 
-    # Проверка и обработка значения value_doctor
-    if value_doctor:
-        if isinstance(value_doctor, str):
-            selected_doctor_ids = [int(id) for id in value_doctor.split(',') if id.strip().isdigit()]
+        selected_status_tuple = tuple(selected_status_values)
+
+        # Проверка и обработка значения value_doctor
+        if value_doctor:
+            if isinstance(value_doctor, str):
+                selected_doctor_ids = [int(id) for id in value_doctor.split(',') if id.strip().isdigit()]
+            else:
+                selected_doctor_ids = [int(id) for id in value_doctor if isinstance(id, (int, str)) and str(id).isdigit()]
         else:
-            selected_doctor_ids = [int(id) for id in value_doctor if isinstance(id, (int, str)) and str(id).isdigit()]
-    else:
-        selected_doctor_ids = []
+            selected_doctor_ids = []
 
-    # Определяем используемый период в зависимости от типа отчета
-    start_date_input_formatted, end_date_input_formatted = None, None
-    start_date_treatment_formatted, end_date_treatment_formatted = None, None
-
-    if report_type == 'month':
+        # Определяем используемый период в зависимости от типа отчета
         start_date_input_formatted, end_date_input_formatted = None, None
         start_date_treatment_formatted, end_date_treatment_formatted = None, None
-    elif report_type == 'initial_input':
-        selected_period = (1, 12)
-        start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
-        end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
-    elif report_type == 'treatment':
-        selected_period = (1, 12)
-        start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
-            '%d-%m-%Y')
-        end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
-            '%d-%m-%Y')
 
-    # Генерация SQL-запроса с учетом всех фильтров
-    columns1, data1 = TableUpdater.query_to_df(
-        engine,
-        sql_query_indicators(
+        if report_type == 'month':
+            start_date_input_formatted, end_date_input_formatted = None, None
+            start_date_treatment_formatted, end_date_treatment_formatted = None, None
+        elif report_type == 'initial_input':
+            selected_period = (1, 12)
+            start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+            end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        elif report_type == 'treatment':
+            selected_period = (1, 12)
+            start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
+                '%d-%m-%Y')
+            end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
+                '%d-%m-%Y')
+
+        # Генерируем ключ кэша
+        status_text = "Формирование SQL-запроса..."
+        progress_value = 40
+        cache_key = f"{selected_year}_{int(time.time() // 60)}"  # Обновляем кэш каждую минуту для исправления SQL
+
+        # Получаем SQL-запрос из кэша (преобразуем списки в кортежи для кэширования)
+        sql_query = get_cached_indicators_query(
             selected_year,
             ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
             inogorodniy, sanction, amount_null,
-            building_ids, department_ids,
-            value_profile,
-            selected_doctor_ids,
+            tuple(building_ids) if building_ids else None,
+            tuple(department_ids) if department_ids else None,
+            tuple(value_profile) if value_profile else None,
+            tuple(selected_doctor_ids) if selected_doctor_ids else None,
             start_date_input_formatted, end_date_input_formatted,
             start_date_treatment_formatted, end_date_treatment_formatted,
-            status_list=selected_status_tuple
+            selected_status_tuple, cache_key
         )
-    )
 
-    return columns1, data1, loading_output
+        # Выполняем запрос с индикацией прогресса
+        status_text = "Выполнение запроса к базе данных..."
+        progress_value = 60
+
+        start_time = time.time()
+        columns1, data1 = TableUpdater.query_to_df(engine, sql_query)
+        execution_time = time.time() - start_time
+
+        # Форматируем время выполнения
+        if execution_time < 1:
+            time_text = f"{execution_time*1000:.0f}мс"
+        else:
+            time_text = f"{execution_time:.1f}с"
+
+        status_text = f"Запрос выполнен за {time_text}. Найдено записей: {len(data1)}"
+        progress_value = 100
+
+        # Скрываем прогресс-бар после завершения
+        progress_style = {'display': 'none'}
+
+        return columns1, data1, progress_value, progress_style, status_text
+
+    except Exception as e:
+        # Обработка ошибок
+        error_msg = f"Ошибка при выполнении запроса: {str(e)}"
+        return [], [], 0, {'display': 'none'}, error_msg

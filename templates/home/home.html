@@ -1,90 +1,646 @@
 <!--home/home.html-->
 {% extends 'home/base.html' %}
+{% load static %}
 
 {% block content %}
-    <div class="container mt-5">
-        <!-- Добавляем заголовок с центровкой -->
-        <div class="row">
-            <div class="col text-center">
-                <h2 class="display-6">{{ organization.name }}</h2>
-            </div>
-        </div>
+<!-- Корпоративный портал БУЗ ВО «ВГКП №3» -->
+<div class="portal-container">
 
-        <!-- Блок карточек -->
-        <div class="row mt-4">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Аналитическая система</h5>
-                        <p class="card-text">МозаикаМед-Аналитика</p>
-                        <a href="{{ dash_url }}" class="btn btn-primary">Открыть</a>
-                    </div>
+    <!-- Быстрые действия -->
+    <section class="quick-actions">
+        <div class="container-fluid">
+            <h3 class="section-title">
+                <i class="fas fa-bolt me-2"></i>
+                Быстрые действия
+            </h3>
+            <div class="row">
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <a href="{{ dash_url }}" class="quick-action-card analytics">
+                        <div class="quick-action-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="quick-action-content">
+                            <h5>Аналитика</h5>
+                            <p>Открыть аналитическую систему</p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <a href="/admin/" class="quick-action-card admin">
+                        <div class="quick-action-icon">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <div class="quick-action-content">
+                            <h5>Админ-панель</h5>
+                            <p>Управление системой</p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <a href="{{ dash_url }}/admin/admin_update_data" class="quick-action-card data">
+                        <div class="quick-action-icon">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div class="quick-action-content">
+                            <h5>Обновление данных</h5>
+                            <p>Загрузка данных в БД</p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <a href="{% url 'people:people_report' %}" class="quick-action-card reports">
+                        <div class="quick-action-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="quick-action-content">
+                            <h5>Отчеты</h5>
+                            <p>Отчет по населению</p>
+                        </div>
+                    </a>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Панель пациента</h5>
-                        <p class="card-text">Панель для пациентов в холле медицинской организации</p>
-                        <a href="{% url 'peopledash_home' %}" class="btn btn-primary">Открыть</a>
+        </div>
+    </section>
+
+    <!-- Основные системы -->
+    <section class="main-systems">
+        <div class="container-fluid">
+            <h3 class="section-title">
+                <i class="fas fa-desktop me-2"></i>
+                Системы и модули
+            </h3>
+            <div class="row">
+                <!-- Аналитическая система -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="system-card analytics-system">
+                        <div class="system-card-header">
+                            <div class="system-icon">
+                                <i class="fas fa-chart-bar"></i>
+                            </div>
+                            <div class="system-status">
+                                <span class="status-indicator online"></span>
+                                <span class="status-text">Онлайн</span>
+                            </div>
+                        </div>
+                        <div class="system-card-body">
+                            <h4 class="system-title">МозаикаМед-Аналитика</h4>
+                            <p class="system-description">Комплексная аналитическая система для анализа медицинских данных, отчетности и мониторинга показателей</p>
+                            <div class="system-features">
+                                <span class="feature-tag">Дашборды</span>
+                                <span class="feature-tag">Отчеты</span>
+                                <span class="feature-tag">Аналитика</span>
+                            </div>
+                        </div>
+                        <div class="system-card-footer">
+                            <a href="{{ dash_url }}" class="btn btn-primary">
+                                <i class="fas fa-external-link-alt me-2"></i>
+                                Открыть систему
+                            </a>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Панель главного врача</h5>
-                        <p class="card-text">Панель главного врача для информационного табло</p>
-                        <a href="{{ dash_chief_url }}" class="btn btn-primary">Открыть</a>
+
+                <!-- Панель главного врача -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="system-card chief-system">
+                        <div class="system-card-header">
+                            <div class="system-icon">
+                                <i class="fas fa-user-md"></i>
+                            </div>
+                            <div class="system-status">
+                                <span class="status-indicator online"></span>
+                                <span class="status-text">Онлайн</span>
+                            </div>
+                        </div>
+                        <div class="system-card-body">
+                            <h4 class="system-title">Панель главного врача</h4>
+                            <p class="system-description">Информационное табло для главного врача с ключевыми показателями работы медицинской организации</p>
+                            <div class="system-features">
+                                <span class="feature-tag">Мониторинг</span>
+                                <span class="feature-tag">KPI</span>
+                                <span class="feature-tag">Табло</span>
+                            </div>
+                        </div>
+                        <div class="system-card-footer">
+                            <a href="{{ dash_chief_url }}" class="btn btn-primary">
+                                <i class="fas fa-external-link-alt me-2"></i>
+                                Открыть панель
+                            </a>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Административный сайт</h5>
-                        <p class="card-text">Переход к административной панели.</p>
-                        <a href="/admin/" class="btn btn-primary">Открыть</a>
+
+                <!-- Панель пациента -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="system-card patient-system">
+                        <div class="system-card-header">
+                            <div class="system-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="system-status">
+                                <span class="status-indicator online"></span>
+                                <span class="status-text">Онлайн</span>
+                            </div>
+                        </div>
+                        <div class="system-card-body">
+                            <h4 class="system-title">Панель пациента</h4>
+                            <p class="system-description">Информационная панель для пациентов в холле медицинской организации</p>
+                            <div class="system-features">
+                                <span class="feature-tag">Информация</span>
+                                <span class="feature-tag">Холл</span>
+                                <span class="feature-tag">Пациенты</span>
+                            </div>
+                        </div>
+                        <div class="system-card-footer">
+                            <a href="{% url 'peopledash_home' %}" class="btn btn-primary">
+                                <i class="fas fa-external-link-alt me-2"></i>
+                                Открыть панель
+                            </a>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Ведение отчетов</h5>
-                        <p class="card-text">Переход к панели для ведения отчетов.</p>
-                        <a href="/admin/reports/" class="btn btn-primary">Открыть</a>
+
+                <!-- Административная система -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="system-card admin-system">
+                        <div class="system-card-header">
+                            <div class="system-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="system-status">
+                                <span class="status-indicator online"></span>
+                                <span class="status-text">Онлайн</span>
+                            </div>
+                        </div>
+                        <div class="system-card-body">
+                            <h4 class="system-title">Административная панель</h4>
+                            <p class="system-description">Система управления пользователями, настройками и конфигурацией всех модулей</p>
+                            <div class="system-features">
+                                <span class="feature-tag">Управление</span>
+                                <span class="feature-tag">Настройки</span>
+                                <span class="feature-tag">Безопасность</span>
+                            </div>
+                        </div>
+                        <div class="system-card-footer">
+                            <a href="/admin/" class="btn btn-primary">
+                                <i class="fas fa-external-link-alt me-2"></i>
+                                Открыть админку
+                            </a>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Обновление данных</h5>
-                        <p class="card-text">Управление загрузкой данных в базу данных</p>
-                        {#<a href="{% url 'data_loader:data_upload_dashboard' %}" class="btn btn-primary">Перейти</a>#}
-                        <a href="{{ dash_url }}/admin/admin_update_data" class="btn btn-primary">Открыть</a>
+
+                <!-- Кадровая система -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="system-card personnel-system">
+                        <div class="system-card-header">
+                            <div class="system-icon">
+                                <i class="fas fa-id-badge"></i>
+                            </div>
+                            <div class="system-status">
+                                <span class="status-indicator online"></span>
+                                <span class="status-text">Онлайн</span>
+                            </div>
+                        </div>
+                        <div class="system-card-body">
+                            <h4 class="system-title">Кадровая служба</h4>
+                            <p class="system-description">Модуль для работы кадровой службы, управления персоналом и ведения кадрового учета</p>
+                            <div class="system-features">
+                                <span class="feature-tag">Персонал</span>
+                                <span class="feature-tag">Кадры</span>
+                                <span class="feature-tag">Учет</span>
+                            </div>
+                        </div>
+                        <div class="system-card-footer">
+                            <a href="/admin/personnel/" class="btn btn-primary">
+                                <i class="fas fa-external-link-alt me-2"></i>
+                                Открыть модуль
+                            </a>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Отчет по населению</h5>
-                        <p class="card-text">Просмотр отчета по населению из ИСЗЛ.</p>
-                        <a href="{% url 'people:people_report' %}" class="btn btn-primary">Перейти</a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Кадры</h5>
-                        <p class="card-text">Модуль для работы кадровой службы.</p>
-                        <a href="/admin/personnel/" class="btn btn-primary">Открыть</a>
+
+                <!-- Система отчетов -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="system-card reports-system">
+                        <div class="system-card-header">
+                            <div class="system-icon">
+                                <i class="fas fa-file-medical-alt"></i>
+                            </div>
+                            <div class="system-status">
+                                <span class="status-indicator online"></span>
+                                <span class="status-text">Онлайн</span>
+                            </div>
+                        </div>
+                        <div class="system-card-body">
+                            <h4 class="system-title">Ведение отчетов</h4>
+                            <p class="system-description">Система для создания, ведения и управления медицинскими отчетами и документацией</p>
+                            <div class="system-features">
+                                <span class="feature-tag">Отчеты</span>
+                                <span class="feature-tag">Документы</span>
+                                <span class="feature-tag">Ведение</span>
+                            </div>
+                        </div>
+                        <div class="system-card-footer">
+                            <a href="/admin/reports/" class="btn btn-primary">
+                                <i class="fas fa-external-link-alt me-2"></i>
+                                Открыть систему
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
+
+    <!-- Статистика и мониторинг -->
+    <section class="system-monitoring">
+        <div class="container-fluid">
+            <h3 class="section-title">
+                <i class="fas fa-heartbeat me-2"></i>
+                Мониторинг систем
+            </h3>
+            <div class="row">
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="monitoring-card">
+                        <div class="monitoring-icon django">
+                            <i class="fab fa-python"></i>
+                        </div>
+                        <div class="monitoring-content">
+                            <h5>Административная система</h5>
+                            <p class="monitoring-status online">Работает</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="monitoring-card">
+                        <div class="monitoring-icon dash">
+                            <i class="fas fa-chart-pie"></i>
+                        </div>
+                        <div class="monitoring-content">
+                            <h5>Аналитическая система</h5>
+                            <p class="monitoring-status online">Работает</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="monitoring-card">
+                        <div class="monitoring-icon database">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div class="monitoring-content">
+                            <h5>PostgreSQL</h5>
+                            <p class="monitoring-status online">Работает</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="monitoring-card">
+                        <div class="monitoring-icon dagster">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <div class="monitoring-content">
+                            <h5>Система управления данными</h5>
+                            <p class="monitoring-status online">Работает</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- Стили для портала -->
+<style>
+.portal-container {
+    background: linear-gradient(135deg, #0d6efd 0%, #2a5298 100%);
+    min-height: 100vh;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+}
+
+
+.quick-actions, .main-systems, .system-monitoring {
+    padding: 3rem 0;
+}
+
+.section-title {
+    color: white;
+    font-weight: 600;
+    font-size: 1.8rem;
+    margin-bottom: 2rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.quick-action-card {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid;
+}
+
+.quick-action-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    text-decoration: none;
+    color: inherit;
+}
+
+.quick-action-card.analytics { border-left-color: #3498db; }
+.quick-action-card.admin { border-left-color: #e74c3c; }
+.quick-action-card.data { border-left-color: #f39c12; }
+.quick-action-card.reports { border-left-color: #27ae60; }
+
+.quick-action-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.quick-action-card.analytics .quick-action-icon { background: #3498db; }
+.quick-action-card.admin .quick-action-icon { background: #e74c3c; }
+.quick-action-card.data .quick-action-icon { background: #f39c12; }
+.quick-action-card.reports .quick-action-icon { background: #27ae60; }
+
+.quick-action-content h5 {
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.quick-action-content p {
+    margin: 0;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.system-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    height: 100%;
+}
+
+.system-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+}
+
+.system-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1.5rem 0 1.5rem;
+}
+
+.system-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    color: white;
+}
+
+.analytics-system .system-icon { background: linear-gradient(135deg, #667eea, #764ba2); }
+.chief-system .system-icon { background: linear-gradient(135deg, #f093fb, #f5576c); }
+.patient-system .system-icon { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+.admin-system .system-icon { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+.personnel-system .system-icon { background: linear-gradient(135deg, #fa709a, #fee140); }
+.reports-system .system-icon { background: linear-gradient(135deg, #a8edea, #fed6e3); }
+
+.system-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #27ae60;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.status-text {
+    font-size: 0.8rem;
+    color: #27ae60;
+    font-weight: 600;
+}
+
+.system-card-body {
+    padding: 1.5rem;
+}
+
+.system-title {
+    color: #2c3e50;
+    font-weight: 700;
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+}
+
+.system-description {
+    color: #7f8c8d;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.system-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.feature-tag {
+    background: #ecf0f1;
+    color: #2c3e50;
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.system-card-footer {
+    padding: 0 1.5rem 1.5rem 1.5rem;
+}
+
+.monitoring-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.monitoring-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.monitoring-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem auto;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.monitoring-icon.django { background: #3776ab; }
+.monitoring-icon.dash { background: #ff6b6b; }
+.monitoring-icon.database { background: #336791; }
+.monitoring-icon.dagster { background: #6366f1; }
+
+.monitoring-content h5 {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.monitoring-status {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.monitoring-status.online {
+    color: #27ae60;
+}
+
+/* Адаптация для sidebar */
+.portal-container {
+    margin-left: 0;
+    transition: margin-left 0.3s ease;
+    width: 100%;
+}
+
+/* Когда sidebar открыт */
+.sidebar-open .portal-container {
+    margin-left: 250px;
+}
+
+/* Стили для свернутого sidebar */
+.sidebar-collapsed .sidebar {
+    width: 60px;
+}
+
+.sidebar-collapsed .sidebar .sidebar-brand span {
+    display: none;
+}
+
+.sidebar-collapsed .sidebar .sidebar-nav .sidebar-link span {
+    display: none;
+}
+
+.sidebar-collapsed .main {
+    margin-left: 60px;
+}
+
+/* Убираем отступы у контейнеров */
+.container-fluid { padding-left: 0; padding-right: 0; margin:0; }
+
+/* Убираем глобальный внутренний отступ у контентной области внутри main */
+.main > .content { padding: 0; }
+
+/* Добавляем отступы только внутренним блокам секций */
+.portal-container > section .container-fluid { padding-left: 1.25rem; padding-right: 1.25rem; }
+
+/* Убираем отступы у секций */
+.quick-actions, .main-systems, .system-monitoring { padding: 2rem 0; }
+
+@media (max-width: 768px) {
+    .quick-actions, .main-systems, .system-monitoring {
+        padding: 1rem 0.5rem;
+    }
+    
+    .sidebar-open .portal-container {
+        margin-left: 0;
+    }
+    
+    .container-fluid {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+}
+</style>
+
+<!-- JavaScript для мониторинга и анимаций -->
+<script>
+// Функция для проверки статуса систем
+async function checkSystemStatus() {
+    try {
+        const response = await fetch('/check-system-status/');
+        const data = await response.json();
+        
+        // Обновляем статусы систем (пока статично, можно расширить)
+        console.log('System status:', data);
+        
+    } catch (error) {
+        console.error('Ошибка проверки статуса систем:', error);
+    }
+}
+
+// Анимация появления карточек
+function animateCards() {
+    const cards = document.querySelectorAll('.system-card, .quick-action-card, .monitoring-card');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(30px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.6s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    animateCards();
+    checkSystemStatus();
+    
+    // Проверяем статус систем каждые 30 секунд
+    setInterval(checkSystemStatus, 30000);
+});
+
+// Добавляем эффект hover для карточек
+document.querySelectorAll('.system-card').forEach(card => {
+    card.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-10px) scale(1.02)';
+    });
+    
+    card.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0) scale(1)';
+    });
+});
+</script>
 {% endblock %}

@@ -1,5 +1,5 @@
 import dash_bootstrap_components as dbc
-from dash import html, dash_table
+from dash import html, dash_table, dcc
 
 from apps.analytical_app.components.filters import get_current_reporting_month, months_sql_labels
 
@@ -68,9 +68,12 @@ def card_table(
             dbc.Card(
                 dbc.CardBody([
                     dbc.CardHeader(card_header),
-                    html.Div(
-                        dash_table.DataTable(**table_kwargs),
-                        style={"maxWidth": "100%", "overflowX": "auto"}
+                    dcc.Loading(
+                        html.Div(
+                            dash_table.DataTable(**table_kwargs),
+                            style={"maxWidth": "100%", "overflowX": "auto"}
+                        ),
+                        type="default"
                     ),
                     sum_button_section
                 ]),

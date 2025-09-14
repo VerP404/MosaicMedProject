@@ -144,6 +144,7 @@ echo "[INFO] Остановка текущих процессов..."
 pkill -f 'python3.12 manage.py runserver' 2>/dev/null
 pkill -f 'python3.12 apps/analytical_app/index.py' 2>/dev/null
 pkill -f 'python3.12 apps/chief_app/main.py' 2>/dev/null
+pkill -f 'python3.12 apps/masterd_dashboard/app.py' 2>/dev/null
 pkill -f 'python3.12 start_dagster.py --host 0.0.0.0 --port 3000' 2>/dev/null
 echo "[INFO] Основные процессы остановлены (если были запущены)."
 
@@ -170,6 +171,7 @@ echo "[INFO] Перезапуск серверов..."
 nohup python3.12 manage.py runserver 0.0.0.0:8000 > /dev/null 2>&1 &
 nohup python3.12 apps/analytical_app/index.py > /dev/null 2>&1 &
 nohup python3.12 apps/chief_app/main.py > /dev/null 2>&1 &
+nohup python3.12 apps/masterd_dashboard/app.py --host 0.0.0.0 --port 5020 > /dev/null 2>&1 &
 nohup python3.12 start_dagster.py --host 0.0.0.0 --port 3000 > /dev/null 2>&1 &
 
 echo "=============================================="

@@ -1,8 +1,11 @@
 from sqlalchemy import text
+from functools import lru_cache
+import time
 from apps.analytical_app.pages.SQL_query.query import base_query
 from apps.analytical_app.query_executor import engine
 
 
+@lru_cache(maxsize=32)
 def get_dynamic_conditions(year):
     query = text("""
         SELECT type, field_name, filter_type, values, operator 
@@ -19,7 +22,14 @@ def get_dynamic_conditions(year):
         clause = ''
         type, field_name, filter_type, values, operator = row
         if filter_type == 'in':
-            clause = f"{field_name} IN ({values})"
+            # Исправляем запятые на точки в числовых значениях для IN условий
+            if values:
+                import re
+                # Паттерн для поиска чисел с запятыми как десятичным разделителем
+                corrected_values = re.sub(r'(\d+),(\d+)', r'\1.\2', values)
+                clause = f"{field_name} IN ({corrected_values})"
+            else:
+                clause = f"{field_name} IN ({values})"
         elif filter_type == 'exact':
             clause = f"{field_name} = '{values}'"
         elif filter_type == 'like':
@@ -80,6 +90,15 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
         union_queries.append(union_query)
 
     # Объединяем основной запрос с динамическими условиями
-    final_query = f"{base} " + " UNION ALL ".join(union_queries)
+    if union_queries:
+        # Добавляем финальный SELECT к base_query и объединяем с union_queries
+        final_query = f"{base}\nSELECT 'base' AS type, COUNT(*) AS \"К-во\", ROUND(COALESCE(SUM(CAST(amount_numeric AS numeric(10, 2))), 0)::numeric, 2) AS \"Сумма\" FROM oms\nUNION ALL\n" + " UNION ALL ".join(union_queries) + "\nLIMIT 10000"
+    else:
+        final_query = f"{base}\nSELECT 'base' AS type, COUNT(*) AS \"К-во\", ROUND(COALESCE(SUM(CAST(amount_numeric AS numeric(10, 2))), 0)::numeric, 2) AS \"Сумма\" FROM oms\nLIMIT 10000"
 
     return final_query
+
+
+def clear_cache():
+    """Очищает кэш для обновления условий"""
+    get_dynamic_conditions.cache_clear()

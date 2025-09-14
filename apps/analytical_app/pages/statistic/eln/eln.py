@@ -9,7 +9,9 @@ from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.statistic.eln.query import (
     sql_eln,
     sql_query_eln_doctors,
-    sql_query_eln_patients
+    sql_query_eln_patients,
+    sql_eln_yearly,
+    sql_eln_monthly,
 )
 from apps.analytical_app.query_executor import engine
 
@@ -410,68 +412,19 @@ def update_tables(start_date, end_date, tvsp_values, status_values, first_value,
     else:
         last_updated_str = "Обновлено: Нет данных"
 
-    # --- Новый расчет: Анализ первичных больничных (для года и месяца) --- #
-    # Загружаем данные всей таблицы и фильтруем локально
-    query_all = "SELECT * FROM load_data_sick_leave_sheets"
-    df_all = pd.read_sql(query_all, engine)
-    df_all = df_all[df_all["duplicate"] == "нет"].copy()
-
-    # Приводим days_count к числовому типу
-    df_all["days_count"] = pd.to_numeric(df_all["days_count"], errors="coerce")
-    # Преобразуем issue_date в datetime
-    df_all["issue_date_dt"] = pd.to_datetime(df_all["issue_date"], errors="coerce")
-    # Фильтрация по дате
-    start_dt = pd.to_datetime(start_date)
-    end_dt = pd.to_datetime(end_date)
-    df_all = df_all[(df_all["issue_date_dt"] >= start_dt) & (df_all["issue_date_dt"] <= end_dt)]
-    # Отбираем первичные больничные
-    df_primary = df_all[df_all["first"].str.lower() == "да"].copy()
-    # Применяем фильтр по ТВСП, если задан
-    if not tvsp_all:
-        df_primary = df_primary[df_primary["tvsp"].isin(tvsp_filter)]
-    # Применяем фильтр по причине, если задан
-    if not reason_all:
-        df_primary["incapacity_reason_code"] = df_primary["incapacity_reason_code"].replace("", "По уходу")
-        df_primary = df_primary[df_primary["incapacity_reason_code"].isin(reason_filter)]
-    # Группировка для годового анализа
-    df_primary["year"] = df_primary["issue_date_dt"].dt.year
-    yearly = df_primary.groupby("year").agg(
-        count_episodes=("number", "count"),
-        total_days=("days_count", "sum"),
-        avg_days=("days_count", "mean"),
-        unique_patients=("snils", "nunique")
-    ).reset_index().sort_values("year", ascending=False)
-    # Группировка для помесячного анализа
-    df_primary["month"] = df_primary["issue_date_dt"].dt.to_period("M")
-    monthly = df_primary.groupby("month").agg(
-        count_episodes=("number", "count"),
-        total_days=("days_count", "sum"),
-        avg_days=("days_count", "mean"),
-        unique_patients=("snils", "nunique")
-    ).reset_index()
-    monthly["month"] = monthly["month"].astype(str)
-
-    yearly = yearly.rename(columns={
-        "year": "Год",
-        "count_episodes": "Количество эпизодов",
-        "total_days": "Сумма дней",
-        "avg_days": "Среднее дней",
-        "unique_patients": "Уникальных пациентов"
-    })
-
-    monthly = monthly.rename(columns={
-        "month": "Месяц",
-        "count_episodes": "Количество эпизодов",
-        "total_days": "Сумма дней",
-        "avg_days": "Среднее дней",
-        "unique_patients": "Уникальных пациентов"
-    })
-
-    yearly_columns = [{"name": col, "id": col} for col in yearly.columns]
-    yearly_data = yearly.to_dict("records")
-
-    monthly_columns = [{"name": col, "id": col} for col in monthly.columns]
-    monthly_data = monthly.to_dict("records")
+    # --- Анализ первичных больничных через SQL (агрегация на стороне БД) --- #
+    aggr_params = {
+        'start_date': start_date,
+        'end_date': end_date,
+        'tvsp': tvsp_filter,
+        'tvsp_all': tvsp_all,
+        'first_list': first_filter if first_filter else ['да'],  # по умолчанию первичные
+        'first_all': first_all,
+        'reason_list': reason_filter,
+        'reason_all': reason_all
+    }
+    yearly_columns, yearly_data = TableUpdater.query_to_df(engine, sql_eln_yearly, aggr_params)
+    monthly_columns, monthly_data = TableUpdater.query_to_df(engine, sql_eln_monthly, aggr_params)
 
     return (columns, data,
             columns1, data1,

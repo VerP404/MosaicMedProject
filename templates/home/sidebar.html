@@ -16,7 +16,7 @@
 
             <!-- Аналитическая система -->
             <li class="sidebar-item">
-                <a href="{{ main_settings.get_dash_url }}" class="sidebar-link">
+                <a href="{{ dash_url }}" class="sidebar-link">
                     <i class="align-middle" data-feather="bar-chart-2"></i> <span class="align-middle">Аналитическая система</span>
                 </a>
             </li>
@@ -30,7 +30,7 @@
 
             <!-- Панель главного врача -->
             <li class="sidebar-item">
-                <a href="/" class="sidebar-link">
+                <a href="{{ dash_chief_url }}" class="sidebar-link">
                     <i class="align-middle" data-feather="activity"></i> <span class="align-middle">Панель главного врача</span>
                 </a>
             </li>
@@ -44,7 +44,7 @@
 
             <!-- Обновление данных -->
             <li class="sidebar-item">
-                <a href="{% url 'data_loader:data_upload_dashboard' %}" class="sidebar-link">
+                <a href="{{ dash_url }}/admin/admin_update_data" class="sidebar-link">
                     <i class="align-middle" data-feather="upload-cloud"></i> <span class="align-middle">Обновление данных</span>
                 </a>
             </li>
@@ -118,6 +118,7 @@
                 });
         }
     });
+
 </script>
 
 
@@ -186,5 +187,6 @@
         background-color: #007bff; /* Цвет полосы прокрутки */
         border-radius: 4px; /* Радиус для скругления */
     }
+
 
 </style>

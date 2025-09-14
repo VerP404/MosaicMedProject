@@ -7,23 +7,8 @@ from apps.organization.models import MedicalOrganization
 
 
 def home(request):
-    main_settings = MainSettings.objects.first()  # Получите настройки
-    organization = MedicalOrganization.objects.first()
-
-    # Формируем динамические URL на основе текущего хоста (актуально при смене подсети/IP)
-    scheme = 'https' if request.is_secure() else 'http'
-    host = request.get_host()
-    host_only = host.split(':')[0]
-
-    dash_url = f"{scheme}://{host_only}:{main_settings.dash_port}"
-    dash_chief_url = f"{scheme}://{host_only}:{main_settings.dash_chief_port}"
-
-    return render(request, 'home/home.html', {
-        'main_settings': main_settings,
-        'organization': organization,
-        'dash_url': dash_url,
-        'dash_chief_url': dash_chief_url,
-    })
+    # Переменные теперь доступны через context processor
+    return render(request, 'home/home.html')
 
 
 def check_system_status(request):

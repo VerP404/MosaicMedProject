@@ -9,6 +9,9 @@ from apps.reports.models import UserGroupAccess
 from apps.reports.models import Group as PatientGroup, UserGroupAccess
 from django.contrib.auth.forms import UserCreationForm
 
+# Ссылка "Открыть сайт" в правом верхнем меню админки должна вести на главную страницу
+admin.site.site_url = '/'
+
 
 class UserGroupsForm(forms.ModelForm):
     patient_groups = forms.ModelMultipleChoiceField(

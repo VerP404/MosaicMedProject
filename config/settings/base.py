@@ -17,6 +17,10 @@ PORT_DASH_CHIEF = env.int('PORT_DASH_CHIEF', default=5001)
 
 ALLOWED_HOSTS = ['*']
 
+# Редиректы после аутентификации
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
+
 INSTALLED_APPS = [
     'unfold',
     "unfold.contrib.filters",
@@ -80,6 +84,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.home.context_processors.portal_context',
             ],
         },
     },
@@ -164,7 +169,7 @@ UNFOLD = {
     "SITE_TITLE": "Панель МозаикаМед",
     "SITE_HEADER": "Панель МозаикаМед",
     "SITE_SUBHEADER": ORGANIZATIONS,
-    "SITE_URL": "/admin/",
+    "SITE_URL": "/",
     "DASHBOARD_CALLBACK": "config.dashboard.dashboard_callback",
     "SIDEBAR": {
         "show_search": False,
@@ -268,7 +273,7 @@ UNFOLD = {
                 "collapsible": True,
                 "items": [
                     {"title": "Отчёты", "icon": "bar_chart", "link": "/admin/reports/"},
-                    {"title": "Журнал", "icon": "article", "link": "/admin/journal/"},
+                    {"title": "Обращения граждан", "icon": "article", "link": "/admin/journal/"},
                 ],
             },
             {

@@ -6,48 +6,61 @@
         <i class="hamburger align-self-center"></i>
     </a>
 
-    <div class="navbar-brand-container ms-3">
-        <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}">
-            <span class="navbar-brand-full">МозаикаМед - {{ organization.name }}</span>
-            <span class="navbar-brand-short">МозаикаМед</span>
+    <!-- Левый бренд: название МО -->
+    <div class="navbar-brand-container ms-2">
+        <a class="navbar-brand d-flex flex-column" href="{% url 'home' %}">
+            <span class="navbar-brand-full d-flex align-items-center">
+                <i class="fas fa-hospital-alt me-2"></i>{{ organization.name }}
+            </span>
+            <span class="brand-subtitle">Внутренняя цифровая платформа медицинской организации МозаикаМед</span>
+            <span class="navbar-brand-short">{{ organization.name }}</span>
         </a>
     </div>
 
+    <!-- (средний блок заголовка убран — бренд слева) -->
 
-    <div class="navbar-collapse collapse">
-        <ul class="navbar-nav navbar-align ms-auto">
-            <li class="nav-item dropdown">
-                {% if user.is_authenticated %}
-                    <!-- Заменяем иконку шестеренки на аватар -->
-                    <a class="nav-icon dropdown-toggle d-inline-block d-sm-none" href="#" data-bs-toggle="dropdown">
-                        <img src="
-                                {% if user.avatar %}{{ user.avatar.url }}{% else %}{% static 'img/avatars/avatar.png' %}{% endif %}"
-                             class="avatar img-fluid rounded me-1" alt="{{ user.get_full_name }}"/>
+    <!-- Правая часть: время + пользователь/вход -->
+    <div class="navbar-right ms-auto">
+        <div class="time-box">
+            <div class="digital-clock" id="digital-clock">
+                <div class="time">
+                    <span class="time-part" id="clk-hh">--</span>
+                    <span class="separator">:</span>
+                    <span class="time-part" id="clk-mm">--</span>
+                    <span class="separator">:</span>
+                    <span class="time-part" id="clk-ss">--</span>
+                </div>
+                <div class="date" id="clk-date">--</div>
+            </div>
+        </div>
+        {% if user.is_authenticated %}
+            <div class="user-row dropdown">
+                <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" data-bs-toggle="dropdown">
+                    <i class="fas fa-user-circle fa-lg text-primary me-2"></i>
+                    <span class="text-dark">{{ user.get_full_name|default:user.username }}</span>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <a class="dropdown-item" href="/admin/">
+                        <i class="fas fa-cog me-2"></i> Админ-панель
                     </a>
-                    <a class="nav-link dropdown-toggle d-none d-sm-inline-block" href="#" data-bs-toggle="dropdown">
-                        <img src="
-                                {% if user.avatar %}{{ user.avatar.url }}{% else %}{% static 'img/avatars/avatar.png' %}{% endif %}"
-                             class="avatar img-fluid rounded me-1" alt="{{ user.get_full_name }}"/>
-                        <span class="text-dark">{{ user.last_name }} {{ user.first_name }}</span>
-                    </a>
-                    <div class="dropdown-menu dropdown-menu-end">
-{#                        <a class="dropdown-item" href="{% url 'profile' %}"><i class="align-middle me-1"#}
-{#                                                                               data-feather="user"></i> Мой профиль</a>#}
-                        <div class="dropdown-divider"></div>
-{#                        <a class="dropdown-item" href="{% url 'logout' %}"#}
-{#                           onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i#}
-{#                                class="align-middle" data-feather="log-out"></i> Выйти</a>#}
-{#                        <form id="logout-form" action="{% url 'logout' %}" method="POST" style="display: none;">#}
-{#                            {% csrf_token %}#}
-{#                        </form>#}
-                    </div>
-                {% else %}
-                    <a class="nav-link d-none d-sm-inline-block" href="{% url 'home' %}">
-                        <span class="text-dark">Войти</span>
-                    </a>
-                {% endif %}
-            </li>
-        </ul>
+                    <div class="dropdown-divider"></div>
+                    <form method="post" action="/admin/logout/" class="px-3 py-1">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="/">
+                        <button type="submit" class="btn btn-link p-0 text-decoration-none">
+                            <i class="fas fa-sign-out-alt me-2"></i> Выйти
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% else %}
+            <div class="user-row">
+                <a class="nav-link d-flex align-items-center" href="/admin/login/?next=/">
+                    <i class="fas fa-sign-in-alt me-2"></i>
+                    <span class="text-dark">Войти</span>
+                </a>
+            </div>
+        {% endif %}
     </div>
 </nav>
 
@@ -56,16 +69,59 @@
     .navbar {
         font-size: 1.25rem;
         font-weight: 600;
-        z-index: 1050; /* Увеличенное значение z-index */
-        position: relative; /* Убедитесь, что позиционирование установлено как относительное или абсолютное */
+        z-index: 1050;
+        position: relative;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
 
-    .navbar-brand-full {
-        display: inline;
+    .navbar-brand-full { display:inline; font-weight:700; }
+    .navbar-brand-short { display:none; }
+
+    /* Стили для заголовка организации в navbar */
+    .navbar-organization-info {
+        display: flex;
+        align-items: center;
     }
 
-    .navbar-brand-short {
-        display: none;
+    .organization-details {
+        text-align: center;
+    }
+
+    .organization-title {
+        color: #2c3e50;
+        font-weight: 700;
+        font-size: 1.8rem;
+        margin: 0;
+        line-height: 1.2;
+    }
+
+    .organization-subtitle {
+        color: #7f8c8d;
+        font-size: 0.9rem;
+        margin: 0.3rem 0 0 0;
+    }
+
+    /* Правая часть */
+    .navbar-right { display:flex; align-items:center; gap:1rem; }
+    .time-box { min-width:240px; text-align:right; }
+    .digital-clock { display:inline-block; text-align:right; }
+    .digital-clock .time { font-family:'Courier New', monospace; font-weight:700; color:#1f2937; font-size:1.1rem; letter-spacing:0; }
+    .digital-clock .time-part { display:inline-block; min-width:16px; }
+    .digital-clock .separator { color:#2563eb; }
+    .digital-clock .date { color:#667085; font-size:.8rem; line-height:1; margin-top:.1rem; }
+    .user-row .nav-link { padding: .25rem 0; }
+
+    .brand-subtitle {
+        color:#667085; font-size:.8rem; line-height:1; margin-left:1.5rem;
+        margin-top:-.25rem;
+    }
+
+    @media (max-width: 1200px) {
+        .organization-title {
+            font-size: 1.5rem;
+        }
     }
 
     @media (max-width: 768px) {
@@ -76,6 +132,33 @@
         .navbar-brand-short {
             display: inline;
         }
+        
+        .navbar-organization-info { display: none; }
     }
 </style>
+
+<!-- JavaScript для цифровых часов (RU) -->
+<script>
+(function(){
+    const monthsRU = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+    const daysRU = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+    const pad = n => String(n).padStart(2,'0');
+
+    function updateClock(){
+        const now = new Date();
+        const hh = document.getElementById('clk-hh');
+        const mm = document.getElementById('clk-mm');
+        const ss = document.getElementById('clk-ss');
+        const dateEl = document.getElementById('clk-date');
+        if(!hh||!mm||!ss||!dateEl) return;
+        hh.textContent = pad(now.getHours());
+        mm.textContent = pad(now.getMinutes());
+        ss.textContent = pad(now.getSeconds());
+        const dateStr = `${now.getDate()} ${monthsRU[now.getMonth()]} ${now.getFullYear()}, ${daysRU[now.getDay()]}`;
+        dateEl.textContent = dateStr;
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+})();
+</script>
 
