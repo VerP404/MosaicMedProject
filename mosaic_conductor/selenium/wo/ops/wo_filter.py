@@ -259,7 +259,7 @@ def filter_input_detail_op(context, site_url: str):
 
     # Выбираем все результаты
     select_all_checkbox = driver.find_element(By.XPATH,
-                                              '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
+                                              '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[2]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
     select_all_checkbox.click()
     # Скачивание файла
     context.log.info("Начинаем скачивание файла")
@@ -358,10 +358,53 @@ def filter_input_error_op(context, site_url: str):
     time.sleep(5)
     context.log.info("Выбираем все результаты")
 
-    # Выбираем все результаты
-    select_all_checkbox = driver.find_element(By.XPATH,
-                                              '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
-    select_all_checkbox.click()
+    # Выбираем все результаты с обработкой ошибок
+    try:
+        # Пробуем найти чекбокс с ожиданием
+        select_all_checkbox = wait.until(
+            EC.element_to_be_clickable(
+                (By.XPATH, '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[2]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
+            )
+        )
+        select_all_checkbox.click()
+        context.log.info("Чекбокс 'выбрать все' успешно найден и нажат")
+    except Exception as e:
+        context.log.warning(f"Не удалось найти основной чекбокс: {e}")
+        # Пробуем альтернативные селекторы
+        alternative_selectors = [
+            '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/input',
+            '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/input',
+            '//table//thead//tr//th[1]//input[@type="checkbox"]',
+            '//input[@type="checkbox" and contains(@class, "select-all")]',
+            '//span[contains(@class, "checkbox")]//input'
+        ]
+        
+        checkbox_found = False
+        for selector in alternative_selectors:
+            try:
+                context.log.info(f"Пробуем альтернативный селектор: {selector}")
+                select_all_checkbox = wait.until(
+                    EC.element_to_be_clickable((By.XPATH, selector))
+                )
+                select_all_checkbox.click()
+                context.log.info(f"Чекбокс найден с селектором: {selector}")
+                checkbox_found = True
+                break
+            except Exception as alt_e:
+                context.log.warning(f"Альтернативный селектор не сработал: {alt_e}")
+                continue
+        
+        if not checkbox_found:
+            context.log.error("Не удалось найти чекбокс 'выбрать все' ни одним из способов")
+            # Проверяем, есть ли вообще таблица на странице
+            try:
+                table = driver.find_element(By.XPATH, '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]')
+                context.log.info("Таблица найдена, но чекбокс отсутствует")
+                # Продолжаем выполнение без выбора всех элементов
+            except Exception as table_e:
+                context.log.error(f"Таблица не найдена: {table_e}")
+                raise Exception("Не удалось найти таблицу с данными для выбора")
+    
     # Скачивание файла
     context.log.info("Начинаем скачивание файла")
     download_button = driver.find_element(By.XPATH, '//*[@id="menu"]/div/div[6]/div/div/div[4]/a/button')
