@@ -64,7 +64,7 @@ def sql_query_rep(selected_year, group_id,
     # Формируем базовый набор условий
     where_conditions = [
         "inogorodniy = false",
-        "sanctions = '-'",
+        "sanctions IN ('-', '0')",  # Включаем как '-' так и '0'
         "amount_numeric != '0'"
     ]
     if filter_conditions:
