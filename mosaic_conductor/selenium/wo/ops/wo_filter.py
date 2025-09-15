@@ -372,7 +372,9 @@ def filter_input_error_op(context, site_url: str):
         context.log.warning(f"Не удалось найти основной чекбокс: {e}")
         # Пробуем альтернативные селекторы
         alternative_selectors = [
+            '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[2]/table[1]/thead/tr[1]/th[1]/span/span[1]/input',
             '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/input',
+            '/html/body/div[1]/div/div[2]/div[2]/div[2]/div/div[2]/table[1]/thead/tr[1]/th[1]/span/span[1]/input',
             '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/input',
             '//table//thead//tr//th[1]//input[@type="checkbox"]',
             '//input[@type="checkbox" and contains(@class, "select-all")]',
