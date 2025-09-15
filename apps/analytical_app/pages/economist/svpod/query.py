@@ -95,6 +95,7 @@ def sql_query_rep(selected_year, group_id,
 
     if unique_flag:
         # Формируем запрос с уникальностью через оконную функцию и CTE
+        # Используем логику приоритизации статусов как в tab4.py
         query = f"""
 WITH filtered AS (
     {base}
@@ -135,8 +136,8 @@ prioritized AS (
 ranked AS (
     SELECT *,
            ROW_NUMBER() OVER (
-               PARTITION BY enp, report_month_number
-               ORDER BY 
+               PARTITION BY enp
+               ORDER BY
                    CASE WHEN has_status_3 THEN CASE WHEN status = '3' THEN 0 ELSE 1 END ELSE 0 END,
                    report_month_number,
                    status_priority
