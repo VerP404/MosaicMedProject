@@ -147,7 +147,13 @@ econ_indicators = html.Div(
          dcc.Loading(
              id=f'loading-output-{type_page}', 
              type='default',
-             children=[card_table(f'result-table1-{type_page}', "Индикаторные показатели", page_size=25)]
+             children=[card_table(f'result-table1-{type_page}', "Индикаторные показатели", page_size=25, 
+                                 style_cell_conditional=[
+                                     {'if': {'column_id': 'type'}, 'width': '25%'},
+                                     {'if': {'column_id': 'К-во'}, 'width': '10%'},
+                                     {'if': {'column_id': 'Сумма'}, 'width': '10%'},
+                                     {'if': {'column_id': 'Условия фильтра'}, 'width': '55%'}
+                                 ])]
          ),
     ],
     style={"padding": "0rem"}

@@ -13,7 +13,8 @@ def card_table(
     row_selectable=None,
     hidden_columns=None,
     show_sum_button=False,
-    merge_duplicate_headers=False
+    merge_duplicate_headers=False,
+    style_cell_conditional=None
 ):
     """
     Возвращает карточку с Dash DataTable.
@@ -27,6 +28,7 @@ def card_table(
     - hidden_columns:           список id скрытых столбцов
     - show_sum_button:          показывать кнопку «Суммировать»
     - merge_duplicate_headers:  склеивать дублирующиеся первые уровни заголовков
+    - style_cell_conditional:   условные стили для ячеек
     """
     table_kwargs = {
         'id': id_table,
@@ -49,6 +51,8 @@ def card_table(
         table_kwargs['row_selectable'] = row_selectable
     if hidden_columns is not None:
         table_kwargs['hidden_columns'] = hidden_columns
+    if style_cell_conditional is not None:
+        table_kwargs['style_cell_conditional'] = style_cell_conditional
 
     sum_button_section = None
     if show_sum_button:
