@@ -255,15 +255,65 @@ def filter_input_detail_op(context, site_url: str):
                                  '//h2[contains(@class, "jss170") and contains(@class, "jss176") and text()="Пожалуйста, подождите..."]')
     wait.until(EC.invisibility_of_element_located(loading_indicator_locator))
     time.sleep(5)
+    
+    # Дополнительное ожидание для загрузки таблицы с большим количеством записей
+    context.log.info("Ожидаем полной загрузки таблицы...")
+    try:
+        # Ждем появления таблицы
+        table_locator = (By.XPATH, '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]')
+        wait.until(EC.presence_of_element_located(table_locator))
+        
+        # Ждем появления чекбокса в заголовке таблицы
+        checkbox_locator = (By.XPATH, '/html/body/div[1]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
+        wait.until(EC.presence_of_element_located(checkbox_locator))
+        
+        # Дополнительная пауза для стабилизации
+        time.sleep(3)
+        context.log.info("Таблица загружена, переходим к выбору всех результатов")
+    except Exception as e:
+        context.log.warning(f"Не удалось дождаться полной загрузки таблицы: {e}")
+    
     context.log.info("Выбираем все результаты")
 
-    # Выбираем все результаты
-    select_all_checkbox = driver.find_element(By.XPATH,
-                                              '//*[@id="root"]/div/div[2]/div[2]/div[2]/div/div[2]/table[1]/thead/tr[1]/th[1]/span/span[1]/input')
-    select_all_checkbox.click()
+    # Выбираем все результаты - используем рабочий XPath
+    try:
+        xpath = '/html/body/div[1]/div/div[2]/div[2]/div[2]/div/div[1]/table[1]/thead/tr[1]/th[1]/span/span[1]/input'
+        select_all_checkbox = driver.find_element(By.XPATH, xpath)
+        select_all_checkbox.click()
+        context.log.info("Чекбокс найден и нажат")
+    except Exception as e:
+        context.log.error(f"Не удалось найти чекбокс: {e}")
+        raise Exception("Элемент для выбора всех результатов не найден")
     # Скачивание файла
     context.log.info("Начинаем скачивание файла")
-    download_button = driver.find_element(By.XPATH, '//*[@id="menu"]/div/div[4]/div/div[2]/div[2]/a/button')
+    
+    # Поиск кнопки скачивания CSV
+    download_button = None
+    download_selectors = [
+        '//*[@id="menu"]/div/div[4]/div/div[2]/div[2]/a/button',
+        '//button[contains(text(), "csv")]',
+        '//a[contains(text(), "csv")]',
+        '//button[contains(text(), "CSV")]',
+        '//a[contains(text(), "CSV")]',
+        '//button[contains(text(), "Скачать")]',
+        '//a[contains(text(), "Скачать")]'
+    ]
+    
+    for selector in download_selectors:
+        try:
+            download_button = wait.until(
+                EC.element_to_be_clickable((By.XPATH, selector))
+            )
+            context.log.info(f"Найдена кнопка скачивания с селектором: {selector}")
+            break
+        except Exception as e:
+            context.log.warning(f"Не удалось найти кнопку с селектором {selector}: {e}")
+            continue
+    
+    if download_button is None:
+        context.log.error("Не удалось найти кнопку скачивания")
+        raise Exception("Кнопка скачивания не найдена")
+    
     download_button.click()
     time.sleep(5)
     return "Данные выгруженны в csv."
