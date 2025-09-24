@@ -80,10 +80,21 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
                 combined_where_clause += f" {operator} "
             combined_where_clause += where_clause
 
+        # Формируем строку индикаторов как в Django админке
+        filter_description = ""
+        for i, (where_clause, operator) in enumerate(conditions):
+            if i > 0:
+                filter_description += f" {operator} "
+            filter_description += where_clause
+        
+        # Экранируем одинарные кавычки для SQL
+        escaped_filter_description = filter_description.replace("'", "''")
+        
         union_query = f"""
             SELECT '{condition_type}' AS type,
                    COUNT(*) AS "К-во",
-                   ROUND(COALESCE(SUM(CAST(amount_numeric AS numeric(10, 2))), 0)::numeric, 2) AS "Сумма"
+                   ROUND(COALESCE(SUM(CAST(amount_numeric AS numeric(10, 2))), 0)::numeric, 2) AS "Сумма",
+                   '{escaped_filter_description}' AS "Условия фильтра"
             FROM oms
             WHERE {combined_where_clause}
         """
@@ -91,10 +102,11 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
 
     # Объединяем основной запрос с динамическими условиями
     if union_queries:
-        # Добавляем финальный SELECT к base_query и объединяем с union_queries
-        final_query = f"{base}\nSELECT 'base' AS type, COUNT(*) AS \"К-во\", ROUND(COALESCE(SUM(CAST(amount_numeric AS numeric(10, 2))), 0)::numeric, 2) AS \"Сумма\" FROM oms\nUNION ALL\n" + " UNION ALL ".join(union_queries) + "\nLIMIT 10000"
+        # Объединяем только динамические запросы без base
+        final_query = f"{base}\n" + " UNION ALL ".join(union_queries) + "\nLIMIT 10000"
     else:
-        final_query = f"{base}\nSELECT 'base' AS type, COUNT(*) AS \"К-во\", ROUND(COALESCE(SUM(CAST(amount_numeric AS numeric(10, 2))), 0)::numeric, 2) AS \"Сумма\" FROM oms\nLIMIT 10000"
+        # Если нет динамических условий, возвращаем пустой результат
+        final_query = f"{base}\nSELECT 'no_data' AS type, 0 AS \"К-во\", 0.00 AS \"Сумма\", 'Нет данных' AS \"Условия фильтра\" FROM oms WHERE 1=0\nLIMIT 10000"
 
     return final_query
 
