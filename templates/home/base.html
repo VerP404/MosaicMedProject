@@ -38,32 +38,45 @@
 
 <script src="{% static 'js/app.js' %}"></script>
 <script>
-    document.getElementById('generate-report-btn').addEventListener('click', function () {
-        if (confirm('Вы уверены, что хотите создать новый отчет?')) {
-            // Показать оверлей загрузки
-            document.getElementById('loading-overlay').style.display = 'block';
+    // Проверяем, существует ли элемент перед добавлением обработчика
+    document.addEventListener('DOMContentLoaded', function() {
+        const generateReportBtn = document.getElementById('generate-report-btn');
+        if (generateReportBtn) {
+            generateReportBtn.addEventListener('click', function () {
+                if (confirm('Вы уверены, что хотите создать новый отчет?')) {
+                    // Показать оверлей загрузки
+                    const loadingOverlay = document.getElementById('loading-overlay');
+                    if (loadingOverlay) {
+                        loadingOverlay.style.display = 'block';
+                    }
 
-            fetch("{% url 'people:generate_iszl_report' %}", {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': '{{ csrf_token }}',
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Скрыть оверлей после завершения запроса
-                document.getElementById('loading-overlay').style.display = 'none';
+                    fetch("{% url 'people:generate_iszl_report' %}", {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': '{{ csrf_token }}',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Скрыть оверлей после завершения запроса
+                        if (loadingOverlay) {
+                            loadingOverlay.style.display = 'none';
+                        }
 
-                alert(data.message);
-                if (data.success) {
-                    location.reload();  // Обновление страницы после успешного создания отчета
+                        alert(data.message);
+                        if (data.success) {
+                            location.reload();  // Обновление страницы после успешного создания отчета
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Ошибка:', error);
+                        if (loadingOverlay) {
+                            loadingOverlay.style.display = 'none';
+                        }
+                        alert('Произошла ошибка при создании отчета.');
+                    });
                 }
-            })
-            .catch(error => {
-                console.error('Ошибка:', error);
-                document.getElementById('loading-overlay').style.display = 'none';
-                alert('Произошла ошибка при создании отчета.');
             });
         }
     });

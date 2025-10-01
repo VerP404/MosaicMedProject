@@ -2,6 +2,12 @@ from .base import *
 
 LOGGING['root']['level'] = 'DEBUG'
 
+# Для обслуживания статических файлов в режиме DEBUG=False
+SERVE_STATIC = True
+
+# Настройки WhiteNoise для обслуживания статических файлов
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -28,6 +34,7 @@ INSTALLED_APPS += [
 ]
 MIDDLEWARE += [
     'debug_toolbar.middleware.DebugToolbarMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 INTERNAL_IPS = [
     '127.0.0.1',
