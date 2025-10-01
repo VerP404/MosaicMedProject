@@ -11,6 +11,7 @@ django-json-widget==2.0.1
 django-autocomplete-light==3.12.1
 django-unfold==1.0.0
 django-debug-toolbar==5.2.0
+whitenoise==6.11.0
 
 #############################
 # База данных и драйверы
