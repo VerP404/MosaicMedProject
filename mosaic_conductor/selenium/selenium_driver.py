@@ -169,7 +169,6 @@ def selenium_driver_resource(context):
 
     # Запуск драйвера в зависимости от браузера
     driver = None
-    browser_fallback = False
 
     try:
         if browser == "firefox":
@@ -310,47 +309,7 @@ def selenium_driver_resource(context):
 
             except Exception as e:
                 context.log.error(f"Критическая ошибка при инициализации Chrome драйвера: {str(e)}")
-                # Пробуем fallback на Firefox
-                if not browser_fallback:
-                    context.log.warning("Chrome недоступен, пробуем Firefox как fallback")
-                    browser_fallback = True
-                    browser = "firefox"
-                    # Переходим к инициализации Firefox
-                else:
-                    raise
-        
-        # Если был fallback на Firefox, инициализируем его
-        if browser_fallback and browser == "firefox":
-            try:
-                from webdriver_manager.firefox import GeckoDriverManager
-                from selenium.webdriver.firefox.options import Options as FirefoxOptions
-                from selenium.webdriver.firefox.service import Service as FirefoxService
-
-                options = FirefoxOptions()
-                options.headless = True
-                # Создаем профиль Firefox и назначаем его в опции
-                profile = webdriver.FirefoxProfile()
-                profile.set_preference("browser.download.folderList", 2)
-                profile.set_preference("browser.download.dir", temp_download_folder)
-                profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
-                options.profile = profile  # назначаем профиль опциям
-                
-                # Пробуем использовать локальный geckodriver
-                geckodriver_path = find_local_chromedriver()  # используем ту же функцию для поиска
-                if geckodriver_path and 'geckodriver' in geckodriver_path:
-                    service = FirefoxService(geckodriver_path)
-                    context.log.info(f"Используем локальный GeckoDriver: {geckodriver_path}")
-                else:
-                    service = FirefoxService(GeckoDriverManager().install())
-                    context.log.info("Используем GeckoDriverManager")
-                
-                driver = webdriver.Firefox(service=service, options=options)
-                context.log.info("Firefox драйвер успешно инициализирован как fallback")
-            except Exception as e:
-                context.log.error(f"Не удалось инициализировать Firefox как fallback: {e}")
                 raise
-        elif browser != "firefox":
-            raise ValueError("Поддерживаются только 'firefox' и 'chrome'")
 
         if not driver:
             raise ValueError("Не удалось создать веб-драйвер")
