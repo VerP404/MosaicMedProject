@@ -9,6 +9,8 @@ import tempfile
 import subprocess
 import platform
 import socket
+import requests
+import glob
 
 from mosaic_conductor.selenium.config import CHROME_DRIVER
 
@@ -66,6 +68,64 @@ def find_available_port():
         return s.getsockname()[1]
 
 
+def check_internet_connection():
+    """Проверяет доступность интернета."""
+    try:
+        response = requests.get('https://www.google.com', timeout=5)
+        return response.status_code == 200
+    except:
+        return False
+
+
+def find_local_chromedriver():
+    """Ищет локальный chromedriver в системе."""
+    possible_paths = [
+        '/usr/bin/chromedriver',
+        '/usr/local/bin/chromedriver',
+        '/opt/chromedriver',
+        './chromedriver',
+        './utils/geckodriver.exe',  # fallback на geckodriver если есть
+        './utils/chromedriver.exe',  # возможный путь к chromedriver
+    ]
+    
+    # Ищем в текущей директории и подпапках
+    current_dir = os.getcwd()
+    search_patterns = [
+        os.path.join(current_dir, '**/chromedriver*'),
+        os.path.join(current_dir, '**/geckodriver*'),
+        os.path.join(current_dir, 'utils/**/chromedriver*'),
+        os.path.join(current_dir, 'utils/**/geckodriver*'),
+    ]
+    
+    for pattern in search_patterns:
+        matches = glob.glob(pattern, recursive=True)
+        for match in matches:
+            if os.path.isfile(match) and os.access(match, os.X_OK):
+                return match
+    
+    # Проверяем стандартные пути
+    for path in possible_paths:
+        if os.path.exists(path) and os.access(path, os.X_OK):
+            return path
+    
+    return None
+
+
+def get_chromedriver_offline():
+    """Получает путь к chromedriver в офлайн режиме."""
+    # Сначала проверяем переменную окружения
+    if CHROME_DRIVER and os.path.exists(CHROME_DRIVER):
+        return CHROME_DRIVER
+    
+    # Ищем локальный драйвер
+    local_driver = find_local_chromedriver()
+    if local_driver:
+        return local_driver
+    
+    # Если ничего не найдено, возвращаем None
+    return None
+
+
 @resource(
     config_schema={
         "browser": str,
@@ -109,6 +169,7 @@ def selenium_driver_resource(context):
 
     # Запуск драйвера в зависимости от браузера
     driver = None
+    browser_fallback = False
 
     try:
         if browser == "firefox":
@@ -178,14 +239,36 @@ def selenium_driver_resource(context):
             options.add_experimental_option('useAutomationExtension', False)
 
             try:
-                # Используем указанный путь к драйверу, если он задан в переменной окружения
+                driver_path = None
+                
+                # Сначала проверяем переменную окружения
                 if CHROME_DRIVER and os.path.exists(CHROME_DRIVER):
                     context.log.info(f"Используем ChromeDriver из переменной окружения: {CHROME_DRIVER}")
                     driver_path = CHROME_DRIVER
                 else:
-                    # Используем ChromeDriverManager для автоматического определения версии
-                    driver_path = ChromeDriverManager().install()
-                    context.log.info(f"Установлен ChromeDriver по пути: {driver_path}")
+                    # Проверяем доступность интернета
+                    if check_internet_connection():
+                        try:
+                            context.log.info("Интернет доступен, пытаемся загрузить ChromeDriver через webdriver-manager")
+                            driver_path = ChromeDriverManager().install()
+                            context.log.info(f"Установлен ChromeDriver по пути: {driver_path}")
+                        except Exception as e:
+                            context.log.warning(f"Не удалось загрузить ChromeDriver через webdriver-manager: {e}")
+                            context.log.info("Переходим к поиску локального драйвера")
+                            driver_path = get_chromedriver_offline()
+                    else:
+                        context.log.warning("Интернет недоступен, ищем локальный ChromeDriver")
+                        driver_path = get_chromedriver_offline()
+                
+                # Если драйвер не найден, пробуем найти локально
+                if not driver_path:
+                    context.log.info("Пытаемся найти локальный ChromeDriver")
+                    driver_path = get_chromedriver_offline()
+                
+                if not driver_path:
+                    raise Exception("Не удалось найти ChromeDriver. Установите драйвер вручную или проверьте подключение к интернету.")
+                
+                context.log.info(f"Используем ChromeDriver: {driver_path}")
 
                 # Устанавливаем права на выполнение для ChromeDriver в Linux
                 if platform.system().lower() == 'linux':
@@ -227,8 +310,46 @@ def selenium_driver_resource(context):
 
             except Exception as e:
                 context.log.error(f"Критическая ошибка при инициализации Chrome драйвера: {str(e)}")
+                # Пробуем fallback на Firefox
+                if not browser_fallback:
+                    context.log.warning("Chrome недоступен, пробуем Firefox как fallback")
+                    browser_fallback = True
+                    browser = "firefox"
+                    # Переходим к инициализации Firefox
+                else:
+                    raise
+        
+        # Если был fallback на Firefox, инициализируем его
+        if browser_fallback and browser == "firefox":
+            try:
+                from webdriver_manager.firefox import GeckoDriverManager
+                from selenium.webdriver.firefox.options import Options as FirefoxOptions
+                from selenium.webdriver.firefox.service import Service as FirefoxService
+
+                options = FirefoxOptions()
+                options.headless = True
+                # Создаем профиль Firefox и назначаем его в опции
+                profile = webdriver.FirefoxProfile()
+                profile.set_preference("browser.download.folderList", 2)
+                profile.set_preference("browser.download.dir", temp_download_folder)
+                profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
+                options.profile = profile  # назначаем профиль опциям
+                
+                # Пробуем использовать локальный geckodriver
+                geckodriver_path = find_local_chromedriver()  # используем ту же функцию для поиска
+                if geckodriver_path and 'geckodriver' in geckodriver_path:
+                    service = FirefoxService(geckodriver_path)
+                    context.log.info(f"Используем локальный GeckoDriver: {geckodriver_path}")
+                else:
+                    service = FirefoxService(GeckoDriverManager().install())
+                    context.log.info("Используем GeckoDriverManager")
+                
+                driver = webdriver.Firefox(service=service, options=options)
+                context.log.info("Firefox драйвер успешно инициализирован как fallback")
+            except Exception as e:
+                context.log.error(f"Не удалось инициализировать Firefox как fallback: {e}")
                 raise
-        else:
+        elif browser != "firefox":
             raise ValueError("Поддерживаются только 'firefox' и 'chrome'")
 
         if not driver:
