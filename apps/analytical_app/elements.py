@@ -40,7 +40,9 @@ def card_table(
         'export_headers': 'display',
         'style_table': {'overflowX': 'auto'},
         'style_cell': {'minWidth': '0px', 'maxWidth': '180px', 'whiteSpace': 'normal'},
-        'merge_duplicate_headers': merge_duplicate_headers
+        'merge_duplicate_headers': merge_duplicate_headers,
+        'cell_selectable': True,  # Включаем выделение ячеек
+        'selected_cells': []      # Инициализируем пустым списком
     }
 
     if page_size is not None:

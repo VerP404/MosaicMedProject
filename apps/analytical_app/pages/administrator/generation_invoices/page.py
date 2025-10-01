@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from dash import dcc, html, Output, Input, exceptions, State
+from dash import dcc, html, Output, Input, exceptions, State, callback_context
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
@@ -24,7 +24,10 @@ admin_gen_inv = html.Div(
                 dbc.Card(
                     dbc.CardBody(
                         [
-                            dbc.CardHeader("Фильтры"),
+                            dbc.CardHeader([
+                                html.H4("🔍 Фильтры и настройки", className="mb-0"),
+                                html.Small("Настройте параметры для формирования отчета", className="text-muted")
+                            ]),
                             dbc.Row(
                                 [
                                     dbc.Col(update_buttons(type_page), width=2),
@@ -33,7 +36,8 @@ admin_gen_inv = html.Div(
                                     dbc.Col(filter_inogorod(type_page), width=2),
                                     dbc.Col(filter_sanction(type_page), width=2),
                                     dbc.Col(filter_amount_null(type_page), width=2),
-                                ]
+                                ],
+                                className="mb-3"
                             ),
                             dbc.Row(
                                 [
@@ -87,6 +91,7 @@ admin_gen_inv = html.Div(
                                 style={'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
                                        'border-radius': '5px'}
                             ),
+                            
 
                         ]
                     ),
@@ -98,13 +103,51 @@ admin_gen_inv = html.Div(
             style={"margin": "0 auto", "padding": "0rem"}
         ),
         dcc.Loading(id=f'loading-output-{type_page}', type='default'),
-        card_table(f'result-table1-{type_page}', "Талоны для формирования", page_size=25),
+        card_table(f'result-table1-{type_page}', "Талоны для формирования", page_size=20),
+        
+        
+        # Простой блок с суммой
+        dbc.Row(
+            dbc.Col(
+                html.Div([
+                    html.Span("Сумма выделенных ячеек: ", style={"font-size": "18px"}),
+                    html.Span(id=f'summary-stats-{type_page}', children="0", 
+                            style={"font-size": "24px", "font-weight": "bold", "color": "#007bff"})
+                ], className="text-center p-3 bg-light rounded"),
+                width=12,
+                className="mt-3"
+            )
+        ),
     ],
     style={"padding": "0rem"}
 )
 
 
-# Callback для кнопки "Суммировать"
+# Callback для подсчета суммы выделенных ячеек
+@app.callback(
+    Output(f'summary-stats-{type_page}', 'children'),
+    [Input(f'result-table1-{type_page}', 'selected_cells'),
+     Input(f'result-table1-{type_page}', 'derived_virtual_data')]
+)
+def update_summary_stats(selected_cells, rows):
+    if not rows or not selected_cells:
+        return "0"
+    
+    # Подсчет только суммы
+    total_sum = 0
+    
+    for cell in selected_cells:
+        row_idx = cell['row']
+        col_id = cell['column_id']
+        value = rows[row_idx].get(col_id, 0)
+        
+        if isinstance(value, (int, float)):
+            total_sum += value
+    
+    return f"{int(total_sum):,}".replace(",", " ")
+
+
+# Callback для кнопки "Суммировать" (оставляем для совместимости)
 @app.callback(
     Output(f'sum-result-result-table1-{type_page}', 'children'),
     Input(f'sum-button-result-table1-{type_page}', 'n_clicks'),
@@ -139,6 +182,7 @@ def calculate_sum_and_count(n_clicks, rows, selected_cells):
 
     # Формируем строку с результатом
     return f"Количество выбранных ячеек: {count}, Сумма значений: {total_sum}"
+
 
 
 
