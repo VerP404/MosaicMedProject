@@ -15,6 +15,7 @@ class DeleteEmdSerializer(serializers.ModelSerializer):
     can_delete = serializers.SerializerMethodField()
     status_color = serializers.CharField(source='get_status_color', read_only=True)
     oid_medical_organization_name = serializers.CharField(source='oid_medical_organization.name', read_only=True)
+    oid_medical_organization_oid = serializers.CharField(source='oid_medical_organization.oid_mo', read_only=True)
     reason_not_actual_text = serializers.CharField(source='reason_not_actual.reason_text', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
 

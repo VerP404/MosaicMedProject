@@ -151,7 +151,9 @@ def create_excel_export(record_data):
         ]
         
         # Получаем данные для экспорта
-        oid_medical_org = record_data.get('oid_medical_organization_name', '') or record_data.get('oid_medical_organization', '')
+        # Для экспорта берем OID медицинской организации
+        oid_medical_org = record_data.get('oid_medical_organization_oid', '') \
+            or record_data.get('oid_medical_organization', '')
         oid_document = record_data.get('oid_document', '')
         creation_date = format_date_for_display(record_data.get('creation_date', ''))
         registration_date = format_date_for_display(record_data.get('registration_date', ''))
