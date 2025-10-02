@@ -5,13 +5,15 @@ from dash.exceptions import PreventUpdate
 import requests
 import json
 from datetime import datetime, date
+import os
 import openpyxl
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
 import io
 import base64
 
-from apps.analytical_app.app import app
+from apps.analytical_app.app import app, DJANGO_API_BASE
+from flask import request
 
 
 def format_date_for_display(date_str):
@@ -43,13 +45,34 @@ def format_date_for_api(date_str):
 
 
 # API функции
+def resolve_api_base() -> str:
+    """Определяет базовый URL Django API универсально.
+    Приоритет:
+    1) Явная переменная окружения DJANGO_API_BASE
+    2) Текущий хост из запроса (X-Forwarded-Host/Proto учитываются) + порт из DJANGO_API_PORT (по умолчанию 8000)
+    """
+    explicit_base = os.getenv('DJANGO_API_BASE') or DJANGO_API_BASE
+    if explicit_base:
+        return explicit_base.rstrip('/')
+
+    try:
+        scheme = request.headers.get('X-Forwarded-Proto') or getattr(request, 'scheme', 'http') or 'http'
+        host_header = request.headers.get('X-Forwarded-Host') or getattr(request, 'host', '')
+        hostname = host_header.split(':')[0] if host_header else '127.0.0.1'
+    except Exception:
+        scheme = 'http'
+        hostname = '127.0.0.1'
+
+    api_port = os.getenv('DJANGO_API_PORT', '8000')
+    return f"{scheme}://{hostname}:{api_port}"
 def get_api_data(endpoint):
     """Получение данных через API"""
     try:
         # Убираем лишний слеш в конце endpoint
         if endpoint.endswith('/'):
             endpoint = endpoint[:-1]
-        url = f'http://127.0.0.1:8000/reports/api/{endpoint}/'
+        base = resolve_api_base()
+        url = f'{base}/reports/api/{endpoint}/'
         print(f"DEBUG: Запрашиваем данные с {url}")
         response = requests.get(url)
         print(f"DEBUG: Статус ответа: {response.status_code}")
@@ -69,7 +92,8 @@ def post_api_data(endpoint, data):
     try:
         if endpoint.endswith('/'):
             endpoint = endpoint[:-1]
-        response = requests.post(f'http://127.0.0.1:8000/reports/api/{endpoint}/', json=data)
+        base = resolve_api_base()
+        response = requests.post(f'{base}/reports/api/{endpoint}/', json=data)
         return response.status_code == 201, response.json() if response.status_code == 201 else response.text
     except Exception as e:
         return False, str(e)
@@ -79,7 +103,8 @@ def put_api_data(endpoint, id, data):
     try:
         if endpoint.endswith('/'):
             endpoint = endpoint[:-1]
-        response = requests.put(f'http://127.0.0.1:8000/reports/api/{endpoint}/{id}/', json=data)
+        base = resolve_api_base()
+        response = requests.put(f'{base}/reports/api/{endpoint}/{id}/', json=data)
         return response.status_code == 200, response.json() if response.status_code == 200 else response.text
     except Exception as e:
         return False, str(e)
@@ -87,7 +112,8 @@ def put_api_data(endpoint, id, data):
 def delete_api_data(endpoint, id):
     """Удаление данных через API"""
     try:
-        response = requests.delete(f'http://127.0.0.1:8000/reports/api/{endpoint}/{id}/')
+        base = resolve_api_base()
+        response = requests.delete(f'{base}/reports/api/{endpoint}/{id}/')
         return response.status_code == 204
     except:
         return False

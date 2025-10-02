@@ -18,3 +18,6 @@ app.server.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
 app.title = 'МозаикаМед: Аналитика'
 
 server = app.server
+
+# Базовый URL Django API (задается через .env DJANGO_API_BASE)
+DJANGO_API_BASE = os.getenv('DJANGO_API_BASE', 'http://127.0.0.1:8000')

@@ -14,6 +14,7 @@ load_dotenv(env_path)
 DEBUG_DASH = os.getenv('DEBUG_DASH', 'True').lower() == 'true'
 PORT_DASH = int(os.getenv('PORT_DASH', '5000'))
 HOST_DASH = os.getenv('HOST_DASH', '0.0.0.0')
+DJANGO_API_BASE = os.getenv('DJANGO_API_BASE', 'http://127.0.0.1:8000')
 
 from dash import dcc, html
 from apps.analytical_app.app import app
