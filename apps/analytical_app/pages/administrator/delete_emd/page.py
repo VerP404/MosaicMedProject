@@ -44,6 +44,22 @@ def format_date_for_api(date_str):
         return date_str
 
 
+# Универсальный конвертер в date для DatePickerSingle
+def to_date_obj(value):
+    """Принимает строки 'YYYY-MM-DD' или 'DD.MM.YYYY', а также date/None -> возвращает date или None"""
+    if not value:
+        return None
+    try:
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            if '.' in value:
+                return datetime.strptime(value, '%d.%m.%Y').date()
+            return datetime.strptime(value, '%Y-%m-%d').date()
+        return value
+    except:
+        return None
+
 # API функции
 def resolve_api_base() -> str:
     """Определяет базовый URL Django API универсально.
@@ -557,38 +573,13 @@ def toggle_modal(btn_create, btn_edit, btn_cancel, table_data, selected_rows):
             print(f"DEBUG: Данные записи: {item.get('id', 'N/A')} - {item.get('patient', 'N/A')}")
             
             # Конвертируем даты в объекты datetime для DatePickerSingle
-            creation_date = item.get('creation_date', '')
-            registration_date = item.get('registration_date', '')
-            date_of_birth = item.get('date_of_birth', '')
-            treatment_end = item.get('treatment_end', '')
-            sent_to_mz_date = item.get('sent_to_mz_date', '')
+            creation_date = to_date_obj(item.get('creation_date', ''))
+            registration_date = to_date_obj(item.get('registration_date', ''))
+            date_of_birth = to_date_obj(item.get('date_of_birth', ''))
+            treatment_end = to_date_obj(item.get('treatment_end', ''))
+            sent_to_mz_date = to_date_obj(item.get('sent_to_mz_date', ''))
             
-            # Если дата в формате строки, конвертируем в объект даты
-            if creation_date and isinstance(creation_date, str):
-                try:
-                    creation_date = datetime.strptime(creation_date, '%Y-%m-%d').date()
-                except:
-                    pass
-            if registration_date and isinstance(registration_date, str):
-                try:
-                    registration_date = datetime.strptime(registration_date, '%Y-%m-%d').date()
-                except:
-                    pass
-            if date_of_birth and isinstance(date_of_birth, str):
-                try:
-                    date_of_birth = datetime.strptime(date_of_birth, '%Y-%m-%d').date()
-                except:
-                    pass
-            if treatment_end and isinstance(treatment_end, str):
-                try:
-                    treatment_end = datetime.strptime(treatment_end, '%Y-%m-%d').date()
-                except:
-                    pass
-            if sent_to_mz_date and isinstance(sent_to_mz_date, str):
-                try:
-                    sent_to_mz_date = datetime.strptime(sent_to_mz_date, '%Y-%m-%d').date()
-                except:
-                    pass
+            # уже конвертировано функцией to_date_obj
             
             # Получаем текстовые значения для отображения
             goal_text = item.get('goal_name', '') or item.get('goal', '')
