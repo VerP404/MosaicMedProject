@@ -25,6 +25,7 @@ class DeleteEmdSerializer(serializers.ModelSerializer):
             'created_by': {'required': False},
             'added_date': {'required': False},
             'responsible': {'required': False},
+            'sent_to_mz_date': {'required': False},
         }
 
     def get_can_edit(self, obj):
@@ -83,8 +84,22 @@ class DeleteEmdViewSet(viewsets.ModelViewSet):
         )
     
     def perform_update(self, serializer):
-        # При обновлении не изменяем created_by и added_date
-        serializer.save()
+        instance: DeleteEmd = self.get_object()
+        new_status = serializer.validated_data.get('status', instance.status)
+        # Логика правок по статусу
+        if instance.status == 'draft':
+            # можно менять всё
+            serializer.save()
+            return
+        if instance.status == 'sent':
+            # можно менять только статус
+            allowed = {'status'}
+            cleaned = {k: v for k, v in serializer.validated_data.items() if k in allowed}
+            cleaned['status'] = new_status
+            serializer.save(**cleaned)
+            return
+        # processed/rejected — запрет изменения
+        raise serializers.ValidationError('Запись с текущим статусом нельзя изменять')
     
     @action(detail=True, methods=['post'])
     def change_status(self, request, pk=None):

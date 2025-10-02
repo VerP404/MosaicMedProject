@@ -237,6 +237,7 @@ admin_delete_emd = dbc.Container([
                                    {'name': 'Номер в реестре РЭМД', 'id': 'reestr_number'},
                                    {'name': 'Дата создания', 'id': 'creation_date'},
                                    {'name': 'Дата регистрации', 'id': 'registration_date'},
+                                   {'name': 'Дата отправки в МЗ', 'id': 'sent_to_mz_date'},
                                    {'name': 'Статус', 'id': 'status_display'},
                                    {'name': 'Ответственный', 'id': 'responsible'}
                                ],
@@ -380,9 +381,15 @@ admin_delete_emd = dbc.Container([
                             )
                         ], width=6),
                         dbc.Col([
+                            dbc.Label("Дата отправки в МЗ"),
+                            dcc.DatePickerSingle(id="modal-sent-to-mz-date", date=None, display_format="DD.MM.YYYY")
+                        ], width=6)
+                    ], className="mb-3"),
+                    dbc.Row([
+                        dbc.Col([
                             dbc.Label("Комментарий"),
                             dbc.Textarea(id="modal-comment", placeholder="Дополнительные комментарии...")
-                        ], width=6)
+                        ], width=12)
                     ], className="mb-3")
                 ], label="Управление", tab_id="tab-management")
             ])
@@ -450,6 +457,8 @@ def update_table_data(btn_refresh, search_value, status_filter, btn_create, init
             item['creation_date'] = format_date_for_display(item.get('creation_date'))
         if 'registration_date' in item:
             item['registration_date'] = format_date_for_display(item.get('registration_date'))
+        if 'sent_to_mz_date' in item:
+            item['sent_to_mz_date'] = format_date_for_display(item.get('sent_to_mz_date'))
 
     print(f"DEBUG: Возвращаем {len(data)} записей")
     return data
@@ -520,6 +529,7 @@ def toggle_buttons(selected_rows):
      Output('modal-treatment-end', 'date'),
      Output('modal-responsible-input', 'value'),
      Output('modal-status-dropdown', 'value'),
+            Output('modal-sent-to-mz-date', 'date'),
      Output('modal-comment', 'value'),
      Output('edit-record-id', 'data')],
     [Input('btn-create', 'n_clicks'),
@@ -531,13 +541,13 @@ def toggle_buttons(selected_rows):
 def toggle_modal(btn_create, btn_edit, btn_cancel, table_data, selected_rows):
     ctx = callback_context
     if not ctx.triggered:
-        return False, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", None
+        return False, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", None, "", None
 
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
     if trigger_id == 'btn-create':
         today = datetime.now().date()
-        return True, "➕ Создать новую заявку", "", today, today, "", "", "", "", "", "", today, "", "", today, "", "draft", "", None
+        return True, "➕ Создать новую заявку", "", today, today, "", "", "", "", "", "", today, "", "", today, "", "draft", None, "", None
     elif trigger_id == 'btn-edit' and selected_rows:
         # Редактирование через кнопку "Редактировать"
         row_idx = selected_rows[0]
@@ -551,6 +561,7 @@ def toggle_modal(btn_create, btn_edit, btn_cancel, table_data, selected_rows):
             registration_date = item.get('registration_date', '')
             date_of_birth = item.get('date_of_birth', '')
             treatment_end = item.get('treatment_end', '')
+            sent_to_mz_date = item.get('sent_to_mz_date', '')
             
             # Если дата в формате строки, конвертируем в объект даты
             if creation_date and isinstance(creation_date, str):
@@ -571,6 +582,11 @@ def toggle_modal(btn_create, btn_edit, btn_cancel, table_data, selected_rows):
             if treatment_end and isinstance(treatment_end, str):
                 try:
                     treatment_end = datetime.strptime(treatment_end, '%Y-%m-%d').date()
+                except:
+                    pass
+            if sent_to_mz_date and isinstance(sent_to_mz_date, str):
+                try:
+                    sent_to_mz_date = datetime.strptime(sent_to_mz_date, '%Y-%m-%d').date()
                 except:
                     pass
             
@@ -594,12 +610,13 @@ def toggle_modal(btn_create, btn_edit, btn_cancel, table_data, selected_rows):
                    treatment_end, \
                    responsible_text, \
                    item.get('status', 'draft'), \
+                   sent_to_mz_date, \
                    item.get('comment', ''), \
                    item['id']
     elif trigger_id == 'modal-cancel':
-        return False, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", None
+        return False, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", None, "", None
 
-    return False, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", None
+    return False, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", None, "", None
 
 
 # Callback для сохранения данных
@@ -625,13 +642,14 @@ def toggle_modal(btn_create, btn_edit, btn_cancel, table_data, selected_rows):
      State('modal-treatment-end', 'date'),
      State('modal-responsible-input', 'value'),
      State('modal-status-dropdown', 'value'),
+     State('modal-sent-to-mz-date', 'date'),
      State('modal-comment', 'value'),
      State('edit-record-id', 'data')],
     prevent_initial_call=True
 )
 def save_data(n_clicks, oid_document, creation_date, registration_date, reestr_number, 
-              local_identifier, reason, document_number, medical_org, patient, 
-              date_of_birth, enp, goal, treatment_end, responsible, status, comment, edit_id):
+             local_identifier, reason, document_number, medical_org, patient, 
+             date_of_birth, enp, goal, treatment_end, responsible, status, sent_to_mz_date, comment, edit_id):
     
     if not n_clicks:
         raise PreventUpdate
@@ -653,6 +671,7 @@ def save_data(n_clicks, oid_document, creation_date, registration_date, reestr_n
         'treatment_end': format_date_for_api(treatment_end),
         'responsible': responsible,  # Теперь это текстовое поле
         'status': status,
+        'sent_to_mz_date': format_date_for_api(sent_to_mz_date),
         'comment': comment
     }
     

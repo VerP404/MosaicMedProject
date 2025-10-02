@@ -57,6 +57,7 @@ class DeleteEmd(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', 
                              verbose_name="Статус", help_text="Статус заявки на удаление ЭМД")
     responsible = models.CharField(max_length=255, verbose_name="Ответственный", help_text="Введите ФИО ответственного")
+    sent_to_mz_date = models.DateField(null=True, blank=True, verbose_name="Дата отправки в МЗ")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, 
                                   related_name='created_delete_emd', verbose_name="Создал",
                                   help_text="Пользователь, создавший заявку")
@@ -67,19 +68,19 @@ class DeleteEmd(models.Model):
     def __str__(self):
         return f"{self.oid_medical_organization} - {self.oid_document} - {self.get_status_display()}"
     
-    def can_edit(self, user):
+    def can_edit(self, user=None):
         """
-        Проверяет, может ли пользователь редактировать заявку.
-        Черновики можно редактировать, отправленные - нет.
+        Правила редактирования:
+        - Черновик: можно изменять любые поля
+        - Отправлен: менять только статус (остальные поля недоступны)
+        - Обработан/Отклонен: ничего менять нельзя
+        Привязка к пользователю не используется.
         """
-        return self.status == 'draft' and (user.is_superuser or user == self.created_by or user == self.responsible)
+        return self.status == 'draft'
     
-    def can_delete(self, user):
-        """
-        Проверяет, может ли пользователь удалить заявку.
-        Только черновики можно удалять.
-        """
-        return self.status == 'draft' and (user.is_superuser or user == self.created_by)
+    def can_delete(self, user=None):
+        """Удалять можно только черновики."""
+        return self.status == 'draft'
     
     def get_status_color(self):
         """
