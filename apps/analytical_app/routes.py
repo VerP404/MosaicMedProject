@@ -151,6 +151,15 @@ routes = {
         layout_remd500
     ]),
 
+    # Удаление ЭМД доступно в разделе Заведующий
+    "/head/delete-emd": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Удаление ЭМД", "active": True},
+        ]),
+        admin_delete_emd
+    ]),
+
     "/web_oms": web_oms_main,
     "/web_oms/web_oms_rep1": html.Div([
         dbc.Breadcrumb(items=[

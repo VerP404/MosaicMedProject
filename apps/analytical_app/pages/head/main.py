@@ -34,6 +34,7 @@ cards_row_3 = dbc.Row(
     [
         dbc.Col(create_card(9, type_page, "Талоны по врачам (помесячно)", "Талоны ОМС по врачам в разрезе по месяцам.")),
         dbc.Col(create_card(10, type_page, "Талоны по врачам (по целям)", "Талоны ОМС по врачам и целям.")),
+        dbc.Col(create_card(11, type_page, "Удаление ЭМД", "Управление заявками на удаление ЭМД")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
@@ -54,7 +55,7 @@ head_main = html.Div([
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 11)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 12)],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -76,6 +77,7 @@ def navigate_pages(*n_clicks):
         8: f"/{main_link}/journal",
         9: f"/{main_link}/doctors_talon",
         10: f"/{main_link}/doctors_talon_goals",
+        11: f"/{main_link}/delete-emd",
     }
     
     return route_map[report_num]

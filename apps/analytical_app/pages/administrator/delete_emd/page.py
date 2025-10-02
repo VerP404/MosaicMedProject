@@ -93,10 +93,10 @@ def post_api_data(endpoint, data):
         if endpoint.endswith('/'):
             endpoint = endpoint[:-1]
         base = resolve_api_base()
-        response = requests.post(f'{base}/reports/api/{endpoint}/', json=data)
+        response = requests.post(f'{base}/reports/api/{endpoint}/', json=data, timeout=15)
         return response.status_code == 201, response.json() if response.status_code == 201 else response.text
     except Exception as e:
-        return False, str(e)
+        return False, f'EXC: {e}'
 
 def put_api_data(endpoint, id, data):
     """Обновление данных через API"""
@@ -104,10 +104,10 @@ def put_api_data(endpoint, id, data):
         if endpoint.endswith('/'):
             endpoint = endpoint[:-1]
         base = resolve_api_base()
-        response = requests.put(f'{base}/reports/api/{endpoint}/{id}/', json=data)
+        response = requests.put(f'{base}/reports/api/{endpoint}/{id}/', json=data, timeout=15)
         return response.status_code == 200, response.json() if response.status_code == 200 else response.text
     except Exception as e:
-        return False, str(e)
+        return False, f'EXC: {e}'
 
 def delete_api_data(endpoint, id):
     """Удаление данных через API"""

@@ -1,4 +1,5 @@
 from rest_framework import serializers, viewsets, status, permissions
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth.models import User
@@ -43,6 +44,7 @@ class DeleteEmdViewSet(viewsets.ModelViewSet):
     queryset = DeleteEmd.objects.all()
     serializer_class = DeleteEmdSerializer
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []  # Явно отключаем CSRF/сессию для server-to-server вызовов из Dash
     
     def get_queryset(self):
         user = self.request.user
