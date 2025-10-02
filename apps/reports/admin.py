@@ -14,12 +14,43 @@ from apps.reports.resources import PatientResource
 
 @admin.register(DeleteEmd)
 class DeleteEmdAdmin(ModelAdmin):
-    list_display = ('oid_medical_organization', 'oid_document', 'goal', 'added_date')
-
+    list_display = ('oid_medical_organization', 'patient', 'enp', 'status', 'responsible', 'created_by', 'added_date', 'updated_at')
+    list_filter = ('status', 'oid_medical_organization', 'responsible', 'created_by', 'added_date')
+    search_fields = ('patient', 'enp', 'reestr_number', 'local_identifier')
+    readonly_fields = ('created_by', 'added_date', 'updated_at')
+    
+    fieldsets = (
+        ('Основная информация', {
+            'fields': ('oid_medical_organization', 'oid_document', 'creation_date', 'registration_date', 
+                      'reestr_number', 'local_identifier', 'reason_not_actual', 'document_number')
+        }),
+        ('Данные пациента', {
+            'fields': ('patient', 'date_of_birth', 'enp', 'goal', 'treatment_end')
+        }),
+        ('Управление заявкой', {
+            'fields': ('status', 'responsible', 'comment')
+        }),
+        ('Системная информация', {
+            'fields': ('created_by', 'added_date', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
     def get_readonly_fields(self, request, obj=None):
-        if obj:  # при редактировании объекта
-            return self.readonly_fields + ('oid_medical_organization',)
-        return self.readonly_fields
+        readonly = list(self.readonly_fields)
+        if obj and obj.status != 'draft':  # Если статус не черновик
+            # Делаем все поля только для чтения, кроме статуса и комментария
+            readonly.extend(['oid_medical_organization', 'oid_document', 'creation_date', 'registration_date',
+                           'reestr_number', 'local_identifier', 'reason_not_actual', 'document_number',
+                           'patient', 'date_of_birth', 'enp', 'goal', 'treatment_end', 'responsible'])
+        return readonly
+    
+    def save_model(self, request, obj, form, change):
+        if not change:  # При создании
+            obj.created_by = request.user
+            if not obj.responsible_id:  # Если ответственный не указан
+                obj.responsible = request.user
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(InvalidationReason)

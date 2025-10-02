@@ -18,6 +18,13 @@ class InvalidationReason(models.Model):
 
 
 class DeleteEmd(models.Model):
+    STATUS_CHOICES = [
+        ('draft', 'Черновик'),
+        ('sent', 'Отправлен'),
+        ('processed', 'Обработан'),
+        ('rejected', 'Отклонен'),
+    ]
+    
     oid_medical_organization = models.ForeignKey(MedicalOrganization, on_delete=models.PROTECT,
                                                  verbose_name="OID Медицинской организации", default=1)
     oid_document = models.CharField(
@@ -43,16 +50,53 @@ class DeleteEmd(models.Model):
     patient = models.CharField(max_length=255, verbose_name="Пациент", help_text="Введите ФИО пациента")
     date_of_birth = models.DateField(verbose_name="Дата рождения", help_text="Введите дату рождения пациента")
     enp = models.CharField(max_length=16, verbose_name="ЕНП", help_text="Введите ЕНП пациента")
-    goal = models.ForeignKey(MedicalOrganizationOMSTarget, on_delete=models.CASCADE, verbose_name="Цель ОМС",
-                             limit_choices_to={'is_active': True}, help_text="Выберите актуальную цель ОМС")
+    goal = models.CharField(max_length=255, verbose_name="Цель ОМС", help_text="Введите цель ОМС")
     treatment_end = models.DateField(verbose_name="Окончание лечения", help_text="Укажите дату завершения лечения")
+    
+    # Новые поля
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', 
+                             verbose_name="Статус", help_text="Статус заявки на удаление ЭМД")
+    responsible = models.CharField(max_length=255, verbose_name="Ответственный", help_text="Введите ФИО ответственного")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, 
+                                  related_name='created_delete_emd', verbose_name="Создал",
+                                  help_text="Пользователь, создавший заявку")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата обновления")
+    comment = models.TextField(blank=True, null=True, verbose_name="Комментарий", 
+                              help_text="Дополнительные комментарии к заявке")
 
     def __str__(self):
-        return f"{self.oid_medical_organization} - {self.oid_document}"
+        return f"{self.oid_medical_organization} - {self.oid_document} - {self.get_status_display()}"
+    
+    def can_edit(self, user):
+        """
+        Проверяет, может ли пользователь редактировать заявку.
+        Черновики можно редактировать, отправленные - нет.
+        """
+        return self.status == 'draft' and (user.is_superuser or user == self.created_by or user == self.responsible)
+    
+    def can_delete(self, user):
+        """
+        Проверяет, может ли пользователь удалить заявку.
+        Только черновики можно удалять.
+        """
+        return self.status == 'draft' and (user.is_superuser or user == self.created_by)
+    
+    def get_status_color(self):
+        """
+        Возвращает цвет для отображения статуса.
+        """
+        colors = {
+            'draft': 'warning',
+            'sent': 'info', 
+            'processed': 'success',
+            'rejected': 'danger'
+        }
+        return colors.get(self.status, 'secondary')
 
     class Meta:
         verbose_name = "ЭМД: аннулирование"
         verbose_name_plural = "ЭМД: аннулирование"
+        ordering = ['-updated_at']
 
 
 class SVOMember(models.Model):
