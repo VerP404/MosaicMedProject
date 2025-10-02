@@ -11,6 +11,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
 import io
 import base64
+from copy import deepcopy
+from docx import Document
 
 from apps.analytical_app.app import app, DJANGO_API_BASE
 from flask import request
@@ -186,6 +188,81 @@ def create_excel_export(record_data):
         raise e
 
 
+def render_docx_from_template(record_data_list):
+    """Заполняет DOCX шаблон. record_data_list — список записей.
+    В таблице шаблона найдём первую строку после заголовков и будем клонировать её под каждую запись,
+    заполняя ячейки по колонкам (OID МО, OID документа, дата создания, дата регистрации, № РЭМД, локальный идентификатор, причина, номер взамен)."""
+    try:
+        template_path = os.path.join(os.path.dirname(__file__), 'удаление ЭМД шаблон.docx')
+        doc = Document(template_path)
+
+        # Подготовим значения
+        # Заполним статические плейсхолдеры первой записи (если они используются вне таблицы)
+        if record_data_list:
+            first = record_data_list[0]
+            values = {
+                'patient': first.get('patient', ''),
+                'responsible': first.get('responsible', ''),
+                'comment': first.get('comment', '') or '',
+            }
+
+            def replace_text_in_paragraph(paragraph):
+                for run in paragraph.runs:
+                    for key, val in values.items():
+                        placeholder = f'{{{{{key}}}}}'
+                        if placeholder in run.text:
+                            run.text = run.text.replace(placeholder, str(val))
+
+            for p in doc.paragraphs:
+                replace_text_in_paragraph(p)
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            replace_text_in_paragraph(p)
+
+        # Найдём первую таблицу и предположим, что строки данных начинаются со второй строки (после заголовка)
+        if not doc.tables:
+            raise Exception('В шаблоне не найдена таблица для вывода данных')
+        t = doc.tables[0]
+        # Используем существующую первую строку данных (индекс 1) как шаблон
+        row_template = t.rows[1]
+        # Очистим все строки данных, оставив заголовок и одну шаблонную строку
+        while len(t.rows) > 2:
+            t._tbl.remove(t.rows[2]._tr)
+
+        for idx, rec in enumerate(record_data_list, start=1):
+            if idx > 1:
+                # Клонируем строку через deepcopy, т.к. CT_Row.clone отсутствует
+                new_tr = deepcopy(row_template._tr)
+                t._tbl.append(new_tr)
+                row = t.rows[-1]
+            else:
+                row = row_template
+
+            # Заполняем ячейки: №, OID МО, OID документа, дата создания, дата регистрации, № РЭМД, локальный идентификатор, причина, номер взамен
+            cells = row.cells
+            # Защитимся от различий в макете — заполним по индексу, если хватает колонок
+            if len(cells) >= 9:
+                cells[0].text = str(idx)
+                cells[1].text = str(rec.get('oid_medical_organization_oid') or rec.get('oid_medical_organization', ''))
+                cells[2].text = str(rec.get('oid_document', ''))
+                cells[3].text = str(format_date_for_display(rec.get('creation_date', '')) or '')
+                cells[4].text = str(format_date_for_display(rec.get('registration_date', '')) or '')
+                cells[5].text = str(rec.get('reestr_number', ''))
+                cells[6].text = str(rec.get('local_identifier', ''))
+                cells[7].text = str(rec.get('reason_not_actual_text', '') or '')
+                cells[8].text = str(rec.get('document_number', '') or '')
+
+        bio = io.BytesIO()
+        doc.save(bio)
+        bio.seek(0)
+        return bio.read()
+    except Exception as e:
+        print(f"DEBUG: Ошибка при формировании DOCX: {e}")
+        raise e
+
+
 admin_delete_emd = dbc.Container([
            # Скрытый компонент для инициализации
            dcc.Store(id='init-trigger', data=0),
@@ -199,8 +276,41 @@ admin_delete_emd = dbc.Container([
                    dbc.ButtonGroup([
                        dbc.Button("➕ Создать заявку", id="btn-create", color="success", size="sm"),
                        dbc.Button("✏️ Редактировать", id="btn-edit", color="primary", size="sm", disabled=True),
-                       dbc.Button("📊 Экспорт в CSV", id="btn-export", color="info", size="sm", disabled=True)
+                      dbc.Button("📊 Экспорт в CSV", id="btn-export", color="info", size="sm", disabled=True),
+                      dbc.Button("📝 Экспорт шаблона приложения", id="btn-export-docx", color="secondary", size="sm", disabled=True)
                    ], className="mb-3")
+               ])
+           ]),
+
+           # Инструкции (Alert + Accordion)
+           dbc.Row([
+               dbc.Col([
+                   dbc.Alert(
+                       "Для формирования приложения необходимо выбрать несколько записей в таблице и нажать кнопку '📝 Экспорт шаблона приложения'.",
+                       color="info",
+                       className="mb-2",
+                       dismissable=False,
+                   ),
+                   dbc.Accordion([
+                        dbc.AccordionItem([
+                           html.Ul([
+                               html.Li(["Направьте на ", html.B("vmiac@zdrav36.ru"), " следующие документы:"]),
+                               html.Li("Письмо на бланке организации о признании ЭМД неактуальным, подписанное руководителем и заверенное печатью организации."),
+                               html.Li(["Акт (в ", html.B("Word и PDF"), ") с перечнем ЭМД, заверенный подписью главного врача и печатью МО, с обязательными сведениями: ",
+                                       "OID МО, OID документа, дата создания, дата регистрации, номер в реестре РЭМД, локальный идентификатор, причина скрытия ЭМД, номер документа взамен (при наличии)." ]),
+                           ])
+                       ], title="Отправка документов в ВМИАЦ"),
+                       dbc.AccordionItem([
+                           html.P("Как сформировать приложение (DOCX):"),
+                           html.Ul([
+                               html.Li("Проверьте заполнение всех полей в таблице."),
+                               html.Li("Выделите в таблице нужные строки."),
+                               html.Li("Нажмите '📝 Экспорт шаблона приложения'."),
+                               html.Li("Будет сформирован DOCX по шаблону с таблицей: №, OID МО, OID документа, Дата создания, Дата регистрации, Номер в реестре РЭМД, Локальный идентификатор, Причина скрытия ЭМД, Номер документа взамен."),
+                           ])
+                       ], title="Экспорт приложения (DOCX)"),
+                       
+                   ], start_collapsed=True, always_open=False, className="mb-3")
                ])
            ]),
     
@@ -265,7 +375,7 @@ admin_delete_emd = dbc.Container([
                         page_action="native",
                         page_current=0,
                         page_size=20,
-                        row_selectable="single",
+                        row_selectable="multi",
                         selected_rows=[],
                         style_table={'overflowX': 'auto'},
                         style_cell={'textAlign': 'left', 'padding': '8px'},
@@ -420,6 +530,7 @@ admin_delete_emd = dbc.Container([
     
     # Скрытый компонент для скачивания файлов
     dcc.Download(id="download-excel"),
+    dcc.Download(id="download-docx"),
     
     # Уведомления
     dbc.Toast(
@@ -519,13 +630,17 @@ def load_modal_data(btn_create, selected_rows, modal_is_open):
 # Callback для активации кнопок "Редактировать" и "Экспорт"
 @app.callback(
     [Output('btn-edit', 'disabled'),
-     Output('btn-export', 'disabled')],
+     Output('btn-export', 'disabled'),
+     Output('btn-export-docx', 'disabled')],
     [Input('delete-emd-table', 'selected_rows')],
     prevent_initial_call=True
 )
 def toggle_buttons(selected_rows):
-    is_disabled = len(selected_rows) == 0
-    return is_disabled, is_disabled
+    count = len(selected_rows)
+    # Редактировать можно только одну запись, экспорт — одну или более
+    disable_edit = count != 1
+    disable_export = count == 0
+    return disable_edit, disable_export, disable_export
 
 
 # Callback для открытия модального окна
@@ -750,3 +865,35 @@ def export_to_excel(n_clicks, selected_rows, table_data):
         print(f"DEBUG: Traceback: {traceback.format_exc()}")
         return None, True, f"❌ Ошибка при экспорте: {str(e)}", "danger"
 
+
+# Callback для экспорта в DOCX по шаблону
+@app.callback(
+    [Output('download-docx', 'data'),
+     Output('toast-notification', 'is_open', allow_duplicate=True),
+     Output('toast-notification', 'children', allow_duplicate=True),
+     Output('toast-notification', 'icon', allow_duplicate=True)],
+    [Input('btn-export-docx', 'n_clicks')],
+    [State('delete-emd-table', 'selected_rows'),
+     State('delete-emd-table', 'data')],
+    prevent_initial_call=True
+)
+def export_to_docx(n_clicks, selected_rows, table_data):
+    if not n_clicks or not selected_rows:
+        raise PreventUpdate
+    try:
+        # Собираем выбранные записи в порядке индексов
+        records = [table_data[i] for i in selected_rows if i < len(table_data)]
+        if records:
+            content_bytes = render_docx_from_template(records)
+            filename = f"delete_emd_{len(records)}.docx"
+            b64 = base64.b64encode(content_bytes).decode()
+            return {
+                "content": b64,
+                "base64": True,
+                "filename": filename,
+                "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            }, True, f"✅ DOCX '{filename}' готов к скачиванию!", "success"
+        else:
+            return None, True, "❌ Ошибка: запись не найдена", "danger"
+    except Exception as e:
+        return None, True, f"❌ Ошибка при экспорте DOCX: {e}", "danger"
