@@ -259,7 +259,7 @@ def filter_sanction(type_page):
                 {'label': 'Санкции', 'value': '2'},
                 {'label': 'Все', 'value': '3'}
             ],
-            value='1',
+            value='3',
             clearable=False
         ),
         style={"width": "100%"}
