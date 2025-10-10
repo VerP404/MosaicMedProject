@@ -273,7 +273,7 @@ def filter_report_type(type_page):
             options=[
                 {'label': 'По отчетному месяцу', 'value': 'month'},
                 {'label': 'По дате формирования', 'value': 'initial_input'},
-                {'label': 'По дате лечения', 'value': 'treatment'}
+                {'label': 'По дате окон.лечения', 'value': 'treatment'}
             ],
             value='month',
             clearable=False

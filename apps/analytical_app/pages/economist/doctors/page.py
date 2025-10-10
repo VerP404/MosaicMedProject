@@ -14,7 +14,7 @@ from apps.analytical_app.components.filters import (
     filter_status, status_groups, filter_report_type, filter_months,
     date_picker, update_buttons
 )
-from apps.analytical_app.pages.economist.doctors.query import sql_query_doctors_goal_stat
+from apps.analytical_app.pages.economist.doctors.query import sql_query_doctors_goal_stat, sql_query_buildings_goal_stat
 from apps.analytical_app.query_executor import engine
 
 type_page = "econ-doctors-talon-list"
@@ -183,12 +183,31 @@ def economist_doctors_talon_list_def():
             ])
         , className="mb-3 shadow-sm", style={"borderRadius": "8px"}),
 
-        # Спиннер вокруг результата
-        dcc.Loading(
-            id=f'loading-table-{type_page}',
-            type="default",
-            children=html.Div(id=f'result-table-container-{type_page}')
-        )
+        # Результаты: вкладки
+        dbc.Tabs([
+            dbc.Tab(
+                label="По врачам",
+                tab_id=f"tab-doctors-{type_page}",
+                children=[
+                    dcc.Loading(
+                        id=f'loading-table-{type_page}-doctors',
+                        type="default",
+                        children=html.Div(id=f'result-table-container-{type_page}-doctors')
+                    )
+                ]
+            ),
+            dbc.Tab(
+                label="По корпусам",
+                tab_id=f"tab-buildings-{type_page}",
+                children=[
+                    dcc.Loading(
+                        id=f'loading-table-{type_page}-buildings',
+                        type="default",
+                        children=html.Div(id=f'result-table-container-{type_page}-buildings')
+                    )
+                ]
+            )
+        ], active_tab=f"tab-doctors-{type_page}")
 
     ], style={"padding": "0rem"})
 
@@ -234,15 +253,16 @@ def update_offcanvas_body(config_id):
 
 # --- Колбэки ---
 
-# 1) При смене конфигурации — только обновляем список групп
+# 1) При смене конфигурации — обновляем список групп и переключаем режим
 @app.callback(
     Output(f"dropdown-goal-groups-{type_page}", "options"),
     Output(f"dropdown-goal-groups-{type_page}", "value"),
+    Output(f"goals-selection-mode-{type_page}", "value"),
     Input(f"dropdown-config-{type_page}", "value")
 )
 def apply_config(config_id):
     if not config_id:
-        return [], []
+        return [], [], "individual"
 
     df = load_configs()
     row = df[df["id"] == config_id].iloc[0]
@@ -255,11 +275,29 @@ def apply_config(config_id):
         {"label": grp, "value": grp}
         for grp in sorted(groups_dict.keys(), key=lambda x: x.lower())
     ]
-    # По умолчанию выбираем все группы конфигурации
-    return grp_opts, [opt["value"] for opt in grp_opts]
+    # По умолчанию выбираем все группы конфигурации и переключаем в режим "Группы"
+    return grp_opts, [opt["value"] for opt in grp_opts], "group"
 
 
-# 2) В зависимости от режима «Группы»/«Отдельные» наполняем дроп-целей
+# 2) Скрытие/показ полей периода в зависимости от типа отчёта
+@app.callback(
+    Output(f"col-months-{type_page}", "style"),
+    Output(f"col-input-{type_page}", "style"),
+    Output(f"col-treatment-{type_page}", "style"),
+    Input(f"dropdown-report-type-{type_page}", "value")
+)
+def toggle_period_inputs(report_type):
+    if report_type == 'month':
+        return {'width': '100%'}, {'display': 'none', 'width': '100%'}, {'display': 'none', 'width': '100%'}
+    elif report_type == 'initial_input':
+        return {'display': 'none', 'width': '100%'}, {'width': '100%'}, {'display': 'none', 'width': '100%'}
+    elif report_type == 'treatment':
+        return {'display': 'none', 'width': '100%'}, {'display': 'none', 'width': '100%'}, {'width': '100%'}
+    else:
+        return {'width': '100%'}, {'display': 'none', 'width': '100%'}, {'display': 'none', 'width': '100%'}
+
+
+# 3) В зависимости от режима «Группы»/«Отдельные» наполняем дроп-целей
 @app.callback(
     Output(f"dropdown-goals-{type_page}", "options"),
     Output(f"dropdown-goals-{type_page}", "value"),
@@ -288,7 +326,7 @@ def update_goals_options(mode, config_id):
     return opts, []
 
 
-# 2) Превью целей по выбранным группам
+# 4) Превью целей по выбранным группам
 @app.callback(
     Output(f"preview-goals-{type_page}", "children"),
     Input(f"dropdown-goal-groups-{type_page}", "value")
@@ -304,24 +342,7 @@ def _preview_goals(selected_groups):
     return "\n".join(lines)
 
 
-# 3) Toggle для периода
-@app.callback(
-    Output(f'range-slider-month-{type_page}', 'style'),
-    Output(f'col-input-{type_page}', 'style'),
-    Output(f'col-treatment-{type_page}', 'style'),
-    Input(f'dropdown-report-type-{type_page}', 'value')
-)
-def toggle_period_inputs(report_type):
-    if report_type == 'month':
-        return {'display': 'block'}, {'display': 'none'}, {'display': 'none'}
-    if report_type == 'initial_input':
-        return {'display': 'none'}, {'display': 'block'}, {'display': 'none'}
-    if report_type == 'treatment':
-        return {'display': 'none'}, {'display': 'none'}, {'display': 'block'}
-    return {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
-
-
-# 4) Toggle между группами и отдельными целями
+# 5) Toggle между группами и отдельными целями
 @app.callback(
     Output(f'goal-groups-container-{type_page}', 'style'),
     Output(f'goals-individual-container-{type_page}', 'style'),
@@ -349,9 +370,9 @@ def toggle_status(mode):
     )
 
 
-# 6) Основной колбэк: строим и выполняем SQL, рисуем таблицу
+# 6a) Таблица по врачам
 @app.callback(
-    Output(f'result-table-container-{type_page}', 'children'),
+    Output(f'result-table-container-{type_page}-doctors', 'children'),
     Input(f'update-button-{type_page}', 'n_clicks'),
     State(f'dropdown-year-{type_page}', 'value'),
     State(f'dropdown-report-type-{type_page}', 'value'),
@@ -409,6 +430,8 @@ def update_table_doctors_goal(
     if report_type == 'month' and months_range:
         si, ei = months_range
         months_ph = ", ".join(str(m) for m in range(si, ei + 1))
+        # Для отчётного месяца не передаём даты
+        si = ei = st = et = None
     elif report_type == 'initial_input' and start_in and end_in:
         si = datetime.fromisoformat(start_in).strftime("%d-%m-%Y")
         ei = datetime.fromisoformat(end_in).strftime("%d-%m-%Y")
@@ -433,10 +456,150 @@ def update_table_doctors_goal(
     cols, data = TableUpdater.query_to_df(engine, sql)
     df = pd.DataFrame(data)
 
+    # Проверяем, пустая ли таблица
+    if df.empty:
+        return html.Div([
+            dbc.Alert([
+                html.H5("Данные не найдены", className="alert-heading"),
+                html.P("По выбранным условиям не найдено ни одной записи."),
+                html.Hr(),
+                html.H6("💡 Попробуйте изменить условия:"),
+                html.Ul([
+                    html.Li("Проверьте выбранный период (год, месяцы или даты)"),
+                    html.Li("Измените фильтры по статусам"),
+                    html.Li("Выберите другие цели или группы целей"),
+                    html.Li("Проверьте фильтры по типу пациентов (местные/иногородние)"),
+                    html.Li("Попробуйте другой тип отчёта")
+                ]),
+                html.P("Если проблема сохраняется, обратитесь к администратору.", className="mb-0")
+            ], color="info", className="mt-3")
+        ])
+
     # Рендерим DataTable
     return html.Div([
         dash_table.DataTable(
-            id=f"table-{type_page}",
+            id=f"table-{type_page}-doctors",
+            columns=[
+                {
+                    "name": c["name"] if isinstance(c, dict) else c,
+                    "id": c["id"] if isinstance(c, dict) else c
+                }
+                for c in cols
+            ],
+            data=df.to_dict('records'),
+            page_size=20,
+            sort_action="native",
+            filter_action="native",
+            export_format="xlsx",
+            style_table={"overflowX": "auto"},
+        )
+    ])
+
+
+# 6b) Таблица по корпусам
+@app.callback(
+    Output(f'result-table-container-{type_page}-buildings', 'children'),
+    Input(f'update-button-{type_page}', 'n_clicks'),
+    State(f'dropdown-year-{type_page}', 'value'),
+    State(f'dropdown-report-type-{type_page}', 'value'),
+    State(f'range-slider-month-{type_page}', 'value'),
+    State(f'date-picker-range-input-{type_page}', 'start_date'),
+    State(f'date-picker-range-input-{type_page}', 'end_date'),
+    State(f'date-picker-range-treatment-{type_page}', 'start_date'),
+    State(f'date-picker-range-treatment-{type_page}', 'end_date'),
+    State(f'dropdown-inogorodniy-{type_page}', 'value'),
+    State(f'dropdown-sanction-{type_page}', 'value'),
+    State(f'dropdown-amount-null-{type_page}', 'value'),
+    State(f'goals-selection-mode-{type_page}', 'value'),
+    State(f'dropdown-goals-{type_page}', 'value'),
+    State(f'dropdown-goal-groups-{type_page}', 'value'),
+    State(f'status-selection-mode-{type_page}', 'value'),
+    State(f'status-group-radio-{type_page}', 'value'),
+    State(f'status-individual-dropdown-{type_page}', 'value'),
+)
+def update_table_buildings_goal(
+        n, year, report_type, months_range,
+        start_in, end_in, start_tr, end_tr,
+        inogorod, sanction, amount_null,
+        goal_mode, indiv_goals, grp_goals,
+        status_mode, status_grp, status_indiv
+):
+    if not n:
+        raise exceptions.PreventUpdate
+
+    # Группы и цели
+    if goal_mode == 'group' and grp_goals:
+        group_mapping = {g: GOAL_GROUPS.get(g, []) for g in grp_goals}
+        goals = [item for g in grp_goals for item in GOAL_GROUPS.get(g, [])]
+    elif goal_mode == 'individual' and indiv_goals:
+        group_mapping = {}
+        goals = indiv_goals
+    else:
+        group_mapping = {}
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT DISTINCT goal FROM data_loader_omsdata WHERE goal IS NOT NULL AND goal <> '-'"
+            )).fetchall()
+        goals = [r[0] for r in rows]
+    goals = sorted(dict.fromkeys(goals), key=sort_key)
+
+    statuses = (
+        status_groups.get(status_grp, [])
+        if status_mode == 'group' else (status_indiv or [])
+    )
+
+    months_ph = None
+    si = ei = st = et = None
+    if report_type == 'month' and months_range:
+        si, ei = months_range
+        months_ph = ", ".join(str(m) for m in range(si, ei + 1))
+        # Для отчётного месяца не передаём даты
+        si = ei = st = et = None
+    elif report_type == 'initial_input' and start_in and end_in:
+        si = datetime.fromisoformat(start_in).strftime("%d-%m-%Y")
+        ei = datetime.fromisoformat(end_in).strftime("%d-%m-%Y")
+    elif report_type == 'treatment' and start_tr and end_tr:
+        st = datetime.fromisoformat(start_tr).strftime("%d-%m-%Y")
+        et = datetime.fromisoformat(end_tr).strftime("%d-%m-%Y")
+
+    sql = sql_query_buildings_goal_stat(
+        selected_year=year,
+        months_placeholder=months_ph,
+        inogorodniy=inogorod,
+        sanction=sanction,
+        amount_null=amount_null,
+        group_mapping=group_mapping,
+        goals=goals,
+        status_list=statuses,
+        report_type=report_type,
+        input_start=si, input_end=ei,
+        treatment_start=st, treatment_end=et
+    )
+    cols, data = TableUpdater.query_to_df(engine, sql)
+    df = pd.DataFrame(data)
+
+    # Проверяем, пустая ли таблица
+    if df.empty:
+        return html.Div([
+            dbc.Alert([
+                html.H5("📊 Данные не найдены", className="alert-heading"),
+                html.P("По выбранным условиям не найдено ни одной записи."),
+                html.Hr(),
+                html.H6("💡 Попробуйте изменить условия:"),
+                html.Ul([
+                    html.Li("Проверьте выбранный период (год, месяцы или даты)"),
+                    html.Li("Измените фильтры по статусам"),
+                    html.Li("Выберите другие цели или группы целей"),
+                    html.Li("Проверьте фильтры по типу пациентов (местные/иногородние)"),
+                    html.Li("Попробуйте другой тип отчёта")
+                ]),
+                html.P("Если проблема сохраняется, обратитесь к администратору.", className="mb-0")
+            ], color="info", className="mt-3")
+        ])
+
+    return html.Div([
+        dash_table.DataTable(
+            id=f"table-{type_page}-buildings",
             columns=[
                 {
                     "name": c["name"] if isinstance(c, dict) else c,
