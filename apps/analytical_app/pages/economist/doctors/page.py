@@ -52,7 +52,8 @@ def economist_doctors_talon_list_def():
         }
         for _, row in df_configs.iterrows()
     ]
-    default_config = config_options[0]["value"] if config_options else None
+    # По умолчанию не выбираем конфигурацию — пользователь может работать без неё
+    default_config = None
 
     return html.Div([
 
@@ -65,8 +66,9 @@ def economist_doctors_talon_list_def():
                         id=f"dropdown-config-{type_page}",
                         options=config_options,
                         value=default_config,
-                        clearable=False,
-                        style={"width": "300px", "flex": "0 0 auto"}
+                        placeholder="Выберите конфигурацию (необязательно)",
+                        clearable=True,
+                        style={"width": "360px", "flex": "0 0 auto"}
                     ),
                     dbc.Button(
                         "Показать все группы и цели",
@@ -96,6 +98,9 @@ def economist_doctors_talon_list_def():
             is_open=False,
             scrollable=True,
             backdrop=True,
+            placement="end",
+            className="shadow",
+            style={"maxWidth": "520px"},
         ),
         # Фильтры
         dbc.Card(
@@ -176,7 +181,7 @@ def economist_doctors_talon_list_def():
                 ], className="mb-3"),
 
             ])
-        ),
+        , className="mb-3 shadow-sm", style={"borderRadius": "8px"}),
 
         # Спиннер вокруг результата
         dcc.Loading(
@@ -237,7 +242,7 @@ def update_offcanvas_body(config_id):
 )
 def apply_config(config_id):
     if not config_id:
-        return [], None
+        return [], []
 
     df = load_configs()
     row = df[df["id"] == config_id].iloc[0]
@@ -250,8 +255,8 @@ def apply_config(config_id):
         {"label": grp, "value": grp}
         for grp in sorted(groups_dict.keys(), key=lambda x: x.lower())
     ]
-    # по умолчанию — первая группа
-    return grp_opts, (grp_opts[0]["value"] if grp_opts else None)
+    # По умолчанию выбираем все группы конфигурации
+    return grp_opts, [opt["value"] for opt in grp_opts]
 
 
 # 2) В зависимости от режима «Группы»/«Отдельные» наполняем дроп-целей
@@ -383,7 +388,8 @@ def update_table_doctors_goal(
         group_mapping = {}
         goals = indiv_goals
     else:
-        group_mapping = GOAL_GROUPS
+        # Если ничего не выбрано или режим индивидуальный без выбора — берём все цели БЕЗ применения групп конфигурации
+        group_mapping = {}
         with engine.connect() as conn:
             rows = conn.execute(text(
                 "SELECT DISTINCT goal FROM data_loader_omsdata WHERE goal IS NOT NULL AND goal <> '-'"

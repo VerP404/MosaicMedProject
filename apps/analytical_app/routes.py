@@ -7,7 +7,7 @@ from apps.analytical_app.pages.chief.main import chief_main
 from apps.analytical_app.pages.doctor.routes import routes_doctors
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.economist.doctor_stac.tab1 import economist_doctor_stac
-from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
+from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list_def
 from apps.analytical_app.pages.economist.indicators.page import econ_indicators
 from apps.analytical_app.pages.economist.main import economist_main
 from apps.analytical_app.pages.economist.stationary.page import economist_stationary
@@ -50,12 +50,12 @@ routes = {
         ]),
         economist_sv_pod
     ]),
-    "/economist/doctors": html.Div([
+    "/economist/doctors": lambda: html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Экономист", "href": "/economist"},
             {"label": "По врачам", "active": True},
         ]),
-        economist_doctors_talon_list
+        economist_doctors_talon_list_def()
     ]),
     "/economist/disp_by_ages": html.Div([
         dbc.Breadcrumb(items=[
@@ -219,12 +219,12 @@ routes = {
         ]),
         economist_sv_pod
     ]),
-    "/iszl/doctors": html.Div([
+    "/iszl/doctors": lambda: html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Главный врач", "href": "/iszl"},
             {"label": "Диспансеризация детей", "active": True},
         ]),
-        economist_doctors_talon_list
+        economist_doctors_talon_list_def()
     ]),
     "/iszl/disp_by_ages": html.Div([
         dbc.Breadcrumb(items=[
@@ -264,4 +264,8 @@ def register_routes(app):
         [Input('url', 'pathname')]
     )
     def display_page(pathname):
-        return routes.get(pathname, page_not_found(pathname))
+        view = routes.get(pathname)
+        if view is None:
+            return page_not_found(pathname)
+        # Если маршрут — функция, вызываем её для динамической генерации layout
+        return view() if callable(view) else view

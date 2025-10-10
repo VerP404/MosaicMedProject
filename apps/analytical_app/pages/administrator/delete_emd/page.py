@@ -18,6 +18,19 @@ from apps.analytical_app.app import app, DJANGO_API_BASE
 from flask import request
 
 
+def field_row(label_text, input_component, help_text, label_width=3, input_width=6, help_width=3):
+    return dbc.Row([
+        dbc.Col([
+            dbc.Label(label_text, className="fw-bold")
+        ], width=label_width),
+        dbc.Col([
+            input_component
+        ], width=input_width),
+        dbc.Col([
+            dbc.FormText(help_text, color="secondary")
+        ], width=help_width)
+    ], className="mb-3")
+
 def format_date_for_display(date_str):
     """Конвертирует дату из формата YYYY-MM-DD в DD.MM.YYYY"""
     if not date_str:
@@ -309,6 +322,20 @@ admin_delete_emd = dbc.Container([
                                html.Li("Будет сформирован DOCX по шаблону с таблицей: №, OID МО, OID документа, Дата создания, Дата регистрации, Номер в реестре РЭМД, Локальный идентификатор, Причина скрытия ЭМД, Номер документа взамен."),
                            ])
                        ], title="Экспорт приложения (DOCX)"),
+                       dbc.AccordionItem([
+                           html.P("Как получить данные из МИС «Квазар»:", className="mb-2 fw-bold"),
+                           html.Ol([
+                               html.Li(["Откройте ", html.B("МИС «Квазар»"), " → ", html.B("Журнал ЭМД"), "."]),
+                               html.Li(["Установите фильтр по ", html.B("Дате исходного документа"), ": укажите дату начала и окончания случая для удаления."]),
+                               html.Li(["Найдите все записи пациента, относящиеся к выбранному случаю (все документы)."]),
+                               html.Li(["Для каждой записи создайте ", html.B("заявку на удаление"), ": нажмите ‘➕ Создать заявку’ и заполните поля по инструкции."], className="mb-2"),
+                           ]),
+                           dbc.Alert(
+                               "Важно: в поле ‘Локальный идентификатор’ укажите имя XML-файла из выгрузки журнала ЭМД (при сохранении файла).",
+                               color="warning",
+                               className="mt-2"
+                           ),
+                       ], title="Как получить данные"),
                        
                    ], start_collapsed=True, always_open=False, className="mb-3")
                ])
@@ -414,111 +441,107 @@ admin_delete_emd = dbc.Container([
         dbc.ModalBody([
             dbc.Tabs([
                 dbc.Tab([
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("OID документа *"),
-                            dbc.Input(id="modal-oid-document", type="text", required=True),
-                            dbc.FormText("Первые цифры Номера в реестре РЭМД - до точки")
-                        ], width=6),
-                        dbc.Col([
-                            dbc.Label("Дата создания *"),
-                            dcc.DatePickerSingle(id="modal-creation-date", date=datetime.now().date(), display_format="DD.MM.YYYY")
-                        ], width=6)
-                    ], className="mb-3"),
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("Дата регистрации *"),
-                            dcc.DatePickerSingle(id="modal-registration-date", date=datetime.now().date(), display_format="DD.MM.YYYY")
-                        ], width=6),
-                        dbc.Col([
-                            dbc.Label("Номер в реестре РЭМД *"),
-                            dbc.Input(id="modal-reestr-number", type="text", required=True),
-                            dbc.FormText("Журнал ЭМД: Регистрационный номер")
-                        ], width=6)
-                    ], className="mb-3"),
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("Локальный идентификатор *"),
-                            dbc.Input(id="modal-local-identifier", type="text", required=True),
-                            dbc.FormText("Журнал ЭМД: имя xml-файла при сохранении, напр.: 3e765e5d-acfc-4e44-b834-7a876acbe40c")
-                        ], width=6),
-                        dbc.Col([
-                            dbc.Label("Причина аннулирования *"),
-                            dcc.Dropdown(id="modal-reason-dropdown", options=[])
-                        ], width=6)
-                    ], className="mb-3"),
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("Номер документа взамен"),
-                            dbc.Input(id="modal-document-number", type="text")
-                        ], width=6),
-                        dbc.Col([
-                            dbc.Label("Медицинская организация *"),
-                            dcc.Dropdown(id="modal-medical-org-dropdown", options=[])
-                        ], width=6)
-                    ], className="mb-3")
+                    field_row(
+                        "Номер в реестре РЭМД *",
+                        dbc.Input(id="modal-reestr-number", type="text", required=True),
+                        "Журнал ЭМД: Регистрационный номер"
+                    ),
+                    field_row(
+                        "OID документа *",
+                        dbc.Input(id="modal-oid-document", type="text", required=True),
+                        "Первые цифры из номера в реестре РЭМД — до точки"
+                    ),
+                    field_row(
+                        "Дата создания *",
+                        dcc.DatePickerSingle(id="modal-creation-date", date=datetime.now().date(), display_format="DD.MM.YYYY"),
+                        "Журнал ЭМД: Дата формирования ЭМД"
+                    ),
+                    field_row(
+                        "Дата регистрации *",
+                        dcc.DatePickerSingle(id="modal-registration-date", date=datetime.now().date(), display_format="DD.MM.YYYY"),
+                        "Журнал ЭМД: Дата отправки в РИР.РЭМД"
+                    ),
+
+                    field_row(
+                        "Локальный идентификатор *",
+                        dbc.Input(id="modal-local-identifier", type="text", required=True),
+                        "Журнал ЭМД: выгружаем XML-файл выбранных записей - имя XML-файл при сохранении, напр.: 3e765e5d-acfc-4e44-b834-7a876acbe40c"
+                    ),
+                    field_row(
+                        "Причина аннулирования *",
+                        dcc.Dropdown(id="modal-reason-dropdown", options=[]),
+                        "Выберите причину из справочника"
+                    ),
+                    field_row(
+                        "Номер документа взамен",
+                        dbc.Input(id="modal-document-number", type="text"),
+                        "Укажите номер документа, если есть"
+                    ),
+                    field_row(
+                        "Медицинская организация *",
+                        dcc.Dropdown(id="modal-medical-org-dropdown", options=[]),
+                        "Выберите организацию из списка"
+                    ),
                 ], label="Основная информация", tab_id="tab-basic"),
                 
                 dbc.Tab([
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("Пациент *"),
-                            dbc.Input(id="modal-patient", type="text", required=True)
-                        ], width=6),
-                        dbc.Col([
-                            dbc.Label("Дата рождения *"),
-                            dcc.DatePickerSingle(id="modal-date-of-birth", date=datetime.now().date(), display_format="DD.MM.YYYY")
-                        ], width=6)
-                    ], className="mb-3"),
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("ЕНП *"),
-                            dbc.Input(id="modal-enp", type="text", required=True)
-                        ], width=6),
-                        dbc.Col([
-                            dbc.Label("Цель ОМС *"),
-                            dbc.Input(id="modal-goal-input", type="text", required=True)
-                        ], width=6)
-                    ], className="mb-3"),
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("Окончание лечения *"),
-                            dcc.DatePickerSingle(id="modal-treatment-end", date=datetime.now().date(), display_format="DD.MM.YYYY")
-                        ], width=6),
-                        dbc.Col([
-                            dbc.Label("Ответственный *"),
-                            dbc.Input(id="modal-responsible-input", type="text", required=True),
-                            dbc.FormText("Текстовое поле: укажите ФИО ответственного")
-                        ], width=6)
-                    ], className="mb-3")
+                    field_row(
+                        "Пациент *",
+                        dbc.Input(id="modal-patient", type="text", required=True),
+                        "ФИО пациента по МИС"
+                    ),
+                    field_row(
+                        "Дата рождения *",
+                        dcc.DatePickerSingle(id="modal-date-of-birth", date=datetime.now().date(), display_format="DD.MM.YYYY"),
+                        "Дата рождения в формате ДД.ММ.ГГГГ"
+                    ),
+                    field_row(
+                        "ЕНП *",
+                        dbc.Input(id="modal-enp", type="text", required=True),
+                        "Единый номер полиса"
+                    ),
+                    field_row(
+                        "Цель ОМС *",
+                        dbc.Input(id="modal-goal-input", type="text", required=True),
+                        "Текст цели из талона ОМС"
+                    ),
+                    field_row(
+                        "Окончание лечения *",
+                        dcc.DatePickerSingle(id="modal-treatment-end", date=datetime.now().date(), display_format="DD.MM.YYYY"),
+                        "Дата окончания лечения из талона"
+                    ),
+                    field_row(
+                        "Ответственный *",
+                        dbc.Input(id="modal-responsible-input", type="text", required=True),
+                        "ФИО ответственного"
+                    ),
                 ], label="Данные пациента", tab_id="tab-patient"),
                 
                 dbc.Tab([
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("Статус *"),
-                            dcc.Dropdown(
-                                id="modal-status-dropdown",
-                                options=[
-                                    {"label": "Черновик", "value": "draft"},
-                                    {"label": "Отправлен", "value": "sent"},
-                                    {"label": "Обработан", "value": "processed"},
-                                    {"label": "Отклонен", "value": "rejected"}
-                                ],
-                                value="draft"
-                            )
-                        ], width=6),
-                        dbc.Col([
-                            dbc.Label("Дата отправки в МЗ"),
-                            dcc.DatePickerSingle(id="modal-sent-to-mz-date", date=None, display_format="DD.MM.YYYY")
-                        ], width=6)
-                    ], className="mb-3"),
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("Комментарий"),
-                            dbc.Textarea(id="modal-comment", placeholder="Дополнительные комментарии...")
-                        ], width=12)
-                    ], className="mb-3")
+                    field_row(
+                        "Статус *",
+                        dcc.Dropdown(
+                            id="modal-status-dropdown",
+                            options=[
+                                {"label": "Черновик", "value": "draft"},
+                                {"label": "Отправлен", "value": "sent"},
+                                {"label": "Обработан", "value": "processed"},
+                                {"label": "Отклонен", "value": "rejected"}
+                            ],
+                            value="draft"
+                        ),
+                        "Текущий этап обработки"
+                    ),
+                    field_row(
+                        "Дата отправки в МЗ",
+                        dcc.DatePickerSingle(id="modal-sent-to-mz-date", date=None, display_format="DD.MM.YYYY"),
+                        "Заполняется при отправке в МЗ"
+                    ),
+                    field_row(
+                        "Комментарий",
+                        dbc.Textarea(id="modal-comment", placeholder="Дополнительные комментарии..."),
+                        "Необязательное поле"
+                    ),
                 ], label="Управление", tab_id="tab-management")
             ])
         ]),
