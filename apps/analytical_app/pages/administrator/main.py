@@ -28,6 +28,16 @@ cards_row_1 = dbc.Row(
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
 
+# Вторая строка карточек
+cards_row_2 = dbc.Row(
+    [
+        dbc.Col(create_card(5, type_page,
+                            "Нежелательные события",
+                            "Аналитика по нежелательным событиям.")),
+    ],
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
+)
+
 # Основной layout
 admin_main = html.Div([
     dbc.Breadcrumb(
@@ -37,12 +47,13 @@ admin_main = html.Div([
     html.Hr(),
     dcc.Location(id=f'url-{type_page}', refresh=True),
     cards_row_1,
+    cards_row_2,
 ])
 
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 5)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 6)],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -57,7 +68,8 @@ def navigate_pages(*n_clicks):
         1: f"/{main_link}/gen_invoices",
         2: f"/{main_link}/admin_delete_emd",
         3: f"/{main_link}/admin_update_data",
-        4: f"/{main_link}/sql_editor"
+        4: f"/{main_link}/sql_editor",
+        5: f"/{main_link}/adverse_events",
     }
     
     return route_map[report_num]
