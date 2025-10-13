@@ -245,7 +245,11 @@ def build_tables(n_clicks, months_range, year, building_ids,
     # — Список карт —
     sql_list = f"""
         SELECT
-            COALESCE(emd.sending_status, 'нет ЭМД') AS sending_status,
+            CASE
+                WHEN emd.sending_status IS NULL OR emd.sending_status = '' THEN 'нет ЭМД'
+                WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
+                ELSE emd.sending_status
+            END AS sending_status,
             oms.talon,
             oms.source_id,
             oms.report_month,
@@ -274,7 +278,11 @@ def build_tables(n_clicks, months_range, year, building_ids,
     sql_buildings = f"""
         SELECT
             oms.building AS корпус,
-            COALESCE(emd.sending_status, 'нет ЭМД') AS sending_status,
+            CASE
+                WHEN emd.sending_status IS NULL OR emd.sending_status = '' THEN 'нет ЭМД'
+                WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
+                ELSE emd.sending_status
+            END AS sending_status,
             COUNT(*) FILTER (WHERE oms.goal='ДВ4') AS dv4,
             COUNT(*) FILTER (WHERE oms.goal='ДВ2') AS dv2,
             COUNT(*) FILTER (WHERE oms.goal='ОПВ') AS opv,
@@ -286,7 +294,12 @@ def build_tables(n_clicks, months_range, year, building_ids,
             ON oms.source_id = emd.original_epmz_id
             AND emd.document_type = 'Эпикриз по результатам диспансеризации/профилактического медицинского осмотра'
         {base_where}
-        GROUP BY oms.building, COALESCE(emd.sending_status, 'нет ЭМД')
+        GROUP BY oms.building,
+                 CASE
+                    WHEN emd.sending_status IS NULL OR emd.sending_status = '' THEN 'нет ЭМД'
+                    WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
+                    ELSE emd.sending_status
+                 END
         ORDER BY oms.building, sending_status
     """
 
@@ -297,7 +310,11 @@ def build_tables(n_clicks, months_range, year, building_ids,
         SELECT
             oms.building AS корпус,
             oms.doctor AS врач,
-            COALESCE(emd.sending_status, 'нет ЭМД') AS sending_status,
+            CASE
+                WHEN emd.sending_status IS NULL OR emd.sending_status = '' THEN 'нет ЭМД'
+                WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
+                ELSE emd.sending_status
+            END AS sending_status,
             COUNT(*) FILTER (WHERE oms.goal='ДВ4') AS dv4,
             COUNT(*) FILTER (WHERE oms.goal='ДВ2') AS dv2,
             COUNT(*) FILTER (WHERE oms.goal='ОПВ') AS opv,
@@ -309,7 +326,12 @@ def build_tables(n_clicks, months_range, year, building_ids,
             ON oms.source_id = emd.original_epmz_id
             AND emd.document_type = 'Эпикриз по результатам диспансеризации/профилактического медицинского осмотра'
         {base_where}
-        GROUP BY oms.building, oms.doctor, COALESCE(emd.sending_status, 'нет ЭМД')
+        GROUP BY oms.building, oms.doctor,
+                 CASE
+                    WHEN emd.sending_status IS NULL OR emd.sending_status = '' THEN 'нет ЭМД'
+                    WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
+                    ELSE emd.sending_status
+                 END
         ORDER BY oms.building, oms.doctor, sending_status
     """
 
