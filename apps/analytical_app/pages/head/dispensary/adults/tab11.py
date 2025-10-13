@@ -231,16 +231,20 @@ def build_tables(n_clicks, months_range, year, building_ids,
     elif emd_presence == "without":
         emd_filter_sql = " AND emd.sending_status IS NULL"
 
-    # Общие фильтры
-    base_where = f"""
+    # Базовые условия (общие для всех)
+    where_common = f"""
         WHERE
             oms.report_year = {int(year)}
             AND oms.report_month BETWEEN {m1} AND {m2}
             AND oms.goal IN ('ДВ4','ДВ2','ОПВ','УД1','УД2')
             AND oms.status IN ({statuses_list})
             {buildings_filter_sql}
-            {emd_filter_sql}
     """
+
+    # Для вкладки "Список" учитываем выбранный фильтр наличия ЭМД
+    base_where_list = where_common + (f"\n            {emd_filter_sql}\n" if emd_filter_sql else "")
+    # Для вкладки "Сводная" также учитываем фильтр наличия ЭМД
+    base_where_summary = where_common + (f"\n            {emd_filter_sql}\n" if emd_filter_sql else "")
 
     # — Список карт —
     sql_list = f"""
@@ -268,7 +272,7 @@ def build_tables(n_clicks, months_range, year, building_ids,
         LEFT JOIN load_data_emd emd
             ON oms.source_id = emd.original_epmz_id
             AND emd.document_type = 'Эпикриз по результатам диспансеризации/профилактического медицинского осмотра'
-        {base_where}
+        {base_where_list}
         ORDER BY oms.building, oms.doctor, oms.report_month, oms.talon
     """
 
@@ -293,7 +297,7 @@ def build_tables(n_clicks, months_range, year, building_ids,
         LEFT JOIN load_data_emd emd
             ON oms.source_id = emd.original_epmz_id
             AND emd.document_type = 'Эпикриз по результатам диспансеризации/профилактического медицинского осмотра'
-        {base_where}
+        {base_where_summary}
         GROUP BY oms.building,
                  CASE
                     WHEN emd.sending_status IS NULL OR emd.sending_status = '' THEN 'нет ЭМД'
@@ -325,7 +329,7 @@ def build_tables(n_clicks, months_range, year, building_ids,
         LEFT JOIN load_data_emd emd
             ON oms.source_id = emd.original_epmz_id
             AND emd.document_type = 'Эпикриз по результатам диспансеризации/профилактического медицинского осмотра'
-        {base_where}
+        {base_where_summary}
         GROUP BY oms.building, oms.doctor,
                  CASE
                     WHEN emd.sending_status IS NULL OR emd.sending_status = '' THEN 'нет ЭМД'
@@ -358,7 +362,7 @@ def build_tables(n_clicks, months_range, year, building_ids,
         LEFT JOIN load_data_emd emd
             ON oms.source_id = emd.original_epmz_id
             AND emd.document_type = 'Эпикриз по результатам диспансеризации/профилактического медицинского осмотра'
-        {base_where}
+        {where_common}
         GROUP BY oms.building
         ORDER BY oms.building
     """
@@ -383,7 +387,7 @@ def build_tables(n_clicks, months_range, year, building_ids,
         LEFT JOIN load_data_emd emd
             ON oms.source_id = emd.original_epmz_id
             AND emd.document_type = 'Эпикриз по результатам диспансеризации/профилактического медицинского осмотра'
-        {base_where}
+        {where_common}
         GROUP BY oms.building, oms.doctor
         ORDER BY oms.building, oms.doctor
     """
