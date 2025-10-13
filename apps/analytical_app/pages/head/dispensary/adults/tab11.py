@@ -46,7 +46,7 @@ adults_dv11 = html.Div(
                                     dbc.Col(
                                         html.Div([
                                             html.Label("Наличие ЭМД", style={"font-weight": "bold"}),
-                                            dcc.RadioItems(
+                                            dbc.RadioItems(
                                                 id=f"emd-presence-{type_page}",
                                                 options=[
                                                     {"label": "Все", "value": "all"},
@@ -55,6 +55,7 @@ adults_dv11 = html.Div(
                                                 ],
                                                 value="all",
                                                 inline=True,
+                                                className="mt-1"
                                             )
                                         ]),
                                         width=6,
@@ -100,10 +101,15 @@ adults_dv11 = html.Div(
                                     dcc.Loading(id=f"loading-list-{type_page}", type="default"),
                                     card_table(f"result-table-list-{type_page}", "Список карт (ОМС + ЭМД)")
                                 ]),
-                                dcc.Tab(label="Анализ", value="analysis", children=[
+                                dcc.Tab(label="Сводная", value="summary", children=[
                                     dcc.Loading(id=f"loading-analysis-{type_page}", type="default"),
                                     card_table(f"result-table-buildings-{type_page}", "Статистика по корпусам"),
                                     card_table(f"result-table-doctors-{type_page}", "Статистика по врачам (разбивка по целям и статусу ЭМД)")
+                                ]),
+                                dcc.Tab(label="Анализ", value="analysis", children=[
+                                    dcc.Loading(id=f"loading-analysis2-{type_page}", type="default"),
+                                    card_table(f"result-table-analysis-buildings-{type_page}", "Анализ по корпусам (с/без ЭМД по целям и итоги)"),
+                                    card_table(f"result-table-analysis-doctors-{type_page}", "Анализ по врачам (с/без ЭМД по целям и итоги)")
                                 ]),
                             ])
                         ]
@@ -161,6 +167,11 @@ def show_period(months, year):
         Output(f'result-table-doctors-{type_page}', 'data'),
         Output(f'loading-list-{type_page}', 'children'),
         Output(f'loading-analysis-{type_page}', 'children'),
+        Output(f'result-table-analysis-buildings-{type_page}', 'columns'),
+        Output(f'result-table-analysis-buildings-{type_page}', 'data'),
+        Output(f'result-table-analysis-doctors-{type_page}', 'columns'),
+        Output(f'result-table-analysis-doctors-{type_page}', 'data'),
+        Output(f'loading-analysis2-{type_page}', 'children'),
     ],
     [Input(f'update-button-{type_page}', 'n_clicks')],
     [
@@ -196,12 +207,19 @@ def build_tables(n_clicks, months_range, year, building_ids,
     if building_ids:
         if not isinstance(building_ids, list):
             building_ids = [building_ids]
-        with engine.connect() as conn:
-            rows = conn.execute(
-                text("SELECT name FROM organization_building WHERE id = ANY(:ids)"),
-                {"ids": building_ids}
-            ).fetchall()
-        building_names = [r[0] for r in rows]
+        # Приводим к целым и убираем нечисловые
+        try:
+            building_ids = [int(b) for b in building_ids if str(b).isdigit()]
+        except Exception:
+            building_ids = []
+        building_names = []
+        if building_ids:
+            ids_csv = ", ".join(map(str, building_ids))
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    text(f"SELECT name FROM organization_building WHERE id IN ({ids_csv})")
+                ).fetchall()
+            building_names = [r[0] for r in rows]
         if building_names:
             buildings_list = ", ".join(f"'{b}'" for b in building_names)
             buildings_filter_sql = f" AND oms.building IN ({buildings_list})"
@@ -298,9 +316,67 @@ def build_tables(n_clicks, months_range, year, building_ids,
     columns_doc, data_doc = TableUpdater.query_to_df(engine, sql_doctors)
 
     loading_dummy = html.Div([dcc.Loading(type="default")])
+    # — Новый Анализ: с/без ЭМД по целям и итоги —
+    sql_analysis_buildings = f"""
+        SELECT
+            oms.building AS корпус,
+            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS dv4_emd,
+            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NULL) AS dv4_no_emd,
+            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS dv2_emd,
+            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NULL) AS dv2_no_emd,
+            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS opv_emd,
+            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NULL) AS opv_no_emd,
+            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS ud1_emd,
+            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NULL) AS ud1_no_emd,
+            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS ud2_emd,
+            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NULL) AS ud2_no_emd,
+            COUNT(*) FILTER (WHERE emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS всего_с_эмд,
+            COUNT(*) FILTER (WHERE emd.sending_status IS NULL) AS всего_без_эмд
+        FROM load_data_oms_data oms
+        LEFT JOIN load_data_emd emd
+            ON oms.source_id = emd.original_epmz_id
+            AND emd.document_type = 'Эпикриз по результатам диспансеризации/профилактического медицинского осмотра'
+        {base_where}
+        GROUP BY oms.building
+        ORDER BY oms.building
+    """
+
+    sql_analysis_doctors = f"""
+        SELECT
+            oms.building AS корпус,
+            oms.doctor AS врач,
+            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS dv4_emd,
+            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NULL) AS dv4_no_emd,
+            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS dv2_emd,
+            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NULL) AS dv2_no_emd,
+            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS opv_emd,
+            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NULL) AS opv_no_emd,
+            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS ud1_emd,
+            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NULL) AS ud1_no_emd,
+            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS ud2_emd,
+            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NULL) AS ud2_no_emd,
+            COUNT(*) FILTER (WHERE emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS всего_с_эмд,
+            COUNT(*) FILTER (WHERE emd.sending_status IS NULL) AS всего_без_эмд
+        FROM load_data_oms_data oms
+        LEFT JOIN load_data_emd emd
+            ON oms.source_id = emd.original_epmz_id
+            AND emd.document_type = 'Эпикриз по результатам диспансеризации/профилактического медицинского осмотра'
+        {base_where}
+        GROUP BY oms.building, oms.doctor
+        ORDER BY oms.building, oms.doctor
+    """
+
+    columns_an_bld, data_an_bld = TableUpdater.query_to_df(engine, sql_analysis_buildings)
+    columns_an_doc, data_an_doc = TableUpdater.query_to_df(engine, sql_analysis_doctors)
+
+    loading_dummy2 = html.Div([dcc.Loading(type="default")])
+
     return (columns_list, data_list,
             columns_bld, data_bld,
             columns_doc, data_doc,
-            loading_dummy, loading_dummy)
+            loading_dummy, loading_dummy,
+            columns_an_bld, data_an_bld,
+            columns_an_doc, data_an_doc,
+            loading_dummy2)
 
 
