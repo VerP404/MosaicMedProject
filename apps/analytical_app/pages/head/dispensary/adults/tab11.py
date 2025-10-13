@@ -99,17 +99,17 @@ adults_dv11 = html.Div(
                             dcc.Tabs(id=f"tabs-{type_page}", value="list", children=[
                                 dcc.Tab(label="Список карт", value="list", children=[
                                     dcc.Loading(id=f"loading-list-{type_page}", type="default"),
-                                    card_table(f"result-table-list-{type_page}", "Список карт (ОМС + ЭМД)")
+                                    card_table(f"result-table-list-{type_page}", "Список карт (ОМС + ЭМД)", page_size=10)
                                 ]),
                                 dcc.Tab(label="Сводная", value="summary", children=[
                                     dcc.Loading(id=f"loading-analysis-{type_page}", type="default"),
                                     card_table(f"result-table-buildings-{type_page}", "Статистика по корпусам"),
-                                    card_table(f"result-table-doctors-{type_page}", "Статистика по врачам (разбивка по целям и статусу ЭМД)")
+                                    card_table(f"result-table-doctors-{type_page}", "Статистика по врачам (разбивка по целям и статусу ЭМД)", page_size=10)
                                 ]),
                                 dcc.Tab(label="Анализ", value="analysis", children=[
                                     dcc.Loading(id=f"loading-analysis2-{type_page}", type="default"),
                                     card_table(f"result-table-analysis-buildings-{type_page}", "Анализ по корпусам (с/без ЭМД по целям и итоги)"),
-                                    card_table(f"result-table-analysis-doctors-{type_page}", "Анализ по врачам (с/без ЭМД по целям и итоги)")
+                                    card_table(f"result-table-analysis-doctors-{type_page}", "Анализ по врачам (с/без ЭМД по целям и итоги)", page_size=10)
                                 ]),
                             ])
                         ]
