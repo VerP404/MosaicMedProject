@@ -7,9 +7,22 @@ import fnmatch
 from dagster import sensor, RunRequest, SkipReason
 
 from config.settings import ORGANIZATIONS
-from mosaic_conductor.etl.kvazar import kvazar_job_eln, kvazar_job_emd, kvazar_job_recipes, kvazar_job_death, \
-    kvazar_job_reference, iszl_job_dn, wo_old_job_talon, wo_old_job_doctors, wo_job_talon, wo_job_doctors, \
-    wo_job_detailed, iszl_job_dn_work, wo_job_errorlog
+from mosaic_conductor.etl.kvazar import (
+    kvazar_job_eln,
+    kvazar_job_emd,
+    kvazar_job_recipes,
+    kvazar_job_death,
+    kvazar_job_reference,
+    iszl_job_dn,
+    wo_old_job_talon,
+    wo_old_job_doctors,
+    wo_job_talon,
+    wo_job_doctors,
+    wo_job_detailed,
+    iszl_job_dn_work,
+    wo_job_errorlog,
+    kvazar_job_load_journal_appeals,
+)
 
 MIN_FILE_AGE_SECONDS = 30
 
@@ -198,6 +211,70 @@ kvazar_sensor_reference = create_sensor(
     "mosaic_conductor/etl/config/mapping.json"
 )
 
+
+@sensor(job=kvazar_job_load_journal_appeals, name="kvazar_sensor_journal_appeals", description="Квазар: Журнал обращений (CSV управление)")
+def kvazar_sensor_journal_appeals(context):
+    directory = "mosaic_conductor/etl/data/kvazar/appeals"
+    if not os.path.exists(directory):
+        context.log.info(f"Папка {directory} не найдена")
+        yield SkipReason("Папка не найдена")
+        return
+
+    files = [os.path.join(directory, f) for f in os.listdir(directory) if f.lower().endswith(".csv")]
+    if not files:
+        context.log.info(f"CSV в {directory} не найдено")
+        yield SkipReason("Нет CSV для загрузки")
+        return
+
+    state = _load_state(context)
+    now = time.time()
+    new_state = state.copy()
+
+    for path in files:
+        file_name = os.path.basename(path)
+        age = now - os.path.getmtime(path)
+        size = os.path.getsize(path)
+
+        if age < MIN_FILE_AGE_SECONDS:
+            context.log.info(f"Файл {file_name} слишком свежий ({age:.0f} сек.)")
+            continue
+
+        previous = state.get(file_name)
+        if previous and previous.get("size") == size:
+            run_key = previous.get("run_key")
+            runs = context.instance.get_runs()
+            matching = next((r for r in runs if r.tags.get("dagster/run_key") == run_key), None)
+            if matching:
+                if matching.is_success:
+                    try:
+                        os.remove(path)
+                        context.log.info(f"Файл {file_name} удалён после успешной загрузки")
+                    except OSError as exc:
+                        context.log.error(f"Не удалось удалить {path}: {exc}")
+                    new_state.pop(file_name, None)
+                elif matching.is_finished:
+                    context.log.warning(f"Запуск с run_key={run_key} завершён неуспешно, файл {file_name} остаётся")
+                else:
+                    context.log.info(f"Файл {file_name} уже обрабатывается, пропуск")
+                continue
+            else:
+                context.log.warning(f"Run для файла {file_name} не найден, инициализируем повторно")
+
+        run_key = f"{file_name}-{size}"
+        new_state[file_name] = {"size": size, "run_key": run_key}
+        yield RunRequest(
+            run_key=run_key,
+            run_config={
+                "ops": {
+                    "load_journal_appeals_op": {
+                        "config": {"csv_path": path}
+                    }
+                }
+            }
+        )
+
+    _save_state(context, new_state)
+
 iszl_sensor_dn = create_sensor(
     iszl_job_dn,
     "iszl_sensor_dn",
@@ -281,5 +358,6 @@ kvazar_sensors = [
     wo_sensor_talon,
     wo_sensor_doctors,
     wo_sensor_detailed,
-    wo_sensor_errorlog
+    wo_sensor_errorlog,
+    kvazar_sensor_journal_appeals
 ]

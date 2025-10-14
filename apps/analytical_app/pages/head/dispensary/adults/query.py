@@ -192,3 +192,110 @@ COALESCE(SUM(1) FILTER(WHERE mon = 1 AND sending_status = 'Документ ус
     GROUP BY doctor, branch
     ORDER BY doctor, branch
     """
+
+
+def sql_query_adults_appointments_not_passed(selected_year: int, visit_start_date: str, visit_end_date: str, exclude_departments: list[str] | None = None) -> str:
+    """
+    Пациенты 18+ по состоянию на выбранный год, которые записаны на прием (журнал обращений)
+    в интервале дат, но НЕ имеют в load_data_oms_data целей 'ДВ4' или 'ОПВ' в указанном отчетном году.
+
+    :param selected_year: Год отчета (int)
+    :param visit_start_date: Дата начала (YYYY-MM-DD)
+    :param visit_end_date: Дата окончания (YYYY-MM-DD)
+    """
+    # Исключение подразделений
+    exclude_clause = ""
+    if exclude_departments:
+        safe_vals = [str(v).replace("'", "''") for v in exclude_departments if isinstance(v, str) and v.strip()]
+        if safe_vals:
+            exclude_clause = " AND ap.department NOT IN (" + ", ".join([f"'{v}'" for v in safe_vals]) + ")"
+
+    return f"""
+WITH appointments AS (
+    SELECT
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        phone,
+        employee_last_name,
+        employee_first_name,
+        employee_middle_name,
+        position,
+        department,
+        schedule_type,
+        record_source,
+        no_show,
+        epmz,
+        COALESCE(
+          /* ISO: YYYY-MM-DD[...]; берём дату */
+          CASE WHEN acceptance_date LIKE '____-__-__%'
+               THEN to_date(SUBSTRING(acceptance_date FROM 1 FOR 10), 'YYYY-MM-DD')::timestamp END,
+          /* RU: DD.MM.YYYY HH:MI; обрезаем до минут */
+          CASE WHEN acceptance_date LIKE '__.__.____%'
+               THEN to_timestamp(SUBSTRING(acceptance_date FROM 1 FOR 16), 'DD.MM.YYYY HH24:MI') END,
+          /* ISO в record_date */
+          CASE WHEN record_date LIKE '____-__-__%'
+               THEN to_date(SUBSTRING(record_date FROM 1 FOR 10), 'YYYY-MM-DD')::timestamp END,
+          /* RU в record_date */
+          CASE WHEN record_date LIKE '__.__.____%'
+               THEN to_date(SUBSTRING(record_date FROM 1 FOR 10), 'DD.MM.YYYY')::timestamp END
+        ) AS appointment_ts,
+        COALESCE(
+          CASE WHEN acceptance_date LIKE '____-__-__T__:%' THEN SUBSTRING(acceptance_date FROM 12 FOR 5) END,
+          CASE WHEN acceptance_date LIKE '____-__-__ __:__%' THEN SUBSTRING(acceptance_date FROM 12 FOR 5) END,
+          CASE WHEN acceptance_date LIKE '__.__.____ __:__%' THEN SUBSTRING(acceptance_date FROM 12 FOR 5) END,
+          CASE WHEN record_date    LIKE '____-__-__T__:%' THEN SUBSTRING(record_date FROM 12 FOR 5) END,
+          CASE WHEN record_date    LIKE '____-__-__ __:__%' THEN SUBSTRING(record_date FROM 12 FOR 5) END,
+          CASE WHEN record_date    LIKE '__.__.____ __:__%' THEN SUBSTRING(record_date FROM 12 FOR 5) END
+        ) AS appointment_time_txt
+    FROM load_data_journal_appeals
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+),
+apps AS (
+    SELECT *
+    FROM appointments
+    WHERE appointment_ts::date BETWEEN DATE '{visit_start_date}' AND DATE '{visit_end_date}'
+),
+adults AS (
+    SELECT
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        fio,
+        dr,
+        lpuuch,
+        COALESCE(
+          CASE WHEN dr ~ '^[0-9]{{2}}[.][0-9]{{2}}[.][0-9]{{4}}' THEN to_date(dr, 'DD.MM.YYYY') END,
+          CASE WHEN dr ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' THEN to_date(dr, 'YYYY-MM-DD') END
+        ) AS dr_date,
+        DATE_PART('year', AGE(make_date({selected_year}, 12, 31), COALESCE(
+          CASE WHEN dr ~ '^[0-9]{{2}}[.][0-9]{{2}}[.][0-9]{{4}}' THEN to_date(dr, 'DD.MM.YYYY') END,
+          CASE WHEN dr ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' THEN to_date(dr, 'YYYY-MM-DD') END
+        )))::INT AS age_years
+    FROM data_loader_iszlpeople
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+)
+SELECT
+    a.fio AS "ФИО",
+    a.dr AS "ДР",
+    a.enp_norm AS "ЕНП",
+    a.lpuuch AS "Участок",
+    a.age_years AS "Возраст",
+    CASE WHEN a.age_years IN (19,20,22,23,25,26,28,29,31,32,34,35,37,38) THEN 'ОПВ' ELSE 'ДВ4' END AS "Тип",
+    ap.phone AS "Телефон",
+    to_char(ap.appointment_ts::date, 'YYYY-MM-DD') AS "Дата приема",
+    COALESCE(ap.appointment_time_txt, '') AS "Время приема",
+    (ap.employee_last_name || ' ' || ap.employee_first_name || ' ' || ap.employee_middle_name) AS "Сотрудник",
+    ap.position AS "Должность",
+    ap.department AS "Подразделение",
+    ap.record_source AS "Источник",
+    ap.schedule_type AS "Тип расписания"
+FROM adults a
+JOIN apps ap ON a.enp_norm = ap.enp_norm
+WHERE a.age_years >= 18
+  AND NOT EXISTS (
+        SELECT 1
+        FROM load_data_oms_data o
+        WHERE regexp_replace(o.enp, '\\D', '', 'g') = a.enp_norm
+          AND o.goal IN ('ДВ4', 'ОПВ')
+          AND o.report_year = {selected_year}
+    )
+{"" if not exclude_clause else exclude_clause}
+ORDER BY ap.appointment_ts DESC, a.lpuuch, a.fio
+    """

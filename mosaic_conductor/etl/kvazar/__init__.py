@@ -1,6 +1,11 @@
+import os
+import shlex
+import subprocess
+import sys
+import time
 from typing import Optional, Callable
 
-from dagster import job, graph, in_process_executor
+from dagster import job, graph, in_process_executor, op, Failure
 
 from config.settings import ORGANIZATIONS
 from .db_check import kvazar_db_check
@@ -193,6 +198,94 @@ wo_job_journal_appeals = create_etl_job(
     "kvazar/journal_appeals",
     "mapping.json",
 )
+
+
+@op(config_schema={"csv_path": str})
+def load_journal_appeals_op(context):
+    csv_path = context.op_config["csv_path"]
+    csv_path = os.path.abspath(csv_path)
+    manage_py = os.path.join(os.getcwd(), "manage.py")
+    python_spec = os.environ.get("DJANGO_PYTHON_BIN")
+    python_cmd = shlex.split(python_spec) if python_spec else [sys.executable]
+
+    if not os.path.exists(csv_path):
+        raise Failure(f"CSV файл не найден: {csv_path}")
+    if not os.path.exists(manage_py):
+        raise Failure("manage.py не найден — запуск load_journal_appeals невозможен")
+
+    cmd = [
+        *python_cmd,
+        manage_py,
+        "load_journal_appeals",
+        f"--file={csv_path}",
+        "--encoding=utf-8-sig",
+        "--delimiter=;",
+    ]
+
+    context.log.info(f"Запуск команды: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        context.log.error(result.stdout)
+        context.log.error(result.stderr)
+        # Перемещаем файл в папку errors с сохранением ошибки
+        error_dir = os.path.join(os.path.dirname(csv_path), "errors")
+        os.makedirs(error_dir, exist_ok=True)
+        
+        file_name = os.path.basename(csv_path)
+        name, ext = os.path.splitext(file_name)
+        timestamp = int(time.time())
+        error_file = os.path.join(error_dir, f"{name}_{timestamp}_error{ext}")
+        error_txt = os.path.join(error_dir, f"{name}_{timestamp}_error.txt")
+        
+        try:
+            # Перемещаем CSV файл
+            os.rename(csv_path, error_file)
+            context.log.info(f"Файл {file_name} перемещён в {error_file}")
+            
+            # Создаём файл с ошибкой
+            with open(error_txt, "w", encoding="utf-8") as f:
+                f.write(f"Ошибка загрузки файла: {file_name}\n")
+                f.write(f"Время: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Код возврата: {result.returncode}\n\n")
+                f.write("STDOUT:\n")
+                f.write(result.stdout)
+                f.write("\n\nSTDERR:\n")
+                f.write(result.stderr)
+            
+            context.log.info(f"Создан файл с ошибкой: {error_txt}")
+            
+        except OSError as exc:
+            context.log.error(f"Не удалось переместить файл в папку ошибок: {exc}")
+        
+        raise Failure(
+            description="Команда load_journal_appeals завершилась с ошибкой",
+            metadata={
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "return_code": result.returncode,
+                "error_file": error_file,
+                "error_txt": error_txt,
+            }
+        )
+
+    context.log.info(result.stdout)
+
+    try:
+        os.remove(csv_path)
+        context.log.info(f"Файл {csv_path} удалён после успешной загрузки")
+    except FileNotFoundError:
+        context.log.warning(f"Файл {csv_path} отсутствует при удалении — возможно, удалён вне процесса")
+    except OSError as exc:
+        context.log.error(f"Не удалось удалить файл {csv_path}: {exc}")
+        raise Failure(f"Не удалось удалить файл {csv_path}: {exc}")
+
+    return "ok"
+
+
+@job(name="kvazar_job_load_journal_appeals")
+def kvazar_job_load_journal_appeals():
+    load_journal_appeals_op()
 kvazar_jobs = [
     kvazar_job_eln,
     kvazar_job_emd,
@@ -208,5 +301,6 @@ kvazar_jobs = [
     wo_job_talon,
     wo_job_detailed,
     wo_job_errorlog,
-    wo_job_journal_appeals
+    wo_job_journal_appeals,
+    kvazar_job_load_journal_appeals
 ]

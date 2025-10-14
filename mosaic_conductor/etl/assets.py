@@ -1,12 +1,15 @@
 import dagster as dg
+import os
+import shlex
+import subprocess
+import sys
+
+import pandas as pd
 
 from mosaic_conductor.etl.kvazar import kvazar_assets, kvazar_jobs
 from mosaic_conductor.etl.kvazar.sensor import kvazar_sensors
 from mosaic_conductor.etl.common.connect_db import connect_to_db
 from dagster import asset, AssetIn, Output, OpExecutionContext
-import pandas as pd
-import os
-import subprocess
 
 all_sensors = kvazar_sensors
 all_assets = kvazar_assets
@@ -44,8 +47,13 @@ def iszl_people_sync(context: OpExecutionContext, csv_path: str) -> Output[str]:
     manage_py = os.path.join(os.getcwd(), "manage.py")
     if not os.path.exists(manage_py):
         raise FileNotFoundError("manage.py не найден — запуск команды невозможен")
+    python_env = os.environ.get("DJANGO_PYTHON_BIN")
+    if python_env:
+        python_cmd = shlex.split(python_env)
+    else:
+        python_cmd = [sys.executable]
     cmd = [
-        "python",
+        *python_cmd,
         manage_py,
         "sync_iszl_people",
         f"--file={csv_path}",

@@ -10,6 +10,7 @@ from apps.analytical_app.pages.head.dispensary.adults.tab3 import adults_dv3
 from apps.analytical_app.pages.head.dispensary.adults.tab8 import adults_dv8
 from apps.analytical_app.pages.head.dispensary.adults.tab9 import adults_dv9
 from apps.analytical_app.pages.head.dispensary.adults.tab11 import adults_dv11
+from apps.analytical_app.pages.head.dispensary.adults.tab12 import adults_dv12
 from apps.analytical_app.pages.head.dispensary.children.main import head_children_dd_main
 from apps.analytical_app.pages.head.dispensary.children.tab1 import children_dn1
 from apps.analytical_app.pages.head.dispensary.children.tab2 import children_dn2
@@ -116,6 +117,14 @@ routes_head = {
             {"label": "Анализ карт на формирование ЭМД", "active": True},
         ]),
         adults_dv11
+    ]),
+    "/head/adults/dv12": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансеризация взрослых", "href": "/head/adults"},
+            {"label": "Записаны, но не прошли", "active": True},
+        ]),
+        adults_dv12
     ]),
     "/head/children": html.Div([
         dbc.Breadcrumb(items=[
