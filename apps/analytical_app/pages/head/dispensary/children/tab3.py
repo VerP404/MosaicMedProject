@@ -145,10 +145,14 @@ def update_table_details(active_cell, viewport_data):
             if r is not None and isinstance(r, int) and 0 <= r < len(viewport_data):
                 row = viewport_data[r]
                 uchastok = row.get('Участок')
-                if c is not None and c not in ('Участок', 'Всего') and isinstance(c, str) and c.isdigit():
-                    age = int(c)
-                    query_details = sql_query_children_list_not_pn1_details_by_uchastok_age(uchastok, age)
-                    columns3, data3 = TableUpdater.query_to_df(engine, query_details)
+                if c is not None and isinstance(c, str):
+                    if c == 'Всего':
+                        query_details = sql_query_children_list_not_pn1_details_by_uchastok_age(uchastok, None)
+                        columns3, data3 = TableUpdater.query_to_df(engine, query_details)
+                    elif c not in ('Участок',) and c.isdigit():
+                        age = int(c)
+                        query_details = sql_query_children_list_not_pn1_details_by_uchastok_age(uchastok, age)
+                        columns3, data3 = TableUpdater.query_to_df(engine, query_details)
         except Exception:
             columns3, data3 = [], []
     return columns3, data3, loading_output

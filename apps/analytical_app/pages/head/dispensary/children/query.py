@@ -318,9 +318,11 @@ ORDER BY n.lpuuch
 """
 
 
-def sql_query_children_list_not_pn1_details_by_uchastok_age(uchastok: str, age_years: int) -> str:
+def sql_query_children_list_not_pn1_details_by_uchastok_age(uchastok: str, age_years=None) -> str:
     safe_uch = str(uchastok).replace("'", "''")
-    safe_age = int(age_years)
+    age_filter = ""
+    if age_years is not None and str(age_years).isdigit():
+        age_filter = f"\n  AND DATE_PART('year', AGE(CURRENT_DATE, n.dr_date))::INT = {int(age_years)}"
     return f"""
 WITH talon AS (
     SELECT
@@ -368,7 +370,7 @@ FROM naselenie n
 LEFT JOIN talon o ON n.enp = o.enp
 WHERE COALESCE(o.has_pn1, 0) = 0
   AND n.lpuuch = '{safe_uch}'
-  AND DATE_PART('year', AGE(CURRENT_DATE, n.dr_date))::INT = {safe_age}
+  {age_filter}
 ORDER BY n.fio
     """
 
