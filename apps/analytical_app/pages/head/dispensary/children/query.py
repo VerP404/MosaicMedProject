@@ -194,8 +194,7 @@ age_requirements AS (
     ]) AS required_age_months
 ),
 naselenie AS (
-    SELECT
-        DISTINCT
+    SELECT DISTINCT ON (enp)
         fio,
         dr,
         CAST(dr AS DATE) AS dr_date,
@@ -237,6 +236,7 @@ naselenie AS (
     FROM data_loader_iszlpeople
     WHERE CAST(dr AS DATE) <= CURRENT_DATE
       AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
+    ORDER BY enp, CAST(dr AS DATE) DESC
 )
 SELECT
     n.fio as "ФИО",
@@ -264,7 +264,8 @@ CAST(
     ) AS text
 ) AS "План осмотров на сегодня"
 FROM naselenie n
-LEFT JOIN talon o ON n.enp = o.enp;
+LEFT JOIN talon o ON n.enp = o.enp
+WHERE COALESCE(o.has_pn1, 0) = 0;
 
 """
 
