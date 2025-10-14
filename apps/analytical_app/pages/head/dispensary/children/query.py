@@ -270,6 +270,109 @@ WHERE COALESCE(o.has_pn1, 0) = 0;
 """
 
 
+query_children_list_not_pn1_summary_by_uchastok = """
+WITH talon AS (
+    SELECT
+        enp,
+        MAX(CASE WHEN goal = 'ПН1' THEN 1 ELSE 0 END) AS has_pn1
+    FROM data_loader_omsdata
+    WHERE goal IN ('ПН1')
+    GROUP BY enp
+),
+naselenie AS (
+    SELECT DISTINCT ON (enp)
+        enp,
+        lpuuch,
+        DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE)))::INT AS age_years
+    FROM data_loader_iszlpeople
+    WHERE CAST(dr AS DATE) <= CURRENT_DATE
+      AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
+    ORDER BY enp, CAST(dr AS DATE) DESC
+)
+SELECT
+    n.lpuuch AS "Участок",
+    COUNT(*) AS "Всего",
+    SUM(CASE WHEN n.age_years = 0 THEN 1 ELSE 0 END) AS "0",
+    SUM(CASE WHEN n.age_years = 1 THEN 1 ELSE 0 END) AS "1",
+    SUM(CASE WHEN n.age_years = 2 THEN 1 ELSE 0 END) AS "2",
+    SUM(CASE WHEN n.age_years = 3 THEN 1 ELSE 0 END) AS "3",
+    SUM(CASE WHEN n.age_years = 4 THEN 1 ELSE 0 END) AS "4",
+    SUM(CASE WHEN n.age_years = 5 THEN 1 ELSE 0 END) AS "5",
+    SUM(CASE WHEN n.age_years = 6 THEN 1 ELSE 0 END) AS "6",
+    SUM(CASE WHEN n.age_years = 7 THEN 1 ELSE 0 END) AS "7",
+    SUM(CASE WHEN n.age_years = 8 THEN 1 ELSE 0 END) AS "8",
+    SUM(CASE WHEN n.age_years = 9 THEN 1 ELSE 0 END) AS "9",
+    SUM(CASE WHEN n.age_years = 10 THEN 1 ELSE 0 END) AS "10",
+    SUM(CASE WHEN n.age_years = 11 THEN 1 ELSE 0 END) AS "11",
+    SUM(CASE WHEN n.age_years = 12 THEN 1 ELSE 0 END) AS "12",
+    SUM(CASE WHEN n.age_years = 13 THEN 1 ELSE 0 END) AS "13",
+    SUM(CASE WHEN n.age_years = 14 THEN 1 ELSE 0 END) AS "14",
+    SUM(CASE WHEN n.age_years = 15 THEN 1 ELSE 0 END) AS "15",
+    SUM(CASE WHEN n.age_years = 16 THEN 1 ELSE 0 END) AS "16",
+    SUM(CASE WHEN n.age_years = 17 THEN 1 ELSE 0 END) AS "17"
+FROM naselenie n
+LEFT JOIN talon o ON n.enp = o.enp
+WHERE COALESCE(o.has_pn1, 0) = 0
+GROUP BY n.lpuuch
+ORDER BY n.lpuuch
+"""
+
+
+def sql_query_children_list_not_pn1_details_by_uchastok_age(uchastok: str, age_years: int) -> str:
+    safe_uch = str(uchastok).replace("'", "''")
+    safe_age = int(age_years)
+    return f"""
+WITH talon AS (
+    SELECT
+        enp,
+        MAX(CASE WHEN goal = 'ПН1' THEN 1 ELSE 0 END) AS has_pn1,
+        MAX(CASE WHEN goal = 'ДС1' THEN 1 ELSE 0 END) AS has_ds1,
+        MAX(CASE WHEN goal = 'ДС2' THEN 1 ELSE 0 END) AS has_ds2,
+        SUM(CASE WHEN goal = 'ПН1' THEN 1 ELSE 0 END) AS count_pn1,
+        SUM(CASE WHEN goal = 'ДС1' THEN 1 ELSE 0 END) AS count_ds1,
+        SUM(CASE WHEN goal = 'ДС2' THEN 1 ELSE 0 END) AS count_ds2
+    FROM data_loader_omsdata
+    WHERE goal IN ('ПН1', 'ДС1', 'ДС2')
+    GROUP BY enp
+),
+naselenie AS (
+    SELECT DISTINCT ON (enp)
+        fio,
+        dr,
+        CAST(dr AS DATE) AS dr_date,
+        enp,
+        lpuuch,
+        DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) AS age_years,
+        DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE))) AS age_months_raw,
+        (DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) * 12 + DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE))))::INTEGER AS age_in_months
+    FROM data_loader_iszlpeople
+    WHERE CAST(dr AS DATE) <= CURRENT_DATE
+      AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
+    ORDER BY enp, CAST(dr AS DATE) DESC
+)
+SELECT
+    n.fio as "ФИО",
+    n.dr as "ДР",
+    n.enp as "ЕНП",
+    n.lpuuch as "Участок",
+    CAST(n.age_years AS text) AS "Возраст",
+    CAST(CASE WHEN n.age_in_months >= 24 THEN 0 ELSE n.age_months_raw END  AS text) AS "Месяцев",
+    CASE WHEN EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM n.dr_date) < 2 THEN 'да' ELSE 'нет' END AS "Дети до 2 лет",
+    CASE WHEN o.has_pn1 = 1 THEN 'да' ELSE 'нет' END AS "ПН1",
+    CASE WHEN o.has_ds1 = 1 THEN 'да' ELSE 'нет' END AS "ДС1",
+    CASE WHEN o.has_ds2 = 1 THEN 'да' ELSE 'нет' END AS "ДС2",
+    CAST(COALESCE(o.count_pn1, 0) AS text) AS "К-во ПН1",
+    CAST(COALESCE(o.count_ds1, 0) AS text) AS "К-во ДС1",
+    CAST(COALESCE(o.count_ds2, 0) AS text) AS "К-во ДС2"
+FROM naselenie n
+LEFT JOIN talon o ON n.enp = o.enp
+WHERE COALESCE(o.has_pn1, 0) = 0
+  AND n.lpuuch = '{safe_uch}'
+  AND DATE_PART('year', AGE(CURRENT_DATE, n.dr_date))::INT = {safe_age}
+ORDER BY n.fio
+    """
+
+
 def query_uniq(selected_year):
     return f"""
 WITH filtered AS (
