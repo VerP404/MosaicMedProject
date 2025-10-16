@@ -38,6 +38,7 @@ cards_row_2 = dbc.Row(
                             "Стационары: по врачам",
                             "Отчет по стационарным случаям по врачам.")),
         dbc.Col(create_card(7, type_page, "Талоны по врачам", "Талоны ОМС по врачам в разрезе по месяцам.")),
+        dbc.Col(create_card(8, type_page, "Диспансеризация", "Анализ диспансеризации по врачам: ОМС и детализация услуг.")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
@@ -57,7 +58,7 @@ economist_main = html.Div([
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 8)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 9)],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -76,6 +77,7 @@ def navigate_pages(*n_clicks):
         5: f"/{main_link}/indicators",
         6: f"/{main_link}/doctor-stac",
         7: f"/{main_link}/doctors_talon",
+        8: f"/{main_link}/dispensary",
     }
     
     return route_map[report_num]

@@ -12,6 +12,7 @@ from apps.analytical_app.pages.economist.indicators.page import econ_indicators
 from apps.analytical_app.pages.economist.main import economist_main
 from apps.analytical_app.pages.economist.stationary.page import economist_stationary
 from apps.analytical_app.pages.economist.svpod.page import economist_sv_pod
+from apps.analytical_app.pages.economist.dispensary.page import economist_dispensary_analysis
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
@@ -91,6 +92,13 @@ routes = {
             {"label": "По врачам", "active": True},
         ]),
         layout_doctors_goal
+    ]),
+    "/economist/dispensary": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "Диспансеризация", "active": True},
+        ]),
+        economist_dispensary_analysis()
     ]),
 
     "/statistic": statistic_main,
