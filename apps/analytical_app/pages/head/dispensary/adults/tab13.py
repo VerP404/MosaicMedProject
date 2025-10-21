@@ -83,7 +83,7 @@ adults_dv13 = html.Div([
     ),
     dcc.Loading(id=f'loading-output-{type_page}', type='default'),
     html.Div(id=f'stat-block-{type_page}', className='filters-label'),
-    card_table(f'result-table-{type_page}', "Прикрепленные не прошедшие диспансеризацию", page_size=10),
+    card_table(f'result-table-{type_page}', "Прикрепленные не прошедшие диспансеризацию", page_size=20),
     html.Details([
         html.Summary("Отладка (показать/скрыть)"),
         html.Pre(id=f'debug-info-{type_page}', style={"whiteSpace": "pre-wrap"})
