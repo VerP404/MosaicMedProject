@@ -137,6 +137,7 @@ def sql_query_details(selected_year, months_placeholder, inogorod, sanction, amo
     WHERE 1=1
       {group_filter}
       {goal_filter}
+    ORDER BY talon
     """
 
     return query

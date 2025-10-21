@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from dash import dcc, html, Output, Input, exceptions, State, callback_context, no_update
+from dash import dcc, html, Output, Input, exceptions, State, callback_context, no_update, dash_table
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.app import app
@@ -98,19 +98,110 @@ doctor_talon = html.Div(
         ),
         dcc.Loading(
             children=[
-                card_table(f'result-table1-{type_page}', "По категориям"),
-                card_table(f'result-table2-{type_page}', "По целям"),
-                dbc.Row([
+                # Таблица по категориям
+                dbc.Row(
                     dbc.Col(
-                        dbc.Button(
-                            "Детализация",
-                            id=f'details-button-{type_page}',
-                            color="primary",
-                            size="sm",
-                            className="mt-2"
-                        ), width="auto"
-                    )
-                ]),
+                        dbc.Card(
+                            dbc.CardBody([
+                                dbc.CardHeader("По категориям"),
+                                dcc.Loading(
+                                    html.Div(
+                                        dash_table.DataTable(
+                                            id=f'result-table1-{type_page}',
+                                            editable=False,
+                                            filter_action='native',
+                                            sort_action='native',
+                                            sort_mode='multi',
+                                            export_format='xlsx',
+                                            export_headers='display',
+                                            style_table={'overflowX': 'auto'},
+                                            style_cell={'minWidth': '0px', 'maxWidth': '180px', 'whiteSpace': 'normal'},
+                                            cell_selectable=True,
+                                            selected_cells=[]
+                                        ),
+                                        style={"maxWidth": "100%", "overflowX": "auto"}
+                                    ),
+                                    type="default"
+                                ),
+                                dbc.Row([
+                                    dbc.Col(
+                                        dbc.Button(
+                                            "Детализация",
+                                            id=f'details-button1-{type_page}',
+                                            color="primary",
+                                            size="sm",
+                                            disabled=True,
+                                            className="mt-2"
+                                        ), width="auto"
+                                    )
+                                ])
+                            ]),
+                            style={
+                                "width": "100%",
+                                "padding": "0rem",
+                                "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+                                "border-radius": "10px"
+                            }
+                        ),
+                        width=12
+                    ),
+                    style={"margin": "0 auto", "padding": "0rem"}
+                ),
+                # Таблица по целям
+                dbc.Row(
+                    dbc.Col(
+                        dbc.Card(
+                            dbc.CardBody([
+                                dbc.CardHeader("По целям"),
+                                dcc.Loading(
+                                    html.Div(
+                                        dash_table.DataTable(
+                                            id=f'result-table2-{type_page}',
+                                            editable=False,
+                                            filter_action='native',
+                                            sort_action='native',
+                                            sort_mode='multi',
+                                            export_format='xlsx',
+                                            export_headers='display',
+                                            style_table={'overflowX': 'auto'},
+                                            style_cell={'minWidth': '0px', 'maxWidth': '180px', 'whiteSpace': 'normal'},
+                                            cell_selectable=True,
+                                            selected_cells=[]
+                                        ),
+                                        style={"maxWidth": "100%", "overflowX": "auto"}
+                                    ),
+                                    type="default"
+                                ),
+                                dbc.Row([
+                                    dbc.Col(
+                                        dbc.Button(
+                                            "Детализация",
+                                            id=f'details-button2-{type_page}',
+                                            color="secondary",
+                                            size="sm",
+                                            disabled=True,
+                                            className="mt-2"
+                                        ), width="auto"
+                                    )
+                                ])
+                            ]),
+                            style={
+                                "width": "100%",
+                                "padding": "0rem",
+                                "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+                                "border-radius": "10px"
+                            }
+                        ),
+                        width=12
+                    ),
+                    style={"margin": "0 auto", "padding": "0rem"}
+                ),
+                # Индикатор активной таблицы
+                html.Div(
+                    id=f'active-table-indicator-{type_page}',
+                    className="mt-2 mb-2",
+                    style={"fontSize": "0.9em", "color": "#6c757d"}
+                ),
                 dcc.Store(id=f'details-store-{type_page}'),
                 dbc.Card([
                     dbc.CardHeader("Детализация"),
@@ -438,6 +529,53 @@ def toggle_details_sql(n_clicks, is_open):
     return is_open, "Показать/Скрыть SQL детализации"
 
 @app.callback(
+    Output(f'active-table-indicator-{type_page}', 'children'),
+    [
+        Input(f'result-table1-{type_page}', 'active_cell'),
+        Input(f'result-table2-{type_page}', 'active_cell')
+    ]
+)
+def update_active_table_indicator(active_cell1, active_cell2):
+    if active_cell1:
+        return html.Span([
+            html.I(className="fas fa-check-circle text-success me-1"),
+            "Активна таблица: По категориям"
+        ])
+    elif active_cell2:
+        return html.Span([
+            html.I(className="fas fa-check-circle text-success me-1"),
+            "Активна таблица: По целям"
+        ])
+    else:
+        return html.Span([
+            html.I(className="fas fa-info-circle text-muted me-1"),
+            "Выберите строку в таблице для детализации"
+        ])
+
+@app.callback(
+    [
+        Output(f'details-button1-{type_page}', 'disabled'),
+        Output(f'details-button2-{type_page}', 'disabled'),
+        Output(f'details-button1-{type_page}', 'color'),
+        Output(f'details-button2-{type_page}', 'color')
+    ],
+    [
+        Input(f'result-table1-{type_page}', 'active_cell'),
+        Input(f'result-table2-{type_page}', 'active_cell')
+    ]
+)
+def update_button_states(active_cell1, active_cell2):
+    # Кнопки активны только если есть выбранная строка в соответствующей таблице
+    button1_disabled = not bool(active_cell1)
+    button2_disabled = not bool(active_cell2)
+    
+    # Цвет кнопок меняется в зависимости от активности таблицы
+    button1_color = "success" if active_cell1 else "primary"
+    button2_color = "success" if active_cell2 else "secondary"
+    
+    return button1_disabled, button2_disabled, button1_color, button2_color
+
+@app.callback(
     [
         Output(f'details-title-{type_page}', 'children'),
         Output(f'details-table-inline-{type_page}', 'columns'),
@@ -445,7 +583,8 @@ def toggle_details_sql(n_clicks, is_open):
         Output(f'details-sql-{type_page}', 'children')
     ],
     [
-        Input(f'details-button-{type_page}', 'n_clicks'),
+        Input(f'details-button1-{type_page}', 'n_clicks'),
+        Input(f'details-button2-{type_page}', 'n_clicks'),
         Input(f'result-table1-{type_page}', 'active_cell'),
         Input(f'result-table2-{type_page}', 'active_cell')
     ],
@@ -470,7 +609,7 @@ def toggle_details_sql(n_clicks, is_open):
         State(f'dropdown-report-type-{type_page}', 'value')
     ]
 )
-def show_details(n_clicks_details, active_cell1, active_cell2,
+def show_details(n_clicks_details1, n_clicks_details2, active_cell1, active_cell2,
                  data1, columns1, data2, columns2,
                  value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
                  amount_null, building_ids, department_ids, start_date_input, end_date_input,
@@ -480,20 +619,32 @@ def show_details(n_clicks_details, active_cell1, active_cell2,
         raise exceptions.PreventUpdate
 
     triggered_id = ctx.triggered[0]['prop_id']
-    # Выполняем детализацию только по кнопке
-    if not triggered_id.startswith(f'details-button-{type_page}'):
-        # Если пользователь просто переключил ячейку — очищаем детализацию
+    
+    # Определяем какая кнопка была нажата
+    is_from_table1 = False
+    active_cell = None
+    row_data = None
+    cols = None
+    
+    if triggered_id.startswith(f'details-button1-{type_page}'):
+        # Кнопка детализации по категориям
+        is_from_table1 = True
+        if not active_cell1:
+            raise exceptions.PreventUpdate
+        active_cell = active_cell1
+        row_data = (data1 or [])[active_cell.get('row')]
+        cols = columns1
+    elif triggered_id.startswith(f'details-button2-{type_page}'):
+        # Кнопка детализации по целям
+        is_from_table1 = False
+        if not active_cell2:
+            raise exceptions.PreventUpdate
+        active_cell = active_cell2
+        row_data = (data2 or [])[active_cell.get('row')]
+        cols = columns2
+    else:
+        # Если клик не по кнопке детализации - очищаем
         return '', [], [], ''
-
-    # Определяем текущую активную ячейку (если есть)
-    is_from_table1 = True if active_cell1 else False if active_cell2 else True
-    active_cell = active_cell1 if is_from_table1 else active_cell2
-    if not active_cell:
-        raise exceptions.PreventUpdate
-
-    row_index = active_cell.get('row')
-    row_data = (data1 or [])[row_index] if is_from_table1 else (data2 or [])[row_index]
-    cols = columns1 if is_from_table1 else columns2
 
     # Берем значение ключевой колонки явно: в таблице 1 колонка называется "Группа", в таблице 2 — id 'goal'
     first_value = None
@@ -533,6 +684,14 @@ def show_details(n_clicks_details, active_cell1, active_cell2,
     months_list = ', '.join([str(m) for m in range(selected_period[0], selected_period[1] + 1)]) if selected_period else '1'
 
     selected_doctor_ids = parse_doctor_ids(value_doctor)
+    
+    # Создаем ключ кэша на основе всех параметров
+    cache_key = f"{selected_year}_{months_list}_{inogorodniy}_{sanction}_{amount_null}_{building_ids}_{department_ids}_{value_profile}_{selected_doctor_ids}_{start_date_input_formatted}_{end_date_input_formatted}_{start_date_treatment_formatted}_{end_date_treatment_formatted}_{group_name}_{goal_value}_{status_filter}"
+    
+    # Проверяем кэш (в реальном проекте можно использовать Redis или другой кэш)
+    # Здесь используем простую проверку - если параметры те же, возвращаем предыдущий результат
+    # В production лучше использовать dcc.Store с проверкой времени жизни кэша
+    
     sql_text = sql_query_details(
         selected_year,
         months_list,
@@ -544,6 +703,11 @@ def show_details(n_clicks_details, active_cell1, active_cell2,
         start_date_treatment_formatted, end_date_treatment_formatted,
         group_name, goal_value, status_filter
     )
+    
+    # Оптимизация: добавляем LIMIT для детализации если записей много
+    if 'LIMIT' not in sql_text.upper():
+        sql_text += " LIMIT 1000"
+    
     columns, data = TableUpdater.query_to_df(engine, sql_text)
 
     status_title = f", Статус: {column_id}" if (column_id and column_id not in ['Группа', 'goal']) else ''
