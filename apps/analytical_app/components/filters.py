@@ -180,6 +180,8 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
             }
             for row in result.fetchall()
         ]
+    # Сортировка по алфавиту по полю label (без учета регистра)
+    doctors.sort(key=lambda d: (d['label'] or '').lower())
     return doctors
 
 

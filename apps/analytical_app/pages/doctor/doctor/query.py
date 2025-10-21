@@ -93,3 +93,50 @@ def sql_query_stac_def(months_placeholder):
                      END
         """
 
+
+def sql_query_details(selected_year, months_placeholder, inogorod, sanction, amount_null,
+                      building=None, department=None, profile=None, doctor=None,
+                      input_start=None, input_end=None, treatment_start=None, treatment_end=None,
+                      group_name=None, goal_value=None, status_list=None):
+    base = base_query(
+        selected_year, months_placeholder, inogorod, sanction, amount_null,
+        building, department, profile, doctor,
+        input_start, input_end, treatment_start, treatment_end,
+        cel_list=None, status_list=status_list
+    )
+
+    group_filter = ""
+    if group_name:
+        group_filter = f"""
+        AND (
+            ( target_categories LIKE '%Диспансерное наблюдение%' AND '{group_name}' = 'Диспансерное наблюдение' ) OR
+            ( target_categories LIKE '%Дневной стационар, Стационар%' AND '{group_name}' = 'Стационар - дневной' ) OR
+            ( target_categories LIKE '%Стационарно, Стационар%' AND '{group_name}' = 'Стационар - стационарно' ) OR
+            ( target_categories LIKE '%Стационар на дому, Стационар%' AND '{group_name}' = 'Стационар - на дому' ) OR
+            ( '{group_name}' NOT IN ('Диспансерное наблюдение','Стационар - дневной','Стационар - стационарно','Стационар - на дому')
+              AND target_categories = '{group_name}' )
+        )
+        """
+
+    goal_filter = ""
+    if goal_value:
+        goal_filter = f"AND goal = '{goal_value}'"
+
+    query = f"""
+    {base}
+    SELECT talon                               AS "Талон",
+           goal                                AS "Цель",
+           status                              AS "Статус",
+           enp                                 AS "ЕНП",
+           patient                             AS "Пациент",
+           birth_date                          AS "Дата рождения",
+           treatment_start                     AS "Дата начала",
+           treatment_end                       AS "Дата окончания",
+           gender                              AS "Пол"
+    FROM oms
+    WHERE 1=1
+      {group_filter}
+      {goal_filter}
+    """
+
+    return query
