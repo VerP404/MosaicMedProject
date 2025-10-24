@@ -14,7 +14,7 @@ from apps.analytical_app.components.filters import filter_years, filter_months, 
     get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
     update_buttons, filter_status, status_groups
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.economist.indicators.query import sql_query_indicators, clear_cache
+from apps.analytical_app.pages.economist.indicators.query import sql_query_indicators, sql_query_indicators_details, clear_cache
 from apps.analytical_app.query_executor import engine
 
 type_page = "econ-indicators"
@@ -155,6 +155,32 @@ econ_indicators = html.Div(
                                      {'if': {'column_id': 'Условия фильтра'}, 'width': '55%'}
                                  ])]
          ),
+         # Таблица детализации
+         dbc.Card([
+             dbc.CardHeader("Детализация по талонам"),
+             dbc.CardBody([
+                 html.Div(id=f'details-title-{type_page}', style={"fontWeight": "bold", "marginBottom": "10px"}),
+                 # Кнопка детализации
+                 dbc.Row([
+                     dbc.Col(
+                         dbc.Button(
+                             "Детализация",
+                             id=f'details-button-{type_page}',
+                             color="primary",
+                             size="sm",
+                             disabled=True,
+                             className="mb-3"
+                         ), width="auto"
+                     )
+                 ]),
+                 card_table(f'details-table-{type_page}', "Детали", page_size=20)
+             ])
+         ], className="mt-3", style={
+             "width": "100%",
+             "padding": "0rem",
+             "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+             "border-radius": "10px"
+         })
     ],
     style={"padding": "0rem"}
 )
@@ -486,3 +512,130 @@ def update_table(n_clicks, value_doctor, value_profile, selected_period, selecte
         # Обработка ошибок
         error_msg = f"Ошибка при выполнении запроса: {str(e)}"
         return [], [], 0, {'display': 'none'}, error_msg
+
+
+# Callback для активации кнопки детализации при выборе строки
+@app.callback(
+    Output(f'details-button-{type_page}', 'disabled'),
+    Input(f'result-table1-{type_page}', 'active_cell')
+)
+def update_details_button_state(active_cell):
+    if not active_cell:
+        return True
+    
+    # Для indicators детализация доступна только для колонок с числовыми значениями
+    column_id = active_cell.get('column_id')
+    # Исключаем колонки "type" и "Условия фильтра"
+    excluded_columns = ['type', 'Условия фильтра']
+    
+    return column_id in excluded_columns
+
+
+# Callback для отображения детализации
+@app.callback(
+    [
+        Output(f'details-title-{type_page}', 'children'),
+        Output(f'details-table-{type_page}', 'columns'),
+        Output(f'details-table-{type_page}', 'data')
+    ],
+    [
+        Input(f'details-button-{type_page}', 'n_clicks')
+    ],
+    [
+        State(f'result-table1-{type_page}', 'data'),
+        State(f'result-table1-{type_page}', 'active_cell'),
+        State(f'dropdown-doctor-{type_page}', 'value'),
+        State(f'dropdown-profile-{type_page}', 'value'),
+        State(f'range-slider-month-{type_page}', 'value'),
+        State(f'dropdown-year-{type_page}', 'value'),
+        State(f'dropdown-inogorodniy-{type_page}', 'value'),
+        State(f'dropdown-sanction-{type_page}', 'value'),
+        State(f'dropdown-amount-null-{type_page}', 'value'),
+        State(f'dropdown-building-{type_page}', 'value'),
+        State(f'dropdown-department-{type_page}', 'value'),
+        State(f'date-picker-range-input-{type_page}', 'start_date'),
+        State(f'date-picker-range-input-{type_page}', 'end_date'),
+        State(f'date-picker-range-treatment-{type_page}', 'start_date'),
+        State(f'date-picker-range-treatment-{type_page}', 'end_date'),
+        State(f'dropdown-report-type-{type_page}', 'value'),
+        State(f'status-selection-mode-{type_page}', 'value'),
+        State(f'status-group-radio-{type_page}', 'value'),
+        State(f'status-individual-dropdown-{type_page}', 'value')
+    ]
+)
+def show_indicators_details(n_clicks, table_data, active_cell,
+                           value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
+                           amount_null, building_ids, department_ids, start_date_input, end_date_input,
+                           start_date_treatment, end_date_treatment, report_type,
+                           status_mode, selected_status_group, selected_individual_statuses):
+    if not n_clicks or not active_cell or not table_data:
+        return '', [], []
+    
+    # Получаем данные выбранной строки
+    row_data = table_data[active_cell.get('row')]
+    indicator_type = row_data.get('type')
+    
+    if not indicator_type:
+        return 'Ошибка: не удалось определить тип индикатора', [], []
+    
+    try:
+        # Определяем список статусов
+        if status_mode == 'group':
+            selected_status_values = status_groups[selected_status_group]
+        else:
+            selected_status_values = selected_individual_statuses if selected_individual_statuses else []
+        
+        selected_status_tuple = tuple(selected_status_values)
+        
+        # Обработка врачей
+        if value_doctor:
+            if isinstance(value_doctor, str):
+                selected_doctor_ids = [int(id) for id in value_doctor.split(',') if id.strip().isdigit()]
+            else:
+                selected_doctor_ids = [int(id) for id in value_doctor if isinstance(id, (int, str)) and str(id).isdigit()]
+        else:
+            selected_doctor_ids = []
+        
+        # Определяем даты
+        start_date_input_formatted, end_date_input_formatted = None, None
+        start_date_treatment_formatted, end_date_treatment_formatted = None, None
+        
+        if report_type == 'initial_input':
+            selected_period = (1, 12)
+            start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+            end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        elif report_type == 'treatment':
+            selected_period = (1, 12)
+            start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+            end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        
+        # Выполняем запрос детализации
+        sql_query = sql_query_indicators_details(
+            selected_year,
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy, sanction, amount_null,
+            building_ids, department_ids,
+            value_profile,
+            selected_doctor_ids,
+            start_date_input_formatted, end_date_input_formatted,
+            start_date_treatment_formatted, end_date_treatment_formatted,
+            indicator_type, selected_status_tuple
+        )
+        
+        columns, data = TableUpdater.query_to_df(engine, sql_query)
+        
+        # Формируем заголовок
+        title_text = f"Детализация по индикатору: {indicator_type}"
+        count_badge = dbc.Badge(
+            f" {len(data)}",
+            color="primary",
+            pill=True,
+            className="ms-2"
+        )
+        title = html.Span([title_text, count_badge])
+        
+        return title, columns, data
+        
+    except Exception as e:
+        error_msg = f"Ошибка при получении детализации: {str(e)}"
+        return error_msg, [], []

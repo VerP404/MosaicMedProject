@@ -10,7 +10,7 @@ from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.components.filters import filter_years, update_buttons
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions
+from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details
 from apps.analytical_app.query_executor import engine
 
 type_page = "econ-sv-pod"
@@ -123,6 +123,32 @@ economist_sv_pod = html.Div(
         dcc.Loading(id=f'loading-output-{type_page}', type='default'),
         card_table(f'result-table1-{type_page}', "Данные", column_selectable='multi'),
         dcc.Store(id=f'selected-data-{type_page}'),
+        # Таблица детализации
+        dbc.Card([
+            dbc.CardHeader("Детализация по талонам"),
+            dbc.CardBody([
+                html.Div(id=f'details-title-{type_page}', style={"fontWeight": "bold", "marginBottom": "10px"}),
+                # Кнопка детализации
+                dbc.Row([
+                    dbc.Col(
+                        dbc.Button(
+                            "Детализация",
+                            id=f'details-button-{type_page}',
+                            color="primary",
+                            size="sm",
+                            disabled=True,
+                            className="mb-3"
+                        ), width="auto"
+                    )
+                ]),
+                card_table(f'details-table-{type_page}', "Детали", page_size=20)
+            ])
+        ], className="mt-3", style={
+            "width": "100%",
+            "padding": "0rem",
+            "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+            "border-radius": "10px"
+        })
     ],
     style={"padding": "0rem"}
 )
@@ -432,3 +458,194 @@ def update_table_with_plan_and_balance(n_clicks,
     ]
 
     return columns, fact_data, loading_output, filter_conditions
+
+
+# Callback для активации кнопки детализации при выборе строки
+@app.callback(
+    Output(f'details-button-{type_page}', 'disabled'),
+    Input(f'result-table1-{type_page}', 'active_cell')
+)
+def update_details_button_state(active_cell):
+    if not active_cell:
+        return True
+    
+    # Проверяем, что выбрана допустимая колонка для детализации
+    column_id = active_cell.get('column_id')
+    allowed_columns = ['Факт', 'новые', 'в_тфомс', 'оплачено', 'исправлено', 'отказано', 'отменено']
+    
+    return column_id not in allowed_columns
+
+
+# Callback для отображения детализации
+@app.callback(
+    [
+        Output(f'details-title-{type_page}', 'children'),
+        Output(f'details-table-{type_page}', 'columns'),
+        Output(f'details-table-{type_page}', 'data')
+    ],
+    [
+        Input(f'details-button-{type_page}', 'n_clicks')
+    ],
+    [
+        State(f'result-table1-{type_page}', 'data'),
+        State(f'result-table1-{type_page}', 'active_cell'),
+        State(f'dropdown-year-{type_page}', 'value'),
+        State(f'month-selector-{type_page}', 'value'),
+        State({'type': 'dynamic-dropdown', 'index': ALL}, 'value')
+    ]
+)
+def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selected_month, 
+                      selected_levels):
+    if not n_clicks or not active_cell or not table_data:
+        return '', [], []
+    
+    # Получаем данные выбранной строки и колонки
+    row_data = table_data[active_cell.get('row')]
+    column_id = active_cell.get('column_id')
+    month_name = row_data.get('month')
+    
+    if not month_name or not selected_year:
+        return 'Ошибка: не удалось определить параметры для детализации', [], []
+    
+    # Проверяем, что выбрана допустимая колонка для детализации
+    allowed_columns = ['Факт', 'новые', 'в_тфомс', 'оплачено', 'исправлено', 'отказано', 'отменено']
+    if column_id not in allowed_columns:
+        return f'Детализация доступна только для колонок: {", ".join(allowed_columns)}', [], []
+    
+    try:
+        # Фильтруем None значения из selected_levels
+        selected_levels = [lvl for lvl in selected_levels if lvl is not None]
+        
+        if not selected_levels:
+            return 'Ошибка: не выбрана группа показателей', [], []
+        
+        # Берем последний выбранный уровень (самый глубокий)
+        selected_level = selected_levels[-1]
+        group_ids = [selected_level]
+        
+        # Получаем условия фильтрации
+        filter_conditions = get_filter_conditions(group_ids, selected_year)
+        
+        # Определяем месяц для фильтрации (изначально)
+        filter_month = selected_month if selected_month is not None else None
+        
+        # Если месяц не выбран в dropdown, но есть месяц в строке, используем его
+        if filter_month is None and month_name:
+            # Проверяем, является ли month_name числом (int или строка с цифрами)
+            if isinstance(month_name, int):
+                filter_month = month_name
+            elif isinstance(month_name, str) and month_name.isdigit():
+                filter_month = int(month_name)
+        
+        # Определяем статусы для фильтрации в зависимости от выбранной колонки
+        status_filter = None
+        if column_id == 'Факт':
+            # Для "Факт" показываем записи, которые учитываются в расчете факта
+            # Логика должна соответствовать расчету в основном запросе
+            if month_name == "Нарастающе" or month_name == "Год":
+                # Для нарастающих и годовых показателей "Факт" = сумма "Факт" по месяцам
+                # Каждый месяц имеет свою логику расчета "Факт"
+                # Создаем сложный запрос, который повторяет логику расчета для каждого месяца
+                from datetime import datetime
+                today = datetime.today()
+                current_month = today.month
+                current_day = today.day
+                
+                # Создаем условия для каждого месяца точно как в расчете "Факт"
+                month_conditions = []
+                for m in range(1, 13):
+                    if m < current_month - 1:
+                        # Прошлые месяцы: только оплаченные
+                        month_conditions.append(f"(report_month_number = {m} AND status = '3')")
+                    elif m == current_month - 1:
+                        if current_day <= 10:
+                            # Предыдущий месяц, день <= 10: новые+в_тфомс+оплачено+исправлено
+                            # Исправлено берется из total_ispravleno_all_months (за ВСЕ месяцы)
+                            month_conditions.append(f"(report_month_number = {m} AND status IN ('1', '2', '3'))")
+                            # Добавляем исправленные записи за ВСЕ месяцы для предыдущего месяца
+                            month_conditions.append(f"(status IN ('6', '8'))")
+                        else:
+                            # Предыдущий месяц, день > 10: только оплаченные
+                            month_conditions.append(f"(report_month_number = {m} AND status = '3')")
+                    elif m == current_month:
+                        # Текущий месяц: новые+в_тфомс+оплачено+исправлено
+                        # Исправлено берется из total_ispravleno_all_months (за ВСЕ месяцы)
+                        month_conditions.append(f"(report_month_number = {m} AND status IN ('1', '2', '3'))")
+                        # Добавляем исправленные записи за ВСЕ месяцы для текущего месяца
+                        month_conditions.append(f"(status IN ('6', '8'))")
+                    # Будущие месяцы не учитываются (Факт = 0)
+                
+                # Объединяем условия через OR
+                if month_conditions:
+                    # Передаем специальный параметр для сложной логики
+                    status_filter = f"COMPLEX_LOGIC:{':'.join(month_conditions)}"
+                else:
+                    status_filter = ['3']  # Fallback
+                
+                # Убираем фильтр по месяцу для нарастающих показателей
+                filter_month = None
+            else:
+                # Для конкретного месяца - логика зависит от того, выбран ли месяц вручную
+                if selected_month is not None:
+                    # Если пользователь выбрал месяц вручную - только оплаченные
+                    status_filter = ['3']  # Только оплачено
+                else:
+                    # Если месяц выбран автоматически - зависит от текущего месяца
+                    from datetime import datetime
+                    today = datetime.today()
+                    current_month = today.month
+                    # Определяем номер месяца
+                    if isinstance(month_name, int):
+                        month_num = month_name
+                    elif isinstance(month_name, str) and month_name.isdigit():
+                        month_num = int(month_name)
+                    else:
+                        month_num = None
+                    
+                    if month_num and month_num < current_month - 1:
+                        # Для прошлых месяцев - только оплаченные
+                        status_filter = ['3']
+                    elif month_num and (month_num == current_month - 1 or month_num == current_month):
+                        # Для текущего и предыдущего месяца - новые + в_тфомс + оплачено + исправлено
+                        status_filter = ['1', '2', '3', '6', '8']
+                    else:
+                        # По умолчанию - только оплаченные
+                        status_filter = ['3']
+        elif column_id == 'новые':
+            status_filter = ['1']  # Новые талоны
+        elif column_id == 'в_тфомс':
+            status_filter = ['2']  # В ТФОМС
+        elif column_id == 'оплачено':
+            status_filter = ['3']  # Оплачено
+        elif column_id == 'исправлено':
+            status_filter = ['6', '8']  # Исправлено
+        elif column_id == 'отказано':
+            status_filter = ['5', '7', '12']  # Отказано
+        elif column_id == 'отменено':
+            status_filter = ['0', '13', '17']  # Отменено
+        
+        # Выполняем запрос детализации
+        sql_query = sql_query_svpod_details(selected_year, filter_month, group_ids, filter_conditions, status_filter)
+        
+        columns, data = TableUpdater.query_to_df(engine, sql_query)
+        
+        # Формируем заголовок
+        if month_name == "Нарастающе" or month_name == "Год":
+            # Для нарастающих показателей добавляем пояснение
+            title_text = f"Детализация по показателям за {month_name} {selected_year} - {column_id} (приблизительно)"
+        else:
+            title_text = f"Детализация по показателям за {month_name} {selected_year} - {column_id}"
+        
+        count_badge = dbc.Badge(
+            f" {len(data)}",
+            color="primary",
+            pill=True,
+            className="ms-2"
+        )
+        title = html.Span([title_text, count_badge])
+        
+        return title, columns, data
+        
+    except Exception as e:
+        error_msg = f"Ошибка при получении детализации: {str(e)}"
+        return error_msg, [], []
