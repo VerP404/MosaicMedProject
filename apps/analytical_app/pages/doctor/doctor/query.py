@@ -132,7 +132,8 @@ def sql_query_details(selected_year, months_placeholder, inogorod, sanction, amo
            birth_date                          AS "Дата рождения",
            treatment_start                     AS "Дата начала",
            treatment_end                       AS "Дата окончания",
-           gender                              AS "Пол"
+           gender                              AS "Пол",
+           main_diagnosis_code                                 AS "Диагноз"
     FROM oms
     WHERE 1=1
       {group_filter}
