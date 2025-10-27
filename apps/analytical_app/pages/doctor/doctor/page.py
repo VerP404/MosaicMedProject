@@ -703,11 +703,7 @@ def show_details(n_clicks_details1, n_clicks_details2, active_cell1, active_cell
         start_date_treatment_formatted, end_date_treatment_formatted,
         group_name, goal_value, status_filter
     )
-    
-    # Оптимизация: добавляем LIMIT для детализации если записей много
-    if 'LIMIT' not in sql_text.upper():
-        sql_text += " LIMIT 1000"
-    
+
     columns, data = TableUpdater.query_to_df(engine, sql_text)
 
     status_title = f", Статус: {column_id}" if (column_id and column_id not in ['Группа', 'goal']) else ''
