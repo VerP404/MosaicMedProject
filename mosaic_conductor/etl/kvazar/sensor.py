@@ -14,6 +14,7 @@ from mosaic_conductor.etl.kvazar import (
     kvazar_job_death,
     kvazar_job_reference,
     iszl_job_dn,
+    iszl_job_people,
     wo_old_job_talon,
     wo_old_job_doctors,
     wo_job_talon,
@@ -345,6 +346,15 @@ wo_sensor_errorlog = create_sensor(
     "mosaic_conductor/etl/config/oms_mapping.json"
 )
 
+iszl_sensor_people = create_sensor(
+    iszl_job_people,
+    "iszl_sensor_people",
+    "ИСЗЛ: Население.",
+    "mosaic_conductor/etl/data/iszl/people",
+    "data_loader_iszlpeople",
+    "mosaic_conductor/etl/config/mapping.json"
+)
+
 kvazar_sensors = [
     kvazar_sensor_eln,
     kvazar_sensor_emd,
@@ -353,6 +363,7 @@ kvazar_sensors = [
     kvazar_sensor_reference,
     iszl_sensor_dn,
     iszl_sensor_dn_work,
+    iszl_sensor_people,
     wo_old_sensor_talon,
     wo_old_sensor_doctors,
     wo_sensor_talon,

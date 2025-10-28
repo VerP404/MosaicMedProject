@@ -145,7 +145,7 @@ iszl_job_dn_work = create_etl_job(
 )
 iszl_job_people = create_etl_job(
     "iszl_job_people",
-    "load_data_iszl_population",
+    "data_loader_iszlpeople",
     "iszl/people",
     "mapping.json",
 )

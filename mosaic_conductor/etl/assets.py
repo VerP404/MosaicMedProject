@@ -11,16 +11,6 @@ from mosaic_conductor.etl.kvazar.sensor import kvazar_sensors
 from mosaic_conductor.etl.common.connect_db import connect_to_db
 from dagster import asset, AssetIn, Output, OpExecutionContext
 
-all_sensors = kvazar_sensors
-all_assets = kvazar_assets
-all_jobs = kvazar_jobs
-defs = dg.Definitions(
-    assets=all_assets,
-    jobs=all_jobs,
-    schedules=[],
-    sensors=all_sensors
-)
-
 
 @asset(name="iszl_people_snapshot")
 def iszl_people_snapshot(context: OpExecutionContext) -> Output[str]:
@@ -69,4 +59,15 @@ def iszl_people_sync(context: OpExecutionContext, csv_path: str) -> Output[str]:
         raise RuntimeError("sync_iszl_people завершилась с ошибкой")
     context.log.info(res.stdout)
     return Output("ok")
+
+
+all_sensors = kvazar_sensors
+all_assets = kvazar_assets + [iszl_people_snapshot, iszl_people_sync]
+all_jobs = kvazar_jobs
+defs = dg.Definitions(
+    assets=all_assets,
+    jobs=all_jobs,
+    schedules=[],
+    sensors=all_sensors
+)
 

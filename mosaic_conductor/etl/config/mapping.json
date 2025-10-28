@@ -491,6 +491,30 @@
       ],
       "encoding": "cp1251",
       "delimiter": ";"
+    },
+    "data_loader_iszlpeople": {
+      "file": {
+        "file_pattern": "Att_MO*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "PID": "pid",
+        "FIO": "fio",
+        "DR": "dr",
+        "SMO": "smo",
+        "ENP": "enp",
+        "LPU": "lpu",
+        "SS_DOCTOR": "ss_doctor",
+        "LPUUCH": "lpuuch",
+        "Upd": "upd",
+        "CLOSED": "closed"
+      },
+      "column_check": [
+        "enp"
+      ],
+      "encoding": "utf-8-sig",
+      "delimiter": ";",
+      "use_timestamps": false
     }
   }
 }
