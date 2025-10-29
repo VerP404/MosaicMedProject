@@ -204,13 +204,18 @@ def run_diagnostic(n_clicks):
         
         # Проверка таблицы населения
         iszl = results.get('check_iszlpeople', {})
-        if 'error' not in iszl:
-            info_items.append(html.H5("2. Проверка таблицы data_loader_iszlpeople:"))
+        info_items.append(html.H5("2. Проверка таблицы data_loader_iszlpeople:"))
+        if 'error' in iszl:
+            info_items.append(html.P(f"❌ ОШИБКА: {iszl.get('error', 'Неизвестная ошибка')}", className='text-danger'))
+        else:
             info_items.append(html.P(f"Всего строк: {iszl.get('total_rows', 'N/A')}"))
             info_items.append(html.P(f"Уникальных ENP: {iszl.get('unique_enp', 'N/A')}"))
             info_items.append(html.P(f"С валидными датами: {iszl.get('valid_dates', 'N/A')}"))
             info_items.append(html.P(f"Детей (<18 лет): {iszl.get('children_count', 'N/A')}"))
-            info_items.append(html.Hr())
+            if iszl.get('children_count', 0) == 0:
+                info_items.append(html.P("⚠️ ВНИМАНИЕ: Нет детей в таблице! Нужно загрузить данные из CSV.", 
+                                        className='text-danger fw-bold'))
+        info_items.append(html.Hr())
         
         # Проверка CTE talon
         talon = results.get('check_talon_cte', {})
@@ -222,40 +227,95 @@ def run_diagnostic(n_clicks):
         
         # Проверка CTE naselenie
         naselenie = results.get('check_naselenie_cte', {})
-        if 'error' not in naselenie:
-            info_items.append(html.H5("4. CTE 'naselenie' (обработанное население):"))
+        info_items.append(html.H5("4. CTE 'naselenie' (обработанное население):"))
+        if 'error' in naselenie:
+            info_items.append(html.P(f"❌ ОШИБКА: {naselenie.get('error', 'Неизвестная ошибка')}", className='text-danger'))
+        else:
             info_items.append(html.P(f"Всего ENP: {naselenie.get('unique_enp', 'N/A')}"))
             info_items.append(html.P(f"Возраст: {naselenie.get('min_age', 'N/A')} - {naselenie.get('max_age', 'N/A')} лет"))
-            info_items.append(html.Hr())
+            if naselenie.get('unique_enp', 0) == 0:
+                info_items.append(html.P("⚠️ ВНИМАНИЕ: CTE naselenie пустое! Проблема с данными в data_loader_iszlpeople.", 
+                                        className='text-danger fw-bold'))
+        info_items.append(html.Hr())
         
         # Проверка результата JOIN
         join_result = results.get('check_join_result', {})
-        if 'error' not in join_result:
-            info_items.append(html.H5("5. Результат JOIN naselenie + talon:"))
-            info_items.append(html.P(f"Всего после JOIN: {join_result.get('total_after_join', 'N/A')}"))
-            info_items.append(html.P(f"Без данных talon (has_pn1 IS NULL): {join_result.get('without_talon_data', 'N/A')}"))
-            info_items.append(html.P(f"Без ПН1 (has_pn1 = 0): {join_result.get('without_pn1', 'N/A')}"))
-            info_items.append(html.P(f"С ПН1 (has_pn1 = 1): {join_result.get('with_pn1', 'N/A')}"))
-            info_items.append(html.Hr())
+        info_items.append(html.H5("5. Результат JOIN naselenie + talon:"))
+        if 'error' in join_result:
+            info_items.append(html.P(f"❌ ОШИБКА: {join_result.get('error', 'Неизвестная ошибка')}", className='text-danger'))
+        else:
+            total_after_join = join_result.get('total_after_join', 0)
+            without_talon = join_result.get('without_talon_data', 0)
+            without_pn1 = join_result.get('without_pn1', 0)
+            with_pn1 = join_result.get('with_pn1', 0)
+            info_items.append(html.P(f"Всего после JOIN: {total_after_join}"))
+            info_items.append(html.P(f"Без данных talon (has_pn1 IS NULL): {without_talon}"))
+            info_items.append(html.P(f"Без ПН1 (has_pn1 = 0): {without_pn1}"))
+            info_items.append(html.P(f"С ПН1 (has_pn1 = 1): {with_pn1}"))
+            if total_after_join == 0:
+                info_items.append(html.P("⚠️ ВНИМАНИЕ: JOIN не дал результатов - нет совпадений по ENP между таблицами!", 
+                                        className='text-danger fw-bold'))
+            elif with_pn1 == total_after_join:
+                info_items.append(html.P("⚠️ ВНИМАНИЕ: Все дети имеют ПН1, поэтому нет детей без ПН1 (это нормально если так в базе).", 
+                                        className='text-warning fw-bold'))
+            elif without_pn1 == 0 and without_talon == 0:
+                info_items.append(html.P("⚠️ ПРОБЛЕМА: Все записи после JOIN имеют has_pn1=1, но JOIN дал результат. Проверьте логику фильтрации.", 
+                                        className='text-danger fw-bold'))
+        info_items.append(html.Hr())
+        
+        # Проверка совпадения ENP между таблицами
+        enp_match = results.get('check_enp_match', {})
+        info_items.append(html.H5("5.1. Проверка совпадения ENP между таблицами:"))
+        if 'error' in enp_match:
+            info_items.append(html.P(f"❌ ОШИБКА: {enp_match.get('error', 'Неизвестная ошибка')}", className='text-danger'))
+        else:
+            iszl_count = enp_match.get('iszl_enp_count', 0)
+            oms_count = enp_match.get('oms_enp_count', 0)
+            matching = enp_match.get('matching_enp', 0)
+            iszl_only = enp_match.get('iszl_only_enp', 0)
+            oms_only = enp_match.get('oms_only_enp', 0)
+            info_items.append(html.P(f"ENP в iszlpeople (дети): {iszl_count}"))
+            info_items.append(html.P(f"ENP в omsdata (с целями ПН1/ДС1/ДС2): {oms_count}"))
+            info_items.append(html.P(f"Совпадающие ENP: {matching}"))
+            info_items.append(html.P(f"Только в iszlpeople: {iszl_only}"))
+            info_items.append(html.P(f"Только в omsdata: {oms_only}"))
+            if matching == 0 and iszl_count > 0 and oms_count > 0:
+                info_items.append(html.P("⚠️ КРИТИЧНО: Нет совпадений по ENP между таблицами! Возможные причины:", 
+                                        className='text-danger fw-bold'))
+                info_items.append(html.Ul([
+                    html.Li("Разные форматы ENP (например, с пробелами или без)"),
+                    html.Li("ENP в разных регистрах"),
+                    html.Li("ENP содержат лишние символы"),
+                ], className='list-unstyled'))
+                info_items.append(html.P("Проверьте примеры ENP из обеих таблиц вручную."))
+        info_items.append(html.Hr())
         
         # Финальный результат
         final = results.get('check_final_filter', {})
-        if 'error' not in final:
-            info_items.append(html.H5("6. Финальный результат (после фильтра COALESCE(o.has_pn1, 0) = 0):"))
-            info_items.append(html.P(f"Должно быть записей: {final.get('final_count', 'N/A')}"))
+        info_items.append(html.H5("6. Финальный результат (после фильтра COALESCE(o.has_pn1, 0) = 0):"))
+        if 'error' in final:
+            info_items.append(html.P(f"❌ ОШИБКА: {final.get('error', 'Неизвестная ошибка')}", className='text-danger'))
+        else:
+            final_count = final.get('final_count', 0)
+            info_items.append(html.P(f"Должно быть записей: {final_count}"))
             
             # Диагностика
-            if final.get('final_count', 0) == 0:
+            if final_count == 0:
                 info_items.append(html.Div([
-                    html.H5("🔍 Диагностика:", className='text-danger'),
+                    html.H5("🔍 Возможные причины пустого результата:", className='text-danger'),
                     html.Ul([
-                        html.Li("Если children_count = 0 → нет детей в таблице data_loader_iszlpeople (нужно обновить данные)"),
-                        html.Li("Если with_pn1 = total_after_join → все дети имеют ПН1, значит нет детей без ПН1"),
-                        html.Li("Если without_talon_data = 0 → нет совпадений по ENP между таблицами"),
+                        html.Li("Если children_count = 0 → нет детей в таблице data_loader_iszlpeople (нужно обновить данные из CSV)"),
+                        html.Li("Если with_pn1 = total_after_join → все дети имеют ПН1, значит нет детей без ПН1 (это нормально)"),
+                        html.Li("Если matching_enp = 0 → нет совпадений по ENP между таблицами (проверьте форматы ENP)"),
                         html.Li("Проверьте формат даты рождения (dr) - должен быть валидной датой"),
                         html.Li("Проверьте, что все дети действительно младше 18 лет"),
                     ])
                 ], className='alert alert-warning'))
+            else:
+                info_items.append(html.Div([
+                    html.P(f"✅ Найдено {final_count} записей. Данные должны отображаться в таблице.", 
+                          className='text-success fw-bold')
+                ], className='alert alert-success'))
         
         return dbc.Card([
             dbc.CardHeader(html.H4("Результаты диагностики", className='mb-0')),

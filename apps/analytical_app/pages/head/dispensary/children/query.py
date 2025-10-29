@@ -601,5 +601,24 @@ def get_diagnostic_stats():
                 GROUP BY enp
             ) o ON n.enp = o.enp
             WHERE COALESCE(o.has_pn1, 0) = 0
+        """,
+        'check_enp_match': """
+            SELECT 
+                COUNT(DISTINCT n.enp) as iszl_enp_count,
+                COUNT(DISTINCT o.enp) as oms_enp_count,
+                COUNT(DISTINCT CASE WHEN o.enp IS NOT NULL THEN n.enp END) as matching_enp,
+                COUNT(DISTINCT CASE WHEN o.enp IS NULL THEN n.enp END) as iszl_only_enp,
+                COUNT(DISTINCT CASE WHEN n.enp IS NULL THEN o.enp END) as oms_only_enp
+            FROM (
+                SELECT DISTINCT enp
+                FROM data_loader_iszlpeople
+                WHERE CAST(dr AS DATE) <= CURRENT_DATE
+                  AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
+            ) n
+            FULL OUTER JOIN (
+                SELECT DISTINCT enp
+                FROM data_loader_omsdata
+                WHERE goal IN ('ПН1', 'ДС1', 'ДС2')
+            ) o ON n.enp = o.enp
         """
     }
