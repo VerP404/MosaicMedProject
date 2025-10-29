@@ -6,7 +6,7 @@ from datetime import datetime
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.economist.financial_indicators.query import sql_query_financial_indicators
 from apps.analytical_app.components.filters import (
-    filter_years, filter_building, filter_department, update_buttons,
+    filter_years, filter_building, filter_department,
     get_available_buildings, get_available_departments
 )
 from apps.analytical_app.callback import TableUpdater
@@ -79,7 +79,8 @@ def layout(type_page="econ-financial-indicators"):
                     # Кнопка обновления
                     dbc.Col([
                         html.Label("", className="fw-bold"),  # Пустая метка для выравнивания
-                        update_buttons(type_page)
+                        dbc.Button("Обновить", id=f'update-button-{type_page}', color="primary",
+                                   className="mt-3")
                     ], width=1)
                 ], className="mb-3"),
                 

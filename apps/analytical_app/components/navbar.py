@@ -434,6 +434,7 @@ def update_updates_data(is_open, n_clicks):
         {"name": "ОМС: Врачи", "table": "load_data_doctor"},
         {"name": "ОМС: Отказы", "table": "load_data_error_log_talon"},
         {"name": "ОМС: Диспансеризация", "table": "load_data_detailed_medical_examination"},
+        {"name": "Квазар: ЭМД", "table": "load_data_emd"},
     ]
     
     rows = []

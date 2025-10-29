@@ -170,6 +170,11 @@ class AnnualPlan(models.Model):
     group = models.ForeignKey(GroupIndicators, on_delete=models.CASCADE, related_name="annual_plans",
                               verbose_name="Группа")
     year = models.PositiveIntegerField(verbose_name="Год")
+    show_in_cumulative_report = models.BooleanField(
+        default=False,
+        verbose_name="Отображать в отчете нарастающе",
+        help_text="Отметьте, чтобы включить этот показатель в отчет 'Нарастающе по всем показателям'"
+    )
 
     class Meta:
         unique_together = ('group', 'year')

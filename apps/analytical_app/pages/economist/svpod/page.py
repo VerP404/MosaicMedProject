@@ -10,7 +10,7 @@ from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.components.filters import filter_years, update_buttons
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details
+from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups
 from apps.analytical_app.query_executor import engine
 
 type_page = "econ-sv-pod"
@@ -26,7 +26,8 @@ def get_level_options(parent_id=None):
     return [{'label': level['name'], 'value': level['id']} for _, level in levels.iterrows()]
 
 
-economist_sv_pod = html.Div(
+# Контент для основной вкладки (текущий отчет)
+current_report_tab = html.Div(
     [
         dbc.Row(
             dbc.Col(
@@ -149,6 +150,97 @@ economist_sv_pod = html.Div(
             "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
             "border-radius": "10px"
         })
+    ],
+    style={"padding": "0rem"}
+)
+
+# Контент для вкладки "Нарастающе по всем показателям"
+cumulative_report_tab = html.Div(
+    [
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    dbc.CardBody(
+                        [
+                            dbc.CardHeader("Фильтры"),
+                            dbc.Row([
+                                dbc.Col(
+                                    dbc.Button(
+                                        "Сформировать отчет",
+                                        id=f'generate-cumulative-{type_page}',
+                                        color="primary",
+                                        className="me-2"
+                                    ),
+                                    width=2
+                                ),
+                                dbc.Col(filter_years(f'{type_page}-cumulative'), width=1),
+                                dbc.Col(
+                                    dcc.RadioItems(
+                                        id=f'mode-toggle-cumulative-{type_page}',
+                                        options=[
+                                            {'label': 'Объемы', 'value': 'volumes'},
+                                            {'label': 'Финансы', 'value': 'finance'}
+                                        ],
+                                        value='volumes',
+                                        inline=True,
+                                        labelStyle={'margin-right': '15px'}
+                                    ),
+                                    width=3
+                                ),
+                                dbc.Col(
+                                    dcc.Checklist(
+                                        id=f'unique-toggle-cumulative-{type_page}',
+                                        options=[{"label": "Уникальные пациенты", "value": "unique"}],
+                                        value=[],
+                                        inline=True,
+                                        style={"margin-left": "20px"}
+                                    ),
+                                    width=3
+                                ),
+                            ]),
+                            dbc.Row([
+                                dbc.Col(
+                                    dbc.Alert(
+                                        "Формируется отчет нарастающим итогом по всем показателям из базы данных",
+                                        color="info"
+                                    ),
+                                    width=12
+                                )
+                            ]),
+                        ]
+                    ),
+                    style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+                           "border-radius": "10px"}
+                ),
+                width=12
+            ),
+            style={"margin": "0 auto", "padding": "0rem"}
+        ),
+        dcc.Loading(id=f'loading-cumulative-{type_page}', type='default'),
+        card_table(f'cumulative-table-{type_page}', "Отчет нарастающим итогом по всем показателям", column_selectable='multi'),
+    ],
+    style={"padding": "0rem"}
+)
+
+# Основной layout с вкладками
+economist_sv_pod = html.Div(
+    [
+        dbc.Tabs(
+            [
+                dbc.Tab(
+                    label="Текущий отчет",
+                    tab_id=f"tab-current-{type_page}",
+                    children=current_report_tab
+                ),
+                dbc.Tab(
+                    label="Нарастающе по всем показателям",
+                    tab_id=f"tab-cumulative-{type_page}",
+                    children=cumulative_report_tab
+                ),
+            ],
+            active_tab=f"tab-current-{type_page}",
+            id=f"tabs-{type_page}"
+        )
     ],
     style={"padding": "0rem"}
 )
@@ -649,3 +741,63 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
     except Exception as e:
         error_msg = f"Ошибка при получении детализации: {str(e)}"
         return error_msg, [], []
+
+
+# Callback для формирования отчета нарастающе по всем показателям
+@app.callback(
+    [
+        Output(f'cumulative-table-{type_page}', 'columns'),
+        Output(f'cumulative-table-{type_page}', 'data'),
+        Output(f'loading-cumulative-{type_page}', 'children'),
+    ],
+    Input(f'generate-cumulative-{type_page}', 'n_clicks'),
+    State(f'dropdown-year-{type_page}-cumulative', 'value'),
+    State(f'mode-toggle-cumulative-{type_page}', 'value'),
+    State(f'unique-toggle-cumulative-{type_page}', 'value')
+)
+def generate_cumulative_report(n_clicks, selected_year, mode, unique_flag):
+    if n_clicks is None:
+        raise PreventUpdate
+    
+    if not selected_year:
+        return [], [], html.Div(dbc.Alert("Выберите год", color="warning"))
+    
+    loading_output = html.Div([dcc.Loading(type="default")])
+    
+    try:
+        unique = "unique" in unique_flag if unique_flag else False
+        mode = mode or 'volumes'
+        
+        # Получаем отчет нарастающе по всем группам
+        df = get_cumulative_report_for_all_groups(
+            selected_year=selected_year,
+            mode=mode,
+            unique_flag=unique
+        )
+        
+        if df.empty:
+            return [], [], html.Div(dbc.Alert("Нет данных для отображения", color="info"))
+        
+        # Формируем колонки для таблицы
+        columns = [
+            {"name": "Группа показателей", "id": "Группа показателей"},
+            {"name": ["Итог", "План"], "id": "План 1/12"},
+            {"name": ["Итог", "Факт"], "id": "Факт"},
+            {"name": ["Итог", "%"], "id": "%"},
+            {"name": ["Итог", "Остаток"], "id": "Остаток"},
+            {"name": ["Факт", "Новые"], "id": "новые"},
+            {"name": ["Факт", "В ТФОМС"], "id": "в_тфомс"},
+            {"name": ["Факт", "Оплачено"], "id": "оплачено"},
+            {"name": ["Факт", "Исправлено"], "id": "исправлено"},
+            {"name": ["Факт", "Отказано"], "id": "отказано"},
+            {"name": ["Факт", "Отменено"], "id": "отменено"},
+        ]
+        
+        # Преобразуем DataFrame в список словарей
+        data = df.to_dict('records')
+        
+        return columns, data, loading_output
+        
+    except Exception as e:
+        error_msg = f"Ошибка при формировании отчета: {str(e)}"
+        return [], [], html.Div(dbc.Alert(error_msg, color="danger"))

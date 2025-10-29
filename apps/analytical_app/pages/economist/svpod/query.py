@@ -2,6 +2,7 @@ import pandas as pd
 
 from apps.analytical_app.pages.SQL_query.query import base_query
 from apps.analytical_app.query_executor import engine
+from datetime import datetime
 
 
 # Функция для генерации условий фильтрации на основе планов
@@ -375,3 +376,216 @@ def sql_query_svpod_details(selected_year, selected_month, group_ids, filter_con
     """
     
     return query
+
+
+def get_all_end_groups():
+    """
+    Получает все конечные группы показателей (те, у которых нет дочерних групп).
+    Это группы, которые используются для формирования отчетов.
+    Устарело: используйте get_groups_for_cumulative_report(selected_year) вместо этого.
+    """
+    query = """
+    SELECT DISTINCT g.id, g.name
+    FROM plan_groupindicators g
+    WHERE NOT EXISTS (
+        SELECT 1 
+        FROM plan_groupindicators child 
+        WHERE child.parent_id = g.id
+    )
+    ORDER BY g.name
+    """
+    groups = pd.read_sql(query, engine)
+    return groups
+
+
+def get_groups_for_cumulative_report(selected_year):
+    """
+    Получает группы показателей, которые нужно отображать в отчете нарастающе.
+    Выбираются группы, у которых AnnualPlan.show_in_cumulative_report = True для указанного года.
+    Может быть любой уровень вложенности (не только конечные группы).
+    Возвращает полную иерархию групп через обратный слэш (\).
+    """
+    from sqlalchemy import text
+    
+    query = text("""
+    WITH RECURSIVE group_paths AS (
+        -- Базовый случай: группы с show_in_cumulative_report = true
+        SELECT 
+            g.id,
+            g.name,
+            g.parent_id,
+            g.name::text as full_path,
+            0 as level
+        FROM plan_groupindicators g
+        INNER JOIN plan_annualplan ap ON ap.group_id = g.id
+        WHERE ap.year = :selected_year 
+        AND ap.show_in_cumulative_report = true
+        
+        UNION ALL
+        
+        -- Рекурсивный случай: поднимаемся по иерархии вверх к родителю
+        SELECT 
+            gp.id,
+            p.name,
+            p.parent_id,
+            p.name || ' \\ ' || gp.full_path as full_path,
+            gp.level + 1
+        FROM plan_groupindicators p
+        INNER JOIN group_paths gp ON gp.parent_id = p.id
+    )
+    SELECT DISTINCT ON (id)
+        id,
+        full_path as name
+    FROM group_paths
+    ORDER BY id, level DESC
+    """)
+    groups = pd.read_sql(query, engine, params={"selected_year": selected_year})
+    return groups
+
+
+def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_flag=False):
+    """
+    Формирует отчет нарастающе по всем группам показателей.
+    Для каждой группы рассчитывает нарастающий итог за год.
+    
+    Возвращает DataFrame с колонками:
+    - Группа показателей (название)
+    - План 1/12 (сумма за год)
+    - Факт (нарастающий итог)
+    - Остаток
+    - % выполнения
+    - новые, в_тфомс, оплачено, исправлено, отказано, отменено (суммы)
+    """
+    from apps.analytical_app.callback import TableUpdater
+    from sqlalchemy import text
+    
+    # Получаем группы, помеченные для отображения в отчете нарастающе
+    groups = get_groups_for_cumulative_report(selected_year)
+    
+    if groups.empty:
+        return pd.DataFrame()
+    
+    # Определяем текущий месяц и день
+    today = datetime.today()
+    default_month = today.month - 1 if today.day <= 5 else today.month
+    current_day = today.day
+    current_month = default_month
+    
+    results = []
+
+    for _, group_row in groups.iterrows():
+        group_id = group_row['id']
+        group_name = group_row['name']
+        
+        # Получаем условия фильтрации для группы
+        filter_conditions = get_filter_conditions([group_id], selected_year)
+        
+        # Получаем фактические данные по месяцам
+        fact_columns, fact_data_list = TableUpdater.query_to_df(
+            engine,
+            sql_query_rep(selected_year,
+                          group_id=[group_id],
+                          filter_conditions=filter_conditions,
+                          mode=mode,
+                          unique_flag=unique_flag)
+        )
+        
+        # Преобразуем в словарь по месяцам
+        fact_dict = {}
+        for row in fact_data_list:
+            m = row["month"]
+            fact_dict[m] = row
+        
+        # Получаем плановые данные
+        plan_field = "quantity" if mode == 'volumes' else "amount"
+        plan_query = text(f"""
+            SELECT mp.month, SUM(mp.{plan_field}) AS plan
+            FROM plan_monthlyplan AS mp
+            INNER JOIN plan_annualplan AS ap ON mp.annual_plan_id = ap.id
+            WHERE ap.group_id = :group_id AND ap.year = :year
+            GROUP BY mp.month
+            ORDER BY mp.month
+        """)
+        with engine.connect() as connection:
+            result = connection.execute(plan_query, {"group_id": group_id, "year": selected_year}).mappings()
+            plan_data = {row["month"]: row["plan"] for row in result}
+        
+        # Рассчитываем общую сумму "исправлено" за все месяцы
+        total_ispravleno_all_months = sum(row.get("исправлено", 0) or 0 for row in fact_data_list)
+        
+        # Собираем данные по месяцам
+        cumulative_fact = 0
+        cumulative_new = 0
+        cumulative_tfoms = 0
+        cumulative_oplacheno = 0
+        cumulative_ispravleno = 0
+        cumulative_otkazano = 0
+        cumulative_otmeneno = 0
+        cumulative_plan_12 = 0  # Сумма планов за отображаемые месяцы (от 1 до current_month)
+        incoming_balance = 0
+        
+        # Проходим по всем месяцам от 1 до current_month для расчета остатка
+        for m in range(1, current_month + 1):
+            month_data = fact_dict.get(m, {})
+            
+            # Рассчитываем Факт по текущему дню (логика аналогична основной странице)
+            if m < current_month - 1:
+                month_fact = month_data.get("оплачено", 0) or 0
+            elif m == current_month - 1:
+                if current_day <= 10:
+                    month_fact = (
+                        (month_data.get("новые", 0) or 0) +
+                        (month_data.get("в_тфомс", 0) or 0) +
+                        (month_data.get("оплачено", 0) or 0) +
+                        total_ispravleno_all_months
+                    )
+                else:
+                    month_fact = month_data.get("оплачено", 0) or 0
+            elif m == current_month:
+                month_fact = (
+                    (month_data.get("новые", 0) or 0) +
+                    (month_data.get("в_тфомс", 0) or 0) +
+                    (month_data.get("оплачено", 0) or 0) +
+                    total_ispravleno_all_months
+                )
+            else:
+                month_fact = 0
+            
+            # Рассчитываем план на месяц
+            month_plan_12 = plan_data.get(m, 0) or 0
+            month_plan = month_plan_12 + incoming_balance
+            
+            # Накапливаем сумму планов за отображаемые месяцы
+            cumulative_plan_12 += month_plan_12
+            
+            # Остаток
+            month_remainder = month_plan - month_fact
+            incoming_balance = month_remainder
+            
+            # Накапливаем суммы
+            cumulative_fact += month_fact
+            cumulative_new += (month_data.get("новые", 0) or 0)
+            cumulative_tfoms += (month_data.get("в_тфомс", 0) or 0)
+            cumulative_oplacheno += (month_data.get("оплачено", 0) or 0)
+            cumulative_ispravleno += (month_data.get("исправлено", 0) or 0)
+            cumulative_otkazano += (month_data.get("отказано", 0) or 0)
+            cumulative_otmeneno += (month_data.get("отменено", 0) or 0)
+        
+        # Формируем строку результата
+        percent = round(cumulative_fact / cumulative_plan_12 * 100, 1) if cumulative_plan_12 > 0 else 0
+        
+        results.append({
+            "Группа показателей": group_name,
+            "План 1/12": cumulative_plan_12,
+            "Факт": cumulative_fact,
+            "Остаток": incoming_balance,
+            "%": percent,
+            "новые": cumulative_new,
+            "в_тфомс": cumulative_tfoms,
+            "оплачено": cumulative_oplacheno,
+            "исправлено": cumulative_ispravleno,
+            "отказано": cumulative_otkazano,
+            "отменено": cumulative_otmeneno,
+        })
+    
+    return pd.DataFrame(results)

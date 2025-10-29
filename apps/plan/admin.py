@@ -234,10 +234,11 @@ class DepartmentAutocomplete(autocomplete.Select2QuerySetView):
 class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     import_form_class = ImportForm
     export_form_class = ExportForm
-    list_display = ('group', 'year', 'has_quantity_plan', 'has_amount_plan')
-    list_filter = ('year',)
+    list_display = ('group', 'year', 'show_in_cumulative_report', 'has_quantity_plan', 'has_amount_plan')
+    list_filter = ('year', 'show_in_cumulative_report')
     search_fields = ('group__name', 'year',)
     inlines = [MonthlyPlanInline]
+    fields = ('group', 'year', 'show_in_cumulative_report')
 
     def has_quantity_plan(self, obj):
         """

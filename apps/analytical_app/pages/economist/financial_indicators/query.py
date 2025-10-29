@@ -13,54 +13,51 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
     
     if building_ids:
         building_ids_str = ', '.join(map(str, building_ids))
-        building_filter = f"AND building_id IN ({building_ids_str})"
+        building_filter = f"AND building.id IN ({building_ids_str})"
     
     if department_ids:
         department_ids_str = ', '.join(map(str, department_ids))
-        department_filter = f"AND department_id IN ({department_ids_str})"
+        department_filter = f"AND department.id IN ({department_ids_str})"
     
+    # Адаптация вашего рабочего запроса с правильной фильтрацией по месяцам
     query = f"""
     WITH report_data AS (
         SELECT oms.*,
-            CASE
-                WHEN oms.report_period = '-' THEN RIGHT(oms.treatment_end, 4)
-                ELSE RIGHT(oms.report_period, 4)
-                END AS report_year,
-            CASE
-                WHEN oms.report_period = '-' THEN
-                    CASE
-                        WHEN EXTRACT(DAY FROM CURRENT_DATE)::INT <= 4 THEN
-                            CASE
-                                WHEN TO_NUMBER(SUBSTRING(oms.treatment_end FROM 4 FOR 2), '99') =
-                                     EXTRACT(MONTH FROM CURRENT_DATE) THEN
-                                    EXTRACT(MONTH FROM CURRENT_DATE)::INT
-                                ELSE
-                                    CASE
-                                        WHEN EXTRACT(MONTH FROM CURRENT_DATE)::INT = 1 THEN 12
-                                        ELSE EXTRACT(MONTH FROM CURRENT_DATE)::INT - 1
-                                        END
-                                END
-                        ELSE
-                            EXTRACT(MONTH FROM CURRENT_DATE)::INT
-                        END
-                ELSE
-                    CASE TRIM(SUBSTRING(oms.report_period FROM 1 FOR
-                                        POSITION(' ' IN oms.report_period) - 1))
-                        WHEN 'Января' THEN 1
-                        WHEN 'Февраля' THEN 2
-                        WHEN 'Марта' THEN 3
-                        WHEN 'Апреля' THEN 4
-                        WHEN 'Мая' THEN 5
-                        WHEN 'Июня' THEN 6
-                        WHEN 'Июля' THEN 7
-                        WHEN 'Августа' THEN 8
-                        WHEN 'Сентября' THEN 9
-                        WHEN 'Октября' THEN 10
-                        WHEN 'Ноября' THEN 11
-                        WHEN 'Декабря' THEN 12
-                        ELSE NULL
-                        END
-                END AS report_month_number
+               CASE
+                   WHEN oms.report_period = '-' THEN RIGHT(oms.treatment_end, 4)
+                   ELSE RIGHT(oms.report_period, 4)
+                   END AS report_year,
+               CASE
+                   WHEN oms.report_period = '-' THEN
+                       CASE
+                           WHEN EXTRACT(DAY FROM CURRENT_DATE)::INT <= 4 THEN
+                               CASE
+                                   WHEN TO_NUMBER(SUBSTRING(oms.treatment_end FROM 4 FOR 2), '99') = EXTRACT(MONTH FROM CURRENT_DATE)
+                                   THEN EXTRACT(MONTH FROM CURRENT_DATE)::INT
+                                   ELSE CASE
+                                       WHEN EXTRACT(MONTH FROM CURRENT_DATE)::INT = 1 THEN 12
+                                       ELSE EXTRACT(MONTH FROM CURRENT_DATE)::INT - 1
+                                       END
+                                   END
+                           ELSE EXTRACT(MONTH FROM CURRENT_DATE)::INT
+                           END
+                   ELSE
+                       CASE TRIM(SUBSTRING(oms.report_period FROM 1 FOR POSITION(' ' IN oms.report_period) - 1))
+                           WHEN 'Января' THEN 1
+                           WHEN 'Февраля' THEN 2
+                           WHEN 'Марта' THEN 3
+                           WHEN 'Апреля' THEN 4
+                           WHEN 'Мая' THEN 5
+                           WHEN 'Июня' THEN 6
+                           WHEN 'Июля' THEN 7
+                           WHEN 'Августа' THEN 8
+                           WHEN 'Сентября' THEN 9
+                           WHEN 'Октября' THEN 10
+                           WHEN 'Ноября' THEN 11
+                           WHEN 'Декабря' THEN 12
+                           ELSE NULL
+                           END
+                   END AS report_month_number
         FROM data_loader_omsdata oms
     ),
     oms_data AS (
@@ -72,8 +69,8 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
                 ELSE NULL
                 END AS amount_numeric,
             report_data.status,
-            report_data.report_month_number,
             report_data.report_year,
+            report_data.report_month_number,
             department.id as department_id,
             building.id as building_id
         FROM report_data
@@ -84,15 +81,14 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
         ) pd ON SUBSTRING(report_data.doctor FROM 1 FOR POSITION(' ' IN report_data.doctor) - 1) = pd.doctor_code
         LEFT JOIN public.organization_department department ON department.id = pd.department_id
         LEFT JOIN public.organization_building building ON building.id = department.building_id
-        WHERE report_data.report_month_number = {selected_month}
+        WHERE report_data.status = '3'
           AND report_data.report_year = '{selected_year}'
-          AND report_data.status = '3'
+          AND report_data.report_month_number = {selected_month}
           {building_filter}
           {department_filter}
     )
     SELECT *
     FROM (
-        -- Основные цели
         SELECT
             COALESCE(goal, 'Без цели') AS goal,
             COUNT(*) AS count_records,
@@ -108,7 +104,6 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
 
         UNION ALL
 
-        -- Сверхподушевик
         SELECT
             'Сверхподушевик' AS goal,
             COUNT(*) AS count_records,
@@ -126,7 +121,6 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
 
         UNION ALL
 
-        -- ИТОГО
         SELECT
             'ИТОГО' AS goal,
             COUNT(*) AS count_records,
@@ -149,5 +143,4 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
     """
     
     return query
-
 
