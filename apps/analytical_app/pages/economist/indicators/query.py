@@ -90,6 +90,7 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
         # Экранируем одинарные кавычки для SQL
         escaped_filter_description = filter_description.replace("'", "''")
         
+        # Используем правильную логику группировки статусов как в svpod
         union_query = f"""
             SELECT '{condition_type}' AS type,
                    COUNT(*) AS "К-во",
@@ -97,6 +98,9 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
                    '{escaped_filter_description}' AS "Условия фильтра"
             FROM oms
             WHERE {combined_where_clause}
+            AND inogorodniy = false
+            AND sanctions IN ('-', '0')
+            AND amount_numeric != '0'
         """
         union_queries.append(union_query)
 
