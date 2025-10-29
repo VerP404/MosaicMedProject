@@ -105,6 +105,33 @@ def copy_filters_action(modeladmin, request, queryset):
 copy_filters_action.short_description = "Скопировать фильтры на следующий год для выбранных групп"
 
 
+# Действия для изменения статуса отображения в отчете нарастающе
+def enable_cumulative_report_action(modeladmin, request, queryset):
+    """Включить отображение в отчете нарастающе для выбранных планов"""
+    updated = queryset.update(show_in_cumulative_report=True)
+    modeladmin.message_user(
+        request,
+        f"Включено отображение в отчете нарастающе для {updated} планов.",
+        messages.SUCCESS
+    )
+
+
+enable_cumulative_report_action.short_description = "Включить отображение в отчете нарастающе"
+
+
+def disable_cumulative_report_action(modeladmin, request, queryset):
+    """Отключить отображение в отчете нарастающе для выбранных планов"""
+    updated = queryset.update(show_in_cumulative_report=False)
+    modeladmin.message_user(
+        request,
+        f"Отключено отображение в отчете нарастающе для {updated} планов.",
+        messages.SUCCESS
+    )
+
+
+disable_cumulative_report_action.short_description = "Отключить отображение в отчете нарастающе"
+
+
 # Фильтр по году фильтра
 class FilterYearListFilter(admin.SimpleListFilter):
     title = 'Год фильтра'
@@ -239,6 +266,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     search_fields = ('group__name', 'year',)
     inlines = [MonthlyPlanInline]
     fields = ('group', 'year', 'show_in_cumulative_report')
+    actions = [enable_cumulative_report_action, disable_cumulative_report_action]
 
     def has_quantity_plan(self, obj):
         """
