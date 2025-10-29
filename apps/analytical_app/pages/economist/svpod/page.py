@@ -748,6 +748,7 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
     [
         Output(f'cumulative-table-{type_page}', 'columns'),
         Output(f'cumulative-table-{type_page}', 'data'),
+        Output(f'cumulative-table-{type_page}', 'style_cell_conditional'),
         Output(f'loading-cumulative-{type_page}', 'children'),
     ],
     Input(f'generate-cumulative-{type_page}', 'n_clicks'),
@@ -760,9 +761,19 @@ def generate_cumulative_report(n_clicks, selected_year, mode, unique_flag):
         raise PreventUpdate
     
     if not selected_year:
-        return [], [], html.Div(dbc.Alert("Выберите год", color="warning"))
+        return [], [], [], html.Div(dbc.Alert("Выберите год", color="warning"))
     
     loading_output = html.Div([dcc.Loading(type="default")])
+    
+    # Стили для столбцов - делаем "Группа показателей" шире
+    style_cell_conditional = [
+        {
+            'if': {'column_id': 'Группа показателей'},
+            'minWidth': '300px',
+            'maxWidth': '400px',
+            'width': '350px'
+        }
+    ]
     
     try:
         unique = "unique" in unique_flag if unique_flag else False
@@ -776,7 +787,7 @@ def generate_cumulative_report(n_clicks, selected_year, mode, unique_flag):
         )
         
         if df.empty:
-            return [], [], html.Div(dbc.Alert("Нет данных для отображения", color="info"))
+            return [], [], [], html.Div(dbc.Alert("Нет данных для отображения", color="info"))
         
         # Формируем колонки для таблицы
         columns = [
@@ -796,8 +807,8 @@ def generate_cumulative_report(n_clicks, selected_year, mode, unique_flag):
         # Преобразуем DataFrame в список словарей
         data = df.to_dict('records')
         
-        return columns, data, loading_output
+        return columns, data, style_cell_conditional, loading_output
         
     except Exception as e:
         error_msg = f"Ошибка при формировании отчета: {str(e)}"
-        return [], [], html.Div(dbc.Alert(error_msg, color="danger"))
+        return [], [], [], html.Div(dbc.Alert(error_msg, color="danger"))
