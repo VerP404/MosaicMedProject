@@ -1,39 +1,73 @@
 import datetime
+import logging
 
 from sqlalchemy import text
 import pandas as pd
 
 from apps.analytical_app.query_executor import engine
 
+logger = logging.getLogger(__name__)
+
 
 class TableUpdater:
 
     @staticmethod
-    def query_to_df(engine, sql_query, bind_params=None):
-        # Очищаем запрос от переносов строк и лишних пробелов
-        sql_query_cleaned = sql_query.replace('\n', ' ').replace('\r', ' ').strip()
+    def query_to_df(engine, sql_query, bind_params=None, debug=False):
+        """
+        Выполняет SQL-запрос и возвращает данные для таблицы Dash.
+        
+        Args:
+            engine: SQLAlchemy engine
+            sql_query: SQL-запрос (строка)
+            bind_params: параметры для запроса (dict)
+            debug: если True, логирует детальную информацию о запросе и результате
+        
+        Returns:
+            tuple: (columns, data) - колонки и данные для Dash таблицы
+        """
+        try:
+            # Очищаем запрос от переносов строк и лишних пробелов
+            sql_query_cleaned = sql_query.replace('\n', ' ').replace('\r', ' ').strip()
+            
+            if debug:
+                logger.info(f"Выполнение запроса (первые 500 символов): {sql_query_cleaned[:500]}...")
 
-        # Выполняем запрос с параметрами
-        with engine.connect() as conn:
-            query = text(sql_query_cleaned)
-            if bind_params:
-                query = query.bindparams(**bind_params)
-            result = conn.execute(query)
+            # Выполняем запрос с параметрами
+            with engine.connect() as conn:
+                query = text(sql_query_cleaned)
+                if bind_params:
+                    query = query.bindparams(**bind_params)
+                    if debug:
+                        logger.info(f"Параметры запроса: {bind_params}")
+                
+                result = conn.execute(query)
 
-            # Получаем результаты
-            columns = [desc[0] for desc in result.cursor.description]
-            rows = result.fetchall()
+                # Получаем результаты
+                columns = [desc[0] for desc in result.cursor.description]
+                rows = result.fetchall()
 
-            # Преобразуем результат в DataFrame
-            df = pd.DataFrame(rows, columns=columns)
+                # Преобразуем результат в DataFrame
+                df = pd.DataFrame(rows, columns=columns)
+                
+                row_count = len(df)
+                if debug:
+                    logger.info(f"Запрос выполнен успешно. Найдено строк: {row_count}")
+                    if row_count == 0:
+                        logger.warning("Запрос вернул пустой результат!")
 
-            if len(df) == 0:
-                return [], []
+                if row_count == 0:
+                    return [], []
 
-            # Преобразуем для отображения в таблице Dash
-            columns = [{'name': col, 'id': col} for col in df.columns]
-            data = df.to_dict('records')
-            return columns, data
+                # Преобразуем для отображения в таблице Dash
+                columns = [{'name': col, 'id': col} for col in df.columns]
+                data = df.to_dict('records')
+                return columns, data
+                
+        except Exception as e:
+            logger.error(f"Ошибка при выполнении запроса: {str(e)}", exc_info=True)
+            if debug:
+                logger.error(f"Проблемный запрос: {sql_query[:1000]}")
+            raise
 
     @staticmethod
     def get_sql_month(month):

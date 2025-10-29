@@ -497,3 +497,109 @@ FROM data
 GROUP BY month, department
 ORDER BY month, department
     """
+
+
+# Диагностические запросы для отладки пустых результатов
+
+def get_diagnostic_stats():
+    """
+    Возвращает словарь с диагностическими SQL-запросами для проверки данных.
+    Помогает понять, почему запрос возвращает пустой результат.
+    """
+    return {
+        'check_omsdata': """
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(DISTINCT enp) as unique_enp,
+                COUNT(DISTINCT CASE WHEN goal IN ('ПН1', 'ДС1', 'ДС2') THEN enp END) as enp_with_goals,
+                COUNT(DISTINCT CASE WHEN goal = 'ПН1' THEN enp END) as enp_with_pn1,
+                COUNT(DISTINCT CASE WHEN goal = 'ДС1' THEN enp END) as enp_with_ds1,
+                COUNT(DISTINCT CASE WHEN goal = 'ДС2' THEN enp END) as enp_with_ds2
+            FROM data_loader_omsdata
+        """,
+        'check_iszlpeople': """
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(DISTINCT enp) as unique_enp,
+                COUNT(DISTINCT CASE WHEN CAST(dr AS DATE) <= CURRENT_DATE THEN enp END) as valid_dates,
+                COUNT(DISTINCT CASE WHEN DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18 THEN enp END) as children_count
+            FROM data_loader_iszlpeople
+        """,
+        'check_talon_cte': """
+            SELECT
+                COUNT(*) as talon_rows,
+                COUNT(DISTINCT enp) as unique_enp,
+                SUM(has_pn1) as with_pn1,
+                SUM(has_ds1) as with_ds1,
+                SUM(has_ds2) as with_ds2
+            FROM (
+                SELECT
+                    enp,
+                    MAX(CASE WHEN goal = 'ПН1' THEN 1 ELSE 0 END) AS has_pn1,
+                    MAX(CASE WHEN goal = 'ДС1' THEN 1 ELSE 0 END) AS has_ds1,
+                    MAX(CASE WHEN goal = 'ДС2' THEN 1 ELSE 0 END) AS has_ds2
+                FROM data_loader_omsdata
+                WHERE goal IN ('ПН1', 'ДС1', 'ДС2')
+                GROUP BY enp
+            ) t
+        """,
+        'check_naselenie_cte': """
+            SELECT 
+                COUNT(*) as naselenie_rows,
+                COUNT(DISTINCT enp) as unique_enp,
+                MIN(age_years) as min_age,
+                MAX(age_years) as max_age
+            FROM (
+                SELECT DISTINCT ON (enp)
+                    enp,
+                    DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) AS age_years
+                FROM data_loader_iszlpeople
+                WHERE CAST(dr AS DATE) <= CURRENT_DATE
+                  AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
+                ORDER BY enp, CAST(dr AS DATE) DESC
+            ) n
+        """,
+        'check_join_result': """
+            SELECT 
+                COUNT(*) as total_after_join,
+                COUNT(CASE WHEN o.has_pn1 IS NULL THEN 1 END) as without_talon_data,
+                COUNT(CASE WHEN o.has_pn1 = 0 THEN 1 END) as without_pn1,
+                COUNT(CASE WHEN o.has_pn1 = 1 THEN 1 END) as with_pn1
+            FROM (
+                SELECT DISTINCT ON (enp)
+                    enp
+                FROM data_loader_iszlpeople
+                WHERE CAST(dr AS DATE) <= CURRENT_DATE
+                  AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
+                ORDER BY enp, CAST(dr AS DATE) DESC
+            ) n
+            LEFT JOIN (
+                SELECT
+                    enp,
+                    MAX(CASE WHEN goal = 'ПН1' THEN 1 ELSE 0 END) AS has_pn1
+                FROM data_loader_omsdata
+                WHERE goal IN ('ПН1', 'ДС1', 'ДС2')
+                GROUP BY enp
+            ) o ON n.enp = o.enp
+        """,
+        'check_final_filter': """
+            SELECT COUNT(*) as final_count
+            FROM (
+                SELECT DISTINCT ON (enp)
+                    enp
+                FROM data_loader_iszlpeople
+                WHERE CAST(dr AS DATE) <= CURRENT_DATE
+                  AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
+                ORDER BY enp, CAST(dr AS DATE) DESC
+            ) n
+            LEFT JOIN (
+                SELECT
+                    enp,
+                    MAX(CASE WHEN goal = 'ПН1' THEN 1 ELSE 0 END) AS has_pn1
+                FROM data_loader_omsdata
+                WHERE goal IN ('ПН1', 'ДС1', 'ДС2')
+                GROUP BY enp
+            ) o ON n.enp = o.enp
+            WHERE COALESCE(o.has_pn1, 0) = 0
+        """
+    }
