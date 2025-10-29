@@ -197,12 +197,26 @@ naselenie AS (
     SELECT DISTINCT ON (enp)
         fio,
         dr,
-        CAST(dr AS DATE) AS dr_date,
+        CASE 
+            WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN TO_DATE(dr, 'DD.MM.YYYY')
+            ELSE CAST(dr AS DATE)
+        END AS dr_date,
         enp,
         lpuuch,
-        DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) AS age_years,
-        DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE))) AS age_months_raw,
-        (DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) * 12 + DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE))))::INTEGER AS age_in_months,
+        CASE 
+            WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY')))
+            ELSE DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE)))
+        END AS age_years,
+        CASE 
+            WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN DATE_PART('month', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY')))
+            ELSE DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE)))
+        END AS age_months_raw,
+        CASE 
+            WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN 
+                (DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))) * 12 + DATE_PART('month', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))))::INTEGER
+            ELSE 
+                (DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) * 12 + DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE))))::INTEGER
+        END AS age_in_months,
         CASE
             WHEN LOWER("fio") LIKE '%вич%' THEN 'М'
             WHEN LOWER("fio") LIKE '%вна%' THEN 'Ж'
@@ -234,9 +248,19 @@ naselenie AS (
             ELSE 'М'
         END AS gender
     FROM data_loader_iszlpeople
-    WHERE CAST(dr AS DATE) <= CURRENT_DATE
-      AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
-    ORDER BY enp, CAST(dr AS DATE) DESC
+    WHERE dr IS NOT NULL AND dr != ''
+      AND (
+        (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND TO_DATE(dr, 'DD.MM.YYYY') <= CURRENT_DATE)
+        OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND CAST(dr AS DATE) <= CURRENT_DATE)
+      )
+      AND (
+        (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))) < 18)
+        OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18)
+      )
+    ORDER BY enp, CASE 
+        WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN TO_DATE(dr, 'DD.MM.YYYY')
+        ELSE CAST(dr AS DATE)
+    END DESC
 )
 SELECT
     n.fio as "ФИО",
@@ -283,11 +307,24 @@ naselenie AS (
     SELECT DISTINCT ON (enp)
         enp,
         lpuuch,
-        DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE)))::INT AS age_years
+        CASE 
+            WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY')))::INT
+            ELSE DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE)))::INT
+        END AS age_years
     FROM data_loader_iszlpeople
-    WHERE CAST(dr AS DATE) <= CURRENT_DATE
-      AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
-    ORDER BY enp, CAST(dr AS DATE) DESC
+    WHERE dr IS NOT NULL AND dr != ''
+      AND (
+        (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND TO_DATE(dr, 'DD.MM.YYYY') <= CURRENT_DATE)
+        OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND CAST(dr AS DATE) <= CURRENT_DATE)
+      )
+      AND (
+        (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))) < 18)
+        OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18)
+      )
+    ORDER BY enp, CASE 
+        WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN TO_DATE(dr, 'DD.MM.YYYY')
+        ELSE CAST(dr AS DATE)
+    END DESC
 )
 SELECT
     n.lpuuch AS "Участок",
@@ -322,7 +359,7 @@ def sql_query_children_list_not_pn1_details_by_uchastok_age(uchastok: str, age_y
     safe_uch = str(uchastok).replace("'", "''")
     age_filter = ""
     if age_years is not None and str(age_years).isdigit():
-        age_filter = f"\n  AND DATE_PART('year', AGE(CURRENT_DATE, n.dr_date))::INT = {int(age_years)}"
+        age_filter = f"\n  AND n.age_years::INT = {int(age_years)}"
     return f"""
 WITH talon AS (
     SELECT
@@ -341,16 +378,40 @@ naselenie AS (
     SELECT DISTINCT ON (enp)
         fio,
         dr,
-        CAST(dr AS DATE) AS dr_date,
+        CASE 
+            WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN TO_DATE(dr, 'DD.MM.YYYY')
+            ELSE CAST(dr AS DATE)
+        END AS dr_date,
         enp,
         lpuuch,
-        DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) AS age_years,
-        DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE))) AS age_months_raw,
-        (DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) * 12 + DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE))))::INTEGER AS age_in_months
+        CASE 
+            WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY')))
+            ELSE DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE)))
+        END AS age_years,
+        CASE 
+            WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN DATE_PART('month', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY')))
+            ELSE DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE)))
+        END AS age_months_raw,
+        CASE 
+            WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN 
+                (DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))) * 12 + DATE_PART('month', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))))::INTEGER
+            ELSE 
+                (DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) * 12 + DATE_PART('month', AGE(CURRENT_DATE, CAST(dr AS DATE))))::INTEGER
+        END AS age_in_months
     FROM data_loader_iszlpeople
-    WHERE CAST(dr AS DATE) <= CURRENT_DATE
-      AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
-    ORDER BY enp, CAST(dr AS DATE) DESC
+    WHERE dr IS NOT NULL AND dr != ''
+      AND (
+        (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND TO_DATE(dr, 'DD.MM.YYYY') <= CURRENT_DATE)
+        OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND CAST(dr AS DATE) <= CURRENT_DATE)
+      )
+      AND (
+        (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))) < 18)
+        OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18)
+      )
+    ORDER BY enp, CASE 
+        WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN TO_DATE(dr, 'DD.MM.YYYY')
+        ELSE CAST(dr AS DATE)
+    END DESC
 )
 SELECT
     n.fio as "ФИО",
@@ -521,9 +582,16 @@ def get_diagnostic_stats():
             SELECT 
                 COUNT(*) as total_rows,
                 COUNT(DISTINCT enp) as unique_enp,
-                COUNT(DISTINCT CASE WHEN CAST(dr AS DATE) <= CURRENT_DATE THEN enp END) as valid_dates,
-                COUNT(DISTINCT CASE WHEN DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18 THEN enp END) as children_count
+                COUNT(DISTINCT CASE 
+                    WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND TO_DATE(dr, 'DD.MM.YYYY') <= CURRENT_DATE THEN enp
+                    WHEN dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND CAST(dr AS DATE) <= CURRENT_DATE THEN enp
+                END) as valid_dates,
+                COUNT(DISTINCT CASE 
+                    WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))) < 18 THEN enp
+                    WHEN dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18 THEN enp
+                END) as children_count
             FROM data_loader_iszlpeople
+            WHERE dr IS NOT NULL AND dr != ''
         """,
         'check_talon_cte': """
             SELECT
@@ -552,11 +620,24 @@ def get_diagnostic_stats():
             FROM (
                 SELECT DISTINCT ON (enp)
                     enp,
-                    DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) AS age_years
+                    CASE 
+                        WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY')))
+                        ELSE DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE)))
+                    END AS age_years
                 FROM data_loader_iszlpeople
-                WHERE CAST(dr AS DATE) <= CURRENT_DATE
-                  AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
-                ORDER BY enp, CAST(dr AS DATE) DESC
+                WHERE dr IS NOT NULL AND dr != ''
+                  AND (
+                    (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND TO_DATE(dr, 'DD.MM.YYYY') <= CURRENT_DATE)
+                    OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND CAST(dr AS DATE) <= CURRENT_DATE)
+                  )
+                  AND (
+                    (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))) < 18)
+                    OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18)
+                  )
+                ORDER BY enp, CASE 
+                    WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN TO_DATE(dr, 'DD.MM.YYYY')
+                    ELSE CAST(dr AS DATE)
+                END DESC
             ) n
         """,
         'check_join_result': """
@@ -569,9 +650,19 @@ def get_diagnostic_stats():
                 SELECT DISTINCT ON (enp)
                     enp
                 FROM data_loader_iszlpeople
-                WHERE CAST(dr AS DATE) <= CURRENT_DATE
-                  AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
-                ORDER BY enp, CAST(dr AS DATE) DESC
+                WHERE dr IS NOT NULL AND dr != ''
+                  AND (
+                    (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND TO_DATE(dr, 'DD.MM.YYYY') <= CURRENT_DATE)
+                    OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND CAST(dr AS DATE) <= CURRENT_DATE)
+                  )
+                  AND (
+                    (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))) < 18)
+                    OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18)
+                  )
+                ORDER BY enp, CASE 
+                    WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN TO_DATE(dr, 'DD.MM.YYYY')
+                    ELSE CAST(dr AS DATE)
+                END DESC
             ) n
             LEFT JOIN (
                 SELECT
@@ -588,9 +679,19 @@ def get_diagnostic_stats():
                 SELECT DISTINCT ON (enp)
                     enp
                 FROM data_loader_iszlpeople
-                WHERE CAST(dr AS DATE) <= CURRENT_DATE
-                  AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
-                ORDER BY enp, CAST(dr AS DATE) DESC
+                WHERE dr IS NOT NULL AND dr != ''
+                  AND (
+                    (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND TO_DATE(dr, 'DD.MM.YYYY') <= CURRENT_DATE)
+                    OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND CAST(dr AS DATE) <= CURRENT_DATE)
+                  )
+                  AND (
+                    (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))) < 18)
+                    OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18)
+                  )
+                ORDER BY enp, CASE 
+                    WHEN dr ~ '^\d{2}\.\d{2}\.\d{4}$' THEN TO_DATE(dr, 'DD.MM.YYYY')
+                    ELSE CAST(dr AS DATE)
+                END DESC
             ) n
             LEFT JOIN (
                 SELECT
@@ -612,8 +713,15 @@ def get_diagnostic_stats():
             FROM (
                 SELECT DISTINCT enp
                 FROM data_loader_iszlpeople
-                WHERE CAST(dr AS DATE) <= CURRENT_DATE
-                  AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18
+                WHERE dr IS NOT NULL AND dr != ''
+                  AND (
+                    (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND TO_DATE(dr, 'DD.MM.YYYY') <= CURRENT_DATE)
+                    OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND CAST(dr AS DATE) <= CURRENT_DATE)
+                  )
+                  AND (
+                    (dr ~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, TO_DATE(dr, 'DD.MM.YYYY'))) < 18)
+                    OR (dr !~ '^\d{2}\.\d{2}\.\d{4}$' AND DATE_PART('year', AGE(CURRENT_DATE, CAST(dr AS DATE))) < 18)
+                  )
             ) n
             FULL OUTER JOIN (
                 SELECT DISTINCT enp
