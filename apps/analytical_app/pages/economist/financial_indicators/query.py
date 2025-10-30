@@ -91,8 +91,8 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
     FROM (
         SELECT
             COALESCE(goal, 'Без цели') AS goal,
-            COUNT(*) AS count_records,
-            SUM(amount_numeric) AS total_amount,
+            COUNT(*) FILTER (WHERE smo_code IN ('36065', '36071', '36079')) AS count_records,
+            COALESCE(SUM(amount_numeric) FILTER (WHERE smo_code IN ('36065', '36071', '36079')), 0) AS total_amount,
             COUNT(*) FILTER (WHERE smo_code = '36065') AS count_inkomed,
             COALESCE(SUM(amount_numeric) FILTER (WHERE smo_code = '36065'), 0) AS sum_inkomed,
             COUNT(*) FILTER (WHERE smo_code IN ('36071', '36079')) AS count_sogaz,
@@ -106,8 +106,8 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
 
         SELECT
             'Сверхподушевик' AS goal,
-            COUNT(*) AS count_records,
-            COALESCE(SUM(amount_numeric), 0) AS total_amount,
+            COUNT(*) FILTER (WHERE smo_code IN ('36065', '36071', '36079')) AS count_records,
+            COALESCE(SUM(amount_numeric) FILTER (WHERE smo_code IN ('36065', '36071', '36079')), 0) AS total_amount,
             COUNT(*) FILTER (WHERE smo_code = '36065') AS count_inkomed,
             COALESCE(SUM(amount_numeric) FILTER (WHERE smo_code = '36065'), 0) AS sum_inkomed,
             COUNT(*) FILTER (WHERE smo_code IN ('36071', '36079')) AS count_sogaz,
@@ -123,8 +123,8 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
 
         SELECT
             'ИТОГО' AS goal,
-            COUNT(*) AS count_records,
-            SUM(amount_numeric) AS total_amount,
+            COUNT(*) FILTER (WHERE smo_code IN ('36065', '36071', '36079')) AS count_records,
+            COALESCE(SUM(amount_numeric) FILTER (WHERE smo_code IN ('36065', '36071', '36079')), 0) AS total_amount,
             COUNT(*) FILTER (WHERE smo_code = '36065') AS count_inkomed,
             COALESCE(SUM(amount_numeric) FILTER (WHERE smo_code = '36065'), 0) AS sum_inkomed,
             COUNT(*) FILTER (WHERE smo_code IN ('36071', '36079')) AS count_sogaz,

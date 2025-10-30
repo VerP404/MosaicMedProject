@@ -95,7 +95,7 @@ def layout(type_page="econ-financial-indicators"):
                 dbc.Row([
                     dbc.Col([
                         dbc.Alert(
-                            "Отобраны талоны: оплаченные (статус 3)",
+                            "Отобраны талоны: оплаченные (статус 3). Общая сумма и кол-во — без иногородних",
                             color="info",
                             className="mb-2"
                         )
