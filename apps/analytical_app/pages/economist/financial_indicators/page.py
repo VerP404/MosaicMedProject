@@ -13,6 +13,13 @@ from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.query_executor import engine
 
 
+# Список целей, входящих в правила "Сверхподушевик"
+SVERHPOD_GOALS = [
+    'ДВ4', 'ДВ2', 'ОПВ', 'ДР1', 'ДР2', 'УД1', 'УД2',
+    'ПН1', 'ДС2', '3', '113', '307', '22', '541',
+    '64', '301', '305', '14', 'В дневном стационаре', 'На дому'
+]
+
 def layout(type_page="econ-financial-indicators"):
     """Layout для страницы финансовых показателей"""
     
@@ -158,6 +165,9 @@ def update_departments(selected_buildings):
 def update_applied_filters(selected_year, selected_period, selected_buildings, selected_departments):
     filters = []
     
+    # Правила отбора для "Сверхподушевик" (должны соответствовать SQL в query.py)
+    sverhpod_text = "Правила 'Сверхподушевик': цели " + ', '.join(SVERHPOD_GOALS)
+
     if selected_year:
         filters.append(f"Год: {selected_year}")
     
@@ -181,16 +191,17 @@ def update_applied_filters(selected_year, selected_period, selected_buildings, s
         filters.append(f"Отделение: {', '.join(department_names)}")
     
     if filters:
-        return f"Примененные фильтры: {'; '.join(filters)}"
+        return f"Примененные фильтры: {'; '.join(filters)}; {sverhpod_text}"
     else:
-        return "Фильтры не применены"
+        return f"Фильтры не применены; {sverhpod_text}"
 
 
 # Callback для обновления таблицы
 @callback(
     [
         Output(f'result-table-econ-financial-indicators', 'columns'),
-        Output(f'result-table-econ-financial-indicators', 'data')
+        Output(f'result-table-econ-financial-indicators', 'data'),
+        Output(f'result-table-econ-financial-indicators', 'style_data_conditional')
     ],
     Input(f'update-button-econ-financial-indicators', 'n_clicks'),
     [
@@ -202,7 +213,7 @@ def update_applied_filters(selected_year, selected_period, selected_buildings, s
 )
 def update_table(n_clicks, selected_year, selected_period, selected_buildings, selected_departments):
     if not n_clicks or not selected_year or not selected_period:
-        return [], []
+        return [], [], []
     
     try:
         # Используем выбранный месяц напрямую
@@ -231,8 +242,26 @@ def update_table(n_clicks, selected_year, selected_period, selected_buildings, s
             {'name': 'Сумма Иногородние', 'id': 'sum_inogor', 'type': 'numeric', 'format': {'specifier': ',.2f'}}
         ]
         
-        return formatted_columns, data
+        # Условное форматирование: подсветка строки "Сверхподушевик" и всех целей из правил
+        style_data_conditional = [
+            {
+                'if': {'filter_query': '{goal} = "Сверхподушевик"'},
+                'backgroundColor': '#d4edda',  # bootstrap alert-success bg
+                'color': '#155724',            # bootstrap alert-success text
+                'fontWeight': 'bold'
+            }
+        ] + [
+            {
+                'if': {'filter_query': f'{{goal}} = "{g}"'},
+                'backgroundColor': '#d4edda',
+                'color': '#155724',
+                'fontWeight': 'bold'
+            }
+            for g in SVERHPOD_GOALS
+        ]
+
+        return formatted_columns, data, style_data_conditional
         
     except Exception as e:
         print(f"Ошибка при обновлении таблицы: {str(e)}")
-        return [], []
+        return [], [], []
