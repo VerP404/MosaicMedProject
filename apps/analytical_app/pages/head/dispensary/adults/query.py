@@ -299,3 +299,114 @@ WHERE a.age_years >= 18
 {"" if not exclude_clause else exclude_clause}
 ORDER BY ap.appointment_ts DESC, a.lpuuch, a.fio
     """
+
+
+def sql_query_dispensary_organized_collectives(talon_numbers: list[str], age_group: str = None) -> str:
+    """
+    Сводная таблица по возрастам и типам диспансеризации для организованных коллективов.
+    
+    :param talon_numbers: Список номеров талонов для фильтрации
+    :param age_group: '40-65', 'прочие' или None для общего итога
+    """
+    if not talon_numbers:
+        return "SELECT 'Нет данных' AS \"Тип\", 0 AS \"1\", 0 AS \"2\", 0 AS \"3\", 0 AS \"4\", 0 AS \"5\", 0 AS \"6\", 0 AS \"7\", 0 AS \"8\", 0 AS \"12\", 0 AS \"13\", 0 AS \"0\" WHERE 1=0"
+    
+    # Экранируем номера талонов для SQL
+    safe_talons = [f"'{str(t).replace(chr(39), chr(39)+chr(39))}'" for t in talon_numbers if t and str(t).strip()]
+    if not safe_talons:
+        return "SELECT 'Нет данных' AS \"Тип\", 0 AS \"1\", 0 AS \"2\", 0 AS \"3\", 0 AS \"4\", 0 AS \"5\", 0 AS \"6\", 0 AS \"7\", 0 AS \"8\", 0 AS \"12\", 0 AS \"13\", 0 AS \"0\" WHERE 1=0"
+    
+    talons_placeholder = ",".join(safe_talons)
+    
+    # Определяем фильтр по возрасту в WHERE после вычисления возраста
+    age_condition = ""
+    if age_group == '40-65':
+        age_condition = "AND age >= 40 AND age <= 65"
+    elif age_group == 'прочие':
+        age_condition = "AND (age < 40 OR age > 65)"
+    # Для общего итога (None) age_condition остается пустым - берём все записи
+    
+    return f"""
+WITH filtered_data AS (
+    SELECT 
+        goal,
+        status,
+        CASE 
+            WHEN treatment_end IS NOT NULL AND birth_date IS NOT NULL AND
+                 treatment_end::text ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' AND
+                 birth_date::text ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' THEN
+                CAST(SUBSTRING(treatment_end::text FROM 7 FOR 4) AS INTEGER) -
+                CAST(SUBSTRING(birth_date::text FROM 7 FOR 4) AS INTEGER)
+            ELSE NULL
+        END AS age
+    FROM load_data_oms_data
+    WHERE talon IN ({talons_placeholder})
+      AND goal IS NOT NULL
+      AND goal != '-'
+),
+data_with_age AS (
+    SELECT 
+        goal,
+        status,
+        age
+    FROM filtered_data
+    WHERE age IS NOT NULL
+      {age_condition}
+),
+grouped_data AS (
+    SELECT 
+        COALESCE(goal, '-') AS "Тип",
+        COUNT(*) FILTER (WHERE status = '1' OR status::text = '1') AS "1",
+        COUNT(*) FILTER (WHERE status = '2' OR status::text = '2') AS "2",
+        COUNT(*) FILTER (WHERE status = '3' OR status::text = '3') AS "3",
+        COUNT(*) FILTER (WHERE status = '4' OR status::text = '4') AS "4",
+        COUNT(*) FILTER (WHERE status = '5' OR status::text = '5') AS "5",
+        COUNT(*) FILTER (WHERE status = '6' OR status::text = '6') AS "6",
+        COUNT(*) FILTER (WHERE status = '7' OR status::text = '7') AS "7",
+        COUNT(*) FILTER (WHERE status = '8' OR status::text = '8') AS "8",
+        COUNT(*) FILTER (WHERE status = '12' OR status::text = '12') AS "12",
+        COUNT(*) FILTER (WHERE status = '13' OR status::text = '13') AS "13",
+        COUNT(*) FILTER (WHERE status = '0' OR status::text = '0') AS "0"
+    FROM data_with_age
+    WHERE goal IS NOT NULL AND goal != '-'
+    GROUP BY goal
+),
+totals AS (
+    SELECT 
+        'Итого' AS "Тип",
+        SUM("1") AS "1",
+        SUM("2") AS "2",
+        SUM("3") AS "3",
+        SUM("4") AS "4",
+        SUM("5") AS "5",
+        SUM("6") AS "6",
+        SUM("7") AS "7",
+        SUM("8") AS "8",
+        SUM("12") AS "12",
+        SUM("13") AS "13",
+        SUM("0") AS "0"
+    FROM grouped_data
+),
+result AS (
+    SELECT * FROM grouped_data
+    UNION ALL
+    SELECT * FROM totals
+)
+SELECT 
+    "Тип",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "12",
+    "13",
+    "0"
+FROM result
+ORDER BY 
+    CASE WHEN "Тип" = 'Итого' THEN 999 ELSE 1 END,
+    "Тип"
+    """

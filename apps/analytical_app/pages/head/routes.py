@@ -12,6 +12,7 @@ from apps.analytical_app.pages.head.dispensary.adults.tab9 import adults_dv9
 from apps.analytical_app.pages.head.dispensary.adults.tab11 import adults_dv11
 from apps.analytical_app.pages.head.dispensary.adults.tab12 import adults_dv12
 from apps.analytical_app.pages.head.dispensary.adults.tab13 import adults_dv13
+from apps.analytical_app.pages.head.dispensary.adults.tab14 import adults_dv14
 from apps.analytical_app.pages.head.dispensary.children.main import head_children_dd_main
 from apps.analytical_app.pages.head.dispensary.children.tab1 import children_dn1
 from apps.analytical_app.pages.head.dispensary.children.tab2 import children_dn2
@@ -134,6 +135,14 @@ routes_head = {
             {"label": "Прикрепленные не прошедшие", "active": True},
         ]),
         adults_dv13
+    ]),
+    "/head/adults/dv14": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансеризация взрослых", "href": "/head/adults"},
+            {"label": "Диспансеризация в организованных коллективах", "active": True},
+        ]),
+        adults_dv14
     ]),
     "/head/children": html.Div([
         dbc.Breadcrumb(items=[
