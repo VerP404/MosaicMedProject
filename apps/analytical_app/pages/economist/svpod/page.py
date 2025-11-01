@@ -11,6 +11,7 @@ from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.components.filters import filter_years, update_buttons
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups
+import pandas as pd
 from apps.analytical_app.query_executor import engine
 
 type_page = "econ-sv-pod"
@@ -73,7 +74,7 @@ current_report_tab = html.Div(
                                             {'label': 'Объемы', 'value': 'volumes'},
                                             {'label': 'Финансы', 'value': 'finance'}
                                         ],
-                                        value='volumes',  # По умолчанию отображаем объемы
+                                        value='volumes',
                                         inline=True,
                                         labelStyle={'margin-right': '15px'}
                                     ),
@@ -83,7 +84,7 @@ current_report_tab = html.Div(
                                     dcc.Checklist(
                                         id=f'unique-toggle-{type_page}',
                                         options=[{"label": "Уникальные пациенты", "value": "unique"}],
-                                        value=[],  # По умолчанию выключено
+                                        value=[],
                                         inline=True,
                                         style={"margin-left": "20px"}
                                     ),
@@ -176,12 +177,38 @@ cumulative_report_tab = html.Div(
                                 dbc.Col(filter_years(f'{type_page}-cumulative'), width=1),
                                 dbc.Col(
                                     dcc.RadioItems(
+                                        id=f'report-type-toggle-cumulative-{type_page}',
+                                        options=[
+                                            {'label': 'По месяцам', 'value': 'months'},
+                                            {'label': 'Нарастающе', 'value': 'cumulative'}
+                                        ],
+                                        value='cumulative',
+                                        inline=True,
+                                        labelStyle={'margin-right': '15px'}
+                                    ),
+                                    width=3
+                                ),
+                                dbc.Col(
+                                    dcc.RadioItems(
                                         id=f'mode-toggle-cumulative-{type_page}',
                                         options=[
                                             {'label': 'Объемы', 'value': 'volumes'},
                                             {'label': 'Финансы', 'value': 'finance'}
                                         ],
                                         value='volumes',
+                                        inline=True,
+                                        labelStyle={'margin-right': '15px'}
+                                    ),
+                                    width=3
+                                ),
+                                dbc.Col(
+                                    dcc.RadioItems(
+                                        id=f'payment-type-toggle-cumulative-{type_page}',
+                                        options=[
+                                            {'label': 'Предъявленные', 'value': 'presented'},
+                                            {'label': 'Оплаченные', 'value': 'paid'}
+                                        ],
+                                        value='presented',
                                         inline=True,
                                         labelStyle={'margin-right': '15px'}
                                     ),
@@ -381,8 +408,7 @@ def update_table_with_plan_and_balance(n_clicks,
     )
     # Добавляем общую сумму "исправлено"
     total_ispravleno_all_months = sum(row.get("исправлено", 0) or 0 for row in fact_data_list)
-    # Превращаем список словарей fact_data_list в dict по ключу "month" (можно и так).
-    # Будем потом "сливать" с заготовкой всех месяцев.
+    # Превращаем список словарей fact_data_list в dict по ключу "month"
     fact_dict = {}
     for row in fact_data_list:
         m = row["month"]
@@ -392,9 +418,8 @@ def update_table_with_plan_and_balance(n_clicks,
     plan_data = fetch_plan_data(selected_level, selected_year, mode)
 
     today = datetime.today()
-    default_month = today.month - 1 if today.day <= 5 else today.month  # До 5 числа показываем предыдущий месяц
+    default_month = today.month - 1 if today.day <= 5 else today.month
     current_day = today.day
-    # Если пользователь выбрал месяц вручную, берём его, иначе - текущий
     current_month = selected_month if selected_month is not None else default_month
 
     # Формируем список месяцев для отображения: от 1 до current_month
@@ -753,10 +778,12 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
     ],
     Input(f'generate-cumulative-{type_page}', 'n_clicks'),
     State(f'dropdown-year-{type_page}-cumulative', 'value'),
+    State(f'report-type-toggle-cumulative-{type_page}', 'value'),
     State(f'mode-toggle-cumulative-{type_page}', 'value'),
+    State(f'payment-type-toggle-cumulative-{type_page}', 'value'),
     State(f'unique-toggle-cumulative-{type_page}', 'value')
 )
-def generate_cumulative_report(n_clicks, selected_year, mode, unique_flag):
+def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payment_type, unique_flag):
     if n_clicks is None:
         raise PreventUpdate
     
@@ -765,47 +792,233 @@ def generate_cumulative_report(n_clicks, selected_year, mode, unique_flag):
     
     loading_output = html.Div([dcc.Loading(type="default")])
     
-    # Стили для столбцов - делаем "Группа показателей" шире
+    # Стили для столбцов - делаем "Группа показателей" или "Месяц" шире
     style_cell_conditional = [
         {
             'if': {'column_id': 'Группа показателей'},
             'minWidth': '300px',
             'maxWidth': '400px',
             'width': '350px'
+        },
+        {
+            'if': {'column_id': 'month'},
+            'minWidth': '150px',
+            'maxWidth': '200px',
+            'width': '180px'
         }
     ]
     
     try:
         unique = "unique" in unique_flag if unique_flag else False
         mode = mode or 'volumes'
+        report_type = report_type or 'cumulative'
+        payment_type = payment_type or 'presented'
         
-        # Получаем отчет нарастающе по всем группам
-        df = get_cumulative_report_for_all_groups(
-            selected_year=selected_year,
-            mode=mode,
-            unique_flag=unique
-        )
-        
-        if df.empty:
-            return [], [], [], html.Div(dbc.Alert("Нет данных для отображения", color="info"))
-        
-        # Формируем колонки для таблицы
-        columns = [
-            {"name": "Группа показателей", "id": "Группа показателей"},
-            {"name": ["Итог", "План"], "id": "План 1/12"},
-            {"name": ["Итог", "Факт"], "id": "Факт"},
-            {"name": ["Итог", "%"], "id": "%"},
-            {"name": ["Итог", "Остаток"], "id": "Остаток"},
-            {"name": ["Факт", "Новые"], "id": "новые"},
-            {"name": ["Факт", "В ТФОМС"], "id": "в_тфомс"},
-            {"name": ["Факт", "Оплачено"], "id": "оплачено"},
-            {"name": ["Факт", "Исправлено"], "id": "исправлено"},
-            {"name": ["Факт", "Отказано"], "id": "отказано"},
-            {"name": ["Факт", "Отменено"], "id": "отменено"},
-        ]
-        
-        # Преобразуем DataFrame в список словарей
-        data = df.to_dict('records')
+        if report_type == 'cumulative':
+            # Режим "Нарастающе" - показываем все группы показателей
+            df = get_cumulative_report_for_all_groups(
+                selected_year=selected_year,
+                mode=mode,
+                unique_flag=unique
+            )
+            
+            if df.empty:
+                return [], [], [], html.Div(dbc.Alert("Нет данных для отображения", color="info"))
+            
+            # Преобразуем DataFrame в список словарей
+            data = []
+            for _, row in df.iterrows():
+                # Если выбран режим "Оплаченные", меняем Факт на только оплаченные
+                if payment_type == 'paid':
+                    fact_value = row["оплачено"]
+                else:
+                    fact_value = row["Факт"]
+                
+                percent = round(fact_value / row["План 1/12"] * 100, 1) if row["План 1/12"] > 0 else 0
+                remainder = row["План 1/12"] - fact_value
+                
+                data.append({
+                    "Группа показателей": row["Группа показателей"],
+                    "План 1/12": row["План 1/12"],
+                    "Факт": fact_value,
+                    "%": percent,
+                    "Остаток": remainder,
+                    "новые": row["новые"],
+                    "в_тфомс": row["в_тфомс"],
+                    "оплачено": row["оплачено"],
+                    "исправлено": row["исправлено"],
+                    "отказано": row["отказано"],
+                    "отменено": row["отменено"],
+                })
+            
+            # Добавляем строку "Итого" для всех групп
+            if data:
+                total_plan = sum(r["План 1/12"] for r in data)
+                total_fact = sum(r["Факт"] for r in data)
+                total_percent = round(total_fact / total_plan * 100, 1) if total_plan > 0 else 0
+                total_remainder = total_plan - total_fact
+                
+                data.append({
+                    "Группа показателей": "Итого",
+                    "План 1/12": total_plan,
+                    "Факт": total_fact,
+                    "%": total_percent,
+                    "Остаток": total_remainder,
+                    "новые": sum(r["новые"] for r in data if r["Группа показателей"] != "Итого"),
+                    "в_тфомс": sum(r["в_тфомс"] for r in data if r["Группа показателей"] != "Итого"),
+                    "оплачено": sum(r["оплачено"] for r in data if r["Группа показателей"] != "Итого"),
+                    "исправлено": sum(r["исправлено"] for r in data if r["Группа показателей"] != "Итого"),
+                    "отказано": sum(r["отказано"] for r in data if r["Группа показателей"] != "Итого"),
+                    "отменено": sum(r["отменено"] for r in data if r["Группа показателей"] != "Итого"),
+                })
+            
+            # Формируем колонки для таблицы
+            columns = [
+                {"name": "Группа показателей", "id": "Группа показателей"},
+                {"name": ["Итог", "План"], "id": "План 1/12"},
+                {"name": ["Итог", "Факт"], "id": "Факт"},
+                {"name": ["Итог", "%"], "id": "%"},
+                {"name": ["Итог", "Остаток"], "id": "Остаток"},
+                {"name": ["Факт", "Новые"], "id": "новые"},
+                {"name": ["Факт", "В ТФОМС"], "id": "в_тфомс"},
+                {"name": ["Факт", "Оплачено"], "id": "оплачено"},
+                {"name": ["Факт", "Исправлено"], "id": "исправлено"},
+                {"name": ["Факт", "Отказано"], "id": "отказано"},
+                {"name": ["Факт", "Отменено"], "id": "отменено"},
+            ]
+        else:
+            # Режим "По месяцам" - нужно получить группы и показать данные по месяцам для каждой
+            from apps.analytical_app.pages.economist.svpod.query import get_groups_for_cumulative_report
+            
+            groups = get_groups_for_cumulative_report(selected_year)
+            
+            if groups.empty:
+                return [], [], [], html.Div(dbc.Alert("Нет данных для отображения", color="info"))
+            
+            # Получаем данные по месяцам для каждой группы
+            columns = [
+                {"name": ["", "Группа показателей"], "id": "group_name"},
+                {"name": ["", "Месяц"], "id": "month"},
+                {"name": ["Итог", "План"], "id": "План"},
+                {"name": ["Итог", "Факт"], "id": "Факт"},
+                {"name": ["Итог", "%"], "id": "%"},
+                {"name": ["Итог", "Остаток"], "id": "Остаток"},
+                {"name": ["Факт", "Новые"], "id": "новые"},
+                {"name": ["Факт", "В ТФОМС"], "id": "в_тфомс"},
+                {"name": ["Факт", "Оплачено"], "id": "оплачено"},
+                {"name": ["Факт", "Исправлено"], "id": "исправлено"},
+                {"name": ["Факт", "Отказано"], "id": "отказано"},
+                {"name": ["Факт", "Отменено"], "id": "отменено"},
+            ]
+            
+            data = []
+            today = datetime.today()
+            default_month = today.month - 1 if today.day <= 5 else today.month
+            current_day = today.day
+            current_month = default_month
+            
+            for _, group_row in groups.iterrows():
+                group_id = group_row['id']
+                group_name = group_row['name']
+                
+                filter_conditions = get_filter_conditions([group_id], selected_year)
+                fact_columns, fact_data_list = TableUpdater.query_to_df(
+                    engine,
+                    sql_query_rep(selected_year,
+                                  group_id=[group_id],
+                                  filter_conditions=filter_conditions,
+                                  mode=mode,
+                                  unique_flag=unique)
+                )
+                
+                fact_dict = {}
+                for row in fact_data_list:
+                    m = row["month"]
+                    fact_dict[m] = row
+                
+                plan_data = fetch_plan_data(group_id, selected_year, mode)
+                total_ispravleno_all_months = sum(row.get("исправлено", 0) or 0 for row in fact_data_list)
+                
+                incoming_balance = 0
+                group_data = []
+                
+                for m in range(1, 13):
+                    month_data = fact_dict.get(m, {})
+                    
+                    # Рассчитываем Факт в зависимости от режима
+                    if payment_type == 'paid':
+                        # Режим "Оплаченные" - только оплаченные (status = '3')
+                        month_fact = month_data.get("оплачено", 0) or 0
+                    else:
+                        # Режим "Предъявленные" - текущая логика
+                        if m < current_month - 1:
+                            month_fact = month_data.get("оплачено", 0) or 0
+                        elif m == current_month - 1:
+                            if current_day <= 10:
+                                month_fact = (
+                                    (month_data.get("новые", 0) or 0) +
+                                    (month_data.get("в_тфомс", 0) or 0) +
+                                    (month_data.get("оплачено", 0) or 0) +
+                                    total_ispravleno_all_months
+                                )
+                            else:
+                                month_fact = month_data.get("оплачено", 0) or 0
+                        elif m == current_month:
+                            month_fact = (
+                                (month_data.get("новые", 0) or 0) +
+                                (month_data.get("в_тфомс", 0) or 0) +
+                                (month_data.get("оплачено", 0) or 0) +
+                                total_ispravleno_all_months
+                            )
+                        else:
+                            month_fact = 0
+                    
+                    month_plan_12 = plan_data.get(m, 0) or 0
+                    month_plan = month_plan_12 + incoming_balance
+                    month_remainder = month_plan - month_fact
+                    incoming_balance = month_remainder
+                    
+                    percent = round(month_fact / month_plan * 100, 1) if month_plan > 0 else 0
+                    
+                    group_data.append({
+                        "group_name": group_name if m == 1 else "",
+                        "month": m,
+                        "План": month_plan,
+                        "Факт": month_fact,
+                        "%": percent,
+                        "Остаток": month_remainder,
+                        "новые": month_data.get("новые", 0) or 0,
+                        "в_тфомс": month_data.get("в_тфомс", 0) or 0,
+                        "оплачено": month_data.get("оплачено", 0) or 0,
+                        "исправлено": month_data.get("исправлено", 0) or 0,
+                        "отказано": month_data.get("отказано", 0) or 0,
+                        "отменено": month_data.get("отменено", 0) or 0,
+                    })
+                
+                # Добавляем данные группы
+                data.extend(group_data)
+                
+                # Добавляем строку "Итого" для группы
+                if group_data:
+                    total_plan_group = sum(r["План"] for r in group_data)
+                    total_fact_group = sum(r["Факт"] for r in group_data)
+                    total_percent_group = round(total_fact_group / total_plan_group * 100, 1) if total_plan_group > 0 else 0
+                    total_remainder_group = total_plan_group - total_fact_group
+                    
+                    data.append({
+                        "group_name": f"Итого ({group_name})",
+                        "month": "Итого",
+                        "План": total_plan_group,
+                        "Факт": total_fact_group,
+                        "%": total_percent_group,
+                        "Остаток": total_remainder_group,
+                        "новые": sum(r["новые"] for r in group_data),
+                        "в_тфомс": sum(r["в_тфомс"] for r in group_data),
+                        "оплачено": sum(r["оплачено"] for r in group_data),
+                        "исправлено": sum(r["исправлено"] for r in group_data),
+                        "отказано": sum(r["отказано"] for r in group_data),
+                        "отменено": sum(r["отменено"] for r in group_data),
+                    })
         
         return columns, data, style_cell_conditional, loading_output
         
