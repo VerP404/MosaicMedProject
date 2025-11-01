@@ -28,22 +28,18 @@ def parse_xls_contents(contents, filename):
         # Сначала пробуем xlrd для старых .xls файлов
         try:
             df = pd.read_excel(io.BytesIO(decoded), header=None, engine='xlrd')
-            print("Файл прочитан с помощью xlrd")
         except Exception as e:
             error_messages.append(f"xlrd: {str(e)}")
             # Пробуем openpyxl для новых .xlsx файлов
             try:
                 df = pd.read_excel(io.BytesIO(decoded), header=None, engine='openpyxl')
-                print("Файл прочитан с помощью openpyxl")
             except Exception as e2:
                 error_messages.append(f"openpyxl: {str(e2)}")
                 # Последняя попытка - без указания движка
                 try:
                     df = pd.read_excel(io.BytesIO(decoded), header=None)
-                    print("Файл прочитан без указания движка")
                 except Exception as e3:
                     error_messages.append(f"default: {str(e3)}")
-                    print(f"Ошибка чтения файла: {error_messages}")
                     raise Exception(f"Не удалось прочитать файл. Ошибки: {'; '.join(error_messages)}")
         
         if df is None or df.empty:
@@ -51,7 +47,6 @@ def parse_xls_contents(contents, filename):
         
         # Проверяем, что файл содержит минимум 6 строк
         if len(df) < 6:
-            print(f"Файл содержит только {len(df)} строк, требуется минимум 6")
             return []
         
         # Пробуем найти строку с заголовками (ищем строку, содержащую "Номер талона" или похожие заголовки)
@@ -71,14 +66,11 @@ def parse_xls_contents(contents, filename):
         
         # Проверяем наличие нужных столбцов (минимум 7 столбцов, так как G - это 7-й столбец, индекс 6)
         if df_data.shape[1] < 7:
-            print(f"Файл содержит только {df_data.shape[1]} столбцов, требуется минимум 7")
             return []
         
         # Извлекаем столбцы: A (0) - талон, G (6) - Иная МО
         talon_column = df_data.iloc[:, 0]  # Столбец A
         inaya_mo_column = df_data.iloc[:, 6]  # Столбец G
-        
-        print(f"Найдена строка заголовков: {header_row_idx + 1} (в Excel), данных строк: {len(df_data)}")
         
         # Создаем DataFrame для фильтрации
         filtered_df = pd.DataFrame({
@@ -91,16 +83,10 @@ def parse_xls_contents(contents, filename):
         filtered_df = filtered_df[filtered_df['talon'].astype(str).str.strip() != '']
         
         if len(filtered_df) == 0:
-            print("Не найдено строк с номерами талонов")
             return []
         
         # Фильтруем: Иная МО = да (с учетом разных вариантов написания)
         filtered_df['inaya_mo'] = filtered_df['inaya_mo'].fillna('').astype(str).str.strip().str.lower()
-        
-        # Сохраняем примеры значений перед фильтрацией для диагностики
-        unique_inaya_mo_before = list(set(filtered_df['inaya_mo'].unique()))[:20]
-        
-        # Список вариантов значения "да" для фильтрации
         yes_values = ['да', 'yes', '1', 'true', 'д', 'дa', 'дa', '+', 'y', 'есть', 'е']
         
         # Пробуем разные варианты значения "да" и также проверяем частичные совпадения
@@ -113,12 +99,8 @@ def parse_xls_contents(contents, filename):
         filtered_df_filtered = filtered_df[mask]
         
         if len(filtered_df_filtered) == 0:
-            print(f"Не найдено строк где 'Иная МО' = да.")
-            print(f"Всего строк с талонами: {len(filtered_df)}")
-            print(f"Уникальные значения в столбце G (первые 20): {unique_inaya_mo_before}")
             return []
         
-        print(f"Найдено {len(filtered_df_filtered)} строк где 'Иная МО' = да из {len(filtered_df)} строк с талонами")
         filtered_df = filtered_df_filtered
         
         # Получаем список талонов, убираем пустые значения и конвертируем в строки
@@ -128,12 +110,9 @@ def parse_xls_contents(contents, filename):
         # Убираем дубликаты
         talons = list(set(talons))
         
-        print(f"Успешно извлечено {len(talons)} уникальных талонов")
         return talons
         
     except Exception as e:
-        error_msg = f"Ошибка при парсинге файла: {e}\n{traceback.format_exc()}"
-        print(error_msg)
         return []
 
 
@@ -248,35 +227,17 @@ def generate_report(n_clicks, contents, filename):
         # Выполняем запросы
         try:
             columns_40_65, data_40_65 = TableUpdater.query_to_df(engine, query_40_65)
-            print(f"Таблица 40-65: найдено {len(data_40_65) if data_40_65 else 0} строк")
-            if data_40_65:
-                print(f"Пример данных 40-65: {data_40_65[0] if len(data_40_65) > 0 else 'нет'}")
-        except Exception as e:
-            print(f"Ошибка запроса 40-65: {e}")
-            import traceback
-            print(traceback.format_exc())
+        except Exception:
             columns_40_65, data_40_65 = [], []
         
         try:
             columns_prochie, data_prochie = TableUpdater.query_to_df(engine, query_prochie)
-            print(f"Таблица Прочие: найдено {len(data_prochie) if data_prochie else 0} строк")
-            if data_prochie:
-                print(f"Пример данных Прочие: {data_prochie[0] if len(data_prochie) > 0 else 'нет'}")
-        except Exception as e:
-            print(f"Ошибка запроса Прочие: {e}")
-            import traceback
-            print(traceback.format_exc())
+        except Exception:
             columns_prochie, data_prochie = [], []
         
         try:
             columns_total, data_total = TableUpdater.query_to_df(engine, query_total)
-            print(f"Таблица Общий итог: найдено {len(data_total) if data_total else 0} строк")
-            if data_total:
-                print(f"Пример данных Общий итог: {data_total[0] if len(data_total) > 0 else 'нет'}")
-        except Exception as e:
-            print(f"Ошибка запроса Общий итог: {e}")
-            import traceback
-            print(traceback.format_exc())
+        except Exception:
             columns_total, data_total = [], []
         
         # Таблица 1: 40-65

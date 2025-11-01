@@ -311,7 +311,7 @@ def sql_query_dispensary_organized_collectives(talon_numbers: list[str], age_gro
     if not talon_numbers:
         return "SELECT 'Нет данных' AS \"Тип\", 0 AS \"1\", 0 AS \"2\", 0 AS \"3\", 0 AS \"4\", 0 AS \"5\", 0 AS \"6\", 0 AS \"7\", 0 AS \"8\", 0 AS \"12\", 0 AS \"13\", 0 AS \"0\" WHERE 1=0"
     
-    # Экранируем номера талонов для SQL
+    # Экранируем номера талонов для SQL и приводим к строке для сравнения
     safe_talons = [f"'{str(t).replace(chr(39), chr(39)+chr(39))}'" for t in talon_numbers if t and str(t).strip()]
     if not safe_talons:
         return "SELECT 'Нет данных' AS \"Тип\", 0 AS \"1\", 0 AS \"2\", 0 AS \"3\", 0 AS \"4\", 0 AS \"5\", 0 AS \"6\", 0 AS \"7\", 0 AS \"8\", 0 AS \"12\", 0 AS \"13\", 0 AS \"0\" WHERE 1=0"
@@ -331,42 +331,67 @@ WITH filtered_data AS (
     SELECT 
         goal,
         status,
+        talon,
         CASE 
-            WHEN treatment_end IS NOT NULL AND birth_date IS NOT NULL AND
-                 treatment_end::text ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' AND
-                 birth_date::text ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' THEN
-                CAST(SUBSTRING(treatment_end::text FROM 7 FOR 4) AS INTEGER) -
-                CAST(SUBSTRING(birth_date::text FROM 7 FOR 4) AS INTEGER)
+            WHEN treatment_end IS NOT NULL AND birth_date IS NOT NULL THEN
+                CASE
+                    WHEN substring(treatment_end::text FROM '\\d{{4}}$') IS NOT NULL 
+                         AND substring(birth_date::text FROM '\\d{{4}}$') IS NOT NULL THEN
+                        CAST(substring(treatment_end::text FROM '\\d{{4}}$') AS INTEGER) - 
+                        CAST(substring(birth_date::text FROM '\\d{{4}}$') AS INTEGER)
+                    WHEN substring(treatment_end::text FROM '^\\d{{4}}') IS NOT NULL 
+                         AND substring(birth_date::text FROM '^\\d{{4}}') IS NOT NULL THEN
+                        CAST(substring(treatment_end::text FROM '^\\d{{4}}') AS INTEGER) - 
+                        CAST(substring(birth_date::text FROM '^\\d{{4}}') AS INTEGER)
+                    WHEN substring(treatment_end::text FROM '\\d{{4}}') IS NOT NULL 
+                         AND substring(birth_date::text FROM '\\d{{4}}') IS NOT NULL THEN
+                        CAST(substring(treatment_end::text FROM '\\d{{4}}') AS INTEGER) - 
+                        CAST(substring(birth_date::text FROM '\\d{{4}}') AS INTEGER)
+                    ELSE NULL
+                END
             ELSE NULL
         END AS age
     FROM load_data_oms_data
-    WHERE talon IN ({talons_placeholder})
-      AND goal IS NOT NULL
-      AND goal != '-'
+    WHERE COALESCE(talon::text, '') IN ({talons_placeholder})
+      AND goal IN ('ДВ4', 'ОПВ', 'УД1', 'ДР1')
+      AND treatment_end IS NOT NULL
+      AND birth_date IS NOT NULL
 ),
 data_with_age AS (
     SELECT 
         goal,
         status,
-        age
+        age,
+        talon
     FROM filtered_data
     WHERE age IS NOT NULL
       {age_condition}
 ),
 grouped_data AS (
     SELECT 
-        COALESCE(goal, '-') AS "Тип",
-        COUNT(*) FILTER (WHERE status = '1' OR status::text = '1') AS "1",
-        COUNT(*) FILTER (WHERE status = '2' OR status::text = '2') AS "2",
-        COUNT(*) FILTER (WHERE status = '3' OR status::text = '3') AS "3",
-        COUNT(*) FILTER (WHERE status = '4' OR status::text = '4') AS "4",
-        COUNT(*) FILTER (WHERE status = '5' OR status::text = '5') AS "5",
-        COUNT(*) FILTER (WHERE status = '6' OR status::text = '6') AS "6",
-        COUNT(*) FILTER (WHERE status = '7' OR status::text = '7') AS "7",
-        COUNT(*) FILTER (WHERE status = '8' OR status::text = '8') AS "8",
-        COUNT(*) FILTER (WHERE status = '12' OR status::text = '12') AS "12",
-        COUNT(*) FILTER (WHERE status = '13' OR status::text = '13') AS "13",
-        COUNT(*) FILTER (WHERE status = '0' OR status::text = '0') AS "0"
+        goal AS "Тип",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '1'), 0) +
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '2'), 0) +
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '3'), 0) +
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '4'), 0) +
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '5'), 0) +
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '6'), 0) +
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '7'), 0) +
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '8'), 0) +
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '12'), 0) +
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '13'), 0) +
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '0'), 0) AS "Всего",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '1'), 0) AS "1",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '2'), 0) AS "2",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '3'), 0) AS "3",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '4'), 0) AS "4",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '5'), 0) AS "5",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '6'), 0) AS "6",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '7'), 0) AS "7",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '8'), 0) AS "8",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '12'), 0) AS "12",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '13'), 0) AS "13",
+        COALESCE(COUNT(*) FILTER (WHERE status::text = '0'), 0) AS "0"
     FROM data_with_age
     WHERE goal IS NOT NULL AND goal != '-'
     GROUP BY goal
@@ -374,17 +399,18 @@ grouped_data AS (
 totals AS (
     SELECT 
         'Итого' AS "Тип",
-        SUM("1") AS "1",
-        SUM("2") AS "2",
-        SUM("3") AS "3",
-        SUM("4") AS "4",
-        SUM("5") AS "5",
-        SUM("6") AS "6",
-        SUM("7") AS "7",
-        SUM("8") AS "8",
-        SUM("12") AS "12",
-        SUM("13") AS "13",
-        SUM("0") AS "0"
+        COALESCE(SUM("Всего"), 0) AS "Всего",
+        COALESCE(SUM("1"), 0) AS "1",
+        COALESCE(SUM("2"), 0) AS "2",
+        COALESCE(SUM("3"), 0) AS "3",
+        COALESCE(SUM("4"), 0) AS "4",
+        COALESCE(SUM("5"), 0) AS "5",
+        COALESCE(SUM("6"), 0) AS "6",
+        COALESCE(SUM("7"), 0) AS "7",
+        COALESCE(SUM("8"), 0) AS "8",
+        COALESCE(SUM("12"), 0) AS "12",
+        COALESCE(SUM("13"), 0) AS "13",
+        COALESCE(SUM("0"), 0) AS "0"
     FROM grouped_data
 ),
 result AS (
@@ -394,6 +420,7 @@ result AS (
 )
 SELECT 
     "Тип",
+    "Всего",
     "1",
     "2",
     "3",
