@@ -12,7 +12,7 @@ from apps.analytical_app.components.filters import filter_years, \
     get_doctor_details, filter_inogorod, filter_amount_null, \
     filter_status, status_groups, update_buttons
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.administrator.generation_invoices.query import sql_query_fen_inv
+from apps.analytical_app.pages.administrator.generation_invoices.query import sql_query_fen_inv, sql_query_details
 from apps.analytical_app.query_executor import engine
 
 type_page = "admin-gen-inv"
@@ -154,6 +154,42 @@ admin_gen_inv = html.Div(
                     html.Span(id=f'summary-stats-{type_page}', children="0", 
                             style={"font-size": "24px", "font-weight": "bold", "color": "#007bff"})
                 ], className="text-center p-3 bg-light rounded"),
+                width=12,
+                className="mt-3"
+            )
+        ),
+        
+        # Таблица детализации
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    [
+                        dbc.CardHeader("Детализация по талонам"),
+                        dbc.CardBody(
+                            [
+                                html.Div(id=f'details-title-{type_page}', style={"fontWeight": "bold", "marginBottom": "10px"}),
+                                dbc.Row(
+                                    [
+                                        dbc.Col(
+                                            dbc.Button(
+                                                "Детализация",
+                                                id=f'details-button-{type_page}',
+                                                color="primary",
+                                                size="sm",
+                                                disabled=True,
+                                                className="mb-3"
+                                            ),
+                                            width="auto"
+                                        )
+                                    ]
+                                ),
+                                card_table(f'details-table-{type_page}', "Детали", page_size=20)
+                            ]
+                        )
+                    ],
+                    style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+                           "border-radius": "10px"}
+                ),
                 width=12,
                 className="mt-3"
             )
@@ -353,6 +389,7 @@ def update_selected_filters(doctor_id):
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data'),
+     Output(f'result-table1-{type_page}', 'style_data_conditional'),
      Output(f'loading-output-{type_page}', 'children')],
     [Input(f'update-button-{type_page}', 'n_clicks')],
     [State(f'dropdown-doctor-{type_page}', 'value'),
@@ -428,4 +465,162 @@ def update_table(n_clicks, value_doctor, value_profile, selected_year, inogorodn
         )
     )
 
-    return columns1, data1, loading_output
+    # Добавляем стили для зеленого выделения ненулевых значений
+    style_data_conditional = []
+    if columns1:
+        # Получаем все колонки кроме input_date
+        numeric_columns = [col['id'] for col in columns1 if col['id'] != 'input_date']
+        for col_id in numeric_columns:
+            # Используем проверку через filter_query для числовых значений
+            # В Dash DataTable значения могут быть строками, поэтому проверяем и числовое, и строковое представление
+            style_data_conditional.append({
+                'if': {
+                    'filter_query': f'{{{col_id}}} != 0 && {{{col_id}}} != "0" && {{{col_id}}} != null && {{{col_id}}} != ""',
+                    'column_id': col_id
+                },
+                'backgroundColor': '#d4edda',  # светло-зеленый цвет
+                'color': '#155724'  # темно-зеленый цвет текста
+            })
+    
+    return columns1, data1, style_data_conditional, loading_output
+
+
+# Callback для активации кнопки детализации при выборе ячейки
+@app.callback(
+    Output(f'details-button-{type_page}', 'disabled'),
+    Input(f'result-table1-{type_page}', 'active_cell')
+)
+def update_details_button_state(active_cell):
+    """Активирует кнопку детализации при выборе ячейки в колонке цели"""
+    if not active_cell:
+        return True
+    
+    # Проверяем, что выбрана допустимая колонка для детализации
+    column_id = active_cell.get('column_id')
+    allowed_columns = ['1', '3', '305,307 D', '113,114,14 Z', '64 G', '541,561 E', '22 N', 
+                      '30,301 O', 'C', '5,7,9,10,32 P', 'SD', 'ДВ4 V', 'ДВ2 T', 'ОПВ P',
+                      'УД1 U', 'УД2 Y', 'ДР1 R', 'ДР2 Q', 'ПН1 N', 'ДС2 S']
+    
+    return column_id not in allowed_columns
+
+
+# Callback для отображения детализации
+@app.callback(
+    [
+        Output(f'details-title-{type_page}', 'children'),
+        Output(f'details-table-{type_page}', 'columns'),
+        Output(f'details-table-{type_page}', 'data')
+    ],
+    [
+        Input(f'details-button-{type_page}', 'n_clicks')
+    ],
+    [
+        State(f'result-table1-{type_page}', 'derived_viewport_data'),
+        State(f'result-table1-{type_page}', 'active_cell'),
+        State(f'dropdown-year-{type_page}', 'value'),
+        State(f'dropdown-inogorodniy-{type_page}', 'value'),
+        State(f'dropdown-amount-null-{type_page}', 'value'),
+        State(f'dropdown-building-{type_page}', 'value'),
+        State(f'dropdown-department-{type_page}', 'value'),
+        State(f'dropdown-profile-{type_page}', 'value'),
+        State(f'dropdown-doctor-{type_page}', 'value'),
+        State(f'date-picker-range-input-{type_page}', 'start_date'),
+        State(f'date-picker-range-input-{type_page}', 'end_date'),
+        State(f'date-picker-range-treatment-{type_page}', 'start_date'),
+        State(f'date-picker-range-treatment-{type_page}', 'end_date'),
+        State(f'dropdown-report-type-{type_page}', 'value'),
+        State(f'status-selection-mode-{type_page}', 'value'),
+        State(f'status-group-radio-{type_page}', 'value'),
+        State(f'status-individual-dropdown-{type_page}', 'value')
+    ]
+)
+def show_details(n_clicks, viewport_data, active_cell, selected_year, inogorodniy, amount_null,
+                 building_ids, department_ids, value_profile, value_doctor,
+                 start_date_input, end_date_input, start_date_treatment, end_date_treatment,
+                 report_type, status_selection_mode, status_group_value, status_individual_values):
+    """Отображает детализацию талонов по выбранной ячейке"""
+    if not n_clicks or not active_cell or not viewport_data:
+        return '', [], []
+    
+    try:
+        # active_cell.row - это индекс относительно derived_viewport_data (данных текущей страницы)
+        row_idx = active_cell.get('row')
+        if row_idx is None or row_idx >= len(viewport_data):
+            return 'Ошибка: неверный индекс строки', [], []
+        
+        # Получаем данные выбранной строки из данных текущей страницы
+        row_data = viewport_data[row_idx]
+        column_id = active_cell.get('column_id')
+        input_date = row_data.get('input_date')
+        
+        if not input_date or not selected_year:
+            return 'Ошибка: не удалось определить параметры для детализации', [], []
+        
+        # Проверяем, что выбрана допустимая колонка для детализации
+        allowed_columns = ['1', '3', '305,307 D', '113,114,14 Z', '64 G', '541,561 E', '22 N', 
+                          '30,301 O', 'C', '5,7,9,10,32 P', 'SD', 'ДВ4 V', 'ДВ2 T', 'ОПВ P',
+                          'УД1 U', 'УД2 Y', 'ДР1 R', 'ДР2 Q', 'ПН1 N', 'ДС2 S']
+        if column_id not in allowed_columns:
+            return f'Детализация доступна только для колонок: {", ".join(allowed_columns)}', [], []
+        
+        # Обработка фильтров (аналогично update_table)
+        if value_doctor:
+            if isinstance(value_doctor, str):
+                selected_doctor_ids = [int(id) for id in value_doctor.split(',') if id.strip().isdigit()]
+            else:
+                selected_doctor_ids = [int(id) for id in value_doctor if isinstance(id, (int, str)) and str(id).isdigit()]
+        else:
+            selected_doctor_ids = []
+        
+        # Определяем статусы для фильтрации
+        status_list = []
+        if status_selection_mode == 'group':
+            if status_group_value and status_group_value in status_groups:
+                status_list = status_groups[status_group_value]
+        elif status_selection_mode == 'individual':
+            if status_individual_values:
+                status_list = status_individual_values if isinstance(status_individual_values, list) else [status_individual_values]
+        
+        # Форматируем даты
+        start_date_input_formatted, end_date_input_formatted = None, None
+        start_date_treatment_formatted, end_date_treatment_formatted = None, None
+        
+        if report_type == 'initial_input' and start_date_input and end_date_input:
+            start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+            end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        elif report_type == 'treatment' and start_date_treatment and end_date_treatment:
+            start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+            end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        
+        # Выполняем запрос детализации
+        sql_query = sql_query_details(
+            selected_year,
+            ', '.join(map(str, range(1, 13))),
+            inogorodniy, None, amount_null,
+            building_ids, department_ids,
+            value_profile,
+            selected_doctor_ids,
+            start_date_input_formatted, end_date_input_formatted,
+            start_date_treatment_formatted, end_date_treatment_formatted,
+            status_list,
+            input_date,
+            column_id
+        )
+        
+        columns, data = TableUpdater.query_to_df(engine, sql_query)
+        
+        # Формируем заголовок
+        title_text = f"Детализация по дате {input_date} - {column_id}"
+        count_badge = dbc.Badge(
+            f" {len(data)}",
+            color="primary",
+            pill=True,
+            className="ms-2"
+        )
+        title = html.Span([title_text, count_badge])
+        
+        return title, columns, data
+        
+    except Exception as e:
+        error_msg = f"Ошибка при получении детализации: {str(e)}"
+        return error_msg, [], []

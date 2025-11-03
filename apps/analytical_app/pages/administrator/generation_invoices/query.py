@@ -83,3 +83,105 @@ HAVING (
 ORDER BY TO_DATE(initial_input_date, 'DD-MM-YYYY') DESC
     """
     return query
+
+
+def sql_query_details(selected_year, months_placeholder, inogorod, sanction, amount_null, building=None,
+                      department=None,
+                      profile=None,
+                      doctor=None,
+                      input_start=None, input_end=None,
+                      treatment_start=None,
+                      treatment_end=None,
+                      status_list=None,
+                      input_date=None,
+                      column_id=None):
+    """
+    SQL-запрос для детализации талонов по дате формирования и колонке цели
+    """
+    # Если months_placeholder пустой, используем все месяцы
+    if not months_placeholder or months_placeholder.strip() == '':
+        months_placeholder = ', '.join(map(str, range(1, 13)))
+    
+    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
+                      doctor,
+                      input_start, input_end,
+                      treatment_start, treatment_end,
+                      status_list=status_list)
+    
+    # Определяем фильтр по goal на основе выбранной колонки
+    goal_filter = ""
+    if column_id:
+        if column_id == "1":
+            goal_filter = "AND goal = '1'"
+        elif column_id == "3":
+            goal_filter = "AND goal = '3'"
+        elif column_id == "305,307 D":
+            goal_filter = "AND goal IN ('305', '307')"
+        elif column_id == "113,114,14 Z":
+            goal_filter = "AND goal IN ('113', '114', '14')"
+        elif column_id == "64 G":
+            goal_filter = "AND goal IN ('64', '640')"
+        elif column_id == "541,561 E":
+            goal_filter = "AND goal IN ('541', '561')"
+        elif column_id == "22 N":
+            goal_filter = "AND goal = '22'"
+        elif column_id == "30,301 O":
+            goal_filter = "AND goal IN ('30', '301')"
+        elif column_id == "C":
+            goal_filter = """AND goal NOT LIKE 'Д%'
+                AND goal NOT LIKE 'О%'
+                AND goal NOT LIKE 'У%'
+                AND goal NOT LIKE 'П%'
+                AND main_diagnosis_code LIKE 'C%'"""
+        elif column_id == "5,7,9,10,32 P":
+            goal_filter = "AND goal IN ('5', '7', '9', '10', '32')"
+        elif column_id == "SD":
+            goal_filter = "AND goal IN ('В дневном стационаре', 'На дому', 'Стационарно')"
+        elif column_id == "ДВ4 V":
+            goal_filter = "AND goal = 'ДВ4'"
+        elif column_id == "ДВ2 T":
+            goal_filter = "AND goal = 'ДВ2'"
+        elif column_id == "ОПВ P":
+            goal_filter = "AND goal = 'ОПВ'"
+        elif column_id == "УД1 U":
+            goal_filter = "AND goal = 'УД1'"
+        elif column_id == "УД2 Y":
+            goal_filter = "AND goal = 'УД2'"
+        elif column_id == "ДР1 R":
+            goal_filter = "AND goal = 'ДР1'"
+        elif column_id == "ДР2 Q":
+            goal_filter = "AND goal = 'ДР2'"
+        elif column_id == "ПН1 N":
+            goal_filter = "AND goal = 'ПН1'"
+        elif column_id == "ДС2 S":
+            goal_filter = "AND goal = 'ДС2'"
+    
+    # Фильтр по дате формирования
+    date_filter = ""
+    if input_date:
+        date_filter = f"AND TO_DATE(initial_input_date, 'DD-MM-YYYY') = TO_DATE('{input_date}', 'DD-MM-YYYY')"
+    
+    query = f"""
+    {base}
+    SELECT talon AS "Талон",
+           goal AS "Цель",
+           status AS "Статус",
+           patient AS "Пациент",
+           birth_date AS "Дата рождения",
+           treatment_start AS "Дата начала",
+           treatment_end AS "Дата окончания",
+           initial_input_date AS "Дата формирования",
+           smo_code AS "Код СМО",
+           COALESCE(amount_numeric, 0) AS "Сумма",
+           enp AS "ЕНП",
+           doctor AS "Врач",
+           specialty AS "Специальность",
+           building AS "Корпус",
+           department AS "Отделение"
+    FROM oms
+    WHERE 1=1
+        {date_filter}
+        {goal_filter}
+    ORDER BY talon
+    """
+    return query
