@@ -6,11 +6,11 @@ from dash.exceptions import PreventUpdate
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
-from apps.analytical_app.components.filters import filter_years, \
+from apps.analytical_app.components.filters import \
     get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
     get_doctor_details, filter_inogorod, filter_amount_null, \
-    filter_status, status_groups, status_descriptions, update_buttons
+    filter_status, status_groups, status_descriptions
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.administrator.generation_invoices.query import sql_query_fen_inv, sql_query_details
 from apps.analytical_app.query_executor import engine
@@ -53,10 +53,24 @@ admin_gen_inv = html.Div(
                                 html.H4("🔍 Фильтры и настройки", className="mb-0"),
                                 html.Small("Настройте параметры для формирования отчета", className="text-muted")
                             ]),
+                            # Сохранение дат при смене типа отчета
+                            dcc.Store(id=f'store-dates-{type_page}', data={}),
                             dbc.Row(
                                 [
-                                    dbc.Col(update_buttons(type_page), width=2),
-                                    dbc.Col(filter_years(type_page), width=2),
+                                    dbc.Col(
+                                        dcc.Dropdown(
+                                            options=[{'label': str(year), 'value': year} 
+                                                    for year in range(2023, datetime.now().year + 1)],
+                                            id=f'dropdown-year-{type_page}',
+                                            placeholder='Год...',
+                                            value=datetime.now().year,
+                                            clearable=False,
+                                            style={"width": "100%"}
+                                        ),
+                                        width=1
+                                    ),
+                                    dbc.Col(filter_inogorod(type_page), width=2),
+                                    dbc.Col(filter_amount_null(type_page), width=2),
                                     dbc.Col(
                                         dcc.Dropdown(
                                             id=f'dropdown-report-type-{type_page}',
@@ -69,33 +83,16 @@ admin_gen_inv = html.Div(
                                         ),
                                         width=2
                                     ),
-                                    dbc.Col(filter_inogorod(type_page), width=2),
-                                    dbc.Col(filter_amount_null(type_page), width=2),
-                                ],
-                                className="mb-3"
-                            ),
-                            dbc.Row(
-                                [
                                     dbc.Col(
-                                        [
-                                            html.Label("Период", id=f'label-date-{type_page}', 
-                                                       style={'font-weight': 'bold', 'margin-bottom': '10px'}),
-                                            dbc.Col(date_picker_custom(f'input-{type_page}'), width=12,
-                                                    id=f'col-input-{type_page}'),
-                                        ],
-                                        width=6,
+                                        date_picker_custom(f'input-{type_page}'),
                                         id=f'date-container-input-{type_page}',
+                                        width=4,
                                         style={'display': 'none'}
                                     ),
                                     dbc.Col(
-                                        [
-                                            html.Label("Период", id=f'label-treatment-{type_page}',
-                                                       style={'font-weight': 'bold', 'margin-bottom': '10px'}),
-                                            dbc.Col(date_picker_custom(f'treatment-{type_page}'), width=12,
-                                                    id=f'col-treatment-{type_page}'),
-                                        ],
-                                        width=6,
+                                        date_picker_custom(f'treatment-{type_page}'),
                                         id=f'date-container-treatment-{type_page}',
+                                        width=5,
                                         style={'display': 'none'}
                                     ),
                                 ],
@@ -116,20 +113,31 @@ admin_gen_inv = html.Div(
                             ),
                             dbc.Row(
                                 [
-                                    dbc.Col(filter_status(type_page, default_status_group='Готовые к сборке (1,4,6,8,19)'), width=12),
+                                    dbc.Col(filter_status(type_page, default_status_group='Готовые к сборке (1,4,6,8,19)'), width=10),
+                                    dbc.Col(
+                                        dbc.Button("Обновить", id=f'update-button-{type_page}', color="primary",
+                                                   className="mt-4", style={"width": "100%"}),
+                                        width=2
+                                    ),
                                 ],
                                 className="mb-3"
                             ),
                             dbc.Row(
                                 [
-                                    dbc.Col(html.Div(id=f'selected-doctor-{type_page}', className='filters-label',
-                                                     style={'display': 'none'}), width=12),
+                                    dbc.Col(
+                                        html.Div(
+                                            id=f'selected-doctor-{type_page}', 
+                                            className='filters-label',
+                                            style={'display': 'none'}
+                                        ), 
+                                        width=12
+                                    ),
                                 ]
                             ),
                             html.Div(
                                 id=f'selected-filters-{type_page}',
                                 className='selected-filters-block',
-                                style={'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                                style={'display': 'none', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
                                        'border-radius': '5px'}
                             ),
                             
@@ -525,19 +533,87 @@ def calculate_sum_and_count(n_clicks, visible_data, selected_cells):
     [
         Output(f'date-container-input-{type_page}', 'style'),
         Output(f'date-container-treatment-{type_page}', 'style'),
-        Output(f'label-date-{type_page}', 'children'),
-        Output(f'label-treatment-{type_page}', 'children'),
+        Output(f'date-picker-range-input-{type_page}', 'start_date'),
+        Output(f'date-picker-range-input-{type_page}', 'end_date'),
+        Output(f'date-picker-range-treatment-{type_page}', 'start_date'),
+        Output(f'date-picker-range-treatment-{type_page}', 'end_date'),
+        Output(f'store-dates-{type_page}', 'data'),
     ],
-    [Input(f'dropdown-report-type-{type_page}', 'value')]
+    [Input(f'dropdown-report-type-{type_page}', 'value')],
+    [
+        State(f'date-picker-range-input-{type_page}', 'start_date'),
+        State(f'date-picker-range-input-{type_page}', 'end_date'),
+        State(f'date-picker-range-treatment-{type_page}', 'start_date'),
+        State(f'date-picker-range-treatment-{type_page}', 'end_date'),
+        State(f'store-dates-{type_page}', 'data')
+    ],
+    prevent_initial_call=False
 )
-def toggle_date_fields(report_type):
-    """Показывает/скрывает поля дат в зависимости от типа отчета"""
+def toggle_date_fields(report_type, input_start, input_end, treatment_start, treatment_end, stored_dates):
+    """Показывает/скрывает поля дат в зависимости от типа отчета и сохраняет значения"""
+    # Инициализируем хранилище дат
+    dates_to_store = stored_dates.copy() if stored_dates else {}
+    
+    # Сохраняем текущие значения, если они есть и не None
+    if input_start is not None and input_end is not None:
+        dates_to_store['input_start'] = input_start
+        dates_to_store['input_end'] = input_end
+    if treatment_start is not None and treatment_end is not None:
+        dates_to_store['treatment_start'] = treatment_start
+        dates_to_store['treatment_end'] = treatment_end
+    
+    # Восстанавливаем сохраненные даты или используем значения по умолчанию
+    current_year = datetime.now().year
+    default_start = datetime(current_year, 1, 1).date()
+    default_end = datetime.now().date()
+    
     if report_type == 'initial_input':
-        return {'display': 'block'}, {'display': 'none'}, 'Период по дате формирования', 'Период'
+        # Для даты формирования - восстанавливаем сохраненные или используем значения по умолчанию
+        restored_input_start = dates_to_store.get('input_start')
+        restored_input_end = dates_to_store.get('input_end')
+        if restored_input_start is None or restored_input_end is None:
+            restored_input_start = default_start
+            restored_input_end = default_end
+            dates_to_store['input_start'] = restored_input_start
+            dates_to_store['input_end'] = restored_input_end
+        
+        # Для treatment сохраняем текущие значения, если они есть, иначе сохраняем из хранилища
+        if treatment_start is not None and treatment_end is not None:
+            dates_to_store['treatment_start'] = treatment_start
+            dates_to_store['treatment_end'] = treatment_end
+        restored_treatment_start = dates_to_store.get('treatment_start')
+        restored_treatment_end = dates_to_store.get('treatment_end')
+        
+        return {'display': 'block'}, {'display': 'none'}, \
+               restored_input_start, restored_input_end, restored_treatment_start, restored_treatment_end, dates_to_store
     elif report_type == 'treatment':
-        return {'display': 'none'}, {'display': 'block'}, 'Период', 'Период по дате окончания лечения'
+        # Для даты лечения - восстанавливаем сохраненные или используем значения по умолчанию
+        restored_treatment_start = dates_to_store.get('treatment_start')
+        restored_treatment_end = dates_to_store.get('treatment_end')
+        if restored_treatment_start is None or restored_treatment_end is None:
+            restored_treatment_start = default_start
+            restored_treatment_end = default_end
+            dates_to_store['treatment_start'] = restored_treatment_start
+            dates_to_store['treatment_end'] = restored_treatment_end
+        
+        # Для input сохраняем текущие значения, если они есть, иначе сохраняем из хранилища
+        if input_start is not None and input_end is not None:
+            dates_to_store['input_start'] = input_start
+            dates_to_store['input_end'] = input_end
+        restored_input_start = dates_to_store.get('input_start')
+        restored_input_end = dates_to_store.get('input_end')
+        
+        return {'display': 'none'}, {'display': 'block'}, \
+               restored_input_start, restored_input_end, restored_treatment_start, restored_treatment_end, dates_to_store
     else:
-        return {'display': 'none'}, {'display': 'none'}, 'Период', 'Период'
+        # Сохраняем все текущие значения
+        restored_input_start = dates_to_store.get('input_start', input_start)
+        restored_input_end = dates_to_store.get('input_end', input_end)
+        restored_treatment_start = dates_to_store.get('treatment_start', treatment_start)
+        restored_treatment_end = dates_to_store.get('treatment_end', treatment_end)
+        
+        return {'display': 'none'}, {'display': 'none'}, \
+               restored_input_start, restored_input_end, restored_treatment_start, restored_treatment_end, dates_to_store
 
 
 @app.callback(
@@ -566,69 +642,127 @@ def toggle_status_selection_mode(mode):
         Input(f'dropdown-building-{type_page}', 'value'),
         Input(f'dropdown-department-{type_page}', 'value'),
         Input(f'dropdown-profile-{type_page}', 'value'),
-        Input(f'dropdown-doctor-{type_page}', 'value')
-    ]
+        Input(f'dropdown-doctor-{type_page}', 'value'),
+        Input(f'dropdown-year-{type_page}', 'value')
+    ],
+    prevent_initial_call=False
 )
-def update_filters(building_id, department_id, profile_id, doctor_id):
-    # Получаем доступные корпуса
-    buildings = get_available_buildings()
+def update_filters(building_id, department_id, profile_id, doctor_id, selected_year):
+    """Обновляет опции фильтров в зависимости от выбранных значений"""
+    try:
+        # Получаем доступные корпуса
+        buildings = get_available_buildings()
 
-    # Определяем доступные отделения
-    if doctor_id:
-        # Если выбран врач, фильтруем отделения по врачу
-        departments = get_departments_by_doctor(doctor_id)
-    elif building_id:
-        # Если выбран корпус, фильтруем по корпусу
-        departments = get_available_departments(building_id)
-    else:
-        # Если ничего не выбрано, возвращаем все отделения
-        departments = get_available_departments()
+        # Определяем доступные отделения
+        if doctor_id:
+            # Если выбран врач, фильтруем отделения по врачу
+            departments = get_departments_by_doctor(doctor_id)
+        elif building_id:
+            # Если выбран корпус, фильтруем по корпусу
+            departments = get_available_departments(building_id)
+        else:
+            # Если ничего не выбрано, возвращаем все отделения
+            departments = get_available_departments()
 
-    # Определяем доступные профили
-    if building_id or department_id:
-        # Фильтруем профили по корпусу и/или отделению
-        profiles = get_available_profiles(building_id, department_id)
-    else:
-        # Если фильтры не выбраны, возвращаем все профили
-        profiles = get_available_profiles()
+        # Определяем доступные профили
+        if building_id or department_id:
+            # Фильтруем профили по корпусу и/или отделению
+            profiles = get_available_profiles(building_id, department_id)
+        else:
+            # Если фильтры не выбраны, возвращаем все профили
+            profiles = get_available_profiles()
 
-    # Определяем доступных врачей
-    if department_id or profile_id:
-        # Фильтруем врачей по отделению или профилю
-        doctors = get_available_doctors(building_id, department_id, profile_id)
-    else:
-        # Если фильтры не выбраны, возвращаем всех врачей
-        doctors = get_available_doctors()
+        # Определяем доступных врачей с учетом года
+        if department_id or profile_id or building_id:
+            # Фильтруем врачей по отделению, профилю или корпусу
+            doctors = get_available_doctors(building_id, department_id, profile_id, selected_year)
+        else:
+            # Если фильтры не выбраны, возвращаем всех врачей
+            doctors = get_available_doctors(selected_year=selected_year)
 
-    return buildings, departments, profiles, doctors
+        return buildings, departments, profiles, doctors
+    except Exception as e:
+        print(f"Ошибка в update_filters: {str(e)}")
+        # Возвращаем пустые списки в случае ошибки
+        return [], [], [], []
 
 
 @app.callback(
-    Output(f'selected-filters-{type_page}', 'children'),
-    [Input(f'dropdown-doctor-{type_page}', 'value')]
+    [
+        Output(f'selected-filters-{type_page}', 'children'),
+        Output(f'selected-filters-{type_page}', 'style'),
+        Output(f'selected-doctor-{type_page}', 'style')
+    ],
+    [Input(f'dropdown-doctor-{type_page}', 'value')],
+    prevent_initial_call=True
 )
 def update_selected_filters(doctor_id):
-    # Проверяем, выбран ли один врач
-    if isinstance(doctor_id, list) and len(doctor_id) == 1:
-        doctor_id = doctor_id[0]
-    elif isinstance(doctor_id, str) and ',' not in doctor_id:
-        # Если передана строка, и это не список
-        doctor_id = int(doctor_id)
-    else:
-        return []
-
-    # Получаем информацию о враче
-    details = get_doctor_details(doctor_id)
-    if details:
-        selected_text = [
-            f"Врач: {details['doctor_name']}",
-            f"Специальность: {details['specialty']}",
-            f"Отделение: {details['department']}",
-            f"Корпус: {details['building']}"
-        ]
-        return [html.Div(item) for item in selected_text]
-    else:
-        return []
+    """Обновляет отображение информации о выбранном враче"""
+    # Скрываем блоки если врач не выбран
+    if not doctor_id:
+        return [], {'display': 'none', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                    'border-radius': '5px'}, {'display': 'none'}
+    
+    try:
+        # Обрабатываем разные форматы значения doctor_id
+        processed_doctor_id = None
+        
+        if isinstance(doctor_id, list):
+            if len(doctor_id) == 1:
+                processed_doctor_id = doctor_id[0]
+            elif len(doctor_id) > 1:
+                # Если выбрано несколько врачей - не показываем информацию
+                return [], {'display': 'none', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                            'border-radius': '5px'}, {'display': 'none'}
+            else:
+                # Пустой список
+                return [], {'display': 'none', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                            'border-radius': '5px'}, {'display': 'none'}
+        elif isinstance(doctor_id, str):
+            # Если строка содержит запятую - это несколько врачей
+            if ',' in doctor_id:
+                return [], {'display': 'none', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                            'border-radius': '5px'}, {'display': 'none'}
+            # Если строка - это один ID
+            try:
+                processed_doctor_id = int(doctor_id)
+            except (ValueError, TypeError):
+                return [], {'display': 'none', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                            'border-radius': '5px'}, {'display': 'none'}
+        elif isinstance(doctor_id, int):
+            processed_doctor_id = doctor_id
+        else:
+            return [], {'display': 'none', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                        'border-radius': '5px'}, {'display': 'none'}
+        
+        if processed_doctor_id is None:
+            return [], {'display': 'none', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                        'border-radius': '5px'}, {'display': 'none'}
+        
+        # Получаем информацию о враче
+        details = get_doctor_details(processed_doctor_id)
+        if details and len(details) > 0:
+            # Берем первую запись из списка деталей
+            detail = details[0] if isinstance(details, list) else details
+            selected_text = [
+                f"Врач: {detail.get('doctor_name', 'Неизвестно')}",
+                f"Специальность: {detail.get('specialty', 'Неизвестно')}",
+                f"Отделение: {detail.get('department', 'Неизвестно')}",
+                f"Корпус: {detail.get('building', 'Неизвестно')}"
+            ]
+            # Показываем блоки если есть данные
+            return [html.Div(item) for item in selected_text], \
+                   {'display': 'block', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                    'border-radius': '5px'}, {'display': 'block'}
+        else:
+            # Скрываем блоки если нет данных
+            return [], {'display': 'none', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                        'border-radius': '5px'}, {'display': 'none'}
+    except Exception as e:
+        # В случае ошибки скрываем блоки
+        print(f"Ошибка в update_selected_filters: {str(e)}")
+        return [], {'display': 'none', 'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                    'border-radius': '5px'}, {'display': 'none'}
 
 
 

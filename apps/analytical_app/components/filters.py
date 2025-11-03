@@ -138,6 +138,7 @@ def filter_department(type_page):
 
 
 def get_available_profiles(building_ids=None, department_ids=None):
+    """Получает доступные профили с оптимизированным запросом"""
     filters = build_sql_filters(building_ids=building_ids, department_ids=department_ids)
 
     query = f"""
@@ -147,14 +148,20 @@ def get_available_profiles(building_ids=None, department_ids=None):
         JOIN organization_department department ON department.id = doctor.department_id
         WHERE 1=1
         {filters}
+        ORDER BY profile.description
     """
-    with engine.connect() as connection:
-        result = connection.execute(text(query))
-        profiles = [{'label': row[1], 'value': row[0]} for row in result.fetchall()]
-    return profiles
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(text(query))
+            profiles = [{'label': row[1], 'value': row[0]} for row in result.fetchall()]
+        return profiles
+    except Exception as e:
+        print(f"Ошибка в get_available_profiles: {str(e)}")
+        return []
 
 
 def get_available_doctors(building_ids=None, department_ids=None, profile_ids=None, selected_year=None):
+    """Получает доступных врачей с оптимизированным запросом"""
     if not selected_year:
         selected_year = datetime.now().year
 
@@ -170,7 +177,7 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
 
     year_filter = f"""
         AND (
-            (EXTRACT(YEAR FROM start_date) <= :selected_year AND (end_date IS NULL OR EXTRACT(YEAR FROM end_date) >= :selected_year))
+            (EXTRACT(YEAR FROM doctor.start_date) <= :selected_year AND (doctor.end_date IS NULL OR EXTRACT(YEAR FROM doctor.end_date) >= :selected_year))
         )
     """
 
@@ -190,21 +197,26 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
         {filters}
         {year_filter}
         GROUP BY person.last_name, person.first_name, person.patronymic, pp.description, department.name
+        ORDER BY person.last_name, person.first_name
     """
 
-    with engine.connect() as connection:
-        result = connection.execute(text(query), {'selected_year': selected_year})
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(text(query), {'selected_year': selected_year})
 
-        doctors = [
-            {
-                'label': row[1],  # Индекс 1 соответствует 'doctor_info'
-                'value': ','.join(map(str, row[0]))  # Индекс 0 соответствует 'doctor_ids'
-            }
-            for row in result.fetchall()
-        ]
-    # Сортировка по алфавиту по полю label (без учета регистра)
-    doctors.sort(key=lambda d: (d['label'] or '').lower())
-    return doctors
+            doctors = [
+                {
+                    'label': row[1],  # Индекс 1 соответствует 'doctor_info'
+                    'value': ','.join(map(str, row[0]))  # Индекс 0 соответствует 'doctor_ids'
+                }
+                for row in result.fetchall()
+            ]
+        # Сортировка по алфавиту по полю label (без учета регистра)
+        doctors.sort(key=lambda d: (d['label'] or '').lower())
+        return doctors
+    except Exception as e:
+        print(f"Ошибка в get_available_doctors: {str(e)}")
+        return []
 
 
 def filter_profile(type_page):
