@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dash import dcc, html, Output, Input, exceptions, State, callback_context
 import dash_bootstrap_components as dbc
@@ -6,16 +6,40 @@ from dash.exceptions import PreventUpdate
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
-from apps.analytical_app.components.filters import filter_years, filter_months, \
-    get_current_reporting_month, get_available_buildings, filter_building, get_available_departments, filter_department, \
+from apps.analytical_app.components.filters import filter_years, \
+    get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
-    get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
-    update_buttons
+    get_doctor_details, filter_inogorod, filter_amount_null, \
+    filter_status, status_groups, update_buttons
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.administrator.generation_invoices.query import sql_query_fen_inv
 from apps.analytical_app.query_executor import engine
 
 type_page = "admin-gen-inv"
+
+
+def date_picker_custom(type_page):
+    """Date picker с датой начала 1 января текущего года"""
+    current_year = datetime.now().year
+    year_start = datetime(current_year, 1, 1).date()
+    today = datetime.now().date()
+    
+    return html.Div(
+        [
+            dcc.DatePickerRange(
+                id=f'date-picker-range-{type_page}',
+                start_date_placeholder_text="Начало",
+                end_date_placeholder_text="Конец",
+                start_date=year_start,
+                end_date=today,
+                display_format="DD.MM.YYYY",
+                calendar_orientation='horizontal',
+                style={'margin': '10px'},
+                first_day_of_week=1
+            )
+        ]
+    )
+
 
 admin_gen_inv = html.Div(
     [
@@ -31,38 +55,50 @@ admin_gen_inv = html.Div(
                             dbc.Row(
                                 [
                                     dbc.Col(update_buttons(type_page), width=2),
-                                    dbc.Col(filter_years(type_page), width=1),
-                                    dbc.Col(filter_report_type(type_page), width=2),
+                                    dbc.Col(filter_years(type_page), width=2),
+                                    dbc.Col(
+                                        dcc.Dropdown(
+                                            id=f'dropdown-report-type-{type_page}',
+                                            options=[
+                                                {'label': 'По дате формирования', 'value': 'initial_input'},
+                                                {'label': 'По дате окончания лечения', 'value': 'treatment'}
+                                            ],
+                                            value='initial_input',
+                                            clearable=False
+                                        ),
+                                        width=2
+                                    ),
                                     dbc.Col(filter_inogorod(type_page), width=2),
-                                    dbc.Col(filter_sanction(type_page), width=2),
                                     dbc.Col(filter_amount_null(type_page), width=2),
                                 ],
                                 className="mb-3"
                             ),
                             dbc.Row(
                                 [
-                                    dbc.Row(
+                                    dbc.Col(
                                         [
-                                            dbc.Col(filter_months(type_page), width=12),
-                                            dbc.Row(
-                                                [
-                                                    dbc.Col(
-                                                        html.Label("Выберите дату", id=f'label-date-{type_page}',
-                                                                   style={'font-weight': 'bold', 'display': 'none'}),
-                                                        width="auto"
-                                                    ),
-                                                    dbc.Col(date_picker(f'input-{type_page}'), width=4,
-                                                            id=f'col-input-{type_page}', style={'display': 'none'}),
-                                                    dbc.Col(date_picker(f'treatment-{type_page}'), width=4,
-                                                            id=f'col-treatment-{type_page}', style={'display': 'none'}),
-                                                ],
-                                                align="center",
-                                                style={"display": "flex", "align-items": "center",
-                                                       "margin-bottom": "10px"}
-                                            )
-                                        ]
+                                            html.Label("Период", id=f'label-date-{type_page}', 
+                                                       style={'font-weight': 'bold', 'margin-bottom': '10px'}),
+                                            dbc.Col(date_picker_custom(f'input-{type_page}'), width=12,
+                                                    id=f'col-input-{type_page}'),
+                                        ],
+                                        width=6,
+                                        id=f'date-container-input-{type_page}',
+                                        style={'display': 'none'}
                                     ),
-                                ]
+                                    dbc.Col(
+                                        [
+                                            html.Label("Период", id=f'label-treatment-{type_page}',
+                                                       style={'font-weight': 'bold', 'margin-bottom': '10px'}),
+                                            dbc.Col(date_picker_custom(f'treatment-{type_page}'), width=12,
+                                                    id=f'col-treatment-{type_page}'),
+                                        ],
+                                        width=6,
+                                        id=f'date-container-treatment-{type_page}',
+                                        style={'display': 'none'}
+                                    ),
+                                ],
+                                className="mb-3"
                             ),
                             dbc.Row(
                                 [
@@ -74,17 +110,21 @@ admin_gen_inv = html.Div(
                                 [
                                     dbc.Col(filter_profile(type_page), width=6),
                                     dbc.Col(filter_doctor(type_page), width=6),
-                                ]
+                                ],
+                                className="mb-3"
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(filter_status(type_page), width=12),
+                                ],
+                                className="mb-3"
                             ),
                             dbc.Row(
                                 [
                                     dbc.Col(html.Div(id=f'selected-doctor-{type_page}', className='filters-label',
-                                                     style={'display': 'none'}), width=9),
-                                    dbc.Col(html.Div(id=f'selected-period-{type_page}', className='filters-label',
-                                                     style={'display': 'none'}), width=3)
+                                                     style={'display': 'none'}), width=12),
                                 ]
                             ),
-                            html.Div(id=f'current-month-name-{type_page}', className='filters-label'),
                             html.Div(
                                 id=f'selected-filters-{type_page}',
                                 className='selected-filters-block',
@@ -129,20 +169,24 @@ admin_gen_inv = html.Div(
     [Input(f'result-table1-{type_page}', 'selected_cells'),
      Input(f'result-table1-{type_page}', 'derived_virtual_data')]
 )
-def update_summary_stats(selected_cells, rows):
-    if not rows or not selected_cells:
+def update_summary_stats(selected_cells, visible_data):
+    """Суммирует выбранные ячейки на текущей странице"""
+    if not visible_data or not selected_cells:
         return "0"
     
-    # Подсчет только суммы
+    # Подсчет суммы из видимых данных текущей страницы
     total_sum = 0
     
     for cell in selected_cells:
+        # row_idx в selected_cells - это индекс относительно видимых данных (derived_virtual_data)
         row_idx = cell['row']
         col_id = cell['column_id']
-        value = rows[row_idx].get(col_id, 0)
         
-        if isinstance(value, (int, float)):
-            total_sum += value
+        # Проверяем, что индекс строки в пределах видимых данных
+        if row_idx < len(visible_data):
+            value = visible_data[row_idx].get(col_id, 0)
+            if isinstance(value, (int, float)):
+                total_sum += value
     
     return f"{int(total_sum):,}".replace(",", " ")
 
@@ -154,12 +198,13 @@ def update_summary_stats(selected_cells, rows):
     State(f'result-table1-{type_page}', 'derived_virtual_data'),
     State(f'result-table1-{type_page}', 'selected_cells')
 )
-def calculate_sum_and_count(n_clicks, rows, selected_cells):
+def calculate_sum_and_count(n_clicks, visible_data, selected_cells):
+    """Суммирует выбранные ячейки на текущей странице"""
     if n_clicks is None:
         raise PreventUpdate
 
     # Проверка на наличие данных и выделенных ячеек
-    if rows is None or not selected_cells:
+    if visible_data is None or not selected_cells:
         return "Нет данных или не выбраны ячейки для подсчета."
 
     # Инициализация суммы и счетчика
@@ -168,83 +213,57 @@ def calculate_sum_and_count(n_clicks, rows, selected_cells):
 
     # Суммируем значения только в выделенных ячейках и считаем их количество
     for cell in selected_cells:
+        # row_idx в selected_cells - это индекс относительно видимых данных (derived_virtual_data)
         row_idx = cell['row']  # Индекс строки
         col_id = cell['column_id']  # ID столбца
 
-        # Получаем значение ячейки и добавляем к сумме, если оно является числом
-        value = rows[row_idx].get(col_id, 0)
-        if isinstance(value, (int, float)):  # Проверяем, что значение является числом
-            total_sum += value
-            count += 1  # Увеличиваем счетчик для числовых значений
+        # Проверяем, что индекс строки в пределах видимых данных
+        if row_idx < len(visible_data):
+            # Получаем значение ячейки и добавляем к сумме, если оно является числом
+            value = visible_data[row_idx].get(col_id, 0)
+            if isinstance(value, (int, float)):  # Проверяем, что значение является числом
+                total_sum += value
+                count += 1  # Увеличиваем счетчик для числовых значений
 
     # Округляем сумму до 2 знаков и форматируем с разделителями
-    total_sum_formatted = f"{total_sum:,.2f}".replace(",", " ")
+    total_sum_formatted = f"{int(total_sum):,}".replace(",", " ")
 
     # Формируем строку с результатом
-    return f"Количество выбранных ячеек: {count}, Сумма значений: {total_sum}"
-
-
-
-
-@app.callback(
-    [
-        Output(f'range-slider-month-{type_page}', 'style'),
-        Output(f'date-picker-range-input-{type_page}', 'style'),
-        Output(f'date-picker-range-treatment-{type_page}', 'style')
-    ],
-    [Input(f'dropdown-report-type-{type_page}', 'value')]
-)
-def toggle_filters(report_type):
-    if report_type == 'month':
-        return {'display': 'block'}, {'display': 'none'}, {'display': 'none'}
-    elif report_type == 'initial_input':
-        return {'display': 'none'}, {'display': 'block'}, {'display': 'none'}
-    elif report_type == 'treatment':
-        return {'display': 'none'}, {'display': 'none'}, {'display': 'block'}
-    return {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
+    return f"Количество выбранных ячеек: {count}, Сумма значений: {total_sum_formatted}"
 
 
 @app.callback(
     [
-        Output(f'col-input-{type_page}', 'style'),
-        Output(f'col-treatment-{type_page}', 'style'),
+        Output(f'date-container-input-{type_page}', 'style'),
+        Output(f'date-container-treatment-{type_page}', 'style'),
+        Output(f'label-date-{type_page}', 'children'),
+        Output(f'label-treatment-{type_page}', 'children'),
     ],
     [Input(f'dropdown-report-type-{type_page}', 'value')]
 )
-def toggle_datepickers(report_type):
+def toggle_date_fields(report_type):
+    """Показывает/скрывает поля дат в зависимости от типа отчета"""
     if report_type == 'initial_input':
-        return {'display': 'block'}, {'display': 'none'}
+        return {'display': 'block'}, {'display': 'none'}, 'Период по дате формирования', 'Период'
     elif report_type == 'treatment':
-        return {'display': 'none'}, {'display': 'block'}
-    return {'display': 'none'}, {'display': 'none'}
+        return {'display': 'none'}, {'display': 'block'}, 'Период', 'Период по дате окончания лечения'
+    else:
+        return {'display': 'none'}, {'display': 'none'}, 'Период', 'Период'
 
 
 @app.callback(
-    Output(f'label-date-{type_page}', 'style'),
     [
-        Input(f'dropdown-report-type-{type_page}', 'value'),
-        Input(f'date-picker-range-input-{type_page}', 'start_date'),
-        Input(f'date-picker-range-input-{type_page}', 'end_date'),
-        Input(f'date-picker-range-treatment-{type_page}', 'start_date'),
-        Input(f'date-picker-range-treatment-{type_page}', 'end_date')
-    ]
+        Output(f'status-group-container-{type_page}', 'style'),
+        Output(f'status-individual-container-{type_page}', 'style')
+    ],
+    [Input(f'status-selection-mode-{type_page}', 'value')]
 )
-def toggle_label_visibility(report_type, start_date_input, end_date_input, start_date_treatment, end_date_treatment):
-    # Показать подпись только если выбран тип "initial_input" или "treatment", и установлены даты
-    if report_type in ['initial_input', 'treatment'] and (
-            start_date_input or end_date_input or start_date_treatment or end_date_treatment):
-        return {'display': 'block'}
-    # В противном случае скрыть подпись
-    return {'display': 'none'}
-
-
-@app.callback(
-    Output(f'current-month-name-{type_page}', 'children'),
-    Input('date-interval', 'n_intervals')
-)
-def update_current_month(n_intervals):
-    current_month_num, current_month_name = get_current_reporting_month()
-    return current_month_name
+def toggle_status_selection_mode(mode):
+    """Переключает между групповым и индивидуальным выбором статусов"""
+    if mode == 'group':
+        return {'display': 'block'}, {'display': 'none'}
+    else:  # mode == 'individual'
+        return {'display': 'none'}, {'display': 'block'}
 
 
 @app.callback(
@@ -323,15 +342,6 @@ def update_selected_filters(doctor_id):
         return []
 
 
-@app.callback(
-    Output(f'selected-period-{type_page}', 'children'),
-    [Input(f'range-slider-month-{type_page}', 'value'),
-     Input(f'dropdown-year-{type_page}', 'value'),
-     Input(f'current-month-name-{type_page}', 'children'),
-     ]
-)
-def update_selected_period_list(selected_months_range, selected_year, current_month_name):
-    return selected_months_range
 
 
 @app.callback(
@@ -341,10 +351,8 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
     [Input(f'update-button-{type_page}', 'n_clicks')],
     [State(f'dropdown-doctor-{type_page}', 'value'),
      State(f'dropdown-profile-{type_page}', 'value'),
-     State(f'range-slider-month-{type_page}', 'value'),
      State(f'dropdown-year-{type_page}', 'value'),
      State(f'dropdown-inogorodniy-{type_page}', 'value'),
-     State(f'dropdown-sanction-{type_page}', 'value'),
      State(f'dropdown-amount-null-{type_page}', 'value'),
      State(f'dropdown-building-{type_page}', 'value'),
      State(f'dropdown-department-{type_page}', 'value'),
@@ -352,12 +360,16 @@ def update_selected_period_list(selected_months_range, selected_year, current_mo
      State(f'date-picker-range-input-{type_page}', 'end_date'),
      State(f'date-picker-range-treatment-{type_page}', 'start_date'),
      State(f'date-picker-range-treatment-{type_page}', 'end_date'),
-     State(f'dropdown-report-type-{type_page}', 'value')]
+     State(f'dropdown-report-type-{type_page}', 'value'),
+     State(f'status-selection-mode-{type_page}', 'value'),
+     State(f'status-group-radio-{type_page}', 'value'),
+     State(f'status-individual-dropdown-{type_page}', 'value')]
 )
-def update_table(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
+def update_table(n_clicks, value_doctor, value_profile, selected_year, inogorodniy,
                  amount_null,
                  building_ids, department_ids, start_date_input, end_date_input,
-                 start_date_treatment, end_date_treatment, report_type):
+                 start_date_treatment, end_date_treatment, report_type,
+                 status_selection_mode, status_group_value, status_individual_values):
     # Если кнопка не была нажата, обновление не происходит
     if n_clicks is None:
         raise exceptions.PreventUpdate
@@ -373,36 +385,40 @@ def update_table(n_clicks, value_doctor, value_profile, selected_period, selecte
     else:
         selected_doctor_ids = []
 
-    # Определяем используемый период в зависимости от типа отчета
+    # Определяем статусы для фильтрации
+    status_list = []
+    if status_selection_mode == 'group':
+        if status_group_value and status_group_value in status_groups:
+            status_list = status_groups[status_group_value]
+    elif status_selection_mode == 'individual':
+        if status_individual_values:
+            status_list = status_individual_values if isinstance(status_individual_values, list) else [status_individual_values]
+    
+    # Форматируем даты в зависимости от типа отчета
     start_date_input_formatted, end_date_input_formatted = None, None
     start_date_treatment_formatted, end_date_treatment_formatted = None, None
 
-    if report_type == 'month':
-        start_date_input_formatted, end_date_input_formatted = None, None
-        start_date_treatment_formatted, end_date_treatment_formatted = None, None
-    elif report_type == 'initial_input':
-        selected_period = (1, 12)
+    if report_type == 'initial_input' and start_date_input and end_date_input:
         start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
         end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
-    elif report_type == 'treatment':
-        selected_period = (1, 12)
-        start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
-            '%d-%m-%Y')
-        end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
-            '%d-%m-%Y')
+    elif report_type == 'treatment' and start_date_treatment and end_date_treatment:
+        start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
 
     # Генерация SQL-запроса с учетом всех фильтров
+    # Для months передаем все месяцы, так как фильтр по месяцам не используется
     columns1, data1 = TableUpdater.query_to_df(
         engine,
         sql_query_fen_inv(
             selected_year,
-            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
-            inogorodniy, sanction, amount_null,
+            ', '.join(map(str, range(1, 13))),  # Все месяцы
+            inogorodniy, None, amount_null,  # sanction = None
             building_ids, department_ids,
             value_profile,
             selected_doctor_ids,
             start_date_input_formatted, end_date_input_formatted,
-            start_date_treatment_formatted, end_date_treatment_formatted
+            start_date_treatment_formatted, end_date_treatment_formatted,
+            status_list  # Фильтр по статусам
         )
     )
 

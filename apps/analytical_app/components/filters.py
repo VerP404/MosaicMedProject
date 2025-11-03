@@ -422,12 +422,14 @@ def filter_status(type_page):
                             html.Div(
                                 [
                                     dbc.Label("Выберите группу статусов:", className="mb-2"),
-                                    dcc.RadioItems(
+                                    dcc.Dropdown(
                                         id=f'status-group-radio-{type_page}',
                                         options=[{'label': group, 'value': group}
                                                  for group in status_groups.keys()],
                                         value='Предъявленные и оплаченные (2, 3)',
-                                        labelStyle={'display': 'block', 'margin-bottom': '4px'}
+                                        clearable=False,
+                                        placeholder="Выберите группу статусов",
+                                        style={"width": "100%"}
                                     )
                                 ],
                                 id=f'status-group-container-{type_page}',
@@ -444,7 +446,7 @@ def filter_status(type_page):
                                         value=[],
                                         multi=True,
                                         placeholder="Выберите статусы",
-                                        style={"max-width": "350px"}
+                                        style={"width": "100%"}
                                     ),
                                 ],
                                 id=f'status-individual-container-{type_page}',

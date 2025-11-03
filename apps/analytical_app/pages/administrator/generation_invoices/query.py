@@ -7,11 +7,17 @@ def sql_query_fen_inv(selected_year, months_placeholder, inogorod, sanction, amo
                       doctor=None,
                       input_start=None, input_end=None,
                       treatment_start=None,
-                      treatment_end=None):
+                      treatment_end=None,
+                      status_list=None):
+    # Если months_placeholder пустой, используем все месяцы
+    if not months_placeholder or months_placeholder.strip() == '':
+        months_placeholder = ', '.join(map(str, range(1, 13)))
+    
     base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
                       doctor,
                       input_start, input_end,
-                      treatment_start, treatment_end)
+                      treatment_start, treatment_end,
+                      status_list=status_list)
     query = f"""
     {base}
 SELECT TO_CHAR(TO_DATE(initial_input_date, 'DD-MM-YYYY'), 'DD-MM-YYYY')                       AS input_date,
@@ -43,8 +49,37 @@ SELECT TO_CHAR(TO_DATE(initial_input_date, 'DD-MM-YYYY'), 'DD-MM-YYYY')         
        COUNT(case when goal = 'ПН1' then 1 end)                                                 as "ПН1 N",
        COUNT(case when goal = 'ДС2' then 1 end)                                                 as "ДС2 S"
 FROM oms
-WHERE status IN ('1', '4', '6', '8')
+WHERE 1=1
 GROUP BY TO_DATE(initial_input_date, 'DD-MM-YYYY')
+HAVING (
+    COUNT(CASE WHEN goal = '1' THEN 1 END) +
+    COUNT(CASE WHEN goal = '3' THEN 1 END) +
+    COUNT(CASE WHEN goal in ('305', '307') THEN 1 END) +
+    COUNT(CASE WHEN goal in ('113', '114', '14') THEN 1 END) +
+    COUNT(CASE WHEN goal in ('64', '640') THEN 1 END) +
+    COUNT(CASE WHEN goal in ('541', '561') THEN 1 END) +
+    COUNT(CASE WHEN goal = '22' THEN 1 END) +
+    COUNT(CASE WHEN goal in ('30', '301') THEN 1 END) +
+    COUNT(CASE
+              WHEN goal NOT LIKE 'Д%'
+                  AND goal NOT LIKE 'О%'
+                  AND goal NOT LIKE 'У%'
+                  AND goal NOT LIKE 'П%'
+                  AND main_diagnosis_code LIKE 'C%'
+                  THEN 1
+        END) +
+    COUNT(CASE WHEN goal in ('5', '7', '9', '10', '32') THEN 1 END) +
+    COUNT(CASE WHEN goal in ('В дневном стационаре', 'На дому', 'Стационарно') THEN 1 END) +
+    COUNT(case when goal = 'ДВ4' then 1 end) +
+    COUNT(case when goal = 'ДВ2' then 1 end) +
+    COUNT(case when goal = 'ОПВ' then 1 end) +
+    COUNT(case when goal = 'УД1' then 1 end) +
+    COUNT(case when goal = 'УД2' then 1 end) +
+    COUNT(case when goal = 'ДР1' then 1 end) +
+    COUNT(case when goal = 'ДР2' then 1 end) +
+    COUNT(case when goal = 'ПН1' then 1 end) +
+    COUNT(case when goal = 'ДС2' then 1 end)
+) > 0
 ORDER BY TO_DATE(initial_input_date, 'DD-MM-YYYY') DESC
     """
     return query
