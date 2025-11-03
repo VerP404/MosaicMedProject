@@ -163,31 +163,37 @@ admin_gen_inv = html.Div(
 )
 
 
+# Callback для очистки выделений при смене страницы
+@app.callback(
+    Output(f'result-table1-{type_page}', 'selected_cells', allow_duplicate=True),
+    Input(f'result-table1-{type_page}', 'page_current'),
+    prevent_initial_call=True
+)
+def clear_selection_on_page_change(page_current):
+    """Очищает выделение ячеек при смене страницы"""
+    return []
+
+
 # Callback для подсчета суммы выделенных ячеек
 @app.callback(
     Output(f'summary-stats-{type_page}', 'children'),
     [Input(f'result-table1-{type_page}', 'selected_cells'),
-     Input(f'result-table1-{type_page}', 'derived_virtual_data')]
+     Input(f'result-table1-{type_page}', 'derived_viewport_data')]
 )
-def update_summary_stats(selected_cells, visible_data):
-    """Суммирует выбранные ячейки на текущей странице"""
-    if not visible_data or not selected_cells:
+def update_summary_stats(selected_cells, viewport_data):
+    """Суммирует выбранные ячейки на текущей странице (видимые данные)."""
+    if not viewport_data or not selected_cells:
         return "0"
-    
-    # Подсчет суммы из видимых данных текущей страницы
+
     total_sum = 0
-    
     for cell in selected_cells:
-        # row_idx в selected_cells - это индекс относительно видимых данных (derived_virtual_data)
-        row_idx = cell['row']
-        col_id = cell['column_id']
-        
-        # Проверяем, что индекс строки в пределах видимых данных
-        if row_idx < len(visible_data):
-            value = visible_data[row_idx].get(col_id, 0)
+        row_idx = cell.get('row')
+        col_id = cell.get('column_id')
+        if row_idx is not None and col_id and 0 <= row_idx < len(viewport_data):
+            value = viewport_data[row_idx].get(col_id, 0)
             if isinstance(value, (int, float)):
                 total_sum += value
-    
+
     return f"{int(total_sum):,}".replace(",", " ")
 
 
