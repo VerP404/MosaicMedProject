@@ -115,7 +115,7 @@ admin_gen_inv = html.Div(
                             ),
                             dbc.Row(
                                 [
-                                    dbc.Col(filter_status(type_page), width=12),
+                                    dbc.Col(filter_status(type_page, default_status_group='Готовые к сборке (1,4,6,8,19)'), width=12),
                                 ],
                                 className="mb-3"
                             ),

@@ -385,7 +385,7 @@ def date_end(label, type_page):
         ))
 
 
-def filter_status(type_page):
+def filter_status(type_page, default_status_group='Предъявленные первичные и повторные (1,2,3,4,6,8,19)'):
     dropdown_options = [
         {'label': f'Статус {status} - {status_descriptions.get(status, "")}', 'value': status}
         for status in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '12', '13', '17', '18', '19']
@@ -432,7 +432,7 @@ def filter_status(type_page):
                                         id=f'status-group-radio-{type_page}',
                                         options=[{'label': group, 'value': group}
                                                  for group in status_groups.keys()],
-                                        value='Предъявленные первичные и повторные (1,2,3,4,6,8,19)',
+                                        value=default_status_group,
                                         clearable=False,
                                         placeholder="Выберите группу статусов",
                                         style={"width": "100%"}
