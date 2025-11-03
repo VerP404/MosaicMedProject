@@ -171,6 +171,7 @@ def sql_query_details(selected_year, months_placeholder, inogorod, sanction, amo
            treatment_start AS "Дата начала",
            treatment_end AS "Дата окончания",
            initial_input_date AS "Дата формирования",
+           last_change_date AS "Дата изменения",
            smo_code AS "Код СМО",
            COALESCE(amount_numeric, 0) AS "Сумма",
            enp AS "ЕНП",

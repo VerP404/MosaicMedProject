@@ -10,10 +10,11 @@ from apps.analytical_app.components.filters import filter_years, \
     get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
     get_doctor_details, filter_inogorod, filter_amount_null, \
-    filter_status, status_groups, update_buttons
+    filter_status, status_groups, status_descriptions, update_buttons
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.administrator.generation_invoices.query import sql_query_fen_inv, sql_query_details
 from apps.analytical_app.query_executor import engine
+from sqlalchemy import text
 
 type_page = "admin-gen-inv"
 
@@ -184,6 +185,252 @@ admin_gen_inv = html.Div(
                                     ]
                                 ),
                                 card_table(f'details-table-{type_page}', "Детали", page_size=20)
+                            ]
+                        )
+                    ],
+                    style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+                           "border-radius": "10px"}
+                ),
+                width=12,
+                className="mt-3"
+            )
+        ),
+        
+        # Блок управления талонами (удаление и изменение статуса)
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    [
+                        dbc.CardHeader(
+                            [
+                                html.H4("⚙️ Управление талонами", className="mb-0"),
+                                html.Small("Удаление и изменение статуса записей по номеру талона", className="text-muted")
+                            ]
+                        ),
+                        dbc.CardBody(
+                            [
+                                dbc.Tabs(
+                                    [
+                                        # Вкладка "Удаление"
+                                        dbc.Tab(
+                                            [
+                                                dbc.Alert(
+                                                    [
+                                                        html.I(className="bi bi-exclamation-triangle-fill me-2"),
+                                                        "Внимание! Удаление записей из базы данных невозможно отменить. "
+                                                        "Перед удалением убедитесь, что талон был удален во внешней системе."
+                                                    ],
+                                                    color="warning",
+                                                    className="mb-4"
+                                                ),
+                                                dbc.Row(
+                                                    [
+                                                        dbc.Col(
+                                                            dbc.InputGroup(
+                                                                [
+                                                                    dbc.InputGroupText("Номер талона:", className="fw-bold"),
+                                                                    dbc.Input(
+                                                                        id=f'talon-input-delete-{type_page}',
+                                                                        type="text",
+                                                                        placeholder="Введите номер талона",
+                                                                        size="lg"
+                                                                    ),
+                                                                    dbc.Button(
+                                                                        [
+                                                                            html.I(className="bi bi-search me-2"),
+                                                                            "Найти записи"
+                                                                        ],
+                                                                        id=f'search-talon-button-{type_page}',
+                                                                        color="info",
+                                                                        size="lg"
+                                                                    )
+                                                                ],
+                                                                className="mb-3"
+                                                            ),
+                                                            width=12
+                                                        )
+                                                    ],
+                                                    className="mb-3"
+                                                ),
+                                                html.Div(id=f'talon-search-results-{type_page}', className="mb-3"),
+                                                dbc.Modal(
+                                                    [
+                                                        dbc.ModalHeader(
+                                                            [
+                                                                html.I(className="bi bi-exclamation-triangle-fill text-warning me-2"),
+                                                                "Подтверждение удаления"
+                                                            ]
+                                                        ),
+                                                        dbc.ModalBody(
+                                                            [
+                                                                dbc.Alert(
+                                                                    "Вы уверены, что хотите удалить записи с указанным номером талона?",
+                                                                    color="danger",
+                                                                    className="mb-3"
+                                                                ),
+                                                                html.Div(id=f'delete-confirm-info-{type_page}')
+                                                            ]
+                                                        ),
+                                                        dbc.ModalFooter(
+                                                            [
+                                                                dbc.Button(
+                                                                    [
+                                                                        html.I(className="bi bi-x-circle me-2"),
+                                                                        "Отмена"
+                                                                    ],
+                                                                    id=f'cancel-delete-{type_page}',
+                                                                    color="secondary",
+                                                                    outline=True,
+                                                                    className="me-2"
+                                                                ),
+                                                                dbc.Button(
+                                                                    [
+                                                                        html.I(className="bi bi-trash-fill me-2"),
+                                                                        "Удалить"
+                                                                    ],
+                                                                    id=f'confirm-delete-{type_page}',
+                                                                    color="danger"
+                                                                )
+                                                            ]
+                                                        )
+                                                    ],
+                                                    id=f'delete-modal-{type_page}',
+                                                    is_open=False,
+                                                    centered=True
+                                                ),
+                                                html.Div(id=f'delete-result-{type_page}')
+                                            ],
+                                            label="🗑️ Удаление",
+                                            tab_id="delete-tab"
+                                        ),
+                                        # Вкладка "Изменение статуса"
+                                        dbc.Tab(
+                                            [
+                                                dbc.Alert(
+                                                    [
+                                                        html.I(className="bi bi-info-circle-fill me-2"),
+                                                        "Изменение статуса записей в базе данных. "
+                                                        "Статус будет изменен во всех таблицах для указанного номера талона."
+                                                    ],
+                                                    color="info",
+                                                    className="mb-4"
+                                                ),
+                                                dbc.Row(
+                                                    [
+                                                        dbc.Col(
+                                                            dbc.InputGroup(
+                                                                [
+                                                                    dbc.InputGroupText("Номер талона:", className="fw-bold"),
+                                                                    dbc.Input(
+                                                                        id=f'talon-input-status-{type_page}',
+                                                                        type="text",
+                                                                        placeholder="Введите номер талона",
+                                                                        size="lg"
+                                                                    ),
+                                                                    dbc.Button(
+                                                                        [
+                                                                            html.I(className="bi bi-search me-2"),
+                                                                            "Найти записи"
+                                                                        ],
+                                                                        id=f'search-talon-status-button-{type_page}',
+                                                                        color="info",
+                                                                        size="lg"
+                                                                    )
+                                                                ],
+                                                                className="mb-3"
+                                                            ),
+                                                            width=12
+                                                        )
+                                                    ],
+                                                    className="mb-3"
+                                                ),
+                                                html.Div(id=f'talon-status-search-results-{type_page}', className="mb-3"),
+                                                dbc.Row(
+                                                    [
+                                                        dbc.Col(
+                                                            [
+                                                                dbc.Label("Новый статус:", className="mb-2 fw-bold"),
+                                                                dcc.Dropdown(
+                                                                    id=f'status-change-dropdown-{type_page}',
+                                                                    options=[
+                                                                        {'label': f"{status} - {desc}", 'value': status}
+                                                                        for status, desc in status_descriptions.items()
+                                                                    ],
+                                                                    placeholder="Выберите статус",
+                                                                    clearable=False,
+                                                                    style={"width": "100%"}
+                                                                )
+                                                            ],
+                                                            width=12,
+                                                            className="mb-3"
+                                                        )
+                                                    ]
+                                                ),
+                                                dbc.Button(
+                                                    [
+                                                        html.I(className="bi bi-check-circle-fill me-2"),
+                                                        "Изменить статус"
+                                                    ],
+                                                    id=f'change-status-button-{type_page}',
+                                                    color="primary",
+                                                    size="lg",
+                                                    className="w-100 mb-3",
+                                                    disabled=True
+                                                ),
+                                                dbc.Modal(
+                                                    [
+                                                        dbc.ModalHeader(
+                                                            [
+                                                                html.I(className="bi bi-check-circle-fill text-primary me-2"),
+                                                                "Подтверждение изменения статуса"
+                                                            ]
+                                                        ),
+                                                        dbc.ModalBody(
+                                                            [
+                                                                dbc.Alert(
+                                                                    "Вы уверены, что хотите изменить статус записей с указанным номером талона?",
+                                                                    color="warning",
+                                                                    className="mb-3"
+                                                                ),
+                                                                html.Div(id=f'status-change-confirm-info-{type_page}')
+                                                            ]
+                                                        ),
+                                                        dbc.ModalFooter(
+                                                            [
+                                                                dbc.Button(
+                                                                    [
+                                                                        html.I(className="bi bi-x-circle me-2"),
+                                                                        "Отмена"
+                                                                    ],
+                                                                    id=f'cancel-status-change-{type_page}',
+                                                                    color="secondary",
+                                                                    outline=True,
+                                                                    className="me-2"
+                                                                ),
+                                                                dbc.Button(
+                                                                    [
+                                                                        html.I(className="bi bi-check-circle-fill me-2"),
+                                                                        "Изменить"
+                                                                    ],
+                                                                    id=f'confirm-status-change-{type_page}',
+                                                                    color="primary"
+                                                                )
+                                                            ]
+                                                        )
+                                                    ],
+                                                    id=f'status-change-modal-{type_page}',
+                                                    is_open=False,
+                                                    centered=True
+                                                ),
+                                                html.Div(id=f'status-change-result-{type_page}')
+                                            ],
+                                            label="🔄 Изменение статуса",
+                                            tab_id="status-change-tab"
+                                        )
+                                    ],
+                                    id=f'talon-management-tabs-{type_page}',
+                                    active_tab="delete-tab"
+                                )
                             ]
                         )
                     ],
@@ -624,3 +871,504 @@ def show_details(n_clicks, viewport_data, active_cell, selected_year, inogorodni
     except Exception as e:
         error_msg = f"Ошибка при получении детализации: {str(e)}"
         return error_msg, [], []
+
+
+# Callback для поиска записей по номеру талона
+@app.callback(
+    [
+        Output(f'talon-search-results-{type_page}', 'children'),
+        Output(f'delete-modal-{type_page}', 'is_open'),
+        Output(f'delete-confirm-info-{type_page}', 'children')
+    ],
+    [
+        Input(f'search-talon-button-{type_page}', 'n_clicks'),
+        Input(f'confirm-delete-{type_page}', 'n_clicks'),
+        Input(f'cancel-delete-{type_page}', 'n_clicks')
+    ],
+    [
+        State(f'talon-input-delete-{type_page}', 'value'),
+        State(f'delete-modal-{type_page}', 'is_open')
+    ]
+)
+def search_and_delete_talon(search_clicks, confirm_clicks, cancel_clicks, talon_number, modal_is_open):
+    """Поиск записей по номеру талона и удаление"""
+    ctx = callback_context
+    if not ctx.triggered:
+        return '', False, ''
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    # Отмена
+    if button_id == f'cancel-delete-{type_page}':
+        return '', False, ''
+    
+    # Поиск записей
+    if button_id == f'search-talon-button-{type_page}':
+        if not talon_number or not talon_number.strip():
+            return dbc.Alert("Пожалуйста, введите номер талона", color="warning"), False, ''
+        
+        talon_number = talon_number.strip()
+        
+        try:
+            results = []
+            counts = {}
+            
+            # Поиск в data_loader_omsdata
+            with engine.connect() as connection:
+                query = text("SELECT COUNT(*) FROM data_loader_omsdata WHERE talon = :talon")
+                result = connection.execute(query, {"talon": talon_number})
+                count_data_loader = result.scalar()
+                counts['data_loader_omsdata'] = count_data_loader
+                
+                # Поиск в load_data_oms_data
+                query = text("SELECT COUNT(*) FROM load_data_oms_data WHERE talon = :talon")
+                result = connection.execute(query, {"talon": talon_number})
+                count_load_data = result.scalar()
+                counts['load_data_oms_data'] = count_load_data
+                
+                # Поиск в load_data_talons
+                query = text("SELECT COUNT(*) FROM load_data_talons WHERE talon = :talon")
+                result = connection.execute(query, {"talon": talon_number})
+                count_load_talons = result.scalar()
+                counts['load_data_talons'] = count_load_talons
+            
+            total_count = count_data_loader + count_load_data + count_load_talons
+            
+            if total_count == 0:
+                return dbc.Alert(f"Записи с номером талона '{talon_number}' не найдены", color="info"), False, ''
+            
+            # Формируем информацию о найденных записях
+            info_items = [
+                html.H5(f"Найдено записей для талона: {talon_number}", className="mb-3"),
+                dbc.ListGroup([
+                    dbc.ListGroupItem(
+                        [
+                            html.Span("data_loader_omsdata:", className="fw-bold me-2"),
+                            html.Span(f"{count_data_loader} записей", className="text-primary")
+                        ],
+                        className="d-flex justify-content-between align-items-center"
+                    ),
+                    dbc.ListGroupItem(
+                        [
+                            html.Span("load_data_oms_data:", className="fw-bold me-2"),
+                            html.Span(f"{count_load_data} записей", className="text-primary")
+                        ],
+                        className="d-flex justify-content-between align-items-center"
+                    ),
+                    dbc.ListGroupItem(
+                        [
+                            html.Span("load_data_talons:", className="fw-bold me-2"),
+                            html.Span(f"{count_load_talons} записей", className="text-primary")
+                        ],
+                        className="d-flex justify-content-between align-items-center"
+                    ),
+                    dbc.ListGroupItem(
+                        [
+                            html.Span("Всего:", className="fw-bold me-2"),
+                            dbc.Badge(f"{total_count} записей", color="danger", pill=True)
+                        ],
+                        className="d-flex justify-content-between align-items-center bg-light"
+                    )
+                ], flush=True, className="mb-3")
+            ]
+            
+            # Информация для модального окна
+            confirm_info = dbc.Card(
+                dbc.CardBody([
+                    html.P([
+                        html.Strong("Номер талона: "),
+                        dbc.Badge(talon_number, color="primary", className="ms-2")
+                    ], className="mb-3"),
+                    html.P("Будет удалено записей:", className="fw-bold mb-2"),
+                    dbc.ListGroup([
+                        dbc.ListGroupItem(f"data_loader_omsdata: {count_data_loader}"),
+                        dbc.ListGroupItem(f"load_data_oms_data: {count_load_data}"),
+                        dbc.ListGroupItem(f"load_data_talons: {count_load_talons}")
+                    ], flush=True),
+                    dbc.Alert(
+                        [
+                            html.I(className="bi bi-exclamation-triangle-fill me-2"),
+                            "Это действие нельзя отменить!"
+                        ],
+                        color="danger",
+                        className="mt-3"
+                    )
+                ])
+            )
+            
+            return dbc.Row([
+                dbc.Col([
+                    dbc.Alert(
+                        html.Div(info_items),
+                        color="warning",
+                        className="mb-3"
+                    ),
+                    dbc.Button(
+                        [
+                            html.I(className="bi bi-trash-fill me-2"),
+                            "Удалить все записи"
+                        ],
+                        id=f'open-delete-modal-{type_page}',
+                        color="danger",
+                        size="lg",
+                        className="w-100"
+                    )
+                ], width=12)
+            ]), False, confirm_info
+            
+        except Exception as e:
+            error_msg = f"Ошибка при поиске записей: {str(e)}"
+            return dbc.Alert(error_msg, color="danger"), False, ''
+    
+    # Подтверждение удаления
+    if button_id == f'confirm-delete-{type_page}':
+        if not talon_number or not talon_number.strip():
+            return '', False, ''
+        
+        talon_number = talon_number.strip()
+        
+        try:
+            with engine.begin() as connection:
+                deleted_counts = {}
+                
+                # Удаление из data_loader_omsdata
+                query = text("DELETE FROM data_loader_omsdata WHERE talon = :talon")
+                result = connection.execute(query, {"talon": talon_number})
+                deleted_counts['data_loader_omsdata'] = result.rowcount
+                
+                # Удаление из load_data_oms_data
+                query = text("DELETE FROM load_data_oms_data WHERE talon = :talon")
+                result = connection.execute(query, {"talon": talon_number})
+                deleted_counts['load_data_oms_data'] = result.rowcount
+                
+                # Удаление из load_data_talons
+                query = text("DELETE FROM load_data_talons WHERE talon = :talon")
+                result = connection.execute(query, {"talon": talon_number})
+                deleted_counts['load_data_talons'] = result.rowcount
+                
+                # commit происходит автоматически при выходе из with engine.begin()
+            
+            total_deleted = sum(deleted_counts.values())
+            
+            success_msg = dbc.Alert(
+                [
+                    html.Div([
+                        html.I(className="bi bi-check-circle-fill me-2"),
+                        html.Strong(f"Успешно удалено {total_deleted} записей с номером талона '{talon_number}'")
+                    ], className="mb-3"),
+                    dbc.ListGroup([
+                        dbc.ListGroupItem(
+                            [
+                                html.Span("data_loader_omsdata:", className="fw-bold me-2"),
+                                html.Span(f"{deleted_counts['data_loader_omsdata']} записей", className="text-success")
+                            ],
+                            className="d-flex justify-content-between align-items-center"
+                        ),
+                        dbc.ListGroupItem(
+                            [
+                                html.Span("load_data_oms_data:", className="fw-bold me-2"),
+                                html.Span(f"{deleted_counts['load_data_oms_data']} записей", className="text-success")
+                            ],
+                            className="d-flex justify-content-between align-items-center"
+                        ),
+                        dbc.ListGroupItem(
+                            [
+                                html.Span("load_data_talons:", className="fw-bold me-2"),
+                                html.Span(f"{deleted_counts['load_data_talons']} записей", className="text-success")
+                            ],
+                            className="d-flex justify-content-between align-items-center"
+                        )
+                    ], flush=True)
+                ],
+                color="success"
+            )
+            
+            return success_msg, False, ''
+            
+        except Exception as e:
+            error_msg = f"Ошибка при удалении записей: {str(e)}"
+            return dbc.Alert(error_msg, color="danger"), False, ''
+    
+    return '', False, ''
+
+
+# Callback для открытия модального окна удаления
+@app.callback(
+    Output(f'delete-modal-{type_page}', 'is_open', allow_duplicate=True),
+    Input(f'open-delete-modal-{type_page}', 'n_clicks'),
+    prevent_initial_call=True
+)
+def open_delete_modal(n_clicks):
+    """Открывает модальное окно подтверждения удаления"""
+    if n_clicks:
+        return True
+    return False
+
+
+# Callback для отображения результата удаления
+@app.callback(
+    Output(f'delete-result-{type_page}', 'children'),
+    Input(f'confirm-delete-{type_page}', 'n_clicks')
+)
+def show_delete_result(n_clicks):
+    """Отображает результат удаления"""
+    if n_clicks:
+        return html.Div()  # Результат уже отображается в search_and_delete_talon
+    return html.Div()
+
+
+# Callback для поиска записей при изменении статуса
+@app.callback(
+    [
+        Output(f'talon-status-search-results-{type_page}', 'children'),
+        Output(f'change-status-button-{type_page}', 'disabled')
+    ],
+    Input(f'search-talon-status-button-{type_page}', 'n_clicks'),
+    State(f'talon-input-status-{type_page}', 'value')
+)
+def search_talon_for_status_change(n_clicks, talon_number):
+    """Поиск записей по номеру талона для изменения статуса"""
+    if not n_clicks or not talon_number or not talon_number.strip():
+        return '', True
+    
+    talon_number = talon_number.strip()
+    
+    try:
+        counts = {}
+        current_statuses = {}
+        
+        # Поиск в data_loader_omsdata
+        with engine.connect() as connection:
+            query = text("""
+                SELECT COUNT(*), 
+                       STRING_AGG(DISTINCT status, ', ') as statuses
+                FROM data_loader_omsdata 
+                WHERE talon = :talon
+            """)
+            result = connection.execute(query, {"talon": talon_number})
+            row = result.fetchone()
+            counts['data_loader_omsdata'] = row[0] if row else 0
+            current_statuses['data_loader_omsdata'] = row[1] if row and row[1] else '-'
+            
+            # Поиск в load_data_oms_data
+            query = text("""
+                SELECT COUNT(*), 
+                       STRING_AGG(DISTINCT status, ', ') as statuses
+                FROM load_data_oms_data 
+                WHERE talon = :talon
+            """)
+            result = connection.execute(query, {"talon": talon_number})
+            row = result.fetchone()
+            counts['load_data_oms_data'] = row[0] if row else 0
+            current_statuses['load_data_oms_data'] = row[1] if row and row[1] else '-'
+            
+            # Поиск в load_data_talons
+            query = text("""
+                SELECT COUNT(*), 
+                       STRING_AGG(DISTINCT status, ', ') as statuses
+                FROM load_data_talons 
+                WHERE talon = :talon
+            """)
+            result = connection.execute(query, {"talon": talon_number})
+            row = result.fetchone()
+            counts['load_data_talons'] = row[0] if row else 0
+            current_statuses['load_data_talons'] = row[1] if row and row[1] else '-'
+        
+        total_count = sum(counts.values())
+        
+        if total_count == 0:
+            return dbc.Alert(f"Записи с номером талона '{talon_number}' не найдены", color="info"), True
+        
+        # Формируем информацию о найденных записях
+        info_items = [
+            html.H5(f"Найдено записей для талона: {talon_number}", className="mb-3"),
+            dbc.ListGroup([
+                dbc.ListGroupItem(
+                    [
+                        html.Span("data_loader_omsdata:", className="fw-bold me-2"),
+                        html.Span(f"{counts['data_loader_omsdata']} записей", className="text-primary me-2"),
+                        html.Span(f"(текущий статус: {current_statuses['data_loader_omsdata']})", className="text-muted small")
+                    ],
+                    className="d-flex justify-content-between align-items-center"
+                ),
+                dbc.ListGroupItem(
+                    [
+                        html.Span("load_data_oms_data:", className="fw-bold me-2"),
+                        html.Span(f"{counts['load_data_oms_data']} записей", className="text-primary me-2"),
+                        html.Span(f"(текущий статус: {current_statuses['load_data_oms_data']})", className="text-muted small")
+                    ],
+                    className="d-flex justify-content-between align-items-center"
+                ),
+                dbc.ListGroupItem(
+                    [
+                        html.Span("load_data_talons:", className="fw-bold me-2"),
+                        html.Span(f"{counts['load_data_talons']} записей", className="text-primary me-2"),
+                        html.Span(f"(текущий статус: {current_statuses['load_data_talons']})", className="text-muted small")
+                    ],
+                    className="d-flex justify-content-between align-items-center"
+                ),
+                dbc.ListGroupItem(
+                    [
+                        html.Span("Всего:", className="fw-bold me-2"),
+                        dbc.Badge(f"{total_count} записей", color="info", pill=True)
+                    ],
+                    className="d-flex justify-content-between align-items-center bg-light"
+                )
+            ], flush=True, className="mb-3")
+        ]
+        
+        return dbc.Alert(html.Div(info_items), color="info"), False
+        
+    except Exception as e:
+        error_msg = f"Ошибка при поиске записей: {str(e)}"
+        return dbc.Alert(error_msg, color="danger"), True
+
+
+# Callback для открытия модального окна изменения статуса
+@app.callback(
+    [
+        Output(f'status-change-modal-{type_page}', 'is_open'),
+        Output(f'status-change-confirm-info-{type_page}', 'children')
+    ],
+    [
+        Input(f'change-status-button-{type_page}', 'n_clicks'),
+        Input(f'confirm-status-change-{type_page}', 'n_clicks'),
+        Input(f'cancel-status-change-{type_page}', 'n_clicks')
+    ],
+    [
+        State(f'talon-input-status-{type_page}', 'value'),
+        State(f'status-change-dropdown-{type_page}', 'value'),
+        State(f'status-change-modal-{type_page}', 'is_open')
+    ]
+)
+def toggle_status_change_modal(change_clicks, confirm_clicks, cancel_clicks, talon_number, new_status, is_open):
+    """Управление модальным окном изменения статуса"""
+    ctx = callback_context
+    if not ctx.triggered:
+        return False, ''
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    # Отмена
+    if button_id == f'cancel-status-change-{type_page}':
+        return False, ''
+    
+    # Подтверждение - закрываем модальное окно
+    if button_id == f'confirm-status-change-{type_page}':
+        return False, ''
+    
+    # Открытие модального окна
+    if button_id == f'change-status-button-{type_page}':
+        if not talon_number or not new_status:
+            return False, ''
+        
+        # Формируем информацию для подтверждения
+        status_desc = status_descriptions.get(new_status, 'Неизвестный статус')
+        confirm_info = dbc.Card(
+            dbc.CardBody([
+                html.P([
+                    html.Strong("Номер талона: "),
+                    dbc.Badge(talon_number, color="primary", className="ms-2")
+                ], className="mb-3"),
+                html.P([
+                    html.Strong("Новый статус: "),
+                    dbc.Badge(f"{new_status} - {status_desc}", color="success", className="ms-2")
+                ], className="mb-3"),
+                html.P("Будет изменен статус во всех таблицах:", className="fw-bold mb-2"),
+                dbc.ListGroup([
+                    dbc.ListGroupItem("data_loader_omsdata"),
+                    dbc.ListGroupItem("load_data_oms_data"),
+                    dbc.ListGroupItem("load_data_talons")
+                ], flush=True),
+                dbc.Alert(
+                    [
+                        html.I(className="bi bi-exclamation-triangle-fill me-2"),
+                        "Это действие изменит статус всех найденных записей!"
+                    ],
+                    color="warning",
+                    className="mt-3"
+                )
+            ])
+        )
+        
+        return True, confirm_info
+    
+    return is_open, ''
+
+
+# Callback для изменения статуса
+@app.callback(
+    Output(f'status-change-result-{type_page}', 'children'),
+    Input(f'confirm-status-change-{type_page}', 'n_clicks'),
+    [
+        State(f'talon-input-status-{type_page}', 'value'),
+        State(f'status-change-dropdown-{type_page}', 'value')
+    ]
+)
+def change_status(n_clicks, talon_number, new_status):
+    """Изменение статуса записей"""
+    if not n_clicks or not talon_number or not new_status:
+        return ''
+    
+    talon_number = talon_number.strip()
+    
+    try:
+        updated_counts = {}
+        
+        with engine.begin() as connection:
+            # Изменение статуса в data_loader_omsdata
+            query = text("UPDATE data_loader_omsdata SET status = :new_status WHERE talon = :talon")
+            result = connection.execute(query, {"new_status": new_status, "talon": talon_number})
+            updated_counts['data_loader_omsdata'] = result.rowcount
+            
+            # Изменение статуса в load_data_oms_data
+            query = text("UPDATE load_data_oms_data SET status = :new_status WHERE talon = :talon")
+            result = connection.execute(query, {"new_status": new_status, "talon": talon_number})
+            updated_counts['load_data_oms_data'] = result.rowcount
+            
+            # Изменение статуса в load_data_talons
+            query = text("UPDATE load_data_talons SET status = :new_status WHERE talon = :talon")
+            result = connection.execute(query, {"new_status": new_status, "talon": talon_number})
+            updated_counts['load_data_talons'] = result.rowcount
+        
+        total_updated = sum(updated_counts.values())
+        status_desc = status_descriptions.get(new_status, 'Неизвестный статус')
+        
+        success_msg = dbc.Alert(
+            [
+                html.Div([
+                    html.I(className="bi bi-check-circle-fill me-2"),
+                    html.Strong(f"Успешно изменен статус {total_updated} записей на '{new_status} - {status_desc}'")
+                ], className="mb-3"),
+                dbc.ListGroup([
+                    dbc.ListGroupItem(
+                        [
+                            html.Span("data_loader_omsdata:", className="fw-bold me-2"),
+                            html.Span(f"{updated_counts['data_loader_omsdata']} записей", className="text-success")
+                        ],
+                        className="d-flex justify-content-between align-items-center"
+                    ),
+                    dbc.ListGroupItem(
+                        [
+                            html.Span("load_data_oms_data:", className="fw-bold me-2"),
+                            html.Span(f"{updated_counts['load_data_oms_data']} записей", className="text-success")
+                        ],
+                        className="d-flex justify-content-between align-items-center"
+                    ),
+                    dbc.ListGroupItem(
+                        [
+                            html.Span("load_data_talons:", className="fw-bold me-2"),
+                            html.Span(f"{updated_counts['load_data_talons']} записей", className="text-success")
+                        ],
+                        className="d-flex justify-content-between align-items-center"
+                    )
+                ], flush=True)
+            ],
+            color="success"
+        )
+        
+        return success_msg
+        
+    except Exception as e:
+        error_msg = f"Ошибка при изменении статуса: {str(e)}"
+        return dbc.Alert(error_msg, color="danger")
