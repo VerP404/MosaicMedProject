@@ -9,6 +9,7 @@ from sqlalchemy import text
 from datetime import datetime
 import time
 from urllib.parse import urlparse
+import pandas as pd
 
 
 def get_organization_name():
@@ -228,10 +229,25 @@ def update_table(n_clicks):
 )
 def update_table(n_clicks):
     if n_clicks > 0:
-        columns, data = TableUpdater.query_to_df(engine,
-                                                 f"SELECT status::integer as \"Цель\", "
-                                                 "name as \"Название\" FROM oms_reference_statusweboms "
-                                                 "ORDER BY status::integer")
+        # Импортируем status_descriptions из filters.py
+        from apps.analytical_app.components.filters import status_descriptions
+        
+        # Создаем список данных из словаря status_descriptions
+        data = []
+        # Сортируем статусы: сначала числовые (как числа), потом нечисловые
+        sorted_items = sorted(status_descriptions.items(), 
+                            key=lambda x: (int(x[0]) if x[0].isdigit() else 999, x[0]))
+        for status, description in sorted_items:
+            data.append({
+                'Статус': status,
+                'Описание': description
+            })
+        
+        # Создаем DataFrame и преобразуем в формат для Dash DataTable
+        df = pd.DataFrame(data)
+        columns = [{"name": col, "id": col} for col in df.columns]
+        data = df.to_dict('records')
+        
         return columns, data
     return [], []
 
