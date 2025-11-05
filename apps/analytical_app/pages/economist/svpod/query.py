@@ -696,6 +696,36 @@ def get_plan_for_group(group_id, selected_year, months_list, mode='both'):
         return 0, 0.0
 
 
+def get_plan_by_months_for_group(group_id, selected_year, months_list):
+    """
+    Получает план для группы по месяцам (помесячно).
+    Возвращает словарь: {month: (quantity, amount)}
+    """
+    if not months_list:
+        return {}
+    
+    months_str = ', '.join(map(str, months_list))
+    query = text(f"""
+        SELECT 
+            mp.month,
+            COALESCE(SUM(mp.quantity), 0) AS plan_quantity,
+            COALESCE(SUM(mp.amount), 0) AS plan_amount
+        FROM plan_monthlyplan AS mp
+        INNER JOIN plan_annualplan AS ap ON mp.annual_plan_id = ap.id
+        WHERE ap.group_id = :group_id 
+        AND ap.year = :year
+        AND mp.month IN ({months_str})
+        GROUP BY mp.month
+        ORDER BY mp.month
+    """)
+    with engine.connect() as connection:
+        result = connection.execute(query, {"group_id": group_id, "year": selected_year}).mappings()
+        plan_by_months = {}
+        for row in result:
+            plan_by_months[row["month"]] = (row["plan_quantity"] or 0, float(row["plan_amount"] or 0.0))
+        return plan_by_months
+
+
 def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, amount_null, building=None,
                          department=None,
                          profile=None,
@@ -743,8 +773,8 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
         # Используем правильную логику группировки статусов как в svpod
         union_query = f"""
             SELECT '{condition_type}' AS type,
-                   {plan_quantity} AS "План (количество)",
-                   ROUND({plan_amount}::numeric, 2) AS "План (сумма)",
+                   {plan_quantity} AS "План 1/12 (количество)",
+                   ROUND({plan_amount}::numeric, 2) AS "План 1/12 (сумма)",
                    COUNT(*) AS "К-во",
                    ROUND(COALESCE(SUM(CAST(amount_numeric AS numeric(10, 2))), 0)::numeric, 2) AS "Сумма",
                    '{escaped_filter_description}' AS "Условия фильтра"
@@ -762,7 +792,7 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
         final_query = f"{base}\n" + " UNION ALL ".join(union_queries) + "\nLIMIT 10000"
     else:
         # Если нет динамических условий, возвращаем пустой результат
-        final_query = f"{base}\nSELECT 'no_data' AS type, 0 AS \"План (количество)\", 0.00 AS \"План (сумма)\", 0 AS \"К-во\", 0.00 AS \"Сумма\", 'Нет данных' AS \"Условия фильтра\" FROM oms WHERE 1=0\nLIMIT 10000"
+        final_query = f"{base}\nSELECT 'no_data' AS type, 0 AS \"План 1/12 (количество)\", 0.00 AS \"План 1/12 (сумма)\", 0 AS \"К-во\", 0.00 AS \"Сумма\", 'Нет данных' AS \"Условия фильтра\" FROM oms WHERE 1=0\nLIMIT 10000"
 
     return final_query
 

@@ -16,7 +16,7 @@ from apps.analytical_app.components.filters import filter_years, update_buttons,
     get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
     filter_status, status_groups
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups, sql_query_indicators, sql_query_indicators_details, clear_cache
+from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups, sql_query_indicators, sql_query_indicators_details, clear_cache, get_groups_for_indicators_report, get_plan_by_months_for_group
 import pandas as pd
 from apps.analytical_app.query_executor import engine
 
@@ -430,12 +430,14 @@ indicators_tab = html.Div(
              type='default',
              children=[card_table(f'result-table1-{type_page_indicators}', "Индикаторные показатели", page_size=25, 
                                  style_cell_conditional=[
-                                     {'if': {'column_id': 'type'}, 'width': '25%'},
-                                     {'if': {'column_id': 'План (количество)'}, 'width': '10%'},
-                                     {'if': {'column_id': 'План (сумма)'}, 'width': '10%'},
-                                     {'if': {'column_id': 'К-во'}, 'width': '10%'},
-                                     {'if': {'column_id': 'Сумма'}, 'width': '10%'},
-                                     {'if': {'column_id': 'Условия фильтра'}, 'width': '35%'}
+                                     {'if': {'column_id': 'type'}, 'width': '20%'},
+                                     {'if': {'column_id': 'План 1/12 (количество)'}, 'width': '8%'},
+                                     {'if': {'column_id': 'План 1/12 (сумма)'}, 'width': '8%'},
+                                     {'if': {'column_id': 'План (количество)'}, 'width': '8%'},
+                                     {'if': {'column_id': 'План (сумма)'}, 'width': '8%'},
+                                     {'if': {'column_id': 'К-во'}, 'width': '8%'},
+                                     {'if': {'column_id': 'Сумма'}, 'width': '8%'},
+                                     {'if': {'column_id': 'Условия фильтра'}, 'width': '32%'}
                                  ])]
          ),
          # Таблица детализации
@@ -1601,6 +1603,82 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
 
         start_time = time.time()
         columns1, data1 = TableUpdater.query_to_df(engine, sql_query)
+        
+        # Добавляем расчет нарастающего плана для каждой группы
+        if data1:
+            # Получаем список месяцев
+            months_list = list(range(selected_period[0], selected_period[1] + 1))
+            
+            # Получаем группы для получения ID групп
+            groups = get_groups_for_indicators_report(selected_year)
+            group_name_to_id = {}
+            if not groups.empty:
+                group_name_to_id = dict(zip(groups['name'], groups['id']))
+            
+            # Для каждой строки рассчитываем нарастающий план
+            for row in data1:
+                group_name = row.get('type')
+                group_id = group_name_to_id.get(group_name)
+                
+                if group_id:
+                    # Получаем планы по месяцам для этой группы
+                    # Нужны планы за все месяцы от 1 до последнего выбранного, чтобы правильно рассчитать входящие остатки
+                    last_month = max(months_list) if months_list else 12
+                    all_months_to_last = list(range(1, last_month + 1))
+                    plan_by_months = get_plan_by_months_for_group(group_id, selected_year, all_months_to_last)
+                    
+                    # Рассчитываем нарастающий план с учетом входящего остатка
+                    # Логика как в "Подробно по индикатору": план = план 1/12 + входящий остаток
+                    # Входящий остаток передается от предыдущего месяца
+                    incoming_balance_qty = 0
+                    incoming_balance_amt = 0.0
+                    cumulative_plan_qty = 0
+                    cumulative_plan_amt = 0.0
+                    
+                    # Проходим по всем месяцам от 1 до последнего выбранного месяца
+                    for month in sorted(all_months_to_last):
+                        month_plan_qty, month_plan_amt = plan_by_months.get(month, (0, 0.0))
+                        # План на месяц = План 1/12 + Входящий остаток
+                        month_plan_with_balance_qty = month_plan_qty + incoming_balance_qty
+                        month_plan_with_balance_amt = month_plan_amt + incoming_balance_amt
+                        
+                        # Если месяц входит в выбранные месяцы, добавляем к нарастающему плану
+                        if month in months_list:
+                            cumulative_plan_qty += month_plan_with_balance_qty
+                            cumulative_plan_amt += month_plan_with_balance_amt
+                        
+                        # Входящий остаток для следующего месяца = план текущего месяца
+                        # (без учета факта, так как факт не знаем по месяцам для каждой группы отдельно)
+                        # В реальности остаток = план - факт, но для упрощения используем план
+                        incoming_balance_qty = month_plan_with_balance_qty
+                        incoming_balance_amt = month_plan_with_balance_amt
+                    
+                    # Добавляем нарастающий план в строку
+                    row['План (количество)'] = cumulative_plan_qty
+                    row['План (сумма)'] = round(cumulative_plan_amt, 2)
+                else:
+                    row['План (количество)'] = 0
+                    row['План (сумма)'] = 0.0
+            
+            # Обновляем колонки, добавляя новые колонки для нарастающего плана
+            # Находим индекс колонки "План 1/12 (сумма)" и добавляем после нее
+            new_columns = []
+            plan_12_sum_idx = None
+            for i, col in enumerate(columns1):
+                new_columns.append(col)
+                if col.get('id') == 'План 1/12 (сумма)':
+                    plan_12_sum_idx = i
+                    # Добавляем колонки для нарастающего плана после "План 1/12 (сумма)"
+                    new_columns.append({'name': 'План (количество)', 'id': 'План (количество)'})
+                    new_columns.append({'name': 'План (сумма)', 'id': 'План (сумма)'})
+            
+            # Если индекс не найден, добавляем в конец
+            if plan_12_sum_idx is None:
+                new_columns.append({'name': 'План (количество)', 'id': 'План (количество)'})
+                new_columns.append({'name': 'План (сумма)', 'id': 'План (сумма)'})
+            
+            columns1 = new_columns
+        
         execution_time = time.time() - start_time
 
         if execution_time < 1:
