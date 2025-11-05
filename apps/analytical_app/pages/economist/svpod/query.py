@@ -404,13 +404,12 @@ def get_groups_for_cumulative_report(selected_year):
     Получает группы показателей, которые нужно отображать в отчете нарастающе.
     Выбираются группы, у которых AnnualPlan.show_in_cumulative_report = True для указанного года.
     Может быть любой уровень вложенности (не только конечные группы).
-    Возвращает полную иерархию групп через обратный слэш (\).
+    Возвращает полную иерархию групп через обратный слэш (\\).
     """
     from sqlalchemy import text
     
     query = text("""
     WITH RECURSIVE group_paths AS (
-        -- Базовый случай: группы с show_in_cumulative_report = true
         SELECT 
             g.id,
             g.name,
@@ -424,7 +423,6 @@ def get_groups_for_cumulative_report(selected_year):
         
         UNION ALL
         
-        -- Рекурсивный случай: поднимаемся по иерархии вверх к родителю
         SELECT 
             gp.id,
             p.name,
@@ -449,13 +447,12 @@ def get_groups_for_indicators_report(selected_year):
     Получает группы показателей, которые нужно отображать в отчете индикаторов.
     Выбираются группы, у которых AnnualPlan.show_in_indicators_report = True для указанного года.
     Может быть любой уровень вложенности (не только конечные группы).
-    Возвращает полную иерархию групп через обратный слэш (\).
+    Возвращает полную иерархию групп через обратный слэш (\\).
     """
     from sqlalchemy import text
     
     query = text("""
     WITH RECURSIVE group_paths AS (
-        -- Базовый случай: группы с show_in_indicators_report = true
         SELECT 
             g.id,
             g.name,
@@ -469,7 +466,6 @@ def get_groups_for_indicators_report(selected_year):
         
         UNION ALL
         
-        -- Рекурсивный случай: поднимаемся по иерархии вверх к родителю
         SELECT 
             gp.id,
             p.name,
@@ -1041,6 +1037,107 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
     """
     
     return query
+
+
+def sql_query_plans(selected_year):
+    """
+    Возвращает SQL-запрос для получения планов по объемам и финансам.
+    Принимает год (число) и возвращает строку SQL-запроса.
+    """
+    return f"""
+    WITH RECURSIVE group_hierarchy AS (
+        SELECT
+            g.id,
+            g.name,
+            g.parent_id,
+            g.name::text AS full_path
+        FROM plan_groupindicators g
+        WHERE g.parent_id IS NULL
+        
+        UNION ALL
+        
+        SELECT
+            g.id,
+            g.name,
+            g.parent_id,
+            gh.full_path || ' \\ ' || g.name AS full_path
+        FROM plan_groupindicators g
+        INNER JOIN group_hierarchy gh ON g.parent_id = gh.id
+    ),
+    base_data AS (
+        SELECT
+            gh.full_path AS name,
+            mp.month,
+            mp.quantity,
+            mp.amount
+        FROM plan_annualplan ap
+        JOIN plan_monthlyplan mp ON mp.annual_plan_id = ap.id
+        JOIN plan_groupindicators g ON g.id = ap.group_id
+        JOIN group_hierarchy gh ON gh.id = ap.group_id
+        WHERE ap.year = {selected_year}
+    )
+    SELECT
+        name || ' - Объемы' AS "Показатель",
+        (SUM(CASE WHEN month = 1 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 2 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 3 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 4 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 5 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 6 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 7 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 8 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 9 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 10 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 11 THEN quantity ELSE 0 END) +
+         SUM(CASE WHEN month = 12 THEN quantity ELSE 0 END))::INTEGER AS "Итого",
+        SUM(CASE WHEN month = 1 THEN quantity ELSE 0 END)::INTEGER AS "1",
+        SUM(CASE WHEN month = 2 THEN quantity ELSE 0 END)::INTEGER AS "2",
+        SUM(CASE WHEN month = 3 THEN quantity ELSE 0 END)::INTEGER AS "3",
+        SUM(CASE WHEN month = 4 THEN quantity ELSE 0 END)::INTEGER AS "4",
+        SUM(CASE WHEN month = 5 THEN quantity ELSE 0 END)::INTEGER AS "5",
+        SUM(CASE WHEN month = 6 THEN quantity ELSE 0 END)::INTEGER AS "6",
+        SUM(CASE WHEN month = 7 THEN quantity ELSE 0 END)::INTEGER AS "7",
+        SUM(CASE WHEN month = 8 THEN quantity ELSE 0 END)::INTEGER AS "8",
+        SUM(CASE WHEN month = 9 THEN quantity ELSE 0 END)::INTEGER AS "9",
+        SUM(CASE WHEN month = 10 THEN quantity ELSE 0 END)::INTEGER AS "10",
+        SUM(CASE WHEN month = 11 THEN quantity ELSE 0 END)::INTEGER AS "11",
+        SUM(CASE WHEN month = 12 THEN quantity ELSE 0 END)::INTEGER AS "12"
+    FROM base_data
+    GROUP BY name
+    
+    UNION ALL
+    
+    SELECT
+        name || ' - Финансы' AS "Показатель",
+        (SUM(CASE WHEN month = 1 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 2 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 3 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 4 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 5 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 6 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 7 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 8 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 9 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 10 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 11 THEN amount ELSE 0 END) +
+         SUM(CASE WHEN month = 12 THEN amount ELSE 0 END))::NUMERIC(15,2) AS "Итого",
+        SUM(CASE WHEN month = 1 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "1",
+        SUM(CASE WHEN month = 2 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "2",
+        SUM(CASE WHEN month = 3 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "3",
+        SUM(CASE WHEN month = 4 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "4",
+        SUM(CASE WHEN month = 5 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "5",
+        SUM(CASE WHEN month = 6 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "6",
+        SUM(CASE WHEN month = 7 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "7",
+        SUM(CASE WHEN month = 8 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "8",
+        SUM(CASE WHEN month = 9 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "9",
+        SUM(CASE WHEN month = 10 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "10",
+        SUM(CASE WHEN month = 11 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "11",
+        SUM(CASE WHEN month = 12 THEN amount ELSE 0 END)::NUMERIC(15,2) AS "12"
+    FROM base_data
+    GROUP BY name
+    
+    ORDER BY "Показатель"
+    """
 
 
 def clear_cache():

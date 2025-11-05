@@ -16,7 +16,7 @@ from apps.analytical_app.components.filters import filter_years, update_buttons,
     get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
     filter_status, status_groups
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups, sql_query_indicators, sql_query_indicators_details, clear_cache, get_groups_for_indicators_report, get_plan_by_months_for_group
+from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups, sql_query_indicators, sql_query_indicators_details, clear_cache, get_groups_for_indicators_report, get_plan_by_months_for_group, sql_query_plans
 import pandas as pd
 from apps.analytical_app.query_executor import engine
 
@@ -471,6 +471,62 @@ indicators_tab = html.Div(
 )
 
 
+type_page_plans = "econ-sv-pod-plans"
+
+# Контент для вкладки "Планы"
+plans_tab = html.Div(
+    [
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    dbc.CardBody(
+                        [
+                            dbc.CardHeader("Фильтры"),
+                            dbc.Row([
+                                dbc.Col(
+                                    dbc.Button(
+                                        "Обновить",
+                                        id=f'update-button-{type_page_plans}',
+                                        color="primary",
+                                        className="me-2"
+                                    ),
+                                    width=2
+                                ),
+                                dbc.Col(filter_years(type_page_plans), width=2),
+                            ]),
+                        ]
+                    ),
+                    style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+                           "border-radius": "10px"}
+                )
+            )
+        ),
+        dcc.Loading(
+            id=f'loading-output-{type_page_plans}',
+            type='default',
+            children=[card_table(f'plans-table-{type_page_plans}', "Планы", page_size=50, 
+                                style_cell_conditional=[
+                                    {'if': {'column_id': 'Показатель'}, 'width': '30%'},
+                                    {'if': {'column_id': 'Итого'}, 'width': '5%'},
+                                    {'if': {'column_id': '1'}, 'width': '5%'},
+                                    {'if': {'column_id': '2'}, 'width': '5%'},
+                                    {'if': {'column_id': '3'}, 'width': '5%'},
+                                    {'if': {'column_id': '4'}, 'width': '5%'},
+                                    {'if': {'column_id': '5'}, 'width': '5%'},
+                                    {'if': {'column_id': '6'}, 'width': '5%'},
+                                    {'if': {'column_id': '7'}, 'width': '5%'},
+                                    {'if': {'column_id': '8'}, 'width': '5%'},
+                                    {'if': {'column_id': '9'}, 'width': '5%'},
+                                    {'if': {'column_id': '10'}, 'width': '5%'},
+                                    {'if': {'column_id': '11'}, 'width': '5%'},
+                                    {'if': {'column_id': '12'}, 'width': '5%'},
+                                ])]
+        )
+    ],
+    style={"padding": "0rem"}
+)
+
+
 # Основной layout с вкладками
 economist_sv_pod = html.Div(
     [
@@ -490,6 +546,11 @@ economist_sv_pod = html.Div(
                     label="Выбранные индикаторы",
                     tab_id=f"tab-indicators-{type_page}",
                     children=indicators_tab
+                ),
+                dbc.Tab(
+                    label="Планы",
+                    tab_id=f"tab-plans-{type_page}",
+                    children=plans_tab
                 ),
             ],
             active_tab=f"tab-current-{type_page}",
@@ -1813,3 +1874,71 @@ def show_indicators_details(n_clicks, table_data, active_cell,
     except Exception as e:
         error_msg = f"Ошибка при получении детализации: {str(e)}"
         return error_msg, [], []
+
+
+# ========== Callbacks для вкладки "Планы" ==========
+
+@app.callback(
+    [
+        Output(f'plans-table-{type_page_plans}', 'columns'),
+        Output(f'plans-table-{type_page_plans}', 'data'),
+        Output(f'plans-table-{type_page_plans}', 'style_data_conditional')
+    ],
+    [
+        Input(f'update-button-{type_page_plans}', 'n_clicks')
+    ],
+    [
+        State(f'dropdown-year-{type_page_plans}', 'value')
+    ]
+)
+def update_plans_table(n_clicks, selected_year):
+    if n_clicks is None:
+        return [], [], []
+    
+    if isinstance(selected_year, str):
+        selected_year = int(selected_year)
+    
+    sql_query = sql_query_plans(selected_year)
+    columns, data = TableUpdater.query_to_df(engine, sql_query)
+    
+    # Создаем стили для выделения строк с одинаковым показателем
+    style_data_conditional = []
+    if data:
+        # Цвета для чередования показателей
+        colors = [
+            {'backgroundColor': '#f0f8ff', 'color': 'black'},  # Светло-голубой
+            {'backgroundColor': '#f5f5f5', 'color': 'black'},  # Светло-серый
+            {'backgroundColor': '#fff8dc', 'color': 'black'},  # Светло-бежевый
+            {'backgroundColor': '#f0fff0', 'color': 'black'},  # Светло-зеленый
+            {'backgroundColor': '#ffe4e1', 'color': 'black'},  # Светло-розовый
+            {'backgroundColor': '#e6e6fa', 'color': 'black'},  # Лавандовый
+        ]
+        
+        # Группируем строки по показателю (убираем " - Объемы" и " - Финансы")
+        indicator_groups = {}
+        for idx, row in enumerate(data):
+            indicator = row.get('Показатель', '')
+            # Извлекаем название показателя без типа
+            if ' - Объемы' in indicator:
+                base_indicator = indicator.replace(' - Объемы', '')
+            elif ' - Финансы' in indicator:
+                base_indicator = indicator.replace(' - Финансы', '')
+            else:
+                base_indicator = indicator
+            
+            if base_indicator not in indicator_groups:
+                indicator_groups[base_indicator] = []
+            indicator_groups[base_indicator].append(idx)
+        
+        # Применяем цвета к группам
+        color_idx = 0
+        for base_indicator, row_indices in indicator_groups.items():
+            color = colors[color_idx % len(colors)]
+            for row_idx in row_indices:
+                style_data_conditional.append({
+                    'if': {'row_index': row_idx},
+                    **color
+                })
+            color_idx += 1
+    
+    return columns, data, style_data_conditional
