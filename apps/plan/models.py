@@ -25,6 +25,21 @@ class GroupIndicators(models.Model):
         verbose_name="Корпуса",
         help_text="Укажите корпуса, связанные с этой группой (для распределяемых планов)"
     )
+    # Поле для синхронизации с базовым сервером
+    external_id = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name="Внешний ID",
+        help_text="Уникальный идентификатор для синхронизации с базовым сервером"
+    )
+    # Метка для синхронизации
+    sync_enabled = models.BooleanField(
+        default=True,
+        verbose_name="Синхронизировать",
+        help_text="Включить эту группу в синхронизацию с клиентскими серверами"
+    )
 
     # departments = models.ManyToManyField(
     #     Department,
@@ -34,6 +49,11 @@ class GroupIndicators(models.Model):
     # )
 
     def save(self, *args, **kwargs):
+        # Автоматически генерируем external_id, если его нет
+        if not self.external_id:
+            import uuid
+            self.external_id = str(uuid.uuid4())
+        
         # Устанавливаем уровень вложенности на основе родительской группы
         if self.parent:
             self.level = self.parent.level + 1
@@ -175,7 +195,21 @@ class AnnualPlan(models.Model):
         verbose_name="Отображать в отчете нарастающе",
         help_text="Отметьте, чтобы включить этот показатель в отчет 'Нарастающе по всем показателям'"
     )
-
+    show_in_indicators_report = models.BooleanField(
+        default=False,
+        verbose_name="Отображать в отчете индикаторов",
+        help_text="Отметьте, чтобы включить этот показатель в отчет 'Индикаторы'"
+    )
+    # Поле для синхронизации с базовым сервером
+    external_id = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name="Внешний ID",
+        help_text="Уникальный идентификатор для синхронизации с базовым сервером"
+    )
+    
     class Meta:
         unique_together = ('group', 'year')
         verbose_name = "Объемы: План на год"
@@ -185,6 +219,11 @@ class AnnualPlan(models.Model):
         return f"{self.group.name} - {self.year}"
 
     def save(self, *args, **kwargs):
+        # Автоматически генерируем external_id, если его нет
+        if not self.external_id:
+            import uuid
+            self.external_id = str(uuid.uuid4())
+        
         is_new = self.pk is None
         super().save(*args, **kwargs)
         # Создание месячных планов для группы
@@ -693,3 +732,51 @@ class GoalGroupConfig(models.Model):
     class Meta:
         verbose_name = "Группы целей для талонов врачей"
         verbose_name_plural = "Группы целей для талонов врачей"
+
+
+class OrganizationIndicatorConfig(models.Model):
+    """
+    Модель для управления включением/выключением показателей в организациях.
+    Используется на клиентских серверах для контроля доступности показателей.
+    """
+    group = models.ForeignKey(
+        GroupIndicators,
+        on_delete=models.CASCADE,
+        related_name="organization_configs",
+        verbose_name="Группа показателей"
+    )
+    # Для связи с организацией (если используется модель Organization)
+    organization_code = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name="Код организации",
+        help_text="Код организации для которой этот показатель активен"
+    )
+    is_enabled = models.BooleanField(
+        default=True,
+        verbose_name="Включен",
+        help_text="Включить этот показатель для организации"
+    )
+    notes = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Примечания",
+        help_text="Дополнительные примечания по использованию показателя"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата изменения")
+
+    class Meta:
+        unique_together = ('group', 'organization_code')
+        verbose_name = "Конфигурация показателя организации"
+        verbose_name_plural = "Конфигурации показателей организаций"
+        indexes = [
+            models.Index(fields=['organization_code', 'is_enabled']),
+            models.Index(fields=['group', 'organization_code']),
+        ]
+
+    def __str__(self):
+        org_name = self.organization_code or "Все организации"
+        status = "Включен" if self.is_enabled else "Выключен"
+        return f"{self.group.name} - {org_name} ({status})"

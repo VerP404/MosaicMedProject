@@ -21,7 +21,8 @@ from .forms import GroupIndicatorsForm
 from .models import (
     GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition,
     AnnualPlan, BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan,
-    GroupBuildingDepartment, ChiefDashboard, MonthlyDoctorPlan, AnnualDoctorPlan, GoalGroupConfig
+    GroupBuildingDepartment, ChiefDashboard, MonthlyDoctorPlan, AnnualDoctorPlan, GoalGroupConfig,
+    OrganizationIndicatorConfig
 )
 from .utils import copy_filters_to_new_year
 from ..organization.models import Department, Building
@@ -132,6 +133,32 @@ def disable_cumulative_report_action(modeladmin, request, queryset):
 disable_cumulative_report_action.short_description = "Отключить отображение в отчете нарастающе"
 
 
+def enable_indicators_report_action(modeladmin, request, queryset):
+    """Включить отображение в отчете индикаторов для выбранных планов"""
+    updated = queryset.update(show_in_indicators_report=True)
+    modeladmin.message_user(
+        request,
+        f"Включено отображение в отчете индикаторов для {updated} планов.",
+        messages.SUCCESS
+    )
+
+
+enable_indicators_report_action.short_description = "Включить отображение в отчете индикаторов"
+
+
+def disable_indicators_report_action(modeladmin, request, queryset):
+    """Отключить отображение в отчете индикаторов для выбранных планов"""
+    updated = queryset.update(show_in_indicators_report=False)
+    modeladmin.message_user(
+        request,
+        f"Отключено отображение в отчете индикаторов для {updated} планов.",
+        messages.SUCCESS
+    )
+
+
+disable_indicators_report_action.short_description = "Отключить отображение в отчете индикаторов"
+
+
 # Фильтр по году фильтра
 class FilterYearListFilter(admin.SimpleListFilter):
     title = 'Год фильтра'
@@ -180,12 +207,13 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
     import_form_class = ImportForm
     export_form_class = ExportForm
     ordering = ['parent__name', 'name']
-    list_display = ('name', 'parent', 'level', 'is_distributable', 'latest_filter_year', 'view_subgroups')
-    list_filter = ('level', FilterYearListFilter)
-    search_fields = ['name', 'parent__name', 'parent__parent__name']
+    list_display = ('name', 'parent', 'level', 'is_distributable', 'external_id', 'sync_enabled', 'latest_filter_year', 'view_subgroups')
+    list_filter = ('sync_enabled', 'level', FilterYearListFilter, 'is_distributable')
+    search_fields = ['name', 'parent__name', 'parent__parent__name', 'external_id']
     inlines = [FilterConditionInline, GroupBuildingDepartmentInline]
     actions = [copy_filters_action]
     filter_horizontal = ('buildings',)
+    readonly_fields = ('external_id',)
     fieldsets = (
         (None, {'fields': ('name', 'parent', 'is_distributable')}),
         ('Распределение', {'fields': ('buildings',), 'classes': ('collapse',)}),
@@ -261,12 +289,14 @@ class DepartmentAutocomplete(autocomplete.Select2QuerySetView):
 class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     import_form_class = ImportForm
     export_form_class = ExportForm
-    list_display = ('group', 'year', 'show_in_cumulative_report', 'has_quantity_plan', 'has_amount_plan')
-    list_filter = ('year', 'show_in_cumulative_report')
-    search_fields = ('group__name', 'year',)
+    list_display = ('group', 'year', 'show_in_cumulative_report', 'show_in_indicators_report', 'external_id', 'has_quantity_plan', 'has_amount_plan')
+    list_filter = ('year', 'show_in_cumulative_report', 'show_in_indicators_report')
+    search_fields = ('group__name', 'year', 'external_id')
     inlines = [MonthlyPlanInline]
-    fields = ('group', 'year', 'show_in_cumulative_report')
-    actions = [enable_cumulative_report_action, disable_cumulative_report_action]
+    fields = ('group', 'year', 'show_in_cumulative_report', 'show_in_indicators_report', 'external_id')
+    readonly_fields = ('external_id',)
+    actions = [enable_cumulative_report_action, disable_cumulative_report_action, 
+               enable_indicators_report_action, disable_indicators_report_action]
 
     def has_quantity_plan(self, obj):
         """
@@ -531,6 +561,19 @@ class MonthlyDoctorPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     export_form_class = ExportForm
     list_display = ('annual_doctor_plan', 'month', 'quantity', 'amount')
     list_filter = ('annual_doctor_plan__doctor_record', 'month')
+
+
+@admin.register(OrganizationIndicatorConfig)
+class OrganizationIndicatorConfigAdmin(ModelAdmin):
+    list_display = ('group', 'organization_code', 'is_enabled', 'created_at', 'updated_at')
+    list_filter = ('is_enabled', 'organization_code', 'created_at')
+    search_fields = ('group__name', 'organization_code', 'notes')
+    fields = ('group', 'organization_code', 'is_enabled', 'notes', 'created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at')
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('group')
 
 
 @admin.register(GoalGroupConfig)

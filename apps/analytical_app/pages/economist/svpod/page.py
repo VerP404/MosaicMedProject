@@ -1,4 +1,6 @@
 from datetime import datetime
+import time
+from functools import lru_cache
 
 from dash import html, dcc, Output, Input, State, ALL, exceptions
 import dash_bootstrap_components as dbc
@@ -8,13 +10,18 @@ from sqlalchemy import text
 
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
-from apps.analytical_app.components.filters import filter_years, update_buttons
+from apps.analytical_app.components.filters import filter_years, update_buttons, filter_months, \
+    get_current_reporting_month, get_available_buildings, filter_building, get_available_departments, filter_department, \
+    filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
+    get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
+    filter_status, status_groups
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups
+from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups, sql_query_indicators, sql_query_indicators_details, clear_cache
 import pandas as pd
 from apps.analytical_app.query_executor import engine
 
 type_page = "econ-sv-pod"
+type_page_indicators = "econ-sv-pod-indicators"
 
 
 def get_level_options(parent_id=None):
@@ -25,6 +32,33 @@ def get_level_options(parent_id=None):
         query = f"SELECT id, name FROM plan_groupindicators WHERE parent_id = {parent_id}"
     levels = pd.read_sql(query, engine)
     return [{'label': level['name'], 'value': level['id']} for _, level in levels.iterrows()]
+
+
+# Кэшированная функция для SQL-запроса индикаторов
+@lru_cache(maxsize=64)
+def get_cached_indicators_query(selected_year, months_placeholder, inogorod, sanction, amount_null, 
+                               building_ids_tuple, department_ids_tuple, value_profile_tuple, selected_doctor_ids_tuple,
+                               start_date_input_formatted, end_date_input_formatted,
+                               start_date_treatment_formatted, end_date_treatment_formatted,
+                               selected_status_tuple, cache_key):
+    """Кэшированный результат SQL-запроса для ускорения повторных запросов"""
+    # Преобразуем кортежи обратно в списки для передачи в SQL-функции
+    building_ids = list(building_ids_tuple) if building_ids_tuple else None
+    department_ids = list(department_ids_tuple) if department_ids_tuple else None
+    value_profile = list(value_profile_tuple) if value_profile_tuple else None
+    selected_doctor_ids = list(selected_doctor_ids_tuple) if selected_doctor_ids_tuple else None
+    
+    return sql_query_indicators(
+        selected_year,
+        months_placeholder,
+        inogorod, sanction, amount_null,
+        building_ids, department_ids,
+        value_profile,
+        selected_doctor_ids,
+        start_date_input_formatted, end_date_input_formatted,
+        start_date_treatment_formatted, end_date_treatment_formatted,
+        status_list=selected_status_tuple
+    )
 
 
 # Контент для основной вкладки (текущий отчет)
@@ -68,26 +102,31 @@ current_report_tab = html.Div(
                             ]),
                             dbc.Row([
                                 dbc.Col(
-                                    dcc.RadioItems(
-                                        id=f'mode-toggle-{type_page}',
-                                        options=[
-                                            {'label': 'Объемы', 'value': 'volumes'},
-                                            {'label': 'Финансы', 'value': 'finance'}
-                                        ],
-                                        value='volumes',
-                                        inline=True,
-                                        labelStyle={'margin-right': '15px'}
-                                    ),
-                                    width=4
+                                    [
+                                        html.Label("Режим:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'mode-toggle-{type_page}',
+                                            options=[
+                                                {'label': 'Объемы', 'value': 'volumes'},
+                                                {'label': 'Финансы', 'value': 'finance'}
+                                            ],
+                                            value='volumes',
+                                            clearable=False,
+                                            style={"width": "100%"}
+                                        ),
+                                    ],
+                                    width=3
                                 ),
                                 dbc.Col(
-                                    dcc.Checklist(
-                                        id=f'unique-toggle-{type_page}',
-                                        options=[{"label": "Уникальные пациенты", "value": "unique"}],
-                                        value=[],
-                                        inline=True,
-                                        style={"margin-left": "20px"}
-                                    ),
+                                    [
+                                        html.Label("Уникальные пациенты:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dbc.Checkbox(
+                                            id=f'unique-toggle-{type_page}',
+                                            label="Включить",
+                                            value=False,
+                                            className="mt-2"
+                                        ),
+                                    ],
                                     width=3
                                 ),
                                 dbc.Col(
@@ -122,6 +161,11 @@ current_report_tab = html.Div(
             ),
             style={"margin": "0 auto", "padding": "0rem"}
         ),
+        dbc.Row([
+            dbc.Col([
+                html.Div(id=f'loading-status-{type_page}', style={'text-align': 'center', 'margin': '10px 0'}),
+            ], width=12)
+        ]),
         dcc.Loading(id=f'loading-output-{type_page}', type='default'),
         card_table(f'result-table1-{type_page}', "Данные", column_selectable='multi'),
         dcc.Store(id=f'selected-data-{type_page}'),
@@ -176,53 +220,81 @@ cumulative_report_tab = html.Div(
                                 ),
                                 dbc.Col(filter_years(f'{type_page}-cumulative'), width=1),
                                 dbc.Col(
-                                    dcc.RadioItems(
-                                        id=f'report-type-toggle-cumulative-{type_page}',
-                                        options=[
-                                            {'label': 'По месяцам', 'value': 'months'},
-                                            {'label': 'Нарастающе', 'value': 'cumulative'}
-                                        ],
-                                        value='cumulative',
-                                        inline=True,
-                                        labelStyle={'margin-right': '15px'}
-                                    ),
+                                    [
+                                        html.Label("Отчетный месяц:", style={"font-weight": "bold", "margin-right": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'reporting-month-cumulative-{type_page}',
+                                            options=[
+                                                {'label': f'{i} месяц', 'value': i} for i in range(1, 13)
+                                            ],
+                                            value=None,
+                                            placeholder="Авто (по дате)",
+                                            clearable=True,
+                                            style={"width": "100%"}
+                                        ),
+                                    ],
+                                    width=2
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Тип отчета:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'report-type-toggle-cumulative-{type_page}',
+                                            options=[
+                                                {'label': 'По месяцам', 'value': 'months'},
+                                                {'label': 'Нарастающе', 'value': 'cumulative'}
+                                            ],
+                                            value='cumulative',
+                                            clearable=False,
+                                            style={"width": "100%"}
+                                        ),
+                                    ],
+                                    width=2
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Режим:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'mode-toggle-cumulative-{type_page}',
+                                            options=[
+                                                {'label': 'Объемы', 'value': 'volumes'},
+                                                {'label': 'Финансы', 'value': 'finance'}
+                                            ],
+                                            value='volumes',
+                                            clearable=False,
+                                            style={"width": "100%"}
+                                        ),
+                                    ],
+                                    width=2
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Тип оплаты:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'payment-type-toggle-cumulative-{type_page}',
+                                            options=[
+                                                {'label': 'Предъявленные', 'value': 'presented'},
+                                                {'label': 'Предъявленные 2,3', 'value': 'presented_2_3'},
+                                                {'label': 'Оплаченные', 'value': 'paid'}
+                                            ],
+                                            value='presented',
+                                            clearable=False,
+                                            style={"width": "100%"}
+                                        ),
+                                    ],
                                     width=3
                                 ),
                                 dbc.Col(
-                                    dcc.RadioItems(
-                                        id=f'mode-toggle-cumulative-{type_page}',
-                                        options=[
-                                            {'label': 'Объемы', 'value': 'volumes'},
-                                            {'label': 'Финансы', 'value': 'finance'}
-                                        ],
-                                        value='volumes',
-                                        inline=True,
-                                        labelStyle={'margin-right': '15px'}
-                                    ),
-                                    width=3
-                                ),
-                                dbc.Col(
-                                    dcc.RadioItems(
-                                        id=f'payment-type-toggle-cumulative-{type_page}',
-                                        options=[
-                                            {'label': 'Предъявленные', 'value': 'presented'},
-                                            {'label': 'Оплаченные', 'value': 'paid'}
-                                        ],
-                                        value='presented',
-                                        inline=True,
-                                        labelStyle={'margin-right': '15px'}
-                                    ),
-                                    width=3
-                                ),
-                                dbc.Col(
-                                    dcc.Checklist(
-                                        id=f'unique-toggle-cumulative-{type_page}',
-                                        options=[{"label": "Уникальные пациенты", "value": "unique"}],
-                                        value=[],
-                                        inline=True,
-                                        style={"margin-left": "20px"}
-                                    ),
-                                    width=3
+                                    [
+                                        html.Label("Уникальные пациенты:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dbc.Checkbox(
+                                            id=f'unique-toggle-cumulative-{type_page}',
+                                            label="Включить",
+                                            value=False,
+                                            className="mt-2"
+                                        ),
+                                    ],
+                                    width=2
                                 ),
                             ]),
                             dbc.Row([
@@ -243,11 +315,159 @@ cumulative_report_tab = html.Div(
             ),
             style={"margin": "0 auto", "padding": "0rem"}
         ),
+        dbc.Row([
+            dbc.Col([
+                html.Div(id=f'loading-status-cumulative-{type_page}', style={'text-align': 'center', 'margin': '10px 0'}),
+            ], width=12)
+        ]),
         dcc.Loading(id=f'loading-cumulative-{type_page}', type='default'),
         card_table(f'cumulative-table-{type_page}', "Отчет нарастающим итогом по всем показателям", column_selectable='multi'),
     ],
     style={"padding": "0rem"}
 )
+
+# Контент для вкладки "Выбранные индикаторы"
+indicators_tab = html.Div(
+    [
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    dbc.CardBody(
+                        [
+                            dbc.CardHeader("Фильтры"),
+                            dbc.Row(
+                                [
+                                    dbc.Col(update_buttons(type_page_indicators), width=2),
+                                    dbc.Col(filter_years(type_page_indicators), width=1),
+                                    dbc.Col(filter_report_type(type_page_indicators), width=2),
+                                    dbc.Col(filter_inogorod(type_page_indicators), width=2),
+                                    dbc.Col(filter_sanction(type_page_indicators), width=2),
+                                    dbc.Col(filter_amount_null(type_page_indicators), width=2),
+                                ]
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Row(
+                                        [
+                                            dbc.Col(filter_months(type_page_indicators), width=12),
+                                            dbc.Row(
+                                                [
+                                                    dbc.Col(
+                                                        html.Label("Выберите дату", id=f'label-date-{type_page_indicators}',
+                                                                   style={'font-weight': 'bold', 'display': 'none'}),
+                                                        width="auto"
+                                                    ),
+                                                    dbc.Col(date_picker(f'input-{type_page_indicators}'), width=4,
+                                                            id=f'col-input-{type_page_indicators}', style={'display': 'none'}),
+                                                    dbc.Col(date_picker(f'treatment-{type_page_indicators}'), width=4,
+                                                            id=f'col-treatment-{type_page_indicators}', style={'display': 'none'}),
+                                                ],
+                                                align="center",
+                                                style={"display": "flex", "align-items": "center",
+                                                       "margin-bottom": "10px"}
+                                            )
+                                        ]
+                                    ),
+                                ]
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(filter_building(type_page_indicators), width=6),
+                                    dbc.Col(filter_department(type_page_indicators), width=6),
+                                ]
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(filter_profile(type_page_indicators), width=6),
+                                    dbc.Col(filter_doctor(type_page_indicators), width=6),
+                                ]
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(filter_status(type_page_indicators), width=6),
+                                ]
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(html.Div(id=f'selected-doctor-{type_page_indicators}', className='filters-label',
+                                                     style={'display': 'none'}), width=9),
+                                    dbc.Col(html.Div(id=f'selected-period-{type_page_indicators}', className='filters-label',
+                                                     style={'display': 'none'}), width=3)
+                                ]
+                            ),
+                            html.Div(id=f'current-month-name-{type_page_indicators}', className='filters-label'),
+                            html.Div(
+                                id=f'selected-filters-{type_page_indicators}',
+                                className='selected-filters-block',
+                                style={'margin': '10px', 'padding': '10px', 'border': '1px solid #ccc',
+                                       'border-radius': '5px'}
+                            ),
+
+                        ]
+                    ),
+                    style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+                           "border-radius": "10px"}
+                ),
+                width=12
+            ),
+            style={"margin": "0 auto", "padding": "0rem"}
+        ),
+         # Улучшенная индикация загрузки с прогресс-баром
+         dbc.Row([
+             dbc.Col([
+                 dbc.Progress(
+                     id=f'progress-bar-{type_page_indicators}',
+                     value=0,
+                     striped=True,
+                     animated=True,
+                     style={'display': 'none'}
+                 ),
+                 html.Div(id=f'loading-status-{type_page_indicators}', style={'text-align': 'center', 'margin': '10px 0'}),
+             ], width=12)
+         ]),
+         dcc.Loading(
+             id=f'loading-output-{type_page_indicators}', 
+             type='default',
+             children=[card_table(f'result-table1-{type_page_indicators}', "Индикаторные показатели", page_size=25, 
+                                 style_cell_conditional=[
+                                     {'if': {'column_id': 'type'}, 'width': '25%'},
+                                     {'if': {'column_id': 'План (количество)'}, 'width': '10%'},
+                                     {'if': {'column_id': 'План (сумма)'}, 'width': '10%'},
+                                     {'if': {'column_id': 'К-во'}, 'width': '10%'},
+                                     {'if': {'column_id': 'Сумма'}, 'width': '10%'},
+                                     {'if': {'column_id': 'Условия фильтра'}, 'width': '35%'}
+                                 ])]
+         ),
+         # Таблица детализации
+         dbc.Card([
+             dbc.CardHeader("Детализация по талонам"),
+             dbc.CardBody([
+                 html.Div(id=f'details-title-{type_page_indicators}', style={"fontWeight": "bold", "marginBottom": "10px"}),
+                 # Кнопка детализации
+                 dbc.Row([
+                     dbc.Col(
+                         dbc.Button(
+                             "Детализация",
+                             id=f'details-button-{type_page_indicators}',
+                             color="primary",
+                             size="sm",
+                             disabled=True,
+                             className="mb-3"
+                         ), width="auto"
+                     )
+                 ]),
+                 card_table(f'details-table-{type_page_indicators}', "Детали", page_size=20)
+             ])
+         ], className="mt-3", style={
+             "width": "100%",
+             "padding": "0rem",
+             "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+             "border-radius": "10px"
+         })
+    ],
+    style={"padding": "0rem"}
+)
+
 
 # Основной layout с вкладками
 economist_sv_pod = html.Div(
@@ -255,14 +475,19 @@ economist_sv_pod = html.Div(
         dbc.Tabs(
             [
                 dbc.Tab(
-                    label="Текущий отчет",
+                    label="Подробно по индикатору",
                     tab_id=f"tab-current-{type_page}",
                     children=current_report_tab
                 ),
                 dbc.Tab(
-                    label="Нарастающе по всем показателям",
+                    label="Сводная по индикаторам",
                     tab_id=f"tab-cumulative-{type_page}",
                     children=cumulative_report_tab
+                ),
+                dbc.Tab(
+                    label="Выбранные индикаторы",
+                    tab_id=f"tab-indicators-{type_page}",
+                    children=indicators_tab
                 ),
             ],
             active_tab=f"tab-current-{type_page}",
@@ -369,6 +594,7 @@ def fetch_plan_data(selected_level, year, mode='volumes'):
      Output(f'result-table1-{type_page}', 'data'),
      Output(f'loading-output-{type_page}', 'children'),
      Output(f'applied-filters-{type_page}', 'children'),
+     Output(f'loading-status-{type_page}', 'children'),
      ],
     Input(f'update-button-{type_page}', 'n_clicks'),
     State(f'mode-toggle-{type_page}', 'value'),
@@ -395,9 +621,10 @@ def update_table_with_plan_and_balance(n_clicks,
     selected_level = selected_levels[-1]
     filter_conditions = get_filter_conditions([selected_level], selected_year)
 
-    unique = "unique" in unique_flag
+    unique = unique_flag if unique_flag is not None else False
 
-    # Загружаем фактические данные
+    # Загружаем фактические данные с измерением времени
+    start_time = time.time()
     fact_columns, fact_data_list = TableUpdater.query_to_df(
         engine,
         sql_query_rep(selected_year,
@@ -406,6 +633,7 @@ def update_table_with_plan_and_balance(n_clicks,
                       mode=mode,
                       unique_flag=unique)
     )
+    execution_time = time.time() - start_time
     # Добавляем общую сумму "исправлено"
     total_ispravleno_all_months = sum(row.get("исправлено", 0) or 0 for row in fact_data_list)
     # Превращаем список словарей fact_data_list в dict по ключу "month"
@@ -574,7 +802,17 @@ def update_table_with_plan_and_balance(n_clicks,
         {"name": ["План 1/12", "Входящий остаток"], "id": "Входящий остаток"},
     ]
 
-    return columns, fact_data, loading_output, filter_conditions
+    # Формируем статус загрузки
+    if execution_time < 1:
+        time_text = f"{execution_time*1000:.0f}мс"
+    else:
+        time_text = f"{execution_time:.1f}с"
+    
+    # Подсчитываем количество записей (исключаем строки "Нарастающе" и "Год")
+    record_count = len([r for r in fact_data if isinstance(r.get("month"), int)])
+    status_text = f"Запрос выполнен за {time_text}. Найдено записей: {record_count}"
+
+    return columns, fact_data, loading_output, filter_conditions, status_text
 
 
 # Callback для активации кнопки детализации при выборе строки
@@ -775,20 +1013,22 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
         Output(f'cumulative-table-{type_page}', 'data'),
         Output(f'cumulative-table-{type_page}', 'style_cell_conditional'),
         Output(f'loading-cumulative-{type_page}', 'children'),
+        Output(f'loading-status-cumulative-{type_page}', 'children'),
     ],
     Input(f'generate-cumulative-{type_page}', 'n_clicks'),
     State(f'dropdown-year-{type_page}-cumulative', 'value'),
     State(f'report-type-toggle-cumulative-{type_page}', 'value'),
     State(f'mode-toggle-cumulative-{type_page}', 'value'),
     State(f'payment-type-toggle-cumulative-{type_page}', 'value'),
+    State(f'reporting-month-cumulative-{type_page}', 'value'),
     State(f'unique-toggle-cumulative-{type_page}', 'value')
 )
-def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payment_type, unique_flag):
+def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payment_type, reporting_month, unique_flag):
     if n_clicks is None:
         raise PreventUpdate
     
     if not selected_year:
-        return [], [], [], html.Div(dbc.Alert("Выберите год", color="warning"))
+        return [], [], [], html.Div(dbc.Alert("Выберите год", color="warning")), ""
     
     loading_output = html.Div([dcc.Loading(type="default")])
     
@@ -809,21 +1049,37 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
     ]
     
     try:
-        unique = "unique" in unique_flag if unique_flag else False
+        unique = unique_flag if unique_flag is not None else False
         mode = mode or 'volumes'
         report_type = report_type or 'cumulative'
         payment_type = payment_type or 'presented'
+        
+        # Определяем отчетный месяц
+        today = datetime.today()
+        default_month = today.month - 1 if today.day <= 5 else today.month
+        current_reporting_month = reporting_month if reporting_month is not None else default_month
+        
+        # Измеряем время выполнения
+        start_time = time.time()
         
         if report_type == 'cumulative':
             # Режим "Нарастающе" - показываем все группы показателей
             df = get_cumulative_report_for_all_groups(
                 selected_year=selected_year,
                 mode=mode,
-                unique_flag=unique
+                unique_flag=unique,
+                reporting_month=current_reporting_month,
+                payment_type=payment_type
             )
             
             if df.empty:
-                return [], [], [], html.Div(dbc.Alert("Нет данных для отображения", color="info"))
+                execution_time = time.time() - start_time
+                if execution_time < 1:
+                    time_text = f"{execution_time*1000:.0f}мс"
+                else:
+                    time_text = f"{execution_time:.1f}с"
+                status_text = f"Запрос выполнен за {time_text}. Найдено записей: 0"
+                return [], [], [], html.Div(dbc.Alert("Нет данных для отображения", color="info")), status_text
             
             # Преобразуем DataFrame в список словарей
             data = []
@@ -886,6 +1142,16 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
                 {"name": ["Факт", "Отказано"], "id": "отказано"},
                 {"name": ["Факт", "Отменено"], "id": "отменено"},
             ]
+            
+            execution_time = time.time() - start_time
+            if execution_time < 1:
+                time_text = f"{execution_time*1000:.0f}мс"
+            else:
+                time_text = f"{execution_time:.1f}с"
+            
+            # Подсчитываем количество записей (исключаем строку "Итого")
+            record_count = len([r for r in data if r.get("Группа показателей") != "Итого"])
+            status_text = f"Запрос выполнен за {time_text}. Найдено записей: {record_count}"
         else:
             # Режим "По месяцам" - нужно получить группы и показать данные по месяцам для каждой
             from apps.analytical_app.pages.economist.svpod.query import get_groups_for_cumulative_report
@@ -893,7 +1159,13 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
             groups = get_groups_for_cumulative_report(selected_year)
             
             if groups.empty:
-                return [], [], [], html.Div(dbc.Alert("Нет данных для отображения", color="info"))
+                execution_time = time.time() - start_time
+                if execution_time < 1:
+                    time_text = f"{execution_time*1000:.0f}мс"
+                else:
+                    time_text = f"{execution_time:.1f}с"
+                status_text = f"Запрос выполнен за {time_text}. Найдено записей: 0"
+                return [], [], [], html.Div(dbc.Alert("Нет данных для отображения", color="info")), status_text
             
             # Получаем данные по месяцам для каждой группы
             columns = [
@@ -909,13 +1181,15 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
                 {"name": ["Факт", "Исправлено"], "id": "исправлено"},
                 {"name": ["Факт", "Отказано"], "id": "отказано"},
                 {"name": ["Факт", "Отменено"], "id": "отменено"},
+                {"name": ["План 1/12", "План 1/12"], "id": "План 1/12"},
+                {"name": ["План 1/12", "Входящий остаток"], "id": "Входящий остаток"},
             ]
             
             data = []
             today = datetime.today()
             default_month = today.month - 1 if today.day <= 5 else today.month
             current_day = today.day
-            current_month = default_month
+            current_month = current_reporting_month
             
             for _, group_row in groups.iterrows():
                 group_id = group_row['id']
@@ -942,28 +1216,32 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
                 incoming_balance = 0
                 group_data = []
                 
-                for m in range(1, 13):
+                # Показываем только месяцы от 1 до отчетного месяца включительно
+                for m in range(1, current_month + 1):
                     month_data = fact_dict.get(m, {})
                     
-                    # Рассчитываем Факт в зависимости от режима
+                    # Сохраняем входящий остаток ДО расчета текущего месяца
+                    incoming_balance_for_month = incoming_balance if m > 1 else 0
+                    
+                    # Рассчитываем Факт в зависимости от режима и отчетного месяца
                     if payment_type == 'paid':
                         # Режим "Оплаченные" - только оплаченные (status = '3')
                         month_fact = month_data.get("оплачено", 0) or 0
+                    elif payment_type == 'presented_2_3':
+                        # Режим "Предъявленные 2,3" - статусы 2 и 3 (только для отчетного месяца)
+                        if m == current_month:
+                            # Для отчетного месяца: статусы 2 (в_тфомс) и 3 (оплачено)
+                            month_fact = (month_data.get("в_тфомс", 0) or 0) + (month_data.get("оплачено", 0) or 0)
+                        else:
+                            # Для других месяцев: только оплаченные (статус 3)
+                            month_fact = month_data.get("оплачено", 0) or 0
                     else:
                         # Режим "Предъявленные" - текущая логика
-                        if m < current_month - 1:
+                        if m < current_month:
+                            # Для месяцев < отчетного: только оплаченные (статус 3)
                             month_fact = month_data.get("оплачено", 0) or 0
-                        elif m == current_month - 1:
-                            if current_day <= 10:
-                                month_fact = (
-                                    (month_data.get("новые", 0) or 0) +
-                                    (month_data.get("в_тфомс", 0) or 0) +
-                                    (month_data.get("оплачено", 0) or 0) +
-                                    total_ispravleno_all_months
-                                )
-                            else:
-                                month_fact = month_data.get("оплачено", 0) or 0
                         elif m == current_month:
+                            # Для отчетного месяца: новые+в_тфомс+оплачено+исправлено
                             month_fact = (
                                 (month_data.get("новые", 0) or 0) +
                                 (month_data.get("в_тфомс", 0) or 0) +
@@ -976,7 +1254,7 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
                     month_plan_12 = plan_data.get(m, 0) or 0
                     month_plan = month_plan_12 + incoming_balance
                     month_remainder = month_plan - month_fact
-                    incoming_balance = month_remainder
+                    incoming_balance = month_remainder  # Обновляем для следующего месяца
                     
                     percent = round(month_fact / month_plan * 100, 1) if month_plan > 0 else 0
                     
@@ -993,6 +1271,8 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
                         "исправлено": month_data.get("исправлено", 0) or 0,
                         "отказано": month_data.get("отказано", 0) or 0,
                         "отменено": month_data.get("отменено", 0) or 0,
+                        "План 1/12": month_plan_12,
+                        "Входящий остаток": incoming_balance_for_month,
                     })
                 
                 # Добавляем данные группы
@@ -1000,10 +1280,17 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
                 
                 # Добавляем строку "Итого" для группы
                 if group_data:
-                    total_plan_group = sum(r["План"] for r in group_data)
+                    # Суммируем План 1/12 за месяцы от 1 до отчетного (нарастающе)
+                    total_plan_12_group = sum(r["План 1/12"] for r in group_data)
+                    # Входящий остаток для строки "Итого" всегда 0 (начало года)
+                    total_incoming_balance_group = 0
+                    # Итого План = сумма План 1/12 за месяцы от 1 до отчетного (нарастающе)
+                    total_plan_group = total_plan_12_group
+                    # Итого Факт = сумма фактов за месяцы от 1 до отчетного (нарастающе)
                     total_fact_group = sum(r["Факт"] for r in group_data)
-                    total_percent_group = round(total_fact_group / total_plan_group * 100, 1) if total_plan_group > 0 else 0
+                    # Итого Остаток = Итого План - Итого Факт (нарастающе до отчетного месяца)
                     total_remainder_group = total_plan_group - total_fact_group
+                    total_percent_group = round(total_fact_group / total_plan_group * 100, 1) if total_plan_group > 0 else 0
                     
                     data.append({
                         "group_name": f"Итого ({group_name})",
@@ -1018,10 +1305,433 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
                         "исправлено": sum(r["исправлено"] for r in group_data),
                         "отказано": sum(r["отказано"] for r in group_data),
                         "отменено": sum(r["отменено"] for r in group_data),
+                        "План 1/12": total_plan_12_group,
+                        "Входящий остаток": total_incoming_balance_group,
                     })
+            
+            execution_time = time.time() - start_time
+            if execution_time < 1:
+                time_text = f"{execution_time*1000:.0f}мс"
+            else:
+                time_text = f"{execution_time:.1f}с"
+            
+            # Подсчитываем количество записей (только строки с числовыми значениями месяца)
+            record_count = len([r for r in data if isinstance(r.get("month"), int)])
+            status_text = f"Запрос выполнен за {time_text}. Найдено записей: {record_count}"
         
-        return columns, data, style_cell_conditional, loading_output
+        return columns, data, style_cell_conditional, loading_output, status_text
         
     except Exception as e:
         error_msg = f"Ошибка при формировании отчета: {str(e)}"
-        return [], [], [], html.Div(dbc.Alert(error_msg, color="danger"))
+        return [], [], [], html.Div(dbc.Alert(error_msg, color="danger")), ""
+
+
+# ========== Callbacks для вкладки "Выбранные индикаторы" ==========
+
+@app.callback(
+    [
+        Output(f'status-group-container-{type_page_indicators}', 'style'),
+        Output(f'status-individual-container-{type_page_indicators}', 'style')
+    ],
+    [Input(f'status-selection-mode-{type_page_indicators}', 'value')]
+)
+def toggle_status_selection_mode_indicators(mode):
+    if mode == 'group':
+        return {'display': 'block'}, {'display': 'none'}
+    else:  # mode == 'individual'
+        return {'display': 'none'}, {'display': 'block'}
+
+
+@app.callback(
+    Output(f'sum-result-result-table1-{type_page_indicators}', 'children'),
+    Input(f'sum-button-result-table1-{type_page_indicators}', 'n_clicks'),
+    State(f'result-table1-{type_page_indicators}', 'derived_virtual_data'),
+    State(f'result-table1-{type_page_indicators}', 'selected_cells')
+)
+def calculate_sum_and_count_indicators(n_clicks, rows, selected_cells):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    if rows is None or not selected_cells:
+        return "Нет данных или не выбраны ячейки для подсчета."
+
+    total_sum = 0
+    count = 0
+    for cell in selected_cells:
+        row_idx = cell['row']
+        col_id = cell['column_id']
+        value = rows[row_idx].get(col_id, 0)
+        if isinstance(value, (int, float)):
+            total_sum += value
+            count += 1
+
+    total_sum_formatted = f"{total_sum:,.2f}".replace(",", " ")
+    return f"Количество выбранных ячеек: {count}, Сумма значений: {total_sum}"
+
+
+@app.callback(
+    [
+        Output(f'range-slider-month-{type_page_indicators}', 'style'),
+        Output(f'date-picker-range-input-{type_page_indicators}', 'style'),
+        Output(f'date-picker-range-treatment-{type_page_indicators}', 'style')
+    ],
+    [Input(f'dropdown-report-type-{type_page_indicators}', 'value')]
+)
+def toggle_filters_indicators(report_type):
+    if report_type == 'month':
+        return {'display': 'block'}, {'display': 'none'}, {'display': 'none'}
+    elif report_type == 'initial_input':
+        return {'display': 'none'}, {'display': 'block'}, {'display': 'none'}
+    elif report_type == 'treatment':
+        return {'display': 'none'}, {'display': 'none'}, {'display': 'block'}
+    return {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
+
+
+@app.callback(
+    [
+        Output(f'col-input-{type_page_indicators}', 'style'),
+        Output(f'col-treatment-{type_page_indicators}', 'style'),
+    ],
+    [Input(f'dropdown-report-type-{type_page_indicators}', 'value')]
+)
+def toggle_datepickers_indicators(report_type):
+    if report_type == 'initial_input':
+        return {'display': 'block'}, {'display': 'none'}
+    elif report_type == 'treatment':
+        return {'display': 'none'}, {'display': 'block'}
+    return {'display': 'none'}, {'display': 'none'}
+
+
+@app.callback(
+    Output(f'label-date-{type_page_indicators}', 'style'),
+    [
+        Input(f'dropdown-report-type-{type_page_indicators}', 'value'),
+        Input(f'date-picker-range-input-{type_page_indicators}', 'start_date'),
+        Input(f'date-picker-range-input-{type_page_indicators}', 'end_date'),
+        Input(f'date-picker-range-treatment-{type_page_indicators}', 'start_date'),
+        Input(f'date-picker-range-treatment-{type_page_indicators}', 'end_date')
+    ]
+)
+def toggle_label_visibility_indicators(report_type, start_date_input, end_date_input, start_date_treatment, end_date_treatment):
+    if report_type in ['initial_input', 'treatment'] and (
+            start_date_input or end_date_input or start_date_treatment or end_date_treatment):
+        return {'display': 'block'}
+    return {'display': 'none'}
+
+
+@app.callback(
+    Output(f'current-month-name-{type_page_indicators}', 'children'),
+    Input('date-interval', 'n_intervals')
+)
+def update_current_month_indicators(n_intervals):
+    current_month_num, current_month_name = get_current_reporting_month()
+    return current_month_name
+
+
+@app.callback(
+    [
+        Output(f'dropdown-building-{type_page_indicators}', 'options'),
+        Output(f'dropdown-department-{type_page_indicators}', 'options'),
+        Output(f'dropdown-profile-{type_page_indicators}', 'options'),
+        Output(f'dropdown-doctor-{type_page_indicators}', 'options')
+    ],
+    [
+        Input(f'dropdown-building-{type_page_indicators}', 'value'),
+        Input(f'dropdown-department-{type_page_indicators}', 'value'),
+        Input(f'dropdown-profile-{type_page_indicators}', 'value'),
+        Input(f'dropdown-doctor-{type_page_indicators}', 'value')
+    ]
+)
+def update_filters_indicators(building_id, department_id, profile_id, doctor_id):
+    buildings = get_available_buildings()
+
+    if doctor_id:
+        departments = get_departments_by_doctor(doctor_id)
+    elif building_id:
+        departments = get_available_departments(building_id)
+    else:
+        departments = get_available_departments()
+
+    if building_id or department_id:
+        profiles = get_available_profiles(building_id, department_id)
+    else:
+        profiles = get_available_profiles()
+
+    if department_id or profile_id:
+        doctors = get_available_doctors(building_id, department_id, profile_id)
+    else:
+        doctors = get_available_doctors()
+
+    return buildings, departments, profiles, doctors
+
+
+@app.callback(
+    Output(f'selected-filters-{type_page_indicators}', 'children'),
+    [Input(f'dropdown-doctor-{type_page_indicators}', 'value')]
+)
+def update_selected_filters_indicators(doctor_id):
+    if isinstance(doctor_id, list) and len(doctor_id) == 1:
+        doctor_id = doctor_id[0]
+    elif isinstance(doctor_id, str) and ',' not in doctor_id:
+        doctor_id = int(doctor_id)
+    else:
+        return []
+
+    details = get_doctor_details(doctor_id)
+    if details:
+        selected_text = [
+            f"Врач: {details['doctor_name']}",
+            f"Специальность: {details['specialty']}",
+            f"Отделение: {details['department']}",
+            f"Корпус: {details['building']}"
+        ]
+        return [html.Div(item) for item in selected_text]
+    else:
+        return []
+
+
+@app.callback(
+    Output(f'selected-period-{type_page_indicators}', 'children'),
+    [Input(f'range-slider-month-{type_page_indicators}', 'value'),
+     Input(f'dropdown-year-{type_page_indicators}', 'value'),
+     Input(f'current-month-name-{type_page_indicators}', 'children'),
+     ]
+)
+def update_selected_period_list_indicators(selected_months_range, selected_year, current_month_name):
+    return selected_months_range
+
+
+@app.callback(
+     [Output(f'result-table1-{type_page_indicators}', 'columns'),
+      Output(f'result-table1-{type_page_indicators}', 'data'),
+      Output(f'progress-bar-{type_page_indicators}', 'value'),
+      Output(f'progress-bar-{type_page_indicators}', 'style'),
+      Output(f'loading-status-{type_page_indicators}', 'children')],
+    [Input(f'update-button-{type_page_indicators}', 'n_clicks')],
+    [State(f'dropdown-doctor-{type_page_indicators}', 'value'),
+     State(f'dropdown-profile-{type_page_indicators}', 'value'),
+     State(f'range-slider-month-{type_page_indicators}', 'value'),
+     State(f'dropdown-year-{type_page_indicators}', 'value'),
+     State(f'dropdown-inogorodniy-{type_page_indicators}', 'value'),
+     State(f'dropdown-sanction-{type_page_indicators}', 'value'),
+     State(f'dropdown-amount-null-{type_page_indicators}', 'value'),
+     State(f'dropdown-building-{type_page_indicators}', 'value'),
+     State(f'dropdown-department-{type_page_indicators}', 'value'),
+     State(f'date-picker-range-input-{type_page_indicators}', 'start_date'),
+     State(f'date-picker-range-input-{type_page_indicators}', 'end_date'),
+     State(f'date-picker-range-treatment-{type_page_indicators}', 'start_date'),
+     State(f'date-picker-range-treatment-{type_page_indicators}', 'end_date'),
+     State(f'dropdown-report-type-{type_page_indicators}', 'value'),
+     State(f'status-selection-mode-{type_page_indicators}', 'value'),
+     State(f'status-group-radio-{type_page_indicators}', 'value'),
+     State(f'status-individual-dropdown-{type_page_indicators}', 'value'),
+     ]
+)
+def update_table_indicators(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
+                 amount_null, building_ids, department_ids, start_date_input, end_date_input,
+                 start_date_treatment, end_date_treatment, report_type,
+                 status_mode, selected_status_group, selected_individual_statuses):
+    if n_clicks is None:
+        raise exceptions.PreventUpdate
+
+    if not selected_year:
+        return [], [], 0, {'display': 'none'}, "Ошибка: Выберите год"
+
+    try:
+        clear_cache()
+        
+        progress_style = {'display': 'block'}
+        status_text = "Подготовка запроса..."
+        progress_value = 10
+
+        status_text = "Обработка фильтров..."
+        progress_value = 20
+        
+        if status_mode == 'group':
+            selected_status_values = status_groups[selected_status_group]
+        else:
+            selected_status_values = selected_individual_statuses if selected_individual_statuses else []
+
+        selected_status_tuple = tuple(selected_status_values)
+
+        if value_doctor:
+            if isinstance(value_doctor, str):
+                selected_doctor_ids = [int(id) for id in value_doctor.split(',') if id.strip().isdigit()]
+            else:
+                selected_doctor_ids = [int(id) for id in value_doctor if isinstance(id, (int, str)) and str(id).isdigit()]
+        else:
+            selected_doctor_ids = []
+
+        start_date_input_formatted, end_date_input_formatted = None, None
+        start_date_treatment_formatted, end_date_treatment_formatted = None, None
+
+        if report_type == 'month':
+            start_date_input_formatted, end_date_input_formatted = None, None
+            start_date_treatment_formatted, end_date_treatment_formatted = None, None
+        elif report_type == 'initial_input':
+            selected_period = (1, 12)
+            start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+            end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        elif report_type == 'treatment':
+            selected_period = (1, 12)
+            start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
+                '%d-%m-%Y')
+            end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime(
+                '%d-%m-%Y')
+
+        status_text = "Формирование SQL-запроса..."
+        progress_value = 40
+        cache_key = f"{selected_year}_{int(time.time() // 60)}"
+
+        sql_query = get_cached_indicators_query(
+            selected_year,
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy, sanction, amount_null,
+            tuple(building_ids) if building_ids else None,
+            tuple(department_ids) if department_ids else None,
+            tuple(value_profile) if value_profile else None,
+            tuple(selected_doctor_ids) if selected_doctor_ids else None,
+            start_date_input_formatted, end_date_input_formatted,
+            start_date_treatment_formatted, end_date_treatment_formatted,
+            selected_status_tuple, cache_key
+        )
+
+        status_text = "Выполнение запроса к базе данных..."
+        progress_value = 60
+
+        start_time = time.time()
+        columns1, data1 = TableUpdater.query_to_df(engine, sql_query)
+        execution_time = time.time() - start_time
+
+        if execution_time < 1:
+            time_text = f"{execution_time*1000:.0f}мс"
+        else:
+            time_text = f"{execution_time:.1f}с"
+
+        status_text = f"Запрос выполнен за {time_text}. Найдено записей: {len(data1)}"
+        progress_value = 100
+
+        progress_style = {'display': 'none'}
+
+        return columns1, data1, progress_value, progress_style, status_text
+
+    except Exception as e:
+        error_msg = f"Ошибка при выполнении запроса: {str(e)}"
+        return [], [], 0, {'display': 'none'}, error_msg
+
+
+@app.callback(
+    Output(f'details-button-{type_page_indicators}', 'disabled'),
+    Input(f'result-table1-{type_page_indicators}', 'active_cell')
+)
+def update_details_button_state_indicators(active_cell):
+    if not active_cell:
+        return True
+    
+    column_id = active_cell.get('column_id')
+    excluded_columns = ['type', 'Условия фильтра']
+    
+    return column_id in excluded_columns
+
+
+@app.callback(
+    [
+        Output(f'details-title-{type_page_indicators}', 'children'),
+        Output(f'details-table-{type_page_indicators}', 'columns'),
+        Output(f'details-table-{type_page_indicators}', 'data')
+    ],
+    [
+        Input(f'details-button-{type_page_indicators}', 'n_clicks')
+    ],
+    [
+        State(f'result-table1-{type_page_indicators}', 'data'),
+        State(f'result-table1-{type_page_indicators}', 'active_cell'),
+        State(f'dropdown-doctor-{type_page_indicators}', 'value'),
+        State(f'dropdown-profile-{type_page_indicators}', 'value'),
+        State(f'range-slider-month-{type_page_indicators}', 'value'),
+        State(f'dropdown-year-{type_page_indicators}', 'value'),
+        State(f'dropdown-inogorodniy-{type_page_indicators}', 'value'),
+        State(f'dropdown-sanction-{type_page_indicators}', 'value'),
+        State(f'dropdown-amount-null-{type_page_indicators}', 'value'),
+        State(f'dropdown-building-{type_page_indicators}', 'value'),
+        State(f'dropdown-department-{type_page_indicators}', 'value'),
+        State(f'date-picker-range-input-{type_page_indicators}', 'start_date'),
+        State(f'date-picker-range-input-{type_page_indicators}', 'end_date'),
+        State(f'date-picker-range-treatment-{type_page_indicators}', 'start_date'),
+        State(f'date-picker-range-treatment-{type_page_indicators}', 'end_date'),
+        State(f'dropdown-report-type-{type_page_indicators}', 'value'),
+        State(f'status-selection-mode-{type_page_indicators}', 'value'),
+        State(f'status-group-radio-{type_page_indicators}', 'value'),
+        State(f'status-individual-dropdown-{type_page_indicators}', 'value')
+    ]
+)
+def show_indicators_details(n_clicks, table_data, active_cell,
+                           value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
+                           amount_null, building_ids, department_ids, start_date_input, end_date_input,
+                           start_date_treatment, end_date_treatment, report_type,
+                           status_mode, selected_status_group, selected_individual_statuses):
+    if not n_clicks or not active_cell or not table_data:
+        return '', [], []
+    
+    row_data = table_data[active_cell.get('row')]
+    indicator_type = row_data.get('type')
+    
+    if not indicator_type:
+        return 'Ошибка: не удалось определить тип индикатора', [], []
+    
+    try:
+        if status_mode == 'group':
+            selected_status_values = status_groups[selected_status_group]
+        else:
+            selected_status_values = selected_individual_statuses if selected_individual_statuses else []
+        
+        selected_status_tuple = tuple(selected_status_values)
+        
+        if value_doctor:
+            if isinstance(value_doctor, str):
+                selected_doctor_ids = [int(id) for id in value_doctor.split(',') if id.strip().isdigit()]
+            else:
+                selected_doctor_ids = [int(id) for id in value_doctor if isinstance(id, (int, str)) and str(id).isdigit()]
+        else:
+            selected_doctor_ids = []
+        
+        start_date_input_formatted, end_date_input_formatted = None, None
+        start_date_treatment_formatted, end_date_treatment_formatted = None, None
+        
+        if report_type == 'initial_input':
+            selected_period = (1, 12)
+            start_date_input_formatted = datetime.strptime(start_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+            end_date_input_formatted = datetime.strptime(end_date_input.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        elif report_type == 'treatment':
+            selected_period = (1, 12)
+            start_date_treatment_formatted = datetime.strptime(start_date_treatment.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+            end_date_treatment_formatted = datetime.strptime(end_date_treatment.split('T')[0], '%Y-%m-%d').strftime('%d-%m-%Y')
+        
+        sql_query = sql_query_indicators_details(
+            selected_year,
+            ', '.join([str(month) for month in range(selected_period[0], selected_period[1] + 1)]),
+            inogorodniy, sanction, amount_null,
+            building_ids, department_ids,
+            value_profile,
+            selected_doctor_ids,
+            start_date_input_formatted, end_date_input_formatted,
+            start_date_treatment_formatted, end_date_treatment_formatted,
+            indicator_type, selected_status_tuple
+        )
+        
+        columns, data = TableUpdater.query_to_df(engine, sql_query)
+        
+        title_text = f"Детализация по индикатору: {indicator_type}"
+        count_badge = dbc.Badge(
+            f" {len(data)}",
+            color="primary",
+            pill=True,
+            className="ms-2"
+        )
+        title = html.Span([title_text, count_badge])
+        
+        return title, columns, data
+        
+    except Exception as e:
+        error_msg = f"Ошибка при получении детализации: {str(e)}"
+        return error_msg, [], []

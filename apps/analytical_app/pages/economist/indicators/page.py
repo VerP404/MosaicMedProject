@@ -150,9 +150,11 @@ econ_indicators = html.Div(
              children=[card_table(f'result-table1-{type_page}', "Индикаторные показатели", page_size=25, 
                                  style_cell_conditional=[
                                      {'if': {'column_id': 'type'}, 'width': '25%'},
+                                     {'if': {'column_id': 'План (количество)'}, 'width': '10%'},
+                                     {'if': {'column_id': 'План (сумма)'}, 'width': '10%'},
                                      {'if': {'column_id': 'К-во'}, 'width': '10%'},
                                      {'if': {'column_id': 'Сумма'}, 'width': '10%'},
-                                     {'if': {'column_id': 'Условия фильтра'}, 'width': '55%'}
+                                     {'if': {'column_id': 'Условия фильтра'}, 'width': '35%'}
                                  ])]
          ),
          # Таблица детализации
@@ -424,6 +426,9 @@ def update_table(n_clicks, value_doctor, value_profile, selected_period, selecte
         return [], [], 0, {'display': 'none'}, "Ошибка: Выберите год"
 
     try:
+        # Очищаем кэш перед выполнением запроса, чтобы получить актуальные данные
+        clear_cache()
+        
         # Показываем прогресс-бар и начинаем анимацию
         progress_style = {'display': 'block'}
         status_text = "Подготовка запроса..."

@@ -13,8 +13,8 @@ label = "Экономист"
 cards_row_1 = dbc.Row(
     [
         dbc.Col(create_card(1, type_page,
-                            "Показатели: выполнение по месяцам",
-                            "Формирует отчет по выбранным показателям выполнения по месяцам с планами.")),
+                            "Показатели: система планирования",
+                            "Формирует отчет по выбранным показателям выполнения с планами.")),
         dbc.Col(create_card(2, type_page,
                             "По врачам",
                             "Анализ выставления целей по врачам.")),
@@ -31,27 +31,18 @@ cards_row_1 = dbc.Row(
 # Вторая группа: те же настройки, хотя колонок меньше
 cards_row_2 = dbc.Row(
     [
-        dbc.Col(create_card(5, type_page,
-                            "Показатели: сводная по индикаторам",
-                            "Формирует отчет по выбранным индикаторным показателям.")),
         dbc.Col(create_card(6, type_page,
                             "Стационары: по врачам",
                             "Отчет по стационарным случаям по врачам.")),
         dbc.Col(create_card(7, type_page, "Талоны по врачам", "Талоны ОМС по врачам в разрезе по месяцам.")),
         dbc.Col(create_card(8, type_page, "Диспансеризация", "Анализ диспансеризации по врачам: ОМС и детализация услуг.")),
-    ],
-    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
-)
-
-# Третья группа: финансовые показатели
-cards_row_3 = dbc.Row(
-    [
         dbc.Col(create_card(9, type_page,
                             "Финансовые показатели",
                             "Финансовые показатели по целям и СМО с разбивкой по Инкомед, Согаз и иногородним.")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
+
 
 # Основной layout
 economist_main = html.Div([
@@ -63,13 +54,12 @@ economist_main = html.Div([
     dcc.Location(id=f'url-{type_page}', refresh=True),
     cards_row_1,
     cards_row_2,
-    cards_row_3,
 ])
 
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 10)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 2, 3, 4, 6, 7, 8, 9]],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -85,7 +75,6 @@ def navigate_pages(*n_clicks):
         2: f"/{main_link}/doctors",
         3: f"/{main_link}/disp_by_ages",
         4: f"/{main_link}/stationary",
-        5: f"/{main_link}/indicators",
         6: f"/{main_link}/doctor-stac",
         7: f"/{main_link}/doctors_talon",
         8: f"/{main_link}/dispensary",

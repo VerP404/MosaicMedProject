@@ -1,49 +1,61 @@
 from sqlalchemy import text
-from functools import lru_cache
 import time
+import pandas as pd
 from apps.analytical_app.pages.SQL_query.query import base_query
 from apps.analytical_app.query_executor import engine
+from apps.analytical_app.pages.economist.svpod.query import get_groups_for_indicators_report, get_filter_conditions
 
 
-@lru_cache(maxsize=32)
 def get_dynamic_conditions(year):
-    query = text("""
-        SELECT type, field_name, filter_type, values, operator 
-        FROM plan_unifiedfilter uf
-        JOIN plan_unifiedfiltercondition ufc ON uf.id = ufc.filter_id
-        WHERE uf.year = :year
-        ORDER BY ufc.id
+    """
+    Получает условия фильтрации из groupindicators через FilterCondition.
+    Используется для обратной совместимости со старым кодом.
+    Кэширование убрано, чтобы данные всегда были актуальными.
+    """
+    # Получаем группы для отчета индикаторов
+    groups = get_groups_for_indicators_report(year)
+    
+    if groups.empty:
+        return []
+    
+    group_ids = groups['id'].tolist()
+    
+    # Получаем условия фильтрации для каждой группы
+    conditions = []
+    for group_id in group_ids:
+        filter_conditions = get_filter_conditions([group_id], year)
+        if filter_conditions:
+            # Используем имя группы как type
+            group_name = groups[groups['id'] == group_id]['name'].iloc[0]
+            conditions.append((group_name, filter_conditions, "AND"))
+    
+    return conditions
+
+
+def get_plan_for_group(group_id, selected_year, months_list, mode='both'):
+    """
+    Получает план для группы за выбранные месяцы.
+    mode: 'both' - возвращает (quantity, amount), 'quantity' - только количество, 'amount' - только сумму
+    """
+    if not months_list:
+        return 0, 0.0
+    
+    months_str = ', '.join(map(str, months_list))
+    query = text(f"""
+        SELECT 
+            COALESCE(SUM(mp.quantity), 0) AS plan_quantity,
+            COALESCE(SUM(mp.amount), 0) AS plan_amount
+        FROM plan_monthlyplan AS mp
+        INNER JOIN plan_annualplan AS ap ON mp.annual_plan_id = ap.id
+        WHERE ap.group_id = :group_id 
+        AND ap.year = :year
+        AND mp.month IN ({months_str})
     """)
     with engine.connect() as connection:
-        result = connection.execute(query, {"year": year}).fetchall()
-
-    conditions = []
-    for row in result:
-        clause = ''
-        type, field_name, filter_type, values, operator = row
-        if filter_type == 'in':
-            # Исправляем запятые на точки в числовых значениях для IN условий
-            if values:
-                import re
-                # Паттерн для поиска чисел с запятыми как десятичным разделителем
-                corrected_values = re.sub(r'(\d+),(\d+)', r'\1.\2', values)
-                clause = f"{field_name} IN ({corrected_values})"
-            else:
-                clause = f"{field_name} IN ({values})"
-        elif filter_type == 'exact':
-            clause = f"{field_name} = '{values}'"
-        elif filter_type == 'like':
-            clause = f"{field_name} LIKE {values}"
-        elif filter_type == 'not_like':
-            clause = f"{field_name} NOT LIKE {values}"
-        elif filter_type == '<':
-            clause = f"{field_name} < {values}"
-        elif filter_type == '>':
-            clause = f"{field_name} > {values}"
-        operator = operator or "AND"
-        conditions.append((type, clause, operator))
-
-    return conditions
+        result = connection.execute(query, {"group_id": group_id, "year": selected_year}).fetchone()
+        if result:
+            return result[0] or 0, float(result[1] or 0.0)
+        return 0, 0.0
 
 
 def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, amount_null, building: None,
@@ -58,46 +70,48 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
                       doctor,
                       input_start, input_end,
                       treatment_start, treatment_end, status_list)
-    # Получаем динамические условия
+    # Получаем динамические условия из groupindicators
     dynamic_conditions = get_dynamic_conditions(selected_year)
+    
+    # Получаем группы для получения планов
+    groups = get_groups_for_indicators_report(selected_year)
+    group_name_to_id = {}
+    if not groups.empty:
+        group_name_to_id = dict(zip(groups['name'], groups['id']))
+    
+    # Парсим список месяцев из months_placeholder
+    try:
+        months_list = [int(m.strip()) for m in months_placeholder.split(',') if m.strip().isdigit()]
+        if not months_list:
+            months_list = list(range(1, 13))  # По умолчанию все месяцы
+    except:
+        months_list = list(range(1, 13))  # По умолчанию все месяцы
+    
     # Создаем список для объединенных запросов
     union_queries = []
 
-    # Группируем условия по типу и объединяем их в один WHERE
-    conditions_by_type = {}
+    # Создаем запросы для каждой группы
     for condition_type, where_clause, operator in dynamic_conditions:
-        if condition_type not in conditions_by_type:
-            conditions_by_type[condition_type] = []
-        # Добавляем условие вместе с оператором
-        conditions_by_type[condition_type].append((where_clause, operator))
-
-    # Создаем запросы с учетом операторов
-    union_queries = []
-    for condition_type, conditions in conditions_by_type.items():
-        combined_where_clause = ""
-        for i, (where_clause, operator) in enumerate(conditions):
-            if i > 0:
-                combined_where_clause += f" {operator} "
-            combined_where_clause += where_clause
-
-        # Формируем строку индикаторов как в Django админке
-        filter_description = ""
-        for i, (where_clause, operator) in enumerate(conditions):
-            if i > 0:
-                filter_description += f" {operator} "
-            filter_description += where_clause
-        
         # Экранируем одинарные кавычки для SQL
-        escaped_filter_description = filter_description.replace("'", "''")
+        escaped_filter_description = where_clause.replace("'", "''")
+        
+        # Получаем план для этой группы
+        group_id = group_name_to_id.get(condition_type)
+        plan_quantity = 0
+        plan_amount = 0.0
+        if group_id:
+            plan_quantity, plan_amount = get_plan_for_group(group_id, selected_year, months_list)
         
         # Используем правильную логику группировки статусов как в svpod
         union_query = f"""
             SELECT '{condition_type}' AS type,
+                   {plan_quantity} AS "План (количество)",
+                   ROUND({plan_amount}::numeric, 2) AS "План (сумма)",
                    COUNT(*) AS "К-во",
                    ROUND(COALESCE(SUM(CAST(amount_numeric AS numeric(10, 2))), 0)::numeric, 2) AS "Сумма",
                    '{escaped_filter_description}' AS "Условия фильтра"
             FROM oms
-            WHERE {combined_where_clause}
+            WHERE {where_clause}
             AND inogorodniy = false
             AND sanctions IN ('-', '0')
             AND amount_numeric != '0'
@@ -110,7 +124,7 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
         final_query = f"{base}\n" + " UNION ALL ".join(union_queries) + "\nLIMIT 10000"
     else:
         # Если нет динамических условий, возвращаем пустой результат
-        final_query = f"{base}\nSELECT 'no_data' AS type, 0 AS \"К-во\", 0.00 AS \"Сумма\", 'Нет данных' AS \"Условия фильтра\" FROM oms WHERE 1=0\nLIMIT 10000"
+        final_query = f"{base}\nSELECT 'no_data' AS type, 0 AS \"План (количество)\", 0.00 AS \"План (сумма)\", 0 AS \"К-во\", 0.00 AS \"Сумма\", 'Нет данных' AS \"Условия фильтра\" FROM oms WHERE 1=0\nLIMIT 10000"
 
     return final_query
 
@@ -363,4 +377,6 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
 
 def clear_cache():
     """Очищает кэш для обновления условий"""
-    get_dynamic_conditions.cache_clear()
+    # Кэширование убрано из get_dynamic_conditions, поэтому функция всегда возвращает актуальные данные
+    # Оставляем функцию для обратной совместимости на случай, если в будущем понадобится кэширование
+    pass
