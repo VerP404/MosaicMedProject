@@ -80,9 +80,61 @@ class Command(BaseCommand):
             if group.external_id
         }
 
+        # Проверяем существующие группы без external_id
+        groups_without_external_id = GroupIndicators.objects.filter(external_id__isnull=True).count()
+        if groups_without_external_id > 0:
+            self.stdout.write(
+                self.style.WARNING(
+                    f'В базе найдено {groups_without_external_id} групп без external_id. '
+                    f'Они не будут синхронизированы и останутся в базе (возможны дубли).'
+                )
+            )
+
+        # Проверяем возможные дубли по имени (группы с одинаковым именем, но разными external_id)
+        imported_names = {g.get('name'): g.get('external_id') for g in structure['groups']}
+        existing_groups = GroupIndicators.objects.all()
+        potential_duplicates = []
+        for group in existing_groups:
+            if group.external_id and group.external_id not in [g.get('external_id') for g in structure['groups']]:
+                # Группа с external_id, но не в импортируемом файле
+                if group.name in imported_names:
+                    potential_duplicates.append({
+                        'name': group.name,
+                        'external_id': group.external_id,
+                        'imported_external_id': imported_names[group.name]
+                    })
+        
+        if potential_duplicates:
+            self.stdout.write('')
+            self.stdout.write(
+                self.style.WARNING(
+                    f'⚠️  Обнаружено {len(potential_duplicates)} потенциальных дублей по имени:'
+                )
+            )
+            for dup in potential_duplicates[:5]:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f'  - "{dup["name"]}": существующий external_id={dup["external_id"]}, '
+                        f'импортируемый external_id={dup["imported_external_id"]}'
+                    )
+                )
+            if len(potential_duplicates) > 5:
+                self.stdout.write(
+                    self.style.WARNING(f'  ... и еще {len(potential_duplicates) - 5} дублей')
+                )
+            self.stdout.write(
+                self.style.WARNING(
+                    '  Существующая группа останется в базе, будет создана новая с импортируемым external_id.'
+                )
+            )
+            self.stdout.write('')
+
         imported_external_ids = set()
         # Словарь для групп, которые будут созданы в этом импорте (для обработки parent_external_id)
         new_groups_cache = {}
+        # Счетчики для статистики
+        created_groups = set()
+        updated_groups = set()
 
         with transaction.atomic():
             # Импортируем группы в несколько проходов: сначала родители, потом дочерние
@@ -122,6 +174,14 @@ class Command(BaseCommand):
                         if not parent_exists:
                             # Родитель еще не обработан, пропускаем эту группу на этой итерации
                             can_process = False
+                            # В режиме dry-run показываем отладочную информацию
+                            if dry_run and iteration == max_iterations:
+                                group_name = group_data.get('name', 'Без имени')
+                                self.stdout.write(
+                                    self.style.WARNING(
+                                        f'  Пропущена "{group_name}": родитель {parent_external_id} не найден'
+                                    )
+                                )
 
                     if not can_process:
                         continue
@@ -133,6 +193,10 @@ class Command(BaseCommand):
 
                     if existing_group:
                         if update_existing:
+                            # Проверяем связанные данные перед обновлением
+                            annual_plans_count = existing_group.annual_plans.count()
+                            filters_count = existing_group.filters.count()
+                            
                             # Обновляем существующую группу
                             existing_group.name = group_data['name']
                             existing_group.level = group_data.get('level', 1)
@@ -159,8 +223,18 @@ class Command(BaseCommand):
                             if not dry_run:
                                 existing_group.save()
                             
+                            updated_groups.add(external_id)
+                            
+                            # Показываем информацию о связанных данных
+                            info_parts = []
+                            if annual_plans_count > 0:
+                                info_parts.append(f'{annual_plans_count} год. планов')
+                            if filters_count > 0:
+                                info_parts.append(f'{filters_count} фильтров')
+                            
+                            info_text = f' (сохранено: {", ".join(info_parts)})' if info_parts else ''
                             self.stdout.write(
-                                self.style.SUCCESS(f'Обновлена группа: {existing_group.name}')
+                                self.style.SUCCESS(f'Обновлена группа: {existing_group.name}{info_text}')
                             )
                         else:
                             self.stdout.write(
@@ -185,10 +259,15 @@ class Command(BaseCommand):
                             sync_enabled=True  # Включаем синхронизацию для импортированных групп
                         )
 
+                        # В режиме dry-run тоже добавляем в кэш, чтобы дочерние группы могли найти родителя
+                        # но не сохраняем в базу
                         if not dry_run:
                             new_group.save()
                             groups_by_external_id[external_id] = new_group
-                            new_groups_cache[external_id] = new_group
+                        
+                        # Добавляем в кэш в любом случае (для dry-run тоже)
+                        new_groups_cache[external_id] = new_group
+                        created_groups.add(external_id)
                         
                         self.stdout.write(
                             self.style.SUCCESS(f'Создана группа: {new_group.name}')
@@ -198,14 +277,38 @@ class Command(BaseCommand):
                     if 'filters' in group_data:
                         group = existing_group if existing_group else (new_group if not dry_run else None)
                         if group and not dry_run:
-                            # Удаляем только те фильтры, которые точно соответствуют импортируемым
-                            # (учитывая group, field_name, filter_type, year)
-                            # Это устраняет дубликаты, но сохраняет фильтры для других годов
+                            # Подсчитываем, сколько фильтров будет удалено/создано
+                            filters_to_delete = []
+                            filters_to_create = []
+                            
                             for filter_data in group_data['filters']:
                                 filter_year = filter_data.get('year', datetime.now().year)
                                 
-                                # Удаляем все дубликаты для конкретной комбинации полей
-                                # (может быть несколько записей с одинаковыми полями - это и есть дубликаты)
+                                # Подсчитываем, сколько фильтров будет удалено
+                                deleted_count = FilterCondition.objects.filter(
+                                    group=group,
+                                    field_name=filter_data['field_name'],
+                                    filter_type=filter_data['filter_type'],
+                                    year=filter_year
+                                ).count()
+                                
+                                if deleted_count > 0:
+                                    filters_to_delete.append({
+                                        'field': filter_data['field_name'],
+                                        'type': filter_data['filter_type'],
+                                        'year': filter_year,
+                                        'count': deleted_count
+                                    })
+                                
+                                filters_to_create.append({
+                                    'field': filter_data['field_name'],
+                                    'type': filter_data['filter_type'],
+                                    'year': filter_year
+                                })
+                                
+                                # Удаляем только те фильтры, которые точно соответствуют импортируемым
+                                # (учитывая group, field_name, filter_type, year)
+                                # Это устраняет дубликаты, но сохраняет фильтры для других годов
                                 FilterCondition.objects.filter(
                                     group=group,
                                     field_name=filter_data['field_name'],
@@ -221,6 +324,17 @@ class Command(BaseCommand):
                                     year=filter_year,
                                     values=filter_data['values'],
                                 )
+                            
+                            # Показываем информацию о фильтрах
+                            if filters_to_delete:
+                                total_deleted = sum(f['count'] for f in filters_to_delete)
+                                years = set(f['year'] for f in filters_to_delete)
+                                self.stdout.write(
+                                    self.style.WARNING(
+                                        f'    → Фильтры для {", ".join(map(str, years))} года: '
+                                        f'удалено {total_deleted}, создано {len(filters_to_create)}'
+                                    )
+                                )
 
                     processed_in_iteration.append(group_data)
 
@@ -230,23 +344,74 @@ class Command(BaseCommand):
 
             # Предупреждаем, если остались необработанные группы
             if remaining_groups:
+                self.stdout.write('')
                 self.stdout.write(
                     self.style.ERROR(
                         f'Не удалось обработать {len(remaining_groups)} групп. Возможно, нарушена иерархия parent_external_id.'
                     )
                 )
+                # Показываем первые несколько примеров для диагностики
+                for i, group_data in enumerate(remaining_groups[:5]):
+                    parent_id = group_data.get('parent_external_id')
+                    group_name = group_data.get('name', 'Без имени')
+                    if parent_id:
+                        # Проверяем, есть ли родитель в импортируемых данных
+                        parent_in_file = any(
+                            g.get('external_id') == parent_id 
+                            for g in structure['groups']
+                        )
+                        if not parent_in_file:
+                            self.stdout.write(
+                                self.style.WARNING(
+                                    f'  - "{group_name}": родитель с external_id={parent_id} отсутствует в файле'
+                                )
+                            )
+                        else:
+                            self.stdout.write(
+                                self.style.WARNING(
+                                    f'  - "{group_name}": родитель с external_id={parent_id} не обработан'
+                                )
+                            )
+                    else:
+                        self.stdout.write(
+                            self.style.WARNING(f'  - "{group_name}": нет внешнего ID')
+                        )
+                if len(remaining_groups) > 5:
+                    self.stdout.write(
+                        self.style.WARNING(f'  ... и еще {len(remaining_groups) - 5} групп')
+                    )
 
             # Удаляем отсутствующие группы, если запрошено
             if delete_missing:
                 existing_external_ids = set(groups_by_external_id.keys())
                 missing_external_ids = existing_external_ids - imported_external_ids
                 
+                if missing_external_ids:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f'⚠️  ВНИМАНИЕ: Будет удалено {len(missing_external_ids)} групп, которых нет в импортируемом файле. '
+                            f'Все связанные планы и данные будут удалены!'
+                        )
+                    )
+                
                 for external_id in missing_external_ids:
                     group = groups_by_external_id[external_id]
+                    # Подсчитываем связанные данные
+                    annual_plans_count = group.annual_plans.count()
+                    filters_count = group.filters.count()
+                    
                     if not dry_run:
                         group.delete()
+                    
+                    info_parts = []
+                    if annual_plans_count > 0:
+                        info_parts.append(f'{annual_plans_count} год. планов')
+                    if filters_count > 0:
+                        info_parts.append(f'{filters_count} фильтров')
+                    
+                    info_text = f' (удалено: {", ".join(info_parts)})' if info_parts else ''
                     self.stdout.write(
-                        self.style.WARNING(f'Удалена отсутствующая группа: {group.name}')
+                        self.style.WARNING(f'Удалена отсутствующая группа: {group.name}{info_text}')
                     )
 
             if dry_run:
@@ -254,9 +419,27 @@ class Command(BaseCommand):
                 transaction.set_rollback(True)
                 self.stdout.write(self.style.WARNING('Транзакция откачена (dry-run режим)'))
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f'Импорт завершен. Обработано групп: {len(imported_external_ids)}'
+        # Итоговая статистика
+        created_count = len(created_groups)
+        updated_count = len(updated_groups)
+        skipped_count = len(imported_external_ids) - created_count - updated_count
+        
+        self.stdout.write('')
+        self.stdout.write(self.style.SUCCESS('=' * 60))
+        self.stdout.write(self.style.SUCCESS('Импорт завершен'))
+        self.stdout.write(self.style.SUCCESS('=' * 60))
+        self.stdout.write(f'Всего обработано групп: {len(imported_external_ids)}')
+        if created_count > 0:
+            self.stdout.write(self.style.SUCCESS(f'  ✓ Создано новых: {created_count}'))
+        if updated_count > 0:
+            self.stdout.write(self.style.SUCCESS(f'  ✓ Обновлено: {updated_count}'))
+        if skipped_count > 0:
+            self.stdout.write(self.style.WARNING(f'  ⚠ Пропущено (без --update-existing): {skipped_count}'))
+        if groups_without_external_id > 0:
+            self.stdout.write(
+                self.style.WARNING(
+                    f'  ⚠ Групп без external_id (не синхронизированы): {groups_without_external_id}'
+                )
             )
-        )
+        self.stdout.write('')
 

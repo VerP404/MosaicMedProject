@@ -1,5 +1,9 @@
 import json
 from datetime import datetime
+import io
+import pandas as pd
+from django.http import HttpResponse
+from django.shortcuts import render, redirect
 
 from dal import autocomplete
 from django.contrib import admin, messages
@@ -14,10 +18,11 @@ from import_export.widgets import ManyToManyWidget, ForeignKeyWidget
 
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.import_export.forms import ImportForm, ExportForm, SelectableFieldsExportForm
+from unfold.decorators import action
 from import_export import resources, fields
 from import_export.admin import ImportExportModelAdmin
 
-from .forms import GroupIndicatorsForm
+from .forms import GroupIndicatorsForm, YearSelectForm, ImportPlansForm
 from .models import (
     GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition,
     AnnualPlan, BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan,
@@ -297,6 +302,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     readonly_fields = ('external_id',)
     actions = [enable_cumulative_report_action, disable_cumulative_report_action, 
                enable_indicators_report_action, disable_indicators_report_action]
+    actions_list = ["export_plans", "import_plans"]
 
     def has_quantity_plan(self, obj):
         """
@@ -317,6 +323,198 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
         return format_html('<img src="/static/admin/img/icon-no.svg" alt="Нет">')
 
     has_amount_plan.short_description = "План суммы"
+
+    @action(description="Экспорт планов в Excel", url_path="export-plans", permissions=["export_plans"])
+    def export_plans(self, request):
+        """Экспорт планов в Excel формат"""
+        if request.method == 'POST':
+            form = YearSelectForm(request.POST)
+            if form.is_valid():
+                year = form.cleaned_data['year']
+                return self._export_plans_to_excel(year)
+        else:
+            form = YearSelectForm(initial={'year': datetime.now().year})
+        
+        context = {
+            'form': form,
+            'title': 'Экспорт планов',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/plan/export_plans.html', context)
+
+    def _export_plans_to_excel(self, year):
+        """Генерирует Excel файл с планами для указанного года"""
+        # Получаем все AnnualPlan для года
+        annual_plans = AnnualPlan.objects.filter(year=year).select_related('group').prefetch_related('monthly_plans')
+        
+        # Создаем список строк для экспорта
+        rows = []
+        
+        for annual_plan in annual_plans:
+            group = annual_plan.group
+            # Получаем иерархию группы
+            hierarchy = group.get_hierarchy_display()
+            
+            # Получаем месячные планы
+            monthly_plans = annual_plan.monthly_plans.all().order_by('month')
+            
+            # Строка с объемами (quantity)
+            quantity_row = {
+                'Показатель': f'{hierarchy} - Объемы',
+                'external_id': group.external_id or '',
+                'Итого': sum(mp.quantity for mp in monthly_plans),
+            }
+            for month in range(1, 13):
+                mp = monthly_plans.filter(month=month).first()
+                quantity_row[f'{month}'] = mp.quantity if mp else 0
+            
+            # Строка с финансами (amount)
+            amount_row = {
+                'Показатель': f'{hierarchy} - Финансы',
+                'external_id': group.external_id or '',
+                'Итого': sum(float(mp.amount) for mp in monthly_plans),
+            }
+            for month in range(1, 13):
+                mp = monthly_plans.filter(month=month).first()
+                amount_row[f'{month}'] = float(mp.amount) if mp else 0.0
+            
+            rows.append(quantity_row)
+            rows.append(amount_row)
+        
+        # Создаем DataFrame
+        df = pd.DataFrame(rows)
+        
+        # Создаем Excel файл в памяти
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Планы', index=False)
+        
+        output.seek(0)
+        
+        # Создаем HTTP ответ
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="plans_{year}.xlsx"'
+        return response
+
+    @action(description="Импорт планов из Excel", url_path="import-plans", permissions=["import_plans"])
+    def import_plans(self, request):
+        """Импорт планов из Excel файла"""
+        if request.method == 'POST':
+            form = ImportPlansForm(request.POST, request.FILES)
+            if form.is_valid():
+                year = form.cleaned_data['year']
+                file = form.cleaned_data['file']
+                
+                try:
+                    result = self._import_plans_from_excel(file, year)
+                    messages.success(request, f'Успешно импортировано: {result["imported"]} строк, обновлено: {result["updated"]} записей')
+                    return redirect('admin:plan_annualplan_changelist')
+                except Exception as e:
+                    messages.error(request, f'Ошибка при импорте: {str(e)}')
+        else:
+            form = ImportPlansForm(initial={'year': datetime.now().year})
+        
+        context = {
+            'form': form,
+            'title': 'Импорт планов',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/plan/import_plans.html', context)
+
+    def _import_plans_from_excel(self, file, year):
+        """Импортирует планы из Excel файла"""
+        # Читаем Excel файл
+        df = pd.read_excel(file)
+        
+        imported = 0
+        updated = 0
+        
+        # Группируем строки по external_id
+        # Создаем словарь: external_id -> {quantity_row, amount_row}
+        groups_data = {}
+        
+        for idx, row in df.iterrows():
+            indicator = str(row.get('Показатель', '')).strip()
+            external_id = str(row.get('external_id', '')).strip()
+            
+            if not indicator or not external_id or external_id == 'nan':
+                continue
+            
+            # Инициализируем запись для external_id если её нет
+            if external_id not in groups_data:
+                groups_data[external_id] = {'quantity_row': None, 'amount_row': None}
+            
+            # Определяем тип строки (объемы или финансы)
+            if indicator.endswith(' - Объемы'):
+                groups_data[external_id]['quantity_row'] = row
+            elif indicator.endswith(' - Финансы'):
+                groups_data[external_id]['amount_row'] = row
+        
+        # Обрабатываем собранные данные
+        for external_id, data in groups_data.items():
+            quantity_row = data['quantity_row']
+            amount_row = data['amount_row']
+            
+            # Пропускаем если нет хотя бы одной строки
+            if quantity_row is None or amount_row is None:
+                continue
+            
+            # Находим группу по external_id
+            try:
+                group = GroupIndicators.objects.get(external_id=external_id)
+            except GroupIndicators.DoesNotExist:
+                # Если не найдено, пропускаем
+                continue
+            
+            # Получаем или создаем AnnualPlan
+            annual_plan, created = AnnualPlan.objects.get_or_create(
+                group=group,
+                year=year,
+                defaults={}
+            )
+            
+            if created:
+                imported += 1
+            else:
+                updated += 1
+            
+            # Обновляем месячные планы
+            for month in range(1, 13):
+                monthly_plan, _ = MonthlyPlan.objects.get_or_create(
+                    annual_plan=annual_plan,
+                    month=month,
+                    defaults={'quantity': 0, 'amount': 0.00}
+                )
+                
+                # Обновляем количество из строки объемов
+                quantity_col = str(month)
+                if quantity_col in quantity_row and pd.notna(quantity_row[quantity_col]):
+                    try:
+                        monthly_plan.quantity = int(float(quantity_row[quantity_col]))
+                    except (ValueError, TypeError):
+                        monthly_plan.quantity = 0
+                
+                # Обновляем сумму из строки финансов
+                if quantity_col in amount_row and pd.notna(amount_row[quantity_col]):
+                    try:
+                        monthly_plan.amount = float(amount_row[quantity_col])
+                    except (ValueError, TypeError):
+                        monthly_plan.amount = 0.00
+                
+                monthly_plan.save()
+        
+        return {'imported': imported, 'updated': updated}
+
+    def has_export_plans_permission(self, request):
+        return request.user.has_perm('plan.export_plans')
+    
+    def has_import_plans_permission(self, request):
+        return request.user.has_perm('plan.import_plans')
 
 
 # Инлайн для MonthlyBuildingPlan
