@@ -43,6 +43,16 @@ cards_row_2 = dbc.Row(
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
 
+# Третья группа: новая карточка для отчета по группам целей
+cards_row_3 = dbc.Row(
+    [
+        dbc.Col(create_card(10, type_page,
+                            "Факт по корпусам и целям помесячно",
+                            "Отчет по целям, подразделениям и месяцам с фильтрацией по статусам.")),
+    ],
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
+)
+
 
 # Основной layout
 economist_main = html.Div([
@@ -54,12 +64,13 @@ economist_main = html.Div([
     dcc.Location(id=f'url-{type_page}', refresh=True),
     cards_row_1,
     cards_row_2,
+    cards_row_3,
 ])
 
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 2, 3, 4, 6, 7, 8, 9]],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 2, 3, 4, 6, 7, 8, 9, 10]],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -79,6 +90,7 @@ def navigate_pages(*n_clicks):
         7: f"/{main_link}/doctors_talon",
         8: f"/{main_link}/dispensary",
         9: f"/{main_link}/financial_indicators",
+        10: f"/{main_link}/goal_groups_report",
     }
     
     return route_map[report_num]
