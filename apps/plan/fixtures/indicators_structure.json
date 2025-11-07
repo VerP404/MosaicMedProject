@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2025-11-07 13:12:38.261413",
+  "export_date": "2025-11-07 13:38:27.690894",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -317,6 +317,12 @@
           "filter_type": "exact",
           "values": "'На дому'",
           "year": 2025
+        },
+        {
+          "field_name": "ksg",
+          "filter_type": "not_like",
+          "values": "'ds37%'",
+          "year": 2025
         }
       ]
     },
@@ -331,6 +337,12 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'В дневном стационаре'",
+          "year": 2025
+        },
+        {
+          "field_name": "ksg",
+          "filter_type": "not_like",
+          "values": "'ds37%'",
           "year": 2025
         }
       ]
@@ -424,6 +436,27 @@
           "field_name": "goal",
           "filter_type": "in",
           "values": "'1','5','7','9','10','14','32','64'",
+          "year": 2025
+        }
+      ]
+    },
+    {
+      "external_id": "6647cd39-f445-41f5-9767-6c77d77ee364",
+      "name": "Реабилитация",
+      "level": 2,
+      "is_distributable": false,
+      "parent_external_id": "476f2f4d-1676-4f98-ae98-d75fc602f390",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'В дневном стационаре', 'На дому'",
+          "year": 2025
+        },
+        {
+          "field_name": "ksg",
+          "filter_type": "like",
+          "values": "'ds37%'",
           "year": 2025
         }
       ]
@@ -826,6 +859,60 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'640'",
+          "year": 2025
+        }
+      ]
+    },
+    {
+      "external_id": "d74dc217-967f-4d8b-ae53-c0bed9850c1f",
+      "name": "Взрослые",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "6647cd39-f445-41f5-9767-6c77d77ee364",
+      "filters": [
+        {
+          "field_name": "Взрослые",
+          "filter_type": "in",
+          "values": "'В дневном стационаре', 'На дому'",
+          "year": 2025
+        },
+        {
+          "field_name": "ksg",
+          "filter_type": "like",
+          "values": "'ds37%'",
+          "year": 2025
+        },
+        {
+          "field_name": "age",
+          "filter_type": ">",
+          "values": "18",
+          "year": 2025
+        }
+      ]
+    },
+    {
+      "external_id": "0ed071ed-0717-4c45-8303-a06e0bb467bb",
+      "name": "Дети",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "6647cd39-f445-41f5-9767-6c77d77ee364",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'В дневном стационаре', 'На дому'",
+          "year": 2025
+        },
+        {
+          "field_name": "ksg",
+          "filter_type": "like",
+          "values": "'ds37%'",
+          "year": 2025
+        },
+        {
+          "field_name": "age",
+          "filter_type": "<",
+          "values": "19",
           "year": 2025
         }
       ]
