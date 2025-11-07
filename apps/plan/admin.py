@@ -294,15 +294,17 @@ class DepartmentAutocomplete(autocomplete.Select2QuerySetView):
 class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     import_form_class = ImportForm
     export_form_class = ExportForm
-    list_display = ('group', 'year', 'show_in_cumulative_report', 'show_in_indicators_report', 'external_id', 'has_quantity_plan', 'has_amount_plan')
+    list_display = ('group', 'year', 'sort_order', 'show_in_cumulative_report', 'show_in_indicators_report', 'external_id', 'has_quantity_plan', 'has_amount_plan')
     list_filter = ('year', 'show_in_cumulative_report', 'show_in_indicators_report')
     search_fields = ('group__name', 'year', 'external_id')
+    list_editable = ('sort_order', 'show_in_cumulative_report', 'show_in_indicators_report')
     inlines = [MonthlyPlanInline]
-    fields = ('group', 'year', 'show_in_cumulative_report', 'show_in_indicators_report', 'external_id')
+    fields = ('group', 'year', 'sort_order', 'show_in_cumulative_report', 'show_in_indicators_report', 'external_id')
     readonly_fields = ('external_id',)
     actions = [enable_cumulative_report_action, disable_cumulative_report_action, 
                enable_indicators_report_action, disable_indicators_report_action]
     actions_list = ["export_plans", "import_plans"]
+    ordering = ['year', 'sort_order', 'group__level', 'group__name']
 
     def has_quantity_plan(self, obj):
         """
@@ -345,13 +347,18 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
 
     def _export_plans_to_excel(self, year):
         """Генерирует Excel файл с планами для указанного года"""
-        # Получаем все AnnualPlan для года с сортировкой по иерархии
+        # Получаем все AnnualPlan для года с сортировкой
         annual_plans = AnnualPlan.objects.filter(
             year=year
         ).select_related('group', 'group__parent', 'group__parent__parent').prefetch_related('monthly_plans')
         
-        # Сортируем по иерархии: строим кортеж из имен на каждом уровне
+        # Сортируем: сначала по sort_order (если указан), потом по иерархии
         def get_sort_key(annual_plan):
+            # Если указан sort_order, используем его
+            if annual_plan.sort_order is not None:
+                return (0, annual_plan.sort_order, '')
+            
+            # Иначе сортируем по иерархии
             group = annual_plan.group
             # Строим список всех предков от корня до текущей группы
             path_names = []
@@ -361,12 +368,11 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
                 current = current.parent
             
             # Дополняем до максимального уровня (10) пустыми строками для правильной сортировки
-            # Пустая строка будет идти после всех непустых строк при сортировке
             max_levels = 10
             sort_key = tuple(path_names + [''] * (max_levels - len(path_names)))
-            return sort_key
+            return (1, 0, sort_key)  # (1, 0, ...) чтобы sort_order был приоритетнее
         
-        # Сортируем annual_plans по иерархии
+        # Сортируем annual_plans
         sorted_annual_plans = sorted(annual_plans, key=get_sort_key)
         
         # Создаем список строк для экспорта

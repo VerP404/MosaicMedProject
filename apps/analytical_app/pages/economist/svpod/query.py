@@ -410,7 +410,7 @@ def get_groups_for_cumulative_report(selected_year):
     """
     Получает группы показателей, которые нужно отображать в отчете нарастающе.
     Выбираются группы, у которых AnnualPlan.show_in_cumulative_report = True для указанного года.
-    Может быть любой уровень вложенности (не только конечные группы).
+    Сортировка: сначала по sort_order (если указан), потом по иерархии групп.
     Возвращает полную иерархию групп через обратный слэш (\\).
     """
     from sqlalchemy import text
@@ -422,7 +422,8 @@ def get_groups_for_cumulative_report(selected_year):
             g.name,
             g.parent_id,
             g.name::text as full_path,
-            0 as level
+            0 as level,
+            COALESCE(ap.sort_order, 999999) as sort_order
         FROM plan_groupindicators g
         INNER JOIN plan_annualplan ap ON ap.group_id = g.id
         WHERE ap.year = :selected_year 
@@ -435,25 +436,32 @@ def get_groups_for_cumulative_report(selected_year):
             p.name,
             p.parent_id,
             p.name || ' \\ ' || gp.full_path as full_path,
-            gp.level + 1
+            gp.level + 1,
+            gp.sort_order
         FROM plan_groupindicators p
         INNER JOIN group_paths gp ON gp.parent_id = p.id
     )
     SELECT DISTINCT ON (id)
         id,
-        full_path as name
+        full_path as name,
+        sort_order
     FROM group_paths
     ORDER BY id, level DESC
     """)
     groups = pd.read_sql(query, engine, params={"selected_year": selected_year})
+    
+    # Сортируем: сначала по sort_order, потом по name
+    if not groups.empty and 'sort_order' in groups.columns:
+        groups = groups.sort_values(by=['sort_order', 'name'], na_position='last')
+    
     return groups
 
 
 def get_groups_for_indicators_report(selected_year):
     """
-    Получает группы показателей, которые нужно отображать в отчете индикаторов.
+    Получает группы для отчета индикаторов с учетом сортировки.
     Выбираются группы, у которых AnnualPlan.show_in_indicators_report = True для указанного года.
-    Может быть любой уровень вложенности (не только конечные группы).
+    Сортировка: сначала по sort_order (если указан), потом по иерархии групп.
     Возвращает полную иерархию групп через обратный слэш (\\).
     """
     from sqlalchemy import text
@@ -465,7 +473,8 @@ def get_groups_for_indicators_report(selected_year):
             g.name,
             g.parent_id,
             g.name::text as full_path,
-            0 as level
+            0 as level,
+            COALESCE(ap.sort_order, 999999) as sort_order
         FROM plan_groupindicators g
         INNER JOIN plan_annualplan ap ON ap.group_id = g.id
         WHERE ap.year = :selected_year 
@@ -478,17 +487,24 @@ def get_groups_for_indicators_report(selected_year):
             p.name,
             p.parent_id,
             p.name || ' \\ ' || gp.full_path as full_path,
-            gp.level + 1
+            gp.level + 1,
+            gp.sort_order
         FROM plan_groupindicators p
         INNER JOIN group_paths gp ON gp.parent_id = p.id
     )
     SELECT DISTINCT ON (id)
         id,
-        full_path as name
+        full_path as name,
+        sort_order
     FROM group_paths
     ORDER BY id, level DESC
     """)
     groups = pd.read_sql(query, engine, params={"selected_year": selected_year})
+    
+    # Сортируем: сначала по sort_order, потом по name
+    if not groups.empty and 'sort_order' in groups.columns:
+        groups = groups.sort_values(by=['sort_order', 'name'], na_position='last')
+    
     return groups
 
 

@@ -213,6 +213,13 @@ class AnnualPlan(models.Model):
         verbose_name="Внешний ID",
         help_text="Уникальный идентификатор для синхронизации с базовым сервером"
     )
+    # Поле для сортировки показателей при экспорте
+    sort_order = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Порядок сортировки",
+        help_text="Порядок сортировки показателей при экспорте. Если пусто, используется иерархия групп."
+    )
     
     class Meta:
         unique_together = ('group', 'year')
