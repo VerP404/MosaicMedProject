@@ -32,9 +32,14 @@ def get_filter_conditions(group_ids, year):
         elif filter_type == 'not_like':
             filter_clauses.append(f"{field_name} NOT LIKE {values}")
         elif filter_type in ('>', '<', '>=', '<='):
-            filter_clauses.append(f"{field_name} {filter_type} {values}")
+            # Для операторов сравнения значения должны быть без кавычек
+            # Убираем кавычки, если они есть (для числовых полей)
+            values_clean = values.strip()
+            if values_clean.startswith("'") and values_clean.endswith("'"):
+                values_clean = values_clean[1:-1]
+            filter_clauses.append(f"{field_name} {filter_type} {values_clean}")
 
-    return " AND ".join(filter_clauses)
+    return " AND ".join(filter_clauses) if filter_clauses else None
 
 
 def sql_query_rep(selected_year, group_id,

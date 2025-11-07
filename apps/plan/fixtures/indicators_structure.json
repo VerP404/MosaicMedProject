@@ -871,7 +871,7 @@
       "parent_external_id": "6647cd39-f445-41f5-9767-6c77d77ee364",
       "filters": [
         {
-          "field_name": "Взрослые",
+          "field_name": "goal",
           "filter_type": "in",
           "values": "'В дневном стационаре', 'На дому'",
           "year": 2025
