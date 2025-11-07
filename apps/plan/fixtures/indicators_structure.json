@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2025-11-07 13:38:27.690894",
+  "export_date": "2025-11-07 14:34:10.963704",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -462,6 +462,27 @@
       ]
     },
     {
+      "external_id": "4110e9d1-237a-439c-a912-bdeb6aee0fbc",
+      "name": "Реабилитация",
+      "level": 2,
+      "is_distributable": false,
+      "parent_external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'30'",
+          "year": 2025
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "in",
+          "values": "21618.9, 25427.7",
+          "year": 2025
+        }
+      ]
+    },
+    {
       "external_id": "52702b6a-fec1-4a5c-8ff9-961cf7c897c3",
       "name": "Неотложка на дому",
       "level": 3,
@@ -871,12 +892,6 @@
       "parent_external_id": "6647cd39-f445-41f5-9767-6c77d77ee364",
       "filters": [
         {
-          "field_name": "goal",
-          "filter_type": "in",
-          "values": "'В дневном стационаре', 'На дому'",
-          "year": 2025
-        },
-        {
           "field_name": "ksg",
           "filter_type": "like",
           "values": "'ds37%'",
@@ -886,6 +901,12 @@
           "field_name": "age",
           "filter_type": ">",
           "values": "18",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'В дневном стационаре', 'На дому'",
           "year": 2025
         }
       ]
@@ -907,6 +928,60 @@
           "field_name": "ksg",
           "filter_type": "like",
           "values": "'ds37%'",
+          "year": 2025
+        },
+        {
+          "field_name": "age",
+          "filter_type": "<",
+          "values": "19",
+          "year": 2025
+        }
+      ]
+    },
+    {
+      "external_id": "422c7b40-8fba-4d45-981b-5661d65c2053",
+      "name": "Взрослые",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "4110e9d1-237a-439c-a912-bdeb6aee0fbc",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'30'",
+          "year": 2025
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "in",
+          "values": "21618.9, 25427.7",
+          "year": 2025
+        },
+        {
+          "field_name": "age",
+          "filter_type": ">",
+          "values": "18",
+          "year": 2025
+        }
+      ]
+    },
+    {
+      "external_id": "42ac180d-ae28-484e-8adf-148221ae85ad",
+      "name": "Дети",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "4110e9d1-237a-439c-a912-bdeb6aee0fbc",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'30'",
+          "year": 2025
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "in",
+          "values": "21618.9, 25427.7",
           "year": 2025
         },
         {
