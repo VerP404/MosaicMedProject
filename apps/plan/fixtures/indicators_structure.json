@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2025-11-07 14:34:10.963704",
+  "export_date": "2025-11-07 14:49:42.324200",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -478,6 +478,27 @@
           "field_name": "amount_numeric",
           "filter_type": "in",
           "values": "21618.9, 25427.7",
+          "year": 2025
+        }
+      ]
+    },
+    {
+      "external_id": "8747423f-f312-402f-87b3-a37e10a91209",
+      "name": "КТ (541)",
+      "level": 2,
+      "is_distributable": false,
+      "parent_external_id": "5690482a-c775-43dd-ad44-abbac7ef99e3",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2025
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "in",
+          "values": "2591,73, 4063,44",
           "year": 2025
         }
       ]
