@@ -125,6 +125,10 @@ class FilterCondition(models.Model):
         ('in', 'В списке (IN)'),
         ('like', 'Похож на (LIKE)'),
         ('not_like', 'Не содержит (NOT LIKE)'),
+        ('>', 'Больше (>)'),
+        ('<', 'Меньше (<)'),
+        ('>=', 'Больше или равно (>=)'),
+        ('<=', 'Меньше или равно (<=)'),
     ]
 
     group = models.ForeignKey(GroupIndicators, on_delete=models.CASCADE, related_name="filters")
@@ -613,6 +617,8 @@ class UnifiedFilterCondition(models.Model):
         ('not_like', 'Не содержит (NOT LIKE)'),
         ('<', 'Меньше (<)'),
         ('>', 'Больше (>)'),
+        ('<=', 'Меньше или равно (<=)'),
+        ('>=', 'Больше или равно (>=)'),
     ]
     OPERATOR_CHOICES = [
         ('AND', 'И'),

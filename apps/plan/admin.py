@@ -345,13 +345,34 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
 
     def _export_plans_to_excel(self, year):
         """Генерирует Excel файл с планами для указанного года"""
-        # Получаем все AnnualPlan для года
-        annual_plans = AnnualPlan.objects.filter(year=year).select_related('group').prefetch_related('monthly_plans')
+        # Получаем все AnnualPlan для года с сортировкой по иерархии
+        annual_plans = AnnualPlan.objects.filter(
+            year=year
+        ).select_related('group', 'group__parent', 'group__parent__parent').prefetch_related('monthly_plans')
+        
+        # Сортируем по иерархии: строим кортеж из имен на каждом уровне
+        def get_sort_key(annual_plan):
+            group = annual_plan.group
+            # Строим список всех предков от корня до текущей группы
+            path_names = []
+            current = group
+            while current:
+                path_names.insert(0, current.name)
+                current = current.parent
+            
+            # Дополняем до максимального уровня (10) пустыми строками для правильной сортировки
+            # Пустая строка будет идти после всех непустых строк при сортировке
+            max_levels = 10
+            sort_key = tuple(path_names + [''] * (max_levels - len(path_names)))
+            return sort_key
+        
+        # Сортируем annual_plans по иерархии
+        sorted_annual_plans = sorted(annual_plans, key=get_sort_key)
         
         # Создаем список строк для экспорта
         rows = []
         
-        for annual_plan in annual_plans:
+        for annual_plan in sorted_annual_plans:
             group = annual_plan.group
             # Получаем иерархию группы
             hierarchy = group.get_hierarchy_display()
@@ -359,7 +380,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
             # Получаем месячные планы
             monthly_plans = annual_plan.monthly_plans.all().order_by('month')
             
-            # Строка с объемами (quantity)
+            # Строка с объемами (quantity) - всегда первой
             quantity_row = {
                 'Показатель': f'{hierarchy} - Объемы',
                 'external_id': group.external_id or '',
@@ -369,7 +390,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
                 mp = monthly_plans.filter(month=month).first()
                 quantity_row[f'{month}'] = mp.quantity if mp else 0
             
-            # Строка с финансами (amount)
+            # Строка с финансами (amount) - всегда второй
             amount_row = {
                 'Показатель': f'{hierarchy} - Финансы',
                 'external_id': group.external_id or '',
@@ -379,6 +400,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
                 mp = monthly_plans.filter(month=month).first()
                 amount_row[f'{month}'] = float(mp.amount) if mp else 0.0
             
+            # Добавляем сначала Объемы, потом Финансы
             rows.append(quantity_row)
             rows.append(amount_row)
         

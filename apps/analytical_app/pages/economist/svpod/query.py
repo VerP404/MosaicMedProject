@@ -31,6 +31,8 @@ def get_filter_conditions(group_ids, year):
             filter_clauses.append(f"{field_name} LIKE {values}")
         elif filter_type == 'not_like':
             filter_clauses.append(f"{field_name} NOT LIKE {values}")
+        elif filter_type in ('>', '<', '>=', '<='):
+            filter_clauses.append(f"{field_name} {filter_type} {values}")
 
     return " AND ".join(filter_clauses)
 

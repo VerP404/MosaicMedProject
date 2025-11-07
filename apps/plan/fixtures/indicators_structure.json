@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2025-11-06 13:55:35.358363",
+  "export_date": "2025-11-07 13:12:38.261413",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -102,7 +102,7 @@
         {
           "field_name": "goal",
           "filter_type": "in",
-          "values": "'1','5','7','9','10','64','640','ДВ4','ОПВ','ДР1','ПН1','ДС2'",
+          "values": "'1','5','7','9','10','14','113','64','640','ДВ4','ОПВ','ДР1','ПН1','ДС2'",
           "year": 2025
         }
       ]
@@ -414,6 +414,21 @@
       ]
     },
     {
+      "external_id": "2433760d-5a85-4c77-af59-b6dbd67289ce",
+      "name": "Посещения",
+      "level": 2,
+      "is_distributable": false,
+      "parent_external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'1','5','7','9','10','14','32','64'",
+          "year": 2025
+        }
+      ]
+    },
+    {
       "external_id": "52702b6a-fec1-4a5c-8ff9-961cf7c897c3",
       "name": "Неотложка на дому",
       "level": 3,
@@ -510,7 +525,7 @@
         {
           "field_name": "goal",
           "filter_type": "in",
-          "values": "'64','640'",
+          "values": "'64'",
           "year": 2025
         }
       ]
@@ -796,6 +811,21 @@
           "field_name": "main_diagnosis_code",
           "filter_type": "like",
           "values": "'J4%'",
+          "year": 2025
+        }
+      ]
+    },
+    {
+      "external_id": "9822f95e-74db-4661-a8a8-1f12554fea9f",
+      "name": "Гериатрия повторные",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'640'",
           "year": 2025
         }
       ]
