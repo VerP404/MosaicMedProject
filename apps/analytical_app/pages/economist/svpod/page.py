@@ -385,6 +385,15 @@ indicators_tab = html.Div(
                             dbc.Row(
                                 [
                                     dbc.Col(filter_status(type_page_indicators), width=6),
+                                    dbc.Col(
+                                        dbc.Switch(
+                                            id=f'show-plan-{type_page_indicators}',
+                                            label="Показывать план",
+                                            value=False,
+                                            style={'margin-top': '8px'}
+                                        ),
+                                        width=6
+                                    ),
                                 ]
                             ),
                             dbc.Row(
@@ -1588,12 +1597,13 @@ def update_selected_period_list_indicators(selected_months_range, selected_year,
      State(f'status-selection-mode-{type_page_indicators}', 'value'),
      State(f'status-group-radio-{type_page_indicators}', 'value'),
      State(f'status-individual-dropdown-{type_page_indicators}', 'value'),
+     State(f'show-plan-{type_page_indicators}', 'value'),
      ]
 )
 def update_table_indicators(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
                  amount_null, building_ids, department_ids, start_date_input, end_date_input,
                  start_date_treatment, end_date_treatment, report_type,
-                 status_mode, selected_status_group, selected_individual_statuses):
+                 status_mode, selected_status_group, selected_individual_statuses, show_plan):
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
@@ -1665,8 +1675,8 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
         start_time = time.time()
         columns1, data1 = TableUpdater.query_to_df(engine, sql_query)
         
-        # Добавляем расчет нарастающего плана для каждой группы
-        if data1:
+        # Добавляем расчет нарастающего плана для каждой группы (только если show_plan включен)
+        if data1 and show_plan:
             # Получаем список месяцев
             months_list = list(range(selected_period[0], selected_period[1] + 1))
             
@@ -1739,6 +1749,22 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
                 new_columns.append({'name': 'План (сумма)', 'id': 'План (сумма)'})
             
             columns1 = new_columns
+        elif data1 and not show_plan:
+            # Если план не показываем, удаляем колонки плана из таблицы
+            new_columns = []
+            for col in columns1:
+                col_id = col.get('id', '')
+                # Пропускаем колонки плана
+                if col_id not in ['План 1/12 (количество)', 'План 1/12 (сумма)', 'План (количество)', 'План (сумма)']:
+                    new_columns.append(col)
+            columns1 = new_columns
+            
+            # Удаляем данные плана из строк
+            for row in data1:
+                row.pop('План 1/12 (количество)', None)
+                row.pop('План 1/12 (сумма)', None)
+                row.pop('План (количество)', None)
+                row.pop('План (сумма)', None)
         
         execution_time = time.time() - start_time
 
