@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2025-11-07 14:49:42.324200",
+  "export_date": "2025-11-10 16:36:38.976782",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -1014,6 +1014,36 @@
       ]
     },
     {
+      "external_id": "7b50e41a-2836-46eb-9969-464a3ada25fa",
+      "name": "ЦЗ - 114",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'114'",
+          "year": 2025
+        }
+      ]
+    },
+    {
+      "external_id": "eab5215f-9793-4838-b1fe-84e591354172",
+      "name": "ЦЗ - 115",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'115'",
+          "year": 2025
+        }
+      ]
+    },
+    {
       "external_id": "dfddba0c-3050-4fc6-a681-9d7c3a8a5287",
       "name": "Репродуктивное - ДР1 (М)",
       "level": 4,
@@ -1084,15 +1114,15 @@
       "parent_external_id": "08f2a841-fc6e-4aff-a65c-216f0d85f5c5",
       "filters": [
         {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДР1'",
-          "year": 2025
-        },
-        {
           "field_name": "gender",
           "filter_type": "exact",
           "values": "'Ж'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДР2'",
           "year": 2025
         }
       ]
