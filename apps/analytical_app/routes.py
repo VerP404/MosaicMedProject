@@ -14,6 +14,7 @@ from apps.analytical_app.pages.economist.svpod.page import economist_sv_pod
 from apps.analytical_app.pages.economist.dispensary.page import economist_dispensary_analysis
 from apps.analytical_app.pages.economist.financial_indicators.page import layout
 from apps.analytical_app.pages.economist.goal_groups_report.page import economist_goal_groups_report_def
+from apps.analytical_app.pages.economist.gis_oms.page import economist_gis_oms_def
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
@@ -107,6 +108,13 @@ routes = {
             {"label": "Факт по корпусам и целям помесячно", "active": True},
         ]),
         economist_goal_groups_report_def()
+    ]),
+    "/economist/gis_oms": lambda: html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "для ГИС ОМС", "active": True},
+        ]),
+        economist_gis_oms_def()
     ]),
 
     "/statistic": statistic_main,
