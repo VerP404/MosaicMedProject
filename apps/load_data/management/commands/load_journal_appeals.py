@@ -161,6 +161,27 @@ class Command(BaseCommand):
             rows: List[List[str]] = [row_to_values(r) for r in rows_raw]
             log(f"CSV прочитан, строк: {len(rows_raw)} | {time.time() - t0:.2f}s")
 
+            # Дедупликация по ключу конфликта (enp, employee_last_name, acceptance_date)
+            # Оставляем последнюю запись для каждого уникального ключа
+            enp_idx = columns.index("enp")
+            employee_last_name_idx = columns.index("employee_last_name")
+            acceptance_date_idx = columns.index("acceptance_date")
+            
+            seen_keys = {}
+            deduplicated_rows = []
+            for row in rows:
+                key = (
+                    row[enp_idx] or '-',
+                    row[employee_last_name_idx] or '-',
+                    row[acceptance_date_idx] or '-'
+                )
+                seen_keys[key] = row
+            
+            deduplicated_rows = list(seen_keys.values())
+            if len(deduplicated_rows) < len(rows):
+                log(f"Дедупликация: {len(rows)} -> {len(deduplicated_rows)} строк (удалено {len(rows) - len(deduplicated_rows)} дубликатов)")
+            rows = deduplicated_rows
+
         except FileNotFoundError as e:
             raise CommandError(str(e))
 
