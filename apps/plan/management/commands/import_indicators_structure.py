@@ -65,6 +65,27 @@ class Command(BaseCommand):
         if dry_run:
             self.stdout.write(self.style.WARNING('Режим проверки (dry-run). Изменения не будут сохранены.'))
 
+        # Информация о безопасности данных
+        self.stdout.write('')
+        self.stdout.write(
+            self.style.SUCCESS(
+                '✓ БЕЗОПАСНОСТЬ: Показатели (AnnualPlan) и планы НЕ будут удалены при обновлении фильтров.'
+            )
+        )
+        self.stdout.write(
+            self.style.SUCCESS(
+                '✓ Обновляются только условия фильтрации (FilterCondition) для указанных годов.'
+            )
+        )
+        if delete_missing:
+            self.stdout.write('')
+            self.stdout.write(
+                self.style.ERROR(
+                    '⚠️  ВНИМАНИЕ: Используется флаг --delete-missing. Группы, отсутствующие в файле, будут УДАЛЕНЫ вместе со всеми показателями!'
+                )
+            )
+        self.stdout.write('')
+
         # Загружаем структуру из файла
         with open(input_file, 'r', encoding='utf-8') as f:
             structure = json.load(f)
@@ -286,62 +307,84 @@ class Command(BaseCommand):
                             group = new_group
                         
                         if group and not dry_run:
-                            # Подсчитываем, сколько фильтров будет удалено/создано
-                            filters_to_delete = []
-                            filters_to_create = []
+                            # Проверяем, что у группы есть планы (показатели) - они НЕ будут удалены
+                            annual_plans_count = group.annual_plans.count()
                             
+                            # Собираем все годы из импортируемых фильтров
+                            import_years = set()
                             for filter_data in group_data['filters']:
                                 filter_year = filter_data.get('year', datetime.now().year)
-                                
-                                # Подсчитываем, сколько фильтров будет удалено
-                                deleted_count = FilterCondition.objects.filter(
-                                    group=group,
-                                    field_name=filter_data['field_name'],
-                                    filter_type=filter_data['filter_type'],
-                                    year=filter_year
-                                ).count()
-                                
-                                if deleted_count > 0:
-                                    filters_to_delete.append({
-                                        'field': filter_data['field_name'],
-                                        'type': filter_data['filter_type'],
-                                        'year': filter_year,
-                                        'count': deleted_count
-                                    })
-                                
-                                filters_to_create.append({
-                                    'field': filter_data['field_name'],
-                                    'type': filter_data['filter_type'],
-                                    'year': filter_year
-                                })
-                                
-                                # Удаляем только те фильтры, которые точно соответствуют импортируемым
-                                # (учитывая group, field_name, filter_type, year)
-                                # Это устраняет дубликаты, но сохраняет фильтры для других годов
-                                FilterCondition.objects.filter(
-                                    group=group,
-                                    field_name=filter_data['field_name'],
-                                    filter_type=filter_data['filter_type'],
-                                    year=filter_year
-                                ).delete()
-                                
-                                # Создаем новую запись из импорта
+                                import_years.add(filter_year)
+                            
+                            # Получаем все существующие фильтры для группы и импортируемых годов
+                            existing_filters = FilterCondition.objects.filter(
+                                group=group,
+                                year__in=import_years
+                            )
+                            
+                            # Создаем множество ключей существующих фильтров для быстрого сравнения
+                            # Ключ: (field_name, filter_type, year, values)
+                            existing_keys = set()
+                            existing_by_key = {}
+                            for f in existing_filters:
+                                key = (f.field_name, f.filter_type, f.year, f.values)
+                                existing_keys.add(key)
+                                existing_by_key[key] = f
+                            
+                            # Создаем множество ключей импортируемых фильтров
+                            import_keys = set()
+                            import_by_key = {}
+                            for filter_data in group_data['filters']:
+                                filter_year = filter_data.get('year', datetime.now().year)
+                                key = (
+                                    filter_data['field_name'],
+                                    filter_data['filter_type'],
+                                    filter_year,
+                                    filter_data['values']
+                                )
+                                import_keys.add(key)
+                                import_by_key[key] = filter_data
+                            
+                            # Определяем, что нужно удалить и создать
+                            # Фильтры с одинаковыми ключами (field_name, filter_type, year, values) не трогаем
+                            to_delete = existing_keys - import_keys  # Есть в базе, но нет в импорте
+                            to_create = import_keys - existing_keys  # Есть в импорте, но нет в базе
+                            unchanged = existing_keys & import_keys  # Есть и там, и там - не трогаем
+                            
+                            # Удаляем фильтры, которых нет в импорте
+                            deleted_count = 0
+                            for key in to_delete:
+                                existing_by_key[key].delete()
+                                deleted_count += 1
+                            
+                            # Создаем новые фильтры
+                            created_count = 0
+                            for key in to_create:
+                                filter_data = import_by_key[key]
                                 FilterCondition.objects.create(
                                     group=group,
                                     field_name=filter_data['field_name'],
                                     filter_type=filter_data['filter_type'],
-                                    year=filter_year,
+                                    year=filter_data.get('year', datetime.now().year),
                                     values=filter_data['values'],
                                 )
+                                created_count += 1
                             
                             # Показываем информацию о фильтрах
-                            if filters_to_delete:
-                                total_deleted = sum(f['count'] for f in filters_to_delete)
-                                years = set(f['year'] for f in filters_to_delete)
+                            if deleted_count > 0 or created_count > 0:
+                                info_parts = []
+                                if deleted_count > 0:
+                                    info_parts.append(f'удалено {deleted_count}')
+                                if created_count > 0:
+                                    info_parts.append(f'создано {created_count}')
+                                if unchanged:
+                                    info_parts.append(f'без изменений {len(unchanged)}')
+                                if annual_plans_count > 0:
+                                    info_parts.append(f'показатели сохранены ({annual_plans_count} год. планов)')
                                 self.stdout.write(
                                     self.style.WARNING(
-                                        f'    → Фильтры для {", ".join(map(str, years))} года: '
-                                        f'удалено {total_deleted}, создано {len(filters_to_create)}'
+                                        f'    → Фильтры для {", ".join(map(str, sorted(import_years)))} года: '
+                                        f'{", ".join(info_parts)}'
                                     )
                                 )
 
