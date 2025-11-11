@@ -274,8 +274,17 @@ class Command(BaseCommand):
                         )
 
                     # Импортируем фильтры, если они есть
+                    # Фильтры обновляем всегда, если группа существует (даже если группа не обновляется)
                     if 'filters' in group_data:
-                        group = existing_group if existing_group else (new_group if not dry_run else None)
+                        # Определяем группу для обновления фильтров
+                        group = None
+                        if existing_group:
+                            # Для существующей группы фильтры обновляем всегда
+                            group = existing_group
+                        elif not dry_run:
+                            # Для новой группы фильтры обновляем всегда (если не dry-run)
+                            group = new_group
+                        
                         if group and not dry_run:
                             # Подсчитываем, сколько фильтров будет удалено/создано
                             filters_to_delete = []
