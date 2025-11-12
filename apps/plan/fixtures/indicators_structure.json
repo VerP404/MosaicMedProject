@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2025-11-11 15:56:17.420883",
+  "export_date": "2025-11-12 10:02:49.166587",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -92,7 +92,7 @@
         },
         {
           "field_name": "ksg",
-          "filter_type": "like",
+          "filter_type": "not_like",
           "values": "'ds37%'",
           "year": 2025
         }
