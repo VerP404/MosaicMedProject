@@ -777,6 +777,34 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
     # Создаем список для объединенных запросов
     union_queries = []
 
+    # Формируем дополнительные фильтры на основе параметров
+    # Если sanction='3' (Все), то фильтр по санкциям не применяется
+    # Для статуса 4 также не применяем фильтр по санкциям
+    additional_filters = []
+    
+    # Фильтр по inogorodniy (только если не "Все")
+    if inogorod == '1':
+        additional_filters.append("inogorodniy = false")
+    elif inogorod == '2':
+        additional_filters.append("inogorodniy = true")
+    
+    # Фильтр по санкциям (только если не "Все" и не статус 4)
+    if sanction == '1':
+        # Без санкций, но для статуса 4 не применяем
+        additional_filters.append("(status = '4' OR sanctions IN ('-', '0'))")
+    elif sanction == '2':
+        # С санкциями, но для статуса 4 не применяем
+        additional_filters.append("(status = '4' OR sanctions NOT IN ('-', '0'))")
+    # Если sanction == '3' (Все), фильтр не добавляем
+    
+    # Фильтр по amount_null
+    if amount_null == '1':
+        additional_filters.append("amount_numeric != '0'")
+    elif amount_null == '2':
+        additional_filters.append("amount_numeric = '0'")
+    
+    additional_where = " AND " + " AND ".join(additional_filters) if additional_filters else ""
+    
     # Создаем запросы для каждой группы
     for condition_type, where_clause, operator in dynamic_conditions:
         # Экранируем одинарные кавычки для SQL
@@ -799,9 +827,7 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
                    '{escaped_filter_description}' AS "Условия фильтра"
             FROM oms
             WHERE {where_clause}
-            AND inogorodniy = false
-            AND sanctions IN ('-', '0')
-            AND amount_numeric != '0'
+            {additional_where}
         """
         union_queries.append(union_query)
 
@@ -859,18 +885,25 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
     
     if inogorod == '1':
         inogorodniy_filter = f"AND inogorodniy = false"
-    if inogorod == '2':
+    elif inogorod == '2':
         inogorodniy_filter = f"AND inogorodniy = true"
+    # Если inogorod == '3' (Все), фильтр не применяется
     
+    # Фильтр по санкциям: если sanction='3' (Все), фильтр не применяется
+    # Для статуса 4 также не применяем фильтр по санкциям
     if sanction == '1':
-        sanction_filter = f"AND sanctions IN ('-', '0')"
-    if sanction == '2':
-        sanction_filter = f"AND sanctions NOT IN ('-', '0')"
+        # Без санкций, но для статуса 4 не применяем
+        sanction_filter = f"AND (status = '4' OR sanctions IN ('-', '0'))"
+    elif sanction == '2':
+        # С санкциями, но для статуса 4 не применяем
+        sanction_filter = f"AND (status = '4' OR sanctions NOT IN ('-', '0'))"
+    # Если sanction == '3' (Все), фильтр не добавляем
     
     if amount_null == '1':
         amount_null_filter = f"AND amount_numeric != '0'"
-    if amount_null == '2':
+    elif amount_null == '2':
         amount_null_filter = f"AND amount_numeric = '0'"
+    # Если amount_null == '3' (Все), фильтр не применяется
     
     if treatment_start and treatment_end:
         treatment = (f"AND to_date(treatment_end, 'DD-MM-YYYY') BETWEEN to_date('{treatment_start}', "
