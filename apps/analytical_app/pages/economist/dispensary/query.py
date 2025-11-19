@@ -72,7 +72,7 @@ def sql_query_detailed_dispensary(
         d.talon_type,
         d.gender,
         d.service_name,
-        dep.department,
+        t.department,
         d.doctor_services_code,
         CONCAT(
             doc.last_name, ' ',
@@ -87,6 +87,8 @@ def sql_query_detailed_dispensary(
         load_data_detailed_medical_examination d
         LEFT JOIN data_loader_doctordata doc
             ON d.doctor_services_code = doc.doctor_code
+        LEFT JOIN load_data_talons t
+            ON d.talon_number = t.talon
         LEFT JOIN load_data_emd e
             ON d.talon_number = (
                 SELECT o.talon
@@ -94,8 +96,6 @@ def sql_query_detailed_dispensary(
                 WHERE o.id = e.talon_id
                 LIMIT 1
             )
-        LEFT JOIN load_data_doctor dep
-            ON d.doctor_services_code = dep.doctor_code
     WHERE
         d.service_status = 'Да'
         AND d.talon_number IN (
