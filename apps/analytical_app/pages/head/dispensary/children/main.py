@@ -36,6 +36,12 @@ cards_row_1 = dbc.Row(
                         "Уникальные дети в талонах диспансеризации детей"),
             className="d-flex"
         ),
+        dbc.Col(
+            create_card(5, type_page,
+                        "Записаны, но нет ПН1",
+                        "Журнал записей vs ПН1 для детей 0–17 лет"),
+            className="d-flex"
+        ),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
@@ -54,7 +60,7 @@ head_children_dd_main = html.Div([
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 5)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 6)],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -69,7 +75,8 @@ def navigate_pages(*n_clicks):
         1: f"/{main_link}/pn1",
         2: f"/{main_link}/pn2",
         3: f"/{main_link}/pn3",
-        4: f"/{main_link}/pn4"
+        4: f"/{main_link}/pn4",
+        5: f"/{main_link}/pn5",
     }
     
     return route_map[report_num]
