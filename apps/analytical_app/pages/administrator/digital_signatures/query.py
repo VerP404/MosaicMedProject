@@ -81,6 +81,14 @@ def sql_query_digital_signatures(
                 WHEN ds.valid_to <= CURRENT_DATE + INTERVAL '60 days' THEN 'expiring_60'
                 ELSE 'active'
             END as status,
+            CASE
+                WHEN ds.scan IS NULL AND ds.application_date IS NULL THEN 'no_actions'
+                WHEN ds.scan IS NOT NULL AND ds.application_date IS NULL THEN 'notification_uploaded'
+                WHEN ds.application_date IS NOT NULL AND (ds.valid_from IS NULL OR ds.valid_to IS NULL) THEN 'application_created'
+                WHEN ds.valid_from IS NOT NULL AND ds.valid_to IS NOT NULL AND ds.valid_from > CURRENT_DATE THEN 'new_certificate_ready'
+                WHEN ds.valid_from IS NOT NULL AND ds.valid_to IS NOT NULL AND ds.valid_to >= CURRENT_DATE THEN 'active_certificate'
+                ELSE 'no_actions'
+            END as process_status,
             CASE 
                 WHEN ds.valid_to IS NOT NULL THEN 
                     (ds.valid_to - CURRENT_DATE)::INTEGER
@@ -144,6 +152,7 @@ def sql_query_digital_signatures(
         position_code,
         position_id,
         status,
+        process_status,
         days_until_expiration,
         signature_rank,
         is_replaced

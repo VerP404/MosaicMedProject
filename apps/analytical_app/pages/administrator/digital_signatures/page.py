@@ -53,9 +53,9 @@ def layout():
                         )
                     ], width=4),
                     
-                    # Фильтр по статусу
+                    # Фильтр по статусу срока действия
                     dbc.Col([
-                        html.Label("Фильтр по статусу:", className="fw-bold"),
+                        html.Label("Фильтр по сроку:", className="fw-bold"),
                         dcc.Dropdown(
                             id=f'dropdown-status-filter-{type_page}',
                             options=[
@@ -71,7 +71,26 @@ def layout():
                             clearable=False,
                             className="mt-2"
                         )
-                    ], width=4),
+                    ], width=3),
+
+                    # Фильтр по процессу получения ЭЦП
+                    dbc.Col([
+                        html.Label("Этап процесса:", className="fw-bold"),
+                        dcc.Dropdown(
+                            id=f'dropdown-process-filter-{type_page}',
+                            options=[
+                                {'label': 'Все', 'value': 'all'},
+                                {'label': 'Нет действий', 'value': 'no_actions'},
+                                {'label': 'Уведомление загружено', 'value': 'notification_uploaded'},
+                                {'label': 'Заявление создано', 'value': 'application_created'},
+                                {'label': 'Новая ЭЦП готова', 'value': 'new_certificate_ready'},
+                                {'label': 'ЭЦП действует', 'value': 'active_certificate'},
+                            ],
+                            value='all',
+                            clearable=False,
+                            className="mt-2"
+                        )
+                    ], width=3),
                     
                     # Кнопка обновления
                     dbc.Col([
@@ -140,6 +159,8 @@ def layout():
                         {'if': {'column_id': 'valid_to'}, 'width': '8%'},
                         {'if': {'column_id': 'days_until_expiration'}, 'width': '8%'},
                         {'if': {'column_id': 'status'}, 'width': '10%'},
+                        {'if': {'column_id': 'process_status_display'}, 'width': '12%'},
+                        {'if': {'column_id': 'has_scan'}, 'width': '8%'},
                         {'if': {'column_id': 'action'}, 'width': '8%'},
                     ],
                     markdown_options={"link_target": "_blank"}
@@ -156,10 +177,11 @@ def layout():
     [
         State(f'switch-working-only-{type_page}', 'value'),
         State(f'radio-show-mode-{type_page}', 'value'),
-        State(f'dropdown-status-filter-{type_page}', 'value')
+        State(f'dropdown-status-filter-{type_page}', 'value'),
+        State(f'dropdown-process-filter-{type_page}', 'value')
     ]
 )
-def update_stats(n_clicks, show_working_only, show_mode, status_filter):
+def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_filter):
     if not n_clicks:
         return html.Div("Нажмите 'Обновить' для загрузки статистики", className="text-muted")
     
@@ -177,6 +199,25 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter):
         
         if not data:
             return html.Div("Нет данных для отображения", className="text-muted")
+
+        # Фильтры
+        if status_filter != 'all':
+            if status_filter == 'expiring_60':
+                data = [row for row in data if row.get('status') in ['expiring_60', 'expiring_30', 'expiring_7']]
+            elif status_filter == 'expiring_30':
+                data = [row for row in data if row.get('status') in ['expiring_30', 'expiring_7']]
+            elif status_filter == 'expiring_7':
+                data = [row for row in data if row.get('status') == 'expiring_7']
+            elif status_filter == 'expired':
+                data = [row for row in data if row.get('status') == 'expired']
+            elif status_filter == 'revoked':
+                data = [row for row in data if row.get('status') == 'revoked']
+
+        if process_filter != 'all':
+            data = [row for row in data if row.get('process_status') == process_filter]
+
+        if not data:
+            return html.Div("Нет данных с выбранными фильтрами", className="text-muted")
         
         # Подсчитываем статистику
         total = len(data)
@@ -201,6 +242,18 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter):
             row.get('person_id') for row in data 
             if row.get('status') in ['expiring_60', 'expiring_30', 'expiring_7'] and row.get('person_id')
         ))
+
+        process_counts = {
+            'no_actions': 0,
+            'notification_uploaded': 0,
+            'application_created': 0,
+            'new_certificate_ready': 0,
+            'active_certificate': 0,
+        }
+        for row in data:
+            ps = row.get('process_status')
+            if ps in process_counts:
+                process_counts[ps] += 1
         
         # Формируем карточки статистики
         stats_cards = dbc.Row([
@@ -261,6 +314,49 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter):
                 ], className="text-center")
             ], width=2),
         ], className="g-3")
+
+        process_cards = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H4(process_counts['no_actions'], className="text-secondary mb-1"),
+                        html.P("Нет действий", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                    ])
+                ], className="text-center")
+            ], width=2),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H4(process_counts['notification_uploaded'], className="text-warning mb-1"),
+                        html.P("Уведомление", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                    ])
+                ], className="text-center")
+            ], width=2),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H4(process_counts['application_created'], className="text-warning mb-1"),
+                        html.P("Заявление", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                    ])
+                ], className="text-center")
+            ], width=2),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H4(process_counts['new_certificate_ready'], className="text-success mb-1"),
+                        html.P("Новая ЭЦП готова", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                    ])
+                ], className="text-center")
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H4(process_counts['active_certificate'], className="text-success mb-1"),
+                        html.P("ЭЦП действует", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                    ])
+                ], className="text-center")
+            ], width=3),
+        ], className="g-3 mt-2")
         
         # Дополнительная информация
         additional_info = dbc.Row([
@@ -273,7 +369,7 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter):
             ], width=12)
         ], className="mt-3")
         
-        return html.Div([stats_cards, additional_info])
+        return html.Div([stats_cards, process_cards, additional_info])
         
     except Exception as e:
         print(f"Ошибка при обновлении статистики: {str(e)}")
@@ -293,10 +389,11 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter):
     [
         State(f'switch-working-only-{type_page}', 'value'),
         State(f'radio-show-mode-{type_page}', 'value'),
-        State(f'dropdown-status-filter-{type_page}', 'value')
+        State(f'dropdown-status-filter-{type_page}', 'value'),
+        State(f'dropdown-process-filter-{type_page}', 'value')
     ]
 )
-def update_table(n_clicks, show_working_only, show_mode, status_filter):
+def update_table(n_clicks, show_working_only, show_mode, status_filter, process_filter):
     if not n_clicks:
         return [], [], []
     
@@ -331,6 +428,10 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter):
             data = [row for row in data if row.get('status') == 'active']
         elif status_filter == 'revoked':
             data = [row for row in data if row.get('status') == 'revoked']
+
+        # Фильтрация по процессу
+        if process_filter != 'all':
+            data = [row for row in data if row.get('process_status') == process_filter]
         
         # Форматируем колонки
         formatted_columns = [
@@ -338,9 +439,6 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter):
             {'name': 'СНИЛС', 'id': 'snils'},
             {'name': 'ИНН', 'id': 'inn'},
             {'name': 'Телефон', 'id': 'phone_number'},
-            {'name': 'Email', 'id': 'email'},
-            {'name': 'Телеграм', 'id': 'telegram'},
-            {'name': 'Серийный номер', 'id': 'certificate_serial'},
             {'name': 'Должность', 'id': 'position_name'},
             {'name': 'Действует с', 'id': 'valid_from'},
             {'name': 'Действует по', 'id': 'valid_to'},
@@ -348,8 +446,9 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter):
             {'name': 'Статус', 'id': 'status'},
             {'name': 'Дата выдачи', 'id': 'issued_date'},
             {'name': 'Дата аннулирования', 'id': 'revoked_date'},
+            {'name': 'Файл выписки', 'id': 'has_scan'},
+            {'name': 'Статус процессов', 'id': 'process_status_display'},
             {'name': 'Действие', 'id': 'action', 'presentation': 'markdown'},
-            {'name': 'Создать ЭЦП', 'id': 'create_action', 'presentation': 'markdown'},
         ]
         
         # Преобразуем is_replaced в строку для filter_query
@@ -357,25 +456,28 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter):
             if 'is_replaced' in row:
                 row['is_replaced'] = 'true' if row['is_replaced'] else 'false'
             
-            # Добавляем ссылку на редактирование в админке
+            # Добавляем ссылки на редактирование и создание новой ЭЦП
             signature_id = row.get('id')
             person_id = row.get('person_id')
+            
+            action_links = []
+            
+            # Ссылка на редактирование существующей ЭЦП
             if signature_id:
                 admin_url = f"http://10.136.29.166:8000/admin/personnel/digitalsignature/{signature_id}/change/"
-                row['action'] = f"[Открыть]({admin_url})"
-            else:
-                row['action'] = ""
+                action_links.append(f"[Открыть]({admin_url})")
             
-            # Добавляем ссылку на создание новой ЭЦП для сотрудника
+            # Ссылка на создание новой ЭЦП для сотрудника
             if person_id:
                 position_id = row.get('position_id')
                 if position_id:
                     create_url = f"http://10.136.29.166:8000/admin/personnel/digitalsignature/add/?person={person_id}&position={position_id}"
                 else:
                     create_url = f"http://10.136.29.166:8000/admin/personnel/digitalsignature/add/?person={person_id}"
-                row['create_action'] = f"[Создать ЭЦП]({create_url})"
-            else:
-                row['create_action'] = ""
+                action_links.append(f"[Создать]({create_url})")
+            
+            # Объединяем ссылки с переносом строки (двойной перенос для markdown)
+            row['action'] = "  \n".join(action_links) if action_links else ""
         
         # Форматируем даты
         for row in data:
@@ -402,9 +504,27 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter):
             'no_end_date': 'Без даты окончания'
         }
         
+        process_status_labels = {
+            'no_actions': 'Нет действий',
+            'notification_uploaded': 'Уведомление загружено',
+            'application_created': 'Заявление создано',
+            'new_certificate_ready': 'Новая ЭЦП готова',
+            'active_certificate': 'ЭЦП действует',
+        }
+
         for row in data:
             status = row.get('status', '')
             row['status'] = status_labels.get(status, status)
+            
+            # Добавляем индикатор наличия файла выписки
+            scan = row.get('scan')
+            if scan:
+                row['has_scan'] = '✓ Есть'
+            else:
+                row['has_scan'] = '✗ Нет'
+
+            # Читаемый статус процесса
+            row['process_status_display'] = process_status_labels.get(row.get('process_status'), 'Нет действий')
         
         # Условное форматирование строк
         style_data_conditional = []
@@ -414,6 +534,26 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter):
         style_data_conditional.append({
             'if': {
                 'filter_query': '{status} = "Просрочена" || {days_until_expiration} < 0'
+            },
+            'backgroundColor': '#f8d7da',
+            'color': '#721c24'
+        })
+        
+        # Выделение наличия файла выписки
+        style_data_conditional.append({
+            'if': {
+                'filter_query': '{has_scan} = "✓ Есть"',
+                'column_id': 'has_scan'
+            },
+            'backgroundColor': '#d4edda',
+            'color': '#155724',
+            'fontWeight': 'bold'
+        })
+        
+        style_data_conditional.append({
+            'if': {
+                'filter_query': '{has_scan} = "✗ Нет"',
+                'column_id': 'has_scan'
             },
             'backgroundColor': '#f8d7da',
             'color': '#721c24'
@@ -455,6 +595,25 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter):
                 'backgroundColor': '#cfe2ff',
                 'color': '#084298'
             })
+
+        # Цвета по статусу процесса
+        style_data_conditional.extend([
+            {
+                'if': {'filter_query': '{process_status_display} = "Уведомление загружено"', 'column_id': 'process_status_display'},
+                'backgroundColor': '#fff3cd',
+                'color': '#856404'
+            },
+            {
+                'if': {'filter_query': '{process_status_display} = "Заявление создано"', 'column_id': 'process_status_display'},
+                'backgroundColor': '#ffe8a1',
+                'color': '#7a5200'
+            },
+            {
+                'if': {'filter_query': '{process_status_display} = "Новая ЭЦП готова"', 'column_id': 'process_status_display'},
+                'backgroundColor': '#d4edda',
+                'color': '#155724'
+            }
+        ])
         
         return formatted_columns, data, style_data_conditional
         
