@@ -524,7 +524,20 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
                 row['has_scan'] = '✗ Нет'
 
             # Читаемый статус процесса
-            row['process_status_display'] = process_status_labels.get(row.get('process_status'), 'Нет действий')
+            process_status = row.get('process_status')
+            process_display = process_status_labels.get(process_status, 'Нет действий')
+
+            if process_status == 'active_certificate':
+                if status == 'Заканчивается (≤7 дней)':
+                    process_display = 'ЭЦП истекает (≤7 дней)'
+                elif status == 'Заканчивается (≤30 дней)':
+                    process_display = 'ЭЦП истекает (≤30 дней)'
+                elif status == 'Заканчивается (≤60 дней)':
+                    process_display = 'ЭЦП истекает (≤60 дней)'
+                else:
+                    process_display = 'ЭЦП действует'
+
+            row['process_status_display'] = process_display
         
         # Условное форматирование строк
         style_data_conditional = []
