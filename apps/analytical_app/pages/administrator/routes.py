@@ -7,6 +7,7 @@ from apps.analytical_app.pages.administrator.main import admin_main
 from apps.analytical_app.pages.administrator.update_data.page import admin_update_data
 from apps.analytical_app.pages.administrator.sql_editor import sql_editor_layout
 from apps.analytical_app.pages.administrator.adverse_events import admin_adverse_events
+from apps.analytical_app.pages.administrator.digital_signatures.page import admin_digital_signatures
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
 
@@ -41,6 +42,14 @@ routes_administrator = {
             {"label": "Нежелательные события", "active": True},
         ]),
         admin_adverse_events
+    ]),
+    
+    "/admin/digital_signatures": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Администратор", "href": "/admin"},
+            {"label": "ЭЦП", "active": True},
+        ]),
+        admin_digital_signatures
     ]),
 
     "/admin/disp_by_ages": html.Div([

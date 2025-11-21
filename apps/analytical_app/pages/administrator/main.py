@@ -34,6 +34,9 @@ cards_row_2 = dbc.Row(
         dbc.Col(create_card(5, type_page,
                             "Нежелательные события",
                             "Аналитика по нежелательным событиям.")),
+        dbc.Col(create_card(6, type_page,
+                            "ЭЦП",
+                            "Список электронных цифровых подписей с фильтрами и цветовой индикацией.")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
@@ -53,7 +56,7 @@ admin_main = html.Div([
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 6)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 7)],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -70,6 +73,7 @@ def navigate_pages(*n_clicks):
         3: f"/{main_link}/admin_update_data",
         4: f"/{main_link}/sql_editor",
         5: f"/{main_link}/adverse_events",
+        6: f"/{main_link}/digital_signatures",
     }
     
     return route_map[report_num]

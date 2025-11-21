@@ -40,3 +40,14 @@ class DigitalSignatureForm(forms.ModelForm):
 
 class DepartmentActionForm(forms.Form):
     department = forms.ModelChoiceField(queryset=Department.objects.all(), label="Выберите отделение")
+
+
+class ExpiringDigitalSignatureForm(forms.Form):
+    """Форма для выбора количества дней до истечения ЭЦП"""
+    days = forms.IntegerField(
+        label="Количество дней до истечения ЭЦП",
+        initial=30,
+        min_value=1,
+        max_value=365,
+        help_text="Укажите, за сколько дней до истечения ЭЦП нужно уведомить (по умолчанию 30 дней)"
+    )

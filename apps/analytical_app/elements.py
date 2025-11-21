@@ -14,7 +14,8 @@ def card_table(
     hidden_columns=None,
     show_sum_button=False,
     merge_duplicate_headers=False,
-    style_cell_conditional=None
+    style_cell_conditional=None,
+    markdown_options=None
 ):
     """
     Возвращает карточку с Dash DataTable.
@@ -55,6 +56,8 @@ def card_table(
         table_kwargs['hidden_columns'] = hidden_columns
     if style_cell_conditional is not None:
         table_kwargs['style_cell_conditional'] = style_cell_conditional
+    if markdown_options is not None:
+        table_kwargs['markdown_options'] = markdown_options
 
     sum_button_section = None
     if show_sum_button:

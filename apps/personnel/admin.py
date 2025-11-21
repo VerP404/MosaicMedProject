@@ -1,4 +1,6 @@
 import csv
+from datetime import date, timedelta
+from datetime import datetime
 
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
@@ -7,8 +9,13 @@ from django.urls import path, reverse
 from django.contrib import messages
 from django.utils.html import format_html
 from django.shortcuts import render, redirect
+from django.utils.translation import gettext_lazy as _
+from django.http import HttpRequest
 from import_export.admin import ImportExportModelAdmin
 from unfold.admin import TabularInline, ModelAdmin
+from unfold.decorators import action
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 from .forms import *
 from .models import *
@@ -503,6 +510,7 @@ class PersonAdmin(ModelAdmin):
     inlines = [DoctorRecordInline, StaffRecordInline, RG014Inline, DigitalSignatureInline, MaternityLeaveInline]
     filter_horizontal = ('telegram_groups',)
     list_per_page = 15
+    actions_list = ["export_expiring_digital_signatures"]
 
     def is_doctor_display(self, obj):
         qs = obj.doctor_records.all()
@@ -566,6 +574,220 @@ class PersonAdmin(ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
+
+    @action(
+        description=_("Экспорт сотрудников с истекающей ЭЦП"),
+        url_path="export-expiring-digital-signatures",
+        permissions=["export_expiring_digital_signatures"]
+    )
+    def export_expiring_digital_signatures(self, request: HttpRequest):
+        """Экспорт сотрудников с истекающей ЭЦП в Excel"""
+        if request.method == 'POST':
+            form = ExpiringDigitalSignatureForm(request.POST)
+            if form.is_valid():
+                days = form.cleaned_data['days']
+                return self._export_expiring_digital_signatures_to_excel(days)
+        else:
+            form = ExpiringDigitalSignatureForm(initial={'days': 30})
+
+        context = {
+            'form': form,
+            'title': 'Экспорт сотрудников с истекающей ЭЦП',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/personnel/export_expiring_digital_signatures.html', context)
+
+    def has_export_expiring_digital_signatures_permission(self, request: HttpRequest):
+        """Проверка прав на экспорт"""
+        return request.user.has_perm('personnel.export_expiring_digital_signatures') or request.user.is_superuser
+
+    def _export_expiring_digital_signatures_to_excel(self, days: int):
+        """Генерирует Excel файл с сотрудниками, у которых заканчивается ЭЦП"""
+        today = date.today()
+        expiration_date = today + timedelta(days=days)
+
+        # Получаем всех сотрудников, которые работают сейчас
+        # Проверяем через doctor_records и staff_records
+        working_persons = Person.objects.filter(
+            models.Q(
+                # Активные врачи
+                doctor_records__end_date__isnull=True
+            ) | models.Q(
+                doctor_records__end_date__gte=today
+            ) | models.Q(
+                # Активные сотрудники
+                staff_records__end_date__isnull=True
+            ) | models.Q(
+                staff_records__end_date__gte=today
+            )
+        ).distinct().prefetch_related('doctor_records', 'staff_records', 'digital_signatures')
+
+        # Собираем данные о сотрудниках с истекающей ЭЦП
+        results = []
+        for person in working_persons:
+            # Проверяем, работает ли сотрудник сейчас
+            is_doctor_active = False
+            is_staff_active = False
+            
+            # Проверяем статус врача
+            doctor_records = person.doctor_records.all()
+            if doctor_records.exists():
+                active_doctors = doctor_records.filter(
+                    models.Q(end_date__isnull=True) | models.Q(end_date__gte=today)
+                )
+                if active_doctors.exists():
+                    is_doctor_active = True
+            
+            # Проверяем статус персонала
+            staff_records = person.staff_records.all()
+            if staff_records.exists():
+                active_staff = staff_records.filter(
+                    models.Q(end_date__isnull=True) | models.Q(end_date__gte=today)
+                )
+                if active_staff.exists():
+                    is_staff_active = True
+            
+            # Пропускаем, если сотрудник не работает
+            if not is_doctor_active and not is_staff_active:
+                continue
+
+            # Получаем все действующие ЭЦП для сотрудника
+            active_signatures = person.digital_signatures.filter(
+                valid_from__lte=today,
+                valid_to__gte=today,
+                revoked_date__isnull=True
+            ).order_by('-valid_to')
+
+            if not active_signatures.exists():
+                continue
+
+            # Берем последнюю действующую ЭЦП (с самой поздней датой окончания)
+            latest_signature = active_signatures.first()
+
+            # Проверяем, истекает ли она в указанный период
+            if latest_signature.valid_to <= expiration_date:
+                # Определяем статус работы
+                work_status = []
+                if is_doctor_active:
+                    work_status.append("Врач")
+                if is_staff_active:
+                    work_status.append("Персонал")
+                work_status_str = ", ".join(work_status) if work_status else "Не определен"
+
+                # Вычисляем количество дней до истечения
+                days_until_expiration = (latest_signature.valid_to - today).days
+
+                results.append({
+                    'ФИО': str(person),
+                    'СНИЛС': person.snils,
+                    'ИНН': person.inn or '',
+                    'Телефон': person.phone_number or '',
+                    'Email': person.email or '',
+                    'Телеграм': person.telegram or '',
+                    'Статус работы': work_status_str,
+                    'Серийный номер ЭЦП': latest_signature.certificate_serial or '',
+                    'Должность': str(latest_signature.position) if latest_signature.position else '',
+                    'Действует с': latest_signature.valid_from.strftime('%d.%m.%Y') if latest_signature.valid_from else '',
+                    'Действует по': latest_signature.valid_to.strftime('%d.%m.%Y') if latest_signature.valid_to else '',
+                    'Дней до истечения': days_until_expiration,
+                })
+
+        # Сортируем по количеству дней до истечения (сначала те, у кого меньше дней)
+        results.sort(key=lambda x: x['Дней до истечения'])
+
+        # Создаем Excel файл
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Истекающие ЭЦП"
+
+        # Стили для заголовков
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+        # Заголовки
+        headers = [
+            '№', 'ФИО', 'СНИЛС', 'ИНН', 'Телефон', 'Email', 'Телеграм',
+            'Статус работы', 'Серийный номер ЭЦП', 'Должность',
+            'Действует с', 'Действует по', 'Дней до истечения'
+        ]
+        ws.append(headers)
+
+        # Применяем стили к заголовкам
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+            cell.border = border
+
+        # Заполняем данные
+        for idx, result in enumerate(results, start=1):
+            row = [
+                idx,
+                result['ФИО'],
+                result['СНИЛС'],
+                result['ИНН'],
+                result['Телефон'],
+                result['Email'],
+                result['Телеграм'],
+                result['Статус работы'],
+                result['Серийный номер ЭЦП'],
+                result['Должность'],
+                result['Действует с'],
+                result['Действует по'],
+                result['Дней до истечения'],
+            ]
+            ws.append(row)
+
+            # Применяем стили к ячейкам
+            for cell in ws[ws.max_row]:
+                cell.border = border
+                cell.alignment = Alignment(vertical="center", wrap_text=True)
+                
+                # Выделяем строки, где осталось меньше 7 дней
+                if result['Дней до истечения'] < 7:
+                    cell.fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
+                elif result['Дней до истечения'] < 14:
+                    cell.fill = PatternFill(start_color="FFF4E6", end_color="FFF4E6", fill_type="solid")
+
+        # Настраиваем ширину столбцов
+        column_widths = {
+            'A': 6,   # №
+            'B': 30,  # ФИО
+            'C': 15,  # СНИЛС
+            'D': 15,  # ИНН
+            'E': 15,  # Телефон
+            'F': 25,  # Email
+            'G': 15,  # Телеграм
+            'H': 15,  # Статус работы
+            'I': 20,  # Серийный номер ЭЦП
+            'J': 30,  # Должность
+            'K': 15,  # Действует с
+            'L': 15,  # Действует по
+            'M': 18,  # Дней до истечения
+        }
+        for col, width in column_widths.items():
+            ws.column_dimensions[col].width = width
+
+        # Фиксируем первую строку
+        ws.freeze_panes = 'A2'
+
+        # Создаем HTTP-ответ
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f"expiring_digital_signatures_{today.strftime('%Y%m%d')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        wb.save(response)
+        return response
 
 
 @admin.register(RG014)
@@ -749,18 +971,27 @@ class DigitalSignatureAdmin(ImportExportModelAdmin, ModelAdmin):
     )
     list_filter = ('valid_from', 'valid_to', DigitalSignatureStatusFilter)
     search_fields = ('person__last_name', 'person__first_name', 'person__patronymic', 'person__snils')
+    list_per_page = 20
+    actions_list = ["export_expiring_digital_signatures"]
     fieldsets = (
         ("Основные данные", {
-            "classes": ("two-columns",),
-            "fields": ('person', 'certificate_serial', 'position'),
+            "classes": ("section",),
+            "fields": (
+                ('person', 'position'),
+                ('certificate_serial', 'application_date'),
+            ),
         }),
-        ("Даты", {
-            "classes": ("two-columns",),
-            "fields": ('application_date', 'valid_from', 'valid_to', 'issued_date', 'revoked_date'),
+        ("Даты действия", {
+            "classes": ("section",),
+            "fields": (
+                ('valid_from', 'valid_to', 'issued_date', 'revoked_date'),
+            ),
         }),
-        ("Файл выписки для получения ЭЦП", {
-            "classes": ("two-columns",),
-            "fields": ('scan', 'scan_uploaded_at', 'added_at'),
+        ("Файл выписки", {
+            "classes": ("section",),
+            "fields": (
+                ('scan', 'scan_uploaded_at', 'added_at'),
+            ),
         }),
     )
 
@@ -790,6 +1021,242 @@ class DigitalSignatureAdmin(ImportExportModelAdmin, ModelAdmin):
             return format_html('<span style="color: red;">✘</span>')
 
     has_scan.short_description = 'Скан'
+
+    def get_changeform_initial_data(self, request):
+        """Предзаполнение полей из URL параметров"""
+        initial = super().get_changeform_initial_data(request)
+        
+        # Предзаполнение сотрудника
+        if 'person' in request.GET:
+            try:
+                person_id = int(request.GET.get('person'))
+                initial['person'] = person_id
+            except (ValueError, TypeError):
+                pass
+        
+        # Предзаполнение должности
+        if 'position' in request.GET:
+            try:
+                position_id = int(request.GET.get('position'))
+                initial['position'] = position_id
+            except (ValueError, TypeError):
+                pass
+        
+        return initial
+
+    @action(
+        description=_("Экспорт сотрудников с истекающей ЭЦП"),
+        url_path="export-expiring-digital-signatures",
+        permissions=["export_expiring_digital_signatures"]
+    )
+    def export_expiring_digital_signatures(self, request: HttpRequest):
+        """Экспорт сотрудников с истекающей ЭЦП в Excel"""
+        if request.method == 'POST':
+            form = ExpiringDigitalSignatureForm(request.POST)
+            if form.is_valid():
+                days = form.cleaned_data['days']
+                return self._export_expiring_digital_signatures_to_excel(days)
+        else:
+            form = ExpiringDigitalSignatureForm(initial={'days': 30})
+
+        context = {
+            'form': form,
+            'title': 'Экспорт сотрудников с истекающей ЭЦП',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/personnel/export_expiring_digital_signatures.html', context)
+
+    def has_export_expiring_digital_signatures_permission(self, request: HttpRequest):
+        """Проверка прав на экспорт"""
+        return request.user.has_perm('personnel.export_expiring_digital_signatures') or request.user.is_superuser
+
+    def _export_expiring_digital_signatures_to_excel(self, days: int):
+        """Генерирует Excel файл с сотрудниками, у которых заканчивается ЭЦП"""
+        today = date.today()
+        expiration_date = today + timedelta(days=days)
+
+        # Получаем всех сотрудников, которые работают сейчас
+        # Проверяем через doctor_records и staff_records
+        working_persons = Person.objects.filter(
+            models.Q(
+                # Активные врачи
+                doctor_records__end_date__isnull=True
+            ) | models.Q(
+                doctor_records__end_date__gte=today
+            ) | models.Q(
+                # Активные сотрудники
+                staff_records__end_date__isnull=True
+            ) | models.Q(
+                staff_records__end_date__gte=today
+            )
+        ).distinct().prefetch_related('doctor_records', 'staff_records', 'digital_signatures')
+
+        # Собираем данные о сотрудниках с истекающей ЭЦП
+        results = []
+        for person in working_persons:
+            # Проверяем, работает ли сотрудник сейчас
+            is_doctor_active = False
+            is_staff_active = False
+            
+            # Проверяем статус врача
+            doctor_records = person.doctor_records.all()
+            if doctor_records.exists():
+                active_doctors = doctor_records.filter(
+                    models.Q(end_date__isnull=True) | models.Q(end_date__gte=today)
+                )
+                if active_doctors.exists():
+                    is_doctor_active = True
+            
+            # Проверяем статус персонала
+            staff_records = person.staff_records.all()
+            if staff_records.exists():
+                active_staff = staff_records.filter(
+                    models.Q(end_date__isnull=True) | models.Q(end_date__gte=today)
+                )
+                if active_staff.exists():
+                    is_staff_active = True
+            
+            # Пропускаем, если сотрудник не работает
+            if not is_doctor_active and not is_staff_active:
+                continue
+
+            # Получаем все действующие ЭЦП для сотрудника
+            active_signatures = person.digital_signatures.filter(
+                valid_from__lte=today,
+                valid_to__gte=today,
+                revoked_date__isnull=True
+            ).order_by('-valid_to')
+
+            if not active_signatures.exists():
+                continue
+
+            # Берем последнюю действующую ЭЦП (с самой поздней датой окончания)
+            latest_signature = active_signatures.first()
+
+            # Проверяем, истекает ли она в указанный период
+            if latest_signature.valid_to <= expiration_date:
+                # Определяем статус работы
+                work_status = []
+                if is_doctor_active:
+                    work_status.append("Врач")
+                if is_staff_active:
+                    work_status.append("Персонал")
+                work_status_str = ", ".join(work_status) if work_status else "Не определен"
+
+                # Вычисляем количество дней до истечения
+                days_until_expiration = (latest_signature.valid_to - today).days
+
+                results.append({
+                    'ФИО': str(person),
+                    'СНИЛС': person.snils,
+                    'ИНН': person.inn or '',
+                    'Телефон': person.phone_number or '',
+                    'Email': person.email or '',
+                    'Телеграм': person.telegram or '',
+                    'Статус работы': work_status_str,
+                    'Серийный номер ЭЦП': latest_signature.certificate_serial or '',
+                    'Должность': str(latest_signature.position) if latest_signature.position else '',
+                    'Действует с': latest_signature.valid_from.strftime('%d.%m.%Y') if latest_signature.valid_from else '',
+                    'Действует по': latest_signature.valid_to.strftime('%d.%m.%Y') if latest_signature.valid_to else '',
+                    'Дней до истечения': days_until_expiration,
+                })
+
+        # Сортируем по количеству дней до истечения (сначала те, у кого меньше дней)
+        results.sort(key=lambda x: x['Дней до истечения'])
+
+        # Создаем Excel файл
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Истекающие ЭЦП"
+
+        # Стили для заголовков
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+        # Заголовки
+        headers = [
+            '№', 'ФИО', 'СНИЛС', 'ИНН', 'Телефон', 'Email', 'Телеграм',
+            'Статус работы', 'Серийный номер ЭЦП', 'Должность',
+            'Действует с', 'Действует по', 'Дней до истечения'
+        ]
+        ws.append(headers)
+
+        # Применяем стили к заголовкам
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+            cell.border = border
+
+        # Заполняем данные
+        for idx, result in enumerate(results, start=1):
+            row = [
+                idx,
+                result['ФИО'],
+                result['СНИЛС'],
+                result['ИНН'],
+                result['Телефон'],
+                result['Email'],
+                result['Телеграм'],
+                result['Статус работы'],
+                result['Серийный номер ЭЦП'],
+                result['Должность'],
+                result['Действует с'],
+                result['Действует по'],
+                result['Дней до истечения'],
+            ]
+            ws.append(row)
+
+            # Применяем стили к ячейкам
+            for cell in ws[ws.max_row]:
+                cell.border = border
+                cell.alignment = Alignment(vertical="center", wrap_text=True)
+                
+                # Выделяем строки, где осталось меньше 7 дней
+                if result['Дней до истечения'] < 7:
+                    cell.fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
+                elif result['Дней до истечения'] < 14:
+                    cell.fill = PatternFill(start_color="FFF4E6", end_color="FFF4E6", fill_type="solid")
+
+        # Настраиваем ширину столбцов
+        column_widths = {
+            'A': 6,   # №
+            'B': 30,  # ФИО
+            'C': 15,  # СНИЛС
+            'D': 15,  # ИНН
+            'E': 15,  # Телефон
+            'F': 25,  # Email
+            'G': 15,  # Телеграм
+            'H': 15,  # Статус работы
+            'I': 20,  # Серийный номер ЭЦП
+            'J': 30,  # Должность
+            'K': 15,  # Действует с
+            'L': 15,  # Действует по
+            'M': 18,  # Дней до истечения
+        }
+        for col, width in column_widths.items():
+            ws.column_dimensions[col].width = width
+
+        # Фиксируем первую строку
+        ws.freeze_panes = 'A2'
+
+        # Создаем HTTP-ответ
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f"expiring_digital_signatures_{today.strftime('%Y%m%d')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        wb.save(response)
+        return response
 
 
 @admin.register(DoctorReportingRecord)
