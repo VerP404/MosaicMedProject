@@ -322,6 +322,16 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
                         delete_missing=False,
                         dry_run=False,
                     )
+                except UnicodeEncodeError:
+                    self.message_user(
+                        request,
+                        (
+                            'Кодек консоли не поддерживает символы из файла (например, ✓). '
+                            'Запустите сервер/команду с переменной окружения '
+                            'PYTHONIOENCODING=utf-8 или удалите спецсимволы из JSON.'
+                        ),
+                        messages.ERROR
+                    )
                 except Exception as exc:
                     self.message_user(request, f'Ошибка импорта: {exc}', messages.ERROR)
                 else:
