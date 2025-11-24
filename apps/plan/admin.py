@@ -1,16 +1,22 @@
 import json
+import os
+import tempfile
 from datetime import datetime
 import io
+from pathlib import Path
 import pandas as pd
 from django.http import HttpResponse
+from django.shortcuts import render, redirect
 from django.shortcuts import render, redirect
 
 from dal import autocomplete
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.db.models import Q, JSONField
 from django.utils.html import format_html
 from django.urls import reverse
+from django.utils import timezone
 from django import forms
 from django.db import models
 from django_json_widget.widgets import JSONEditorWidget
@@ -22,7 +28,13 @@ from unfold.decorators import action
 from import_export import resources, fields
 from import_export.admin import ImportExportModelAdmin
 
-from .forms import GroupIndicatorsForm, YearSelectForm, ImportPlansForm
+from .forms import (
+    GroupIndicatorsForm,
+    YearSelectForm,
+    ImportPlansForm,
+    ExportStructureForm,
+    ImportStructureForm,
+)
 from .models import (
     GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition,
     AnnualPlan, BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan,
@@ -217,6 +229,7 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
     search_fields = ['name', 'parent__name', 'parent__parent__name', 'external_id']
     inlines = [FilterConditionInline, GroupBuildingDepartmentInline]
     actions = [copy_filters_action]
+    actions_list = ["export_structure_action", "import_structure_action"]
     filter_horizontal = ('buildings',)
     readonly_fields = ('external_id',)
     fieldsets = (
@@ -238,6 +251,94 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
                 # ... и так далее ...
             )
         return queryset, False
+
+    fixtures_filename = 'indicators_structure.json'
+
+    @property
+    def fixtures_dir(self):
+        return Path(__file__).resolve().parent / 'fixtures'
+
+    def _fixtures_path(self):
+        path = self.fixtures_dir / self.fixtures_filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def _relative_path_display(self, path_obj):
+        try:
+            return path_obj.relative_to(Path.cwd())
+        except ValueError:
+            return path_obj
+
+    def has_view_groupindicators_permission(self, request):
+        """Разрешение, требуемое changelist-action для просмотра."""
+        return request.user.has_perm('plan.view_groupindicators')
+
+    def has_change_groupindicators_permission(self, request):
+        """Разрешение, требуемое changelist-action для изменения."""
+        return request.user.has_perm('plan.change_groupindicators')
+
+    @action(description="Экспорт в файл", url_path="export-structure", permissions=["view_groupindicators"])
+    def export_structure_action(self, request):
+        form = ExportStructureForm(request.POST or None)
+        if request.method == 'POST' and form.is_valid():
+            output_path = self._fixtures_path()
+            try:
+                call_command('export_indicators_structure', output=str(output_path))
+            except Exception as exc:
+                self.message_user(request, f'Ошибка экспорта: {exc}', messages.ERROR)
+            else:
+                self.message_user(
+                    request,
+                    f'Структура сохранена в {self._relative_path_display(output_path)}',
+                    messages.SUCCESS
+                )
+                return redirect('admin:plan_groupindicators_changelist')
+
+        context = {
+            'form': form,
+            'title': 'Экспорт структуры показателей',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/plan/export_structure.html', context)
+
+    @action(description="Импорт из файла", url_path="import-structure", permissions=["change_groupindicators"])
+    def import_structure_action(self, request):
+        form = ImportStructureForm(request.POST or None)
+        if request.method == 'POST' and form.is_valid():
+            fixtures_path = self._fixtures_path()
+            if not fixtures_path.exists():
+                self.message_user(
+                    request,
+                    f'Файл {self._relative_path_display(fixtures_path)} не найден. Сначала выполните экспорт.',
+                    messages.ERROR
+                )
+            else:
+                try:
+                    call_command(
+                        'import_indicators_structure',
+                        str(fixtures_path),
+                        update_existing=True,
+                        delete_missing=False,
+                        dry_run=False,
+                    )
+                except Exception as exc:
+                    self.message_user(request, f'Ошибка импорта: {exc}', messages.ERROR)
+                else:
+                    self.message_user(
+                        request,
+                        f'Структура импортирована из {self._relative_path_display(fixtures_path)}.',
+                        messages.SUCCESS
+                    )
+                    return redirect('admin:plan_groupindicators_changelist')
+
+        context = {
+            'form': form,
+            'title': 'Импорт структуры показателей',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/plan/import_structure.html', context)
 
     def save_model(self, request, obj, form, change):
         if not obj.pk:

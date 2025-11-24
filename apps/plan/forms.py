@@ -38,3 +38,13 @@ class ImportPlansForm(forms.Form):
         label='Файл Excel',
         widget=forms.FileInput(attrs={'accept': '.xlsx,.xls'})
     )
+
+
+class ExportStructureForm(forms.Form):
+    """Пустая форма для подтверждения экспорта"""
+    pass
+
+
+class ImportStructureForm(forms.Form):
+    """Пустая форма для подтверждения импорта"""
+    pass
