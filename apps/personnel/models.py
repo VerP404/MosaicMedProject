@@ -150,6 +150,22 @@ class StaffRecord(models.Model):
     def __str__(self):
         return f"{self.person} - {self.position}: {self.department} {self.start_date}-{self.end_date}"
 
+    def save(self, *args, **kwargs):
+        """
+        Не даём автоматизированным обновлениям стереть вручную введённую дату увольнения.
+        Если end_date уже заполнена в базе, а при сохранении приходит None, оставляем исходное значение.
+        """
+        if self.pk:
+            original_end_date = (
+                StaffRecord.objects
+                .filter(pk=self.pk)
+                .values_list('end_date', flat=True)
+                .first()
+            )
+            if original_end_date and self.end_date is None:
+                self.end_date = original_end_date
+        super().save(*args, **kwargs)
+
 class SpecialtyRG014(models.Model):
     code = models.CharField("Код специальности", max_length=10, unique=True)
     description = models.CharField("Наименование специальности", max_length=255)
