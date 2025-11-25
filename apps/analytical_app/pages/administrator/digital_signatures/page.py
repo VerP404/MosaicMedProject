@@ -90,7 +90,36 @@ def layout():
                             clearable=False,
                             className="mt-2"
                         )
-                    ], width=3),
+                    ], width=2),
+                    
+                    # Фильтр по категории
+                    dbc.Col([
+                        html.Label("Категория:", className="fw-bold"),
+                        dcc.Dropdown(
+                            id=f'dropdown-category-filter-{type_page}',
+                            options=[
+                                {'label': 'Все', 'value': 'all'},
+                                {'label': 'Врач', 'value': 'doctor'},
+                                {'label': 'Сотрудник', 'value': 'staff'},
+                            ],
+                            value='all',
+                            clearable=False,
+                            className="mt-2"
+                        )
+                    ], width=2),
+                    
+                    # Фильтр по подразделению
+                    dbc.Col([
+                        html.Label("Подразделение:", className="fw-bold"),
+                        dcc.Dropdown(
+                            id=f'dropdown-department-filter-{type_page}',
+                            options=[],
+                            value=None,
+                            placeholder="Все подразделения",
+                            clearable=True,
+                            className="mt-2"
+                        )
+                    ], width=2),
                     
                     # Кнопка обновления
                     dbc.Col([
@@ -151,23 +180,99 @@ def layout():
                     "Список ЭЦП",
                     page_size=50,
                     style_cell_conditional=[
-                        {'if': {'column_id': 'fio'}, 'width': '15%'},
-                        {'if': {'column_id': 'snils'}, 'width': '10%'},
-                        {'if': {'column_id': 'certificate_serial'}, 'width': '12%'},
-                        {'if': {'column_id': 'position_name'}, 'width': '15%'},
-                        {'if': {'column_id': 'valid_from'}, 'width': '8%'},
-                        {'if': {'column_id': 'valid_to'}, 'width': '8%'},
-                        {'if': {'column_id': 'days_until_expiration'}, 'width': '8%'},
-                        {'if': {'column_id': 'status'}, 'width': '10%'},
-                        {'if': {'column_id': 'process_status_display'}, 'width': '12%'},
-                        {'if': {'column_id': 'has_scan'}, 'width': '8%'},
-                        {'if': {'column_id': 'action'}, 'width': '8%'},
+                        {'if': {'column_id': 'fio'}, 'width': '12%'},
+                        {'if': {'column_id': 'snils'}, 'width': '8%'},
+                        {'if': {'column_id': 'certificate_serial'}, 'width': '10%'},
+                        {'if': {'column_id': 'category'}, 'width': '8%'},
+                        {'if': {'column_id': 'department_name'}, 'width': '12%'},
+                        {'if': {'column_id': 'position_name'}, 'width': '12%'},
+                        {'if': {'column_id': 'valid_from'}, 'width': '7%'},
+                        {'if': {'column_id': 'valid_to'}, 'width': '7%'},
+                        {'if': {'column_id': 'days_until_expiration'}, 'width': '7%'},
+                        {'if': {'column_id': 'status'}, 'width': '8%'},
+                        {'if': {'column_id': 'process_status_display'}, 'width': '10%'},
+                        {'if': {'column_id': 'has_scan'}, 'width': '6%'},
+                        {'if': {'column_id': 'action'}, 'width': '6%'},
                     ],
                     markdown_options={"link_target": "_blank"}
                 )
             ]
         )
     ])
+
+
+# Callback для загрузки списка подразделений
+@callback(
+    Output(f'dropdown-department-filter-{type_page}', 'options'),
+    Input(f'update-button-{type_page}', 'n_clicks')
+)
+def load_departments(n_clicks):
+    """Загружает список подразделений для фильтра"""
+    try:
+        # Запрос для получения уникальных подразделений
+        # Используем ту же логику, что и в основном запросе
+        query = """
+        WITH person_departments AS (
+            SELECT DISTINCT
+                p.id as person_id,
+                COALESCE(
+                    (SELECT dr.structural_unit 
+                     FROM personnel_doctorrecord dr
+                     WHERE dr.person_id = p.id
+                     AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                     ORDER BY dr.end_date DESC NULLS FIRST, dr.start_date DESC
+                     LIMIT 1),
+                    (SELECT dept.name 
+                     FROM personnel_doctorrecord dr
+                     INNER JOIN organization_department dept ON dept.id = dr.department_id
+                     WHERE dr.person_id = p.id
+                     AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                     ORDER BY dr.end_date DESC NULLS FIRST, dr.start_date DESC
+                     LIMIT 1),
+                    (SELECT dept.name 
+                     FROM personnel_staffrecord sr
+                     INNER JOIN organization_department dept ON dept.id = sr.department_id
+                     WHERE sr.person_id = p.id
+                     AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+                     ORDER BY sr.end_date DESC NULLS FIRST, sr.start_date DESC
+                     LIMIT 1)
+                ) as department_name
+            FROM personnel_person p
+            WHERE EXISTS (
+                SELECT 1 
+                FROM personnel_doctorrecord dr
+                WHERE dr.person_id = p.id
+                AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+            )
+            OR EXISTS (
+                SELECT 1 
+                FROM personnel_staffrecord sr
+                WHERE sr.person_id = p.id
+                AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+            )
+        )
+        SELECT DISTINCT department_name
+        FROM person_departments
+        WHERE department_name IS NOT NULL AND department_name != '-'
+        ORDER BY department_name
+        """
+        
+        columns, data = TableUpdater.query_to_df(engine, query)
+        
+        # Формируем опции для dropdown
+        options = []
+        
+        for row in data:
+            dept_name = row.get('department_name')
+            if dept_name:
+                options.append({'label': dept_name, 'value': dept_name})
+        
+        return options
+    except Exception as e:
+        print(f"Ошибка при загрузке подразделений: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 
 # Callback для обновления статистики
@@ -178,10 +283,12 @@ def layout():
         State(f'switch-working-only-{type_page}', 'value'),
         State(f'radio-show-mode-{type_page}', 'value'),
         State(f'dropdown-status-filter-{type_page}', 'value'),
-        State(f'dropdown-process-filter-{type_page}', 'value')
+        State(f'dropdown-process-filter-{type_page}', 'value'),
+        State(f'dropdown-category-filter-{type_page}', 'value'),
+        State(f'dropdown-department-filter-{type_page}', 'value')
     ]
 )
-def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_filter):
+def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_filter, category_filter, department_filter):
     if not n_clicks:
         return html.Div("Нажмите 'Обновить' для загрузки статистики", className="text-muted")
     
@@ -189,10 +296,15 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
         # Получаем данные для статистики (без фильтра по статусу)
         show_only_latest = (show_mode == 'latest')
         
+        filter_category = None if category_filter == 'all' else category_filter
+        filter_department_name = department_filter if department_filter else None
+        
         sql_query = sql_query_digital_signatures(
             show_only_latest=show_only_latest,
             show_working_only=show_working_only,
-            filter_expiring=None  # Получаем все для статистики
+            filter_expiring=None,  # Получаем все для статистики
+            filter_category=filter_category,
+            filter_department_name=filter_department_name
         )
         
         columns, data = TableUpdater.query_to_df(engine, sql_query)
@@ -390,10 +502,12 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
         State(f'switch-working-only-{type_page}', 'value'),
         State(f'radio-show-mode-{type_page}', 'value'),
         State(f'dropdown-status-filter-{type_page}', 'value'),
-        State(f'dropdown-process-filter-{type_page}', 'value')
+        State(f'dropdown-process-filter-{type_page}', 'value'),
+        State(f'dropdown-category-filter-{type_page}', 'value'),
+        State(f'dropdown-department-filter-{type_page}', 'value')
     ]
 )
-def update_table(n_clicks, show_working_only, show_mode, status_filter, process_filter):
+def update_table(n_clicks, show_working_only, show_mode, status_filter, process_filter, category_filter, department_filter):
     if not n_clicks:
         return [], [], []
     
@@ -414,11 +528,17 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
         elif status_filter == 'active':
             filter_expiring = None  # Будем фильтровать в Python
         
+        # Определяем фильтры
+        filter_category = None if category_filter == 'all' else category_filter
+        filter_department_name = department_filter if department_filter else None
+        
         # Выполняем запрос
         sql_query = sql_query_digital_signatures(
             show_only_latest=show_only_latest,
             show_working_only=show_working_only,
-            filter_expiring=filter_expiring
+            filter_expiring=filter_expiring,
+            filter_category=filter_category,
+            filter_department_name=filter_department_name
         )
         
         columns, data = TableUpdater.query_to_df(engine, sql_query)
@@ -439,6 +559,8 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
             {'name': 'СНИЛС', 'id': 'snils'},
             {'name': 'ИНН', 'id': 'inn'},
             {'name': 'Телефон', 'id': 'phone_number'},
+            {'name': 'Категория', 'id': 'category'},
+            {'name': 'Подразделение', 'id': 'department_name'},
             {'name': 'Должность', 'id': 'position_name'},
             {'name': 'Действует с', 'id': 'valid_from'},
             {'name': 'Действует по', 'id': 'valid_to'},
@@ -515,6 +637,16 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
         for row in data:
             status = row.get('status', '')
             row['status'] = status_labels.get(status, status)
+            
+            # Форматируем категорию
+            category = row.get('category', 'none')
+            category_labels = {
+                'doctor': 'Врач',
+                'staff': 'Сотрудник',
+                'both': 'Врач/Сотрудник',
+                'none': '-'
+            }
+            row['category'] = category_labels.get(category, category)
             
             # Добавляем индикатор наличия файла выписки
             scan = row.get('scan')

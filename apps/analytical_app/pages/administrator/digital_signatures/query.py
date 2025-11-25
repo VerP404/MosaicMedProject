@@ -4,7 +4,9 @@ from datetime import date
 def sql_query_digital_signatures(
     show_only_latest=True,
     show_working_only=True,
-    filter_expiring=None  # None, 'expiring_60', 'expiring_30', 'expiring_7', 'expired', 'all'
+    filter_expiring=None,  # None, 'expiring_60', 'expiring_30', 'expiring_7', 'expired', 'all'
+    filter_category=None,  # None, 'doctor', 'staff', 'all'
+    filter_department_name=None  # None или название подразделения (для структурных подразделений или департментов)
 ):
     """
     SQL-запрос для получения списка ЭЦП с информацией о сотрудниках
@@ -18,6 +20,11 @@ def sql_query_digital_signatures(
         - 'expiring_7': заканчиваются в течение 7 дней
         - 'expired': просроченные
         - 'all': все
+    - filter_category: фильтр по категории
+        - None или 'all': все
+        - 'doctor': только врачи
+        - 'staff': только сотрудники
+    - filter_department_name: фильтр по названию подразделения (structural_unit или department.name)
     """
     today = date.today()
     
@@ -50,6 +57,82 @@ def sql_query_digital_signatures(
     
     query += """
     ),
+    person_categories AS (
+        SELECT DISTINCT
+            p.id as person_id,
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1 
+                    FROM personnel_doctorrecord dr
+                    WHERE dr.person_id = p.id
+                    AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                ) AND EXISTS (
+                    SELECT 1 
+                    FROM personnel_staffrecord sr
+                    WHERE sr.person_id = p.id
+                    AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+                ) THEN 'both'
+                WHEN EXISTS (
+                    SELECT 1 
+                    FROM personnel_doctorrecord dr
+                    WHERE dr.person_id = p.id
+                    AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                ) THEN 'doctor'
+                WHEN EXISTS (
+                    SELECT 1 
+                    FROM personnel_staffrecord sr
+                    WHERE sr.person_id = p.id
+                    AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+                ) THEN 'staff'
+                ELSE 'none'
+            END as category
+        FROM personnel_person p
+        WHERE p.id IN (SELECT person_id FROM working_persons)
+    ),
+    person_departments AS (
+        SELECT DISTINCT
+            p.id as person_id,
+            COALESCE(
+                (SELECT dr.structural_unit 
+                 FROM personnel_doctorrecord dr
+                 WHERE dr.person_id = p.id
+                 AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                 ORDER BY dr.end_date DESC NULLS FIRST, dr.start_date DESC
+                 LIMIT 1),
+                (SELECT dept.name 
+                 FROM personnel_doctorrecord dr
+                 INNER JOIN organization_department dept ON dept.id = dr.department_id
+                 WHERE dr.person_id = p.id
+                 AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                 ORDER BY dr.end_date DESC NULLS FIRST, dr.start_date DESC
+                 LIMIT 1),
+                (SELECT dept.name 
+                 FROM personnel_staffrecord sr
+                 INNER JOIN organization_department dept ON dept.id = sr.department_id
+                 WHERE sr.person_id = p.id
+                 AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+                 ORDER BY sr.end_date DESC NULLS FIRST, sr.start_date DESC
+                 LIMIT 1)
+            ) as department_name,
+            COALESCE(
+                (SELECT dept.id 
+                 FROM personnel_doctorrecord dr
+                 INNER JOIN organization_department dept ON dept.id = dr.department_id
+                 WHERE dr.person_id = p.id
+                 AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                 ORDER BY dr.end_date DESC NULLS FIRST, dr.start_date DESC
+                 LIMIT 1),
+                (SELECT dept.id 
+                 FROM personnel_staffrecord sr
+                 INNER JOIN organization_department dept ON dept.id = sr.department_id
+                 WHERE sr.person_id = p.id
+                 AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+                 ORDER BY sr.end_date DESC NULLS FIRST, sr.start_date DESC
+                 LIMIT 1)
+            ) as department_id
+        FROM personnel_person p
+        WHERE p.id IN (SELECT person_id FROM working_persons)
+    ),
     digital_signatures_with_status AS (
         SELECT 
             ds.id,
@@ -72,6 +155,9 @@ def sql_query_digital_signatures(
             pos.description as position_name,
             pos.code as position_code,
             ds.position_id,
+            COALESCE(pc.category, 'none') as category,
+            COALESCE(pd.department_name, '-') as department_name,
+            pd.department_id,
             CASE 
                 WHEN ds.revoked_date IS NOT NULL THEN 'revoked'
                 WHEN ds.valid_to IS NULL THEN 'no_end_date'
@@ -128,6 +214,8 @@ def sql_query_digital_signatures(
         FROM personnel_digitalsignature ds
         INNER JOIN personnel_person p ON p.id = ds.person_id
         LEFT JOIN personnel_postrg014 pos ON pos.id = ds.position_id
+        LEFT JOIN person_categories pc ON pc.person_id = p.id
+        LEFT JOIN person_departments pd ON pd.person_id = p.id
         WHERE p.id IN (SELECT person_id FROM working_persons)
     )
     SELECT 
@@ -151,6 +239,9 @@ def sql_query_digital_signatures(
         position_name,
         position_code,
         position_id,
+        category,
+        department_name,
+        department_id,
         status,
         process_status,
         days_until_expiration,
@@ -163,6 +254,19 @@ def sql_query_digital_signatures(
     # Фильтр по последним ЭЦП
     if show_only_latest:
         query += " AND signature_rank = 1"
+    
+    # Фильтр по категории
+    if filter_category == 'doctor':
+        query += " AND (category = 'doctor' OR category = 'both')"
+    elif filter_category == 'staff':
+        query += " AND (category = 'staff' OR category = 'both')"
+    # 'all' или None - показываем все
+    
+    # Фильтр по подразделению
+    if filter_department_name:
+        # Экранируем одинарные кавычки в названии для SQL
+        escaped_name = filter_department_name.replace("'", "''")
+        query += f" AND department_name = '{escaped_name}'"
     
     # Фильтр по статусу
     if filter_expiring == 'expiring_60':
