@@ -3,12 +3,26 @@ import dash_bootstrap_components as dbc
 from datetime import datetime
 
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.administrator.digital_signatures.query import sql_query_digital_signatures
+from apps.analytical_app.pages.administrator.digital_signatures.query import (
+    sql_query_digital_signatures,
+    sql_query_doctors_without_signature,
+)
 from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.query_executor import engine
 from apps.analytical_app.app import app
 
 type_page = "admin-digital-signatures"
+
+
+def fetch_doctors_without_signature(filter_department_name=None):
+    """
+    Возвращает список активных врачей без каких-либо ЭЦП с учетом фильтра по подразделению.
+    """
+    sql_query = sql_query_doctors_without_signature(
+        filter_department_name=filter_department_name
+    )
+    _, data = TableUpdater.query_to_df(engine, sql_query)
+    return data
 
 
 def layout():
@@ -65,7 +79,8 @@ def layout():
                                 {'label': 'Заканчиваются в течение 7 дней', 'value': 'expiring_7'},
                                 {'label': 'Просроченные', 'value': 'expired'},
                                 {'label': 'Активные', 'value': 'active'},
-                                {'label': 'Аннулированные', 'value': 'revoked'}
+                                {'label': 'Аннулированные', 'value': 'revoked'},
+                                {'label': 'Нет ЭЦП', 'value': 'no_signature'},
                             ],
                             value='all',
                             clearable=False,
@@ -298,7 +313,7 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
         
         filter_category = None if category_filter == 'all' else category_filter
         filter_department_name = department_filter if department_filter else None
-        
+
         sql_query = sql_query_digital_signatures(
             show_only_latest=show_only_latest,
             show_working_only=show_working_only,
@@ -308,8 +323,15 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
         )
         
         columns, data = TableUpdater.query_to_df(engine, sql_query)
+
+        include_doctor_category = category_filter in (None, 'all', 'doctor')
+        doctors_without_signature = (
+            fetch_doctors_without_signature(filter_department_name)
+            if include_doctor_category
+            else []
+        )
         
-        if not data:
+        if not data and not doctors_without_signature:
             return html.Div("Нет данных для отображения", className="text-muted")
 
         # Фильтры
@@ -325,10 +347,13 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
             elif status_filter == 'revoked':
                 data = [row for row in data if row.get('status') == 'revoked']
 
-        if process_filter != 'all':
+        if process_filter != 'all' and status_filter != 'no_signature':
             data = [row for row in data if row.get('process_status') == process_filter]
 
-        if not data:
+        if status_filter == 'no_signature':
+            data = []
+
+        if not data and not doctors_without_signature:
             return html.Div("Нет данных с выбранными фильтрами", className="text-muted")
         
         # Подсчитываем статистику
@@ -342,6 +367,13 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
         
         # Уникальные сотрудники
         unique_persons = len(set(row.get('person_id') for row in data if row.get('person_id')))
+        doctors_with_signature = len(set(
+            row.get('person_id')
+            for row in data
+            if row.get('person_id') and row.get('category') in ('doctor', 'both')
+        ))
+        doctors_without_count = len(set(row.get('person_id') for row in doctors_without_signature))
+        total_doctors_scope = doctors_with_signature + doctors_without_count
         
         # Сотрудники с просроченными ЭЦП
         persons_with_expired = len(set(
@@ -368,6 +400,33 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
                 process_counts[ps] += 1
         
         # Формируем карточки статистики
+        doctor_cards = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H4(total_doctors_scope, className="text-primary mb-1"),
+                        html.P("Врачей (всего)", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                    ])
+                ], className="text-center")
+            ], width=2),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H4(doctors_with_signature, className="text-success mb-1"),
+                        html.P("Врачей с ЭЦП", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                    ])
+                ], className="text-center")
+            ], width=2),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H4(doctors_without_count, className="text-danger mb-1"),
+                        html.P("Врачей без ЭЦП", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                    ])
+                ], className="text-center")
+            ], width=2),
+        ], className="g-3 mb-2")
+
         stats_cards = dbc.Row([
             dbc.Col([
                 dbc.Card([
@@ -476,12 +535,13 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
                 dbc.Alert([
                     html.Strong("Требуют внимания: "),
                     f"{persons_with_expired} сотрудников с просроченными ЭЦП, ",
-                    f"{persons_with_expiring} сотрудников с истекающими ЭЦП (≤60 дней)"
-                ], color="warning" if (persons_with_expired > 0 or persons_with_expiring > 0) else "success")
+                    f"{persons_with_expiring} сотрудников с истекающими ЭЦП (≤60 дней), ",
+                    f"{doctors_without_count} врачей без ЭЦП"
+                ], color="warning" if (persons_with_expired > 0 or persons_with_expiring > 0 or doctors_without_count > 0) else "success")
             ], width=12)
         ], className="mt-3")
         
-        return html.Div([stats_cards, process_cards, additional_info])
+        return html.Div([doctor_cards, stats_cards, process_cards, additional_info])
         
     except Exception as e:
         print(f"Ошибка при обновлении статистики: {str(e)}")
@@ -514,6 +574,7 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
     try:
         # Определяем параметры запроса
         show_only_latest = (show_mode == 'latest')
+        show_no_signature_only = (status_filter == 'no_signature')
         
         # Преобразуем фильтр статуса
         filter_expiring = None
@@ -532,26 +593,31 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
         filter_category = None if category_filter == 'all' else category_filter
         filter_department_name = department_filter if department_filter else None
         
-        # Выполняем запрос
-        sql_query = sql_query_digital_signatures(
-            show_only_latest=show_only_latest,
-            show_working_only=show_working_only,
-            filter_expiring=filter_expiring,
-            filter_category=filter_category,
-            filter_department_name=filter_department_name
-        )
-        
-        columns, data = TableUpdater.query_to_df(engine, sql_query)
-        
-        # Дополнительная фильтрация по активным (если нужно)
-        if status_filter == 'active':
-            data = [row for row in data if row.get('status') == 'active']
-        elif status_filter == 'revoked':
-            data = [row for row in data if row.get('status') == 'revoked']
+        if show_no_signature_only:
+            if filter_category == 'staff':
+                data = []
+            else:
+                data = fetch_doctors_without_signature(filter_department_name)
+        else:
+            sql_query = sql_query_digital_signatures(
+                show_only_latest=show_only_latest,
+                show_working_only=show_working_only,
+                filter_expiring=filter_expiring,
+                filter_category=filter_category,
+                filter_department_name=filter_department_name
+            )
+            
+            columns, data = TableUpdater.query_to_df(engine, sql_query)
+            
+            # Дополнительная фильтрация по активным (если нужно)
+            if status_filter == 'active':
+                data = [row for row in data if row.get('status') == 'active']
+            elif status_filter == 'revoked':
+                data = [row for row in data if row.get('status') == 'revoked']
 
-        # Фильтрация по процессу
-        if process_filter != 'all':
-            data = [row for row in data if row.get('process_status') == process_filter]
+            # Фильтрация по процессу
+            if process_filter != 'all':
+                data = [row for row in data if row.get('process_status') == process_filter]
         
         # Форматируем колонки
         formatted_columns = [
@@ -597,6 +663,10 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
                 else:
                     create_url = f"http://10.136.29.166:8000/admin/personnel/digitalsignature/add/?person={person_id}"
                 action_links.append(f"[Создать]({create_url})")
+
+                # Ссылка на карточку физлица (для обновления записей работы)
+                person_url = f"http://10.136.29.166:8000/admin/personnel/person/{person_id}/change/"
+                action_links.append(f"[Физлицо]({person_url})")
             
             # Объединяем ссылки с переносом строки (двойной перенос для markdown)
             row['action'] = "  \n".join(action_links) if action_links else ""
@@ -623,7 +693,8 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
             'expiring_7': 'Заканчивается (≤7 дней)',
             'expired': 'Просрочена',
             'revoked': 'Аннулирована',
-            'no_end_date': 'Без даты окончания'
+            'no_end_date': 'Без даты окончания',
+            'no_signature': 'Нет ЭЦП'
         }
         
         process_status_labels = {
@@ -632,6 +703,7 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
             'application_created': 'Заявление создано',
             'new_certificate_ready': 'Новая ЭЦП готова',
             'active_certificate': 'ЭЦП действует',
+            'no_signature': 'Нет ЭЦП'
         }
 
         for row in data:
@@ -729,6 +801,15 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
             },
             'backgroundColor': '#fffef0',
             'color': '#856404'
+        })
+
+        # Нет ЭЦП (серый)
+        style_data_conditional.append({
+            'if': {
+                'filter_query': '{status} = "Нет ЭЦП"'
+            },
+            'backgroundColor': '#e2e3e5',
+            'color': '#41464b'
         })
         
         # Переоформленные (синий) - только если показываем все ЭЦП

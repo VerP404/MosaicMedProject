@@ -296,3 +296,109 @@ def sql_query_digital_signatures(
     
     return query
 
+
+def sql_query_doctors_without_signature(
+    filter_department_name=None,
+):
+    """
+    Возвращает SQL-запрос, который выбирает активных врачей без каких-либо ЭЦП.
+    """
+
+    query = """
+    WITH active_doctors AS (
+        SELECT
+            dr.person_id,
+            dr.structural_unit,
+            dr.department_id,
+            ROW_NUMBER() OVER (
+                PARTITION BY dr.person_id
+                ORDER BY
+                    dr.end_date DESC NULLS FIRST,
+                    dr.start_date DESC NULLS LAST,
+                    dr.id DESC
+            ) as rn
+        FROM personnel_doctorrecord dr
+        WHERE dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE
+    ),
+    latest_doctors AS (
+        SELECT
+            ad.person_id,
+            ad.structural_unit,
+            ad.department_id
+        FROM active_doctors ad
+        WHERE ad.rn = 1
+    ),
+    person_departments AS (
+        SELECT
+            ld.person_id,
+            COALESCE(ld.structural_unit, dept.name, '-') as department_name,
+            ld.department_id
+        FROM latest_doctors ld
+        LEFT JOIN organization_department dept ON dept.id = ld.department_id
+    ),
+    person_categories AS (
+        SELECT DISTINCT
+            p.id as person_id,
+            CASE
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM personnel_staffrecord sr
+                    WHERE sr.person_id = p.id
+                    AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+                ) THEN 'both'
+                ELSE 'doctor'
+            END as category
+        FROM personnel_person p
+        WHERE EXISTS (
+            SELECT 1
+            FROM active_doctors ad
+            WHERE ad.person_id = p.id
+        )
+    )
+    SELECT
+        NULL::integer as id,
+        p.id as person_id,
+        p.last_name || ' ' || p.first_name || COALESCE(' ' || p.patronymic, '') as fio,
+        p.snils,
+        p.inn,
+        p.phone_number,
+        p.email,
+        p.telegram,
+        NULL::text as certificate_serial,
+        NULL::date as valid_from,
+        NULL::date as valid_to,
+        NULL::date as issued_date,
+        NULL::date as revoked_date,
+        NULL::date as application_date,
+        NULL::text as scan,
+        NULL::timestamp as scan_uploaded_at,
+        NULL::timestamp as added_at,
+        NULL::text as position_name,
+        NULL::text as position_code,
+        NULL::integer as position_id,
+        COALESCE(pc.category, 'doctor') as category,
+        pd.department_name,
+        pd.department_id,
+        'no_signature' as status,
+        'no_signature' as process_status,
+        NULL::integer as days_until_expiration,
+        1 as signature_rank,
+        false as is_replaced
+    FROM person_departments pd
+    INNER JOIN personnel_person p ON p.id = pd.person_id
+    LEFT JOIN person_categories pc ON pc.person_id = p.id
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM personnel_digitalsignature ds
+        WHERE ds.person_id = p.id
+    )
+    """
+
+    if filter_department_name:
+        escaped_department = filter_department_name.replace("'", "''")
+        query += f"\n    AND pd.department_name = '{escaped_department}'"
+
+    query += "\n    ORDER BY fio"
+
+    return query
+
