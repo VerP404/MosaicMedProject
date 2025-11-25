@@ -662,11 +662,11 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
                     create_url = f"http://10.136.29.166:8000/admin/personnel/digitalsignature/add/?person={person_id}&position={position_id}"
                 else:
                     create_url = f"http://10.136.29.166:8000/admin/personnel/digitalsignature/add/?person={person_id}"
-                action_links.append(f"[Создать]({create_url})")
+                action_links.append(f"[Создать ЭЦП]({create_url})")
 
                 # Ссылка на карточку физлица (для обновления записей работы)
                 person_url = f"http://10.136.29.166:8000/admin/personnel/person/{person_id}/change/"
-                action_links.append(f"[Физлицо]({person_url})")
+                action_links.append(f"[Редактировать физлицо]({person_url})")
             
             # Объединяем ссылки с переносом строки (двойной перенос для markdown)
             row['action'] = "  \n".join(action_links) if action_links else ""
