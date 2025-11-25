@@ -33,6 +33,7 @@ from apps.analytical_app.pages.statistic.result_pneumonia.result_pneumonia impor
 from apps.analytical_app.pages.statistic.sharapova.page import statistic_sharapova
 from apps.analytical_app.pages.statistic.visits.visits import statistic_visits
 from apps.analytical_app.pages.statistic.vop.vop import statistic_vop
+from apps.analytical_app.pages.statistic.form131.page import statistic_form131
 from apps.analytical_app.pages.web_oms.main import web_oms_main
 from apps.analytical_app.pages.web_oms.status_talon.tab1 import web_oms_1
 from apps.analytical_app.pages.web_oms.status_talon.tab2 import web_oms_2
@@ -173,6 +174,13 @@ routes = {
             {"label": "РЭМД500", "active": True},
         ]),
         layout_remd500
+    ]),
+    "/statistic/form131": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Статистик", "href": "/statistic"},
+            {"label": "Отчет для 131 формы", "active": True},
+        ]),
+        statistic_form131
     ]),
 
     # Удаление ЭМД доступно в разделе Заведующий

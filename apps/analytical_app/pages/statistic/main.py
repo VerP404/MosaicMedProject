@@ -46,6 +46,15 @@ cards_row_2 = dbc.Row(
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
 
+cards_row_3 = dbc.Row(
+    [
+        dbc.Col(create_card(9, type_page,
+                            "Отчет для 131 формы",
+                            "Отчет для 131 формы (до диспансеризации) с выбором года.")),
+    ],
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
+)
+
 # Основной layout
 statistic_main = html.Div([
     dbc.Breadcrumb(
@@ -56,12 +65,13 @@ statistic_main = html.Div([
     dcc.Location(id=f'url-{type_page}', refresh=True),
     cards_row_1,
     cards_row_2,
+    cards_row_3,
 ])
 
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 9)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 10)],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -81,6 +91,7 @@ def navigate_pages(*n_clicks):
         6: f"/{main_link}/vop",
         7: f"/{main_link}/eln",
         8: f"/{main_link}/remd500",
+        9: f"/{main_link}/form131",
     }
     
     return route_map[report_num]
