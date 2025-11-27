@@ -218,7 +218,7 @@ kvazar_sensor_analysis_orders = create_sensor(
     "kvazar_sensor_analysis_orders",
     "Квазар: Журнал заказов анализов",
     "mosaic_conductor/etl/data/kvazar/analysis_orders",
-    "load_data_analysis_orders",
+    "load_data_kvazar_analysis_orders",
     "mosaic_conductor/etl/config/mapping.json"
 )
 

@@ -133,7 +133,7 @@ kvazar_job_reference = create_etl_job(
 )
 kvazar_job_analysis_orders = create_etl_job(
     "kvazar_job_analysis_orders",
-    "load_data_analysis_orders",
+    "load_data_kvazar_analysis_orders",
     "kvazar/analysis_orders",
     "mapping.json",
 )

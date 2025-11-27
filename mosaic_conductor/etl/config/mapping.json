@@ -370,7 +370,7 @@
       "encoding": "cp1251",
       "delimiter": ";"
     },
-    "load_data_analysis_orders": {
+    "load_data_kvazar_analysis_orders": {
       "file": {
         "file_pattern": "Журнал заказов*",
         "file_format": "csv"
@@ -384,7 +384,7 @@
         "Оператор": "operator",
         "Диагноз": "diagnosis",
         "Услуги": "services",
-        "Создан": "created_at",
+        "Создан": "order_created_at",
         "Источник оплаты": "payment_source",
         "Статус ЭМД": "emd_status",
         "Статус ННС ВИМИС": "nns_vimis_status",
