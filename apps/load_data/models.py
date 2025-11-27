@@ -422,6 +422,30 @@ class Reference(TimeStampedModel):
         verbose_name_plural = 'Справки'
 
 
+class KvazarAnalysisOrder(TimeStampedModel):
+    number = models.CharField("Номер", max_length=255, unique=True)
+    status = models.CharField("Статус", max_length=255, default="-")
+    lis = models.CharField("ЛИС", max_length=255, default="-")
+    patient = models.CharField("Пациент", max_length=255, default="-")
+    doctor = models.CharField("Врач", max_length=500, default="-")
+    operator = models.CharField("Оператор", max_length=500, default="-")
+    diagnosis = models.CharField("Диагноз", max_length=500, default="-")
+    services = models.TextField("Услуги", default="-")
+    order_created_at = models.CharField("Создан", max_length=255, default="-")
+    payment_source = models.CharField("Источник оплаты", max_length=255, default="-")
+    emd_status = models.CharField("Статус ЭМД", max_length=255, default="-")
+    nns_vimis_status = models.CharField("Статус ННС ВИМИС", max_length=255, default="-")
+    rns_vimis_status = models.CharField("Статус (Р)НС ВИМИС", max_length=255, default="-")
+
+    def __str__(self):
+        return f"{self.number} — {self.patient}"
+
+    class Meta:
+        db_table = "load_data_kvazar_analysis_orders"
+        verbose_name = "Квазар: заказ анализа"
+        verbose_name_plural = "Квазар: заказы анализов"
+
+
 class Doctor(TimeStampedModel):
     snils = models.CharField("СНИЛС", max_length=255)
     doctor_code = models.CharField("Код врача", max_length=255, default="-")
