@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from functools import lru_cache
+import time
 
 import pandas as pd
 from dash import html, dcc, Input, Output, State, ctx
@@ -22,12 +23,21 @@ SOURCE_FILTER_ID = f"dropdown-source-{type_page}"
 DEPARTMENT_FILTER_ID = f"dropdown-department-{type_page}"
 APPLY_BUTTON_ID = f"apply-button-{type_page}"
 RESET_BUTTON_ID = f"reset-button-{type_page}"
+STATUS_TEXT_ID = f"query-status-{type_page}"
 
 
 def _default_dates():
     end_date = datetime.now().date()
     start_date = end_date - timedelta(days=6)
     return start_date, end_date
+
+
+def _format_status(duration: float, record_count: int) -> str:
+    if duration < 1:
+        time_text = f"{duration * 1000:.0f}мс"
+    else:
+        time_text = f"{duration:.1f}с"
+    return f"Запрос выполнен за {time_text}. Найдено записей: {record_count}"
 
 
 @lru_cache(maxsize=1)
@@ -155,6 +165,7 @@ appointment_analysis_page = html.Div(
             ]),
             className="mb-4"
         ),
+        html.Div(id=STATUS_TEXT_ID, className="text-muted mt-3"),
         dcc.Tabs([
             dcc.Tab(
                 label="Список записанных",
@@ -164,7 +175,7 @@ appointment_analysis_page = html.Div(
                 label="Анализ записанных",
                 children=[card_table(TABLE_ANALYSIS_ID, "Рейтинг пациентов по числу записей", page_size=20)]
             )
-        ])
+        ]),
     ],
     style={"padding": "20px"}
 )
@@ -177,6 +188,7 @@ appointment_analysis_page = html.Div(
     Output(TABLE_ANALYSIS_ID, 'columns'),
     Output(DATE_RANGE_ID, 'start_date'),
     Output(DATE_RANGE_ID, 'end_date'),
+    Output(STATUS_TEXT_ID, 'children'),
     Input(APPLY_BUTTON_ID, 'n_clicks'),
     Input(RESET_BUTTON_ID, 'n_clicks'),
     State(DATE_RANGE_ID, 'start_date'),
@@ -212,10 +224,13 @@ def update_appointments(
     parsed_start = datetime.fromisoformat(current_start).replace(hour=0, minute=0, second=0, microsecond=0)
     parsed_end = datetime.fromisoformat(current_end).replace(hour=23, minute=59, second=59, microsecond=999999)
 
+    query_start = time.time()
     df = _fetch_appointments(parsed_start, parsed_end, schedule_types, record_sources, departments)
+    execution_time = time.time() - query_start
+    status_text = _format_status(execution_time, len(df))
 
     if df.empty:
-        return [], [], [], [], current_start, current_end
+        return [], [], [], [], current_start, current_end, status_text
 
     df['Пациент'] = (
         df['patient_last_name'].str.title() + ' ' +
@@ -296,5 +311,6 @@ def update_appointments(
         analysis_df.to_dict('records'),
         analysis_columns,
         current_start,
-        current_end
+        current_end,
+        status_text
     )

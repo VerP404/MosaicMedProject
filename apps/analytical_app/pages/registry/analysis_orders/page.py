@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import re
+import time
 from functools import lru_cache
 
 import pandas as pd
@@ -25,12 +26,21 @@ ATTACHMENT_FILTER_ID = f"attachment-filter-{type_page}"
 APPLY_BUTTON_ID = f"apply-filters-{type_page}"
 RESET_BUTTON_ID = f"reset-filters-{type_page}"
 SERVICES_SWITCH_ID = f"services-codes-only-{type_page}"
+STATUS_TEXT_ID = f"query-status-{type_page}"
 
 
 def _default_dates():
     end_date = datetime.now().date()
     start_date = end_date - timedelta(days=6)
     return start_date, end_date
+
+
+def _format_status(duration: float, record_count: int) -> str:
+    if duration < 1:
+        time_text = f"{duration * 1000:.0f}мс"
+    else:
+        time_text = f"{duration:.1f}с"
+    return f"Запрос выполнен за {time_text}. Найдено записей: {record_count}"
 
 
 def _payment_source_options():
@@ -288,6 +298,7 @@ analysis_orders_page = html.Div(
             ]),
             className="mb-4"
         ),
+        html.Div(id=STATUS_TEXT_ID, className="text-muted mb-3"),
         dcc.Tabs(
             [
                 dcc.Tab(
@@ -334,6 +345,7 @@ analysis_orders_page = html.Div(
     Output(DATE_RANGE_ID, 'end_date'),
     Output(PAYMENT_DROPDOWN_ID, 'value'),
     Output(ATTACHMENT_FILTER_ID, 'value'),
+    Output(STATUS_TEXT_ID, 'children'),
     Input(APPLY_BUTTON_ID, 'n_clicks'),
     Input(RESET_BUTTON_ID, 'n_clicks'),
     State(SERVICES_SWITCH_ID, 'value'),
@@ -372,7 +384,10 @@ def update_analysis_orders_table(
     parsed_start = datetime.fromisoformat(current_start).replace(hour=0, minute=0, second=0, microsecond=0)
     parsed_end = datetime.fromisoformat(current_end).replace(hour=23, minute=59, second=59, microsecond=999999)
 
+    query_start = time.time()
     df = _fetch_orders(parsed_start, parsed_end, current_payment, services_codes_only, current_attachment)
+    execution_time = time.time() - query_start
+    status_text = _format_status(execution_time, len(df))
 
     if df.empty:
         empty_resp = ([], [])
@@ -384,7 +399,8 @@ def update_analysis_orders_table(
             current_start,
             current_end,
             current_payment,
-            current_attachment
+            current_attachment,
+            status_text
         )
 
     main_columns = [{"name": col, "id": col} for col in df.columns]
@@ -418,6 +434,7 @@ def update_analysis_orders_table(
         doctor_group.to_dict('records'), doctor_columns,
         patient_group.to_dict('records'), patient_columns,
         department_group.to_dict('records'), department_columns,
-        current_start, current_end, current_payment, current_attachment
+        current_start, current_end, current_payment, current_attachment,
+        status_text
     )
 
