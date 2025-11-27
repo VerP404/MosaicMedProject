@@ -1,499 +1,300 @@
-# -*- coding: utf-8 -*-
-"""
-АНАЛИЗ ЗАПИСАННЫХ НА ПРИЕМ
-Dash-приложение для анализа данных пациентов
-Находит пересечения между списком ЕНП и обращениями пациентов
-"""
+from datetime import datetime, timedelta
+from functools import lru_cache
 
 import pandas as pd
-import chardet
-import io
-import base64
-from datetime import datetime
-from dash import html, dcc, Input, Output, State, callback_context, dash_table, no_update
+from dash import html, dcc, Input, Output, State, ctx
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
+from sqlalchemy import text
+
 from apps.analytical_app.app import app
+from apps.analytical_app.elements import card_table
+from apps.analytical_app.query_executor import engine
+from apps.analytical_app.components import filters as common_filters
+
 
 type_page = "appointment_analysis"
+TABLE_LIST_ID = f"result-table-{type_page}"
+TABLE_ANALYSIS_ID = f"result-table-analysis-{type_page}"
+DATE_RANGE_ID = f"date-picker-range-{type_page}"
+SCHEDULE_FILTER_ID = f"dropdown-schedule-{type_page}"
+SOURCE_FILTER_ID = f"dropdown-source-{type_page}"
+DEPARTMENT_FILTER_ID = f"dropdown-department-{type_page}"
+APPLY_BUTTON_ID = f"apply-button-{type_page}"
+RESET_BUTTON_ID = f"reset-button-{type_page}"
 
 
-def detect_encoding(file_content):
-    """Определяет кодировку файла"""
-    result = chardet.detect(file_content)
-    return result['encoding']
+def _default_dates():
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=6)
+    return start_date, end_date
 
 
-def read_csv_with_encoding(file_content, encoding):
-    """Читает CSV файл с указанной кодировкой"""
-    encodings_to_try = [encoding, 'utf-8', 'cp1251', 'windows-1251', 'iso-8859-1']
-
-    for enc in encodings_to_try:
-        try:
-            return pd.read_csv(io.StringIO(file_content.decode(enc)), sep=';', dtype=str)
-        except (UnicodeDecodeError, UnicodeError):
-            continue
-
-    raise Exception("Не удалось прочитать CSV файл ни с одной кодировкой")
-
-
-# Статистика (замена твоего stats_html)
-def build_stats_card(stats):
-    total_enp = stats['total_enp_records']
-    total_req = stats['total_requests_records']
-    unique_enp = stats['unique_enp_in_file']
-    unique_req = stats['unique_requests_in_file']
-    common = stats['common_enp']
-    result = stats['result_records']
-    enp_field = stats.get('enp_field_used', 'ЕНП')
-
-    return dbc.Card(
-        dbc.CardBody([
-            html.H5("📊 Результаты сверки", className="mb-3"),
-
-            html.P(
-                f"Сравнение выполнено по полю «{enp_field}». ",
-                className="text-muted small"
-            ),
-
-            dbc.Row([
-                dbc.Col([
-                    html.H6("Файл с ЕНП - список людей/пациентов", className="mb-2"),
-                    html.Div(f"Всего записей - строк в файле: {total_enp}", className="mb-1"),
-                    html.Div(f"Всего уникальных людей/пациентов по ЕНП: {unique_enp}", className="mb-1"),
-                ], md=4),
-
-                dbc.Col([
-                    html.H6("Файл из модуля обращений - записи пациентов на прием", className="mb-2"),
-                    html.Div(f"Всего записей - строк в файле: {total_req}", className="mb-1"),
-                    html.Div(f"Всего уникальных людей/пациентов по ЕНП: {unique_req}", className="mb-1"),
-                ], md=4),
-
-                dbc.Col([
-                    html.H6("Совпадения - найденные люди из списка в записях на прием", className="mb-2"),
-                    html.Div(f"Всего найдено записей - записано на прием: {result}", className="mb-1"),
-                    html.Div(f"Всего уникальных людей/пациентов - записано на прием: {common}", className="mb-1"),
-                ], md=4),
-            ])
-        ]),
-        className="shadow-sm mb-4"
-    )
+@lru_cache(maxsize=1)
+def _get_filter_options(column: str) -> list:
+    query = text(f"""
+        SELECT DISTINCT {column}
+        FROM load_data_journal_appeals
+        WHERE COALESCE(NULLIF({column}, '-'), '') <> ''
+        ORDER BY {column}
+    """)
+    with engine.connect() as connection:
+        rows = connection.execute(query).fetchall()
+    return [{'label': row[0], 'value': row[0]} for row in rows if row and row[0]]
 
 
-def process_data(enp_df, requests_df, enp_field='ЕНП'):
-    """Обрабатывает данные и находит пересечения"""
-    try:
-        # Проверяем наличие колонки ЕНП в Excel файле
-        if enp_field not in enp_df.columns:
-            return None, f"Ошибка: В файле с ЕНП нет колонки '{enp_field}'. Доступные колонки: {enp_df.columns.tolist()}"
+def _fetch_appointments(
+    date_from: datetime,
+    date_to: datetime,
+    schedule_types: list,
+    record_sources: list,
+    departments: list
+) -> pd.DataFrame:
+    conditions = ["acceptance_ts BETWEEN :date_from AND :date_to"]
+    params = {"date_from": date_from, "date_to": date_to}
 
-        if 'ЕНП' not in requests_df.columns:
-            return None, f"Ошибка: В файле с обращениями нет колонки 'ЕНП'. Доступные колонки: {requests_df.columns.tolist()}"
+    if schedule_types:
+        conditions.append("schedule_type = ANY(:schedule_types)")
+        params["schedule_types"] = schedule_types
+    if record_sources:
+        conditions.append("record_source = ANY(:record_sources)")
+        params["record_sources"] = record_sources
+    if departments:
+        conditions.append("department = ANY(:departments)")
+        params["departments"] = departments
 
-        # Очищаем данные от пустых ЕНП
-        enp_clean = enp_df.dropna(subset=[enp_field])
-        requests_clean = requests_df.dropna(subset=['ЕНП'])
-
-        # Находим пересечения
-        enp_set = set(enp_clean[enp_field].astype(str).str.replace('.0', '').str.strip())
-        requests_set = set(requests_clean['ЕНП'].astype(str).str.replace('.0', '').str.strip())
-        common_enp = enp_set.intersection(requests_set)
-
-        if len(common_enp) == 0:
-            return None, "Общих ЕНП не найдено!"
-
-        # Фильтруем записи
-        requests_clean = requests_clean.copy()
-        requests_clean['ЕНП_str'] = requests_clean['ЕНП'].astype(str).str.replace('.0', '').str.strip()
-        result_df = requests_clean[requests_clean['ЕНП_str'].isin(common_enp)]
-
-        # Добавляем поле "Прием" с датой
-        if 'Дата приема' in result_df.columns:
-            result_df = result_df.copy()
-            result_df['Прием'] = pd.to_datetime(result_df['Дата приема'], format='%Y-%m-%dT%H:%M',
-                                                errors='coerce').dt.date
-
-        # Удаляем служебную колонку
-        if 'ЕНП_str' in result_df.columns:
-            result_df = result_df.drop('ЕНП_str', axis=1)
-
-        # Статистика
-        stats = {
-            'total_enp_records': len(enp_df),
-            'total_requests_records': len(requests_df),
-            'unique_enp_in_file': len(enp_set),
-            'unique_requests_in_file': len(requests_set),
-            'common_enp': len(common_enp),
-            'result_records': len(result_df),
-            'enp_field_used': enp_field
-        }
-
-        return result_df, stats
-
-    except Exception as e:
-        return None, f"Ошибка при обработке данных: {str(e)}"
-
-
-# Layout страницы
-appointment_analysis_page = html.Div([
-    # Заголовок
-    dbc.Row([
-        dbc.Col([
-            html.H2("Анализ записанных на прием", className="mb-4"),
-            html.P("Загрузите файлы с ЕНП (Excel) и обращениями (CSV) для анализа пересечений",
-                   className="text-muted mb-4")
-        ], width=12)
-    ], className="px-3"),
-
-    # Загрузка файлов
-    dbc.Row([
-        dbc.Col([
-            dbc.Card([
-                dbc.CardHeader("Загрузка файлов"),
-                dbc.CardBody([
-                    dbc.Row([
-                        dbc.Col([
-                            html.Label("Файл с ЕНП для поиска записанных на прием (Excel)",
-                                       style={"font-weight": "bold"}),
-                            dcc.Upload(
-                                id=f"upload-enp-{type_page}",
-                                children=html.Div([
-                                    "Перетащите файл сюда или ",
-                                    html.A("выберите файл")
-                                ]),
-                                style={
-                                    "width": "100%",
-                                    "height": "60px",
-                                    "lineHeight": "60px",
-                                    "borderWidth": "1px",
-                                    "borderStyle": "dashed",
-                                    "borderRadius": "5px",
-                                    "textAlign": "center",
-                                    "margin": "10px"
-                                },
-                                multiple=False,
-                                accept=".xlsx,.xls"
-                            ),
-                            html.Div(id=f"enp-loading-{type_page}", className="mt-2"),
-                            html.Div(id=f"enp-file-info-{type_page}", className="mt-2"),
-                            html.Div(id=f"enp-field-selector-{type_page}", className="mt-2")
-                        ], width=12, md=6, className="mb-3 mb-md-0"),
-                        dbc.Col([
-                            html.Label("Файл из модуля Обращения Квазар (CSV)", style={"font-weight": "bold"}),
-                            dcc.Upload(
-                                id=f"upload-requests-{type_page}",
-                                children=html.Div([
-                                    "Перетащите файл сюда или ",
-                                    html.A("выберите файл")
-                                ]),
-                                style={
-                                    "width": "100%",
-                                    "height": "60px",
-                                    "lineHeight": "60px",
-                                    "borderWidth": "1px",
-                                    "borderStyle": "dashed",
-                                    "borderRadius": "5px",
-                                    "textAlign": "center",
-                                    "margin": "10px"
-                                },
-                                multiple=False,
-                                accept=".csv"
-                            ),
-                            html.Div(id=f"requests-loading-{type_page}", className="mt-2"),
-                            html.Div(id=f"requests-file-info-{type_page}", className="mt-2")
-                        ], width=12, md=6)
-                    ]),
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Button(
-                                "Анализировать данные",
-                                id=f"analyze-button-{type_page}",
-                                color="primary",
-                                className="mt-3",
-                                disabled=True
-                            )
-                        ], width=12)
-                    ])
-                ])
-            ])
-        ], width=12)
-    ], className="mb-4 px-3"),
-
-    # Индикатор загрузки
-    dbc.Row([
-        dbc.Col([
-            html.Div(id=f"loading-indicator-{type_page}")
-        ], width=12)
-    ], className="mb-3 px-3"),
-
-    # Результаты
-    dbc.Row([
-        dbc.Col([
-            dbc.Card([
-                dbc.CardHeader("Результаты анализа"),
-                dbc.CardBody([
-                    html.Div(id=f"analysis-results-{type_page}"),
-                    html.Div(id=f"analysis-table-{type_page}")
-                ])
-            ])
-        ], width=12)
-    ], className="px-3")
-])
-
-
-# Callback для показа индикатора загрузки при загрузке Excel файла
-@app.callback(
-    Output(f"enp-loading-{type_page}", "children"),
-    Input(f"upload-enp-{type_page}", "contents"),
-    prevent_initial_call=True
-)
-def show_enp_loading(contents):
-    if contents is None:
-        raise PreventUpdate
-
-    return dbc.Alert([
-        dbc.Spinner(
-            html.Div([
-                html.Strong("📤 Загружаю Excel файл..."),
-                html.Br(),
-                "Пожалуйста, подождите"
-            ])
+    query = text(f"""
+        WITH data AS (
+            SELECT *,
+                   CASE
+                       WHEN acceptance_date ~ '^\\d{{2}}\\.\\d{{2}}\\.\\d{{4}} \\d{{2}}:\\d{{2}}$' THEN
+                           to_timestamp(acceptance_date, 'DD.MM.YYYY HH24:MI')
+                       WHEN acceptance_date ~ '^\\d{{4}}-\\d{{2}}-\\d{{2}}T\\d{{1,2}}:\\d{{2}}(:\\d{{2}})?$' THEN
+                           to_timestamp(
+                               regexp_replace(
+                                   replace(
+                                       regexp_replace(acceptance_date, 'T(\\d):', 'T0\\1:', 1, 0, 'g'),
+                                       'T',
+                                       ' '
+                                   ),
+                                   '(\\d{{2}}:\\d{{2}})(?!:)',
+                                   '\\1:00',
+                                   1,
+                                   0,
+                                   'g'
+                               ),
+                               'YYYY-MM-DD HH24:MI:SS'
+                           )
+                       ELSE NULL
+                   END AS acceptance_ts
+            FROM load_data_journal_appeals
         )
-    ], color="info", className="mb-2")
+        SELECT *
+        FROM data
+        WHERE acceptance_ts IS NOT NULL
+          AND {' AND '.join(conditions)}
+        ORDER BY acceptance_ts DESC
+    """)
+
+    return pd.read_sql_query(query, engine, params=params, parse_dates=['acceptance_ts'])
 
 
-# Callback для обработки загрузки файла с ЕНП
-@app.callback(
-    Output(f"enp-loading-{type_page}", "children", allow_duplicate=True),
-    Output(f"enp-file-info-{type_page}", "children"),
-    Output(f"enp-field-selector-{type_page}", "children"),
-    Output(f"analyze-button-{type_page}", "disabled"),
-    Input(f"upload-enp-{type_page}", "contents"),
-    State(f"upload-enp-{type_page}", "filename"),
-    prevent_initial_call=True
-)
-def handle_enp_upload(contents, filename):
-    if contents is None:
-        return "", "", "", True
+schedule_options = _get_filter_options("schedule_type")
+source_options = _get_filter_options("record_source")
+department_options = _get_filter_options("department")
+default_start, default_end = _default_dates()
 
-    try:
-        # Декодируем файл
-        content_type, content_string = contents.split(',')
-        decoded = base64.b64decode(content_string)
 
-        # Читаем Excel файл
-        df = pd.read_excel(io.BytesIO(decoded))
-
-        info = dbc.Alert([
-            html.Strong(f"✅ {filename}"),
-            html.Br(),
-            f"Загружено записей: {len(df)}",
-            html.Br(),
-            f"Колонки: {', '.join(df.columns.tolist())}"
-        ], color="success", className="mb-0")
-
-        # Создаем селектор полей
-        field_options = [{'label': col, 'value': col} for col in df.columns.tolist()]
-        field_selector = html.Div([
-            html.Label("Выберите поле с ЕНП:", style={"font-weight": "bold", "font-size": "0.9rem"}),
-            dcc.Dropdown(
-                id=f"enp-field-dropdown-{type_page}",
-                options=field_options,
-                value=field_options[0]['value'] if field_options else None,
-                clearable=False,
-                placeholder="Выберите поле...",
-                style={"font-size": "0.9rem"}
+appointment_analysis_page = html.Div(
+    [
+        dbc.Card(
+            dbc.CardBody([
+                html.H4("Фильтры", className="mb-3"),
+                dbc.Row([
+                    dbc.Col(common_filters.date_picker(type_page), md=4, xs=12, className="mb-3"),
+                    dbc.Col([
+                        html.Label("Тип расписания", className="fw-bold"),
+                        dcc.Dropdown(
+                            id=SCHEDULE_FILTER_ID,
+                            options=schedule_options,
+                            multi=True,
+                            placeholder="Все типы",
+                            clearable=True
+                        )
+                    ], md=4, xs=12, className="mb-3"),
+                    dbc.Col([
+                        html.Label("Источник записи", className="fw-bold"),
+                        dcc.Dropdown(
+                            id=SOURCE_FILTER_ID,
+                            options=source_options,
+                            multi=True,
+                            placeholder="Все источники",
+                            clearable=True
+                        )
+                    ], md=4, xs=12, className="mb-3"),
+                ]),
+                dbc.Row([
+                    dbc.Col([
+                        html.Label("Подразделение", className="fw-bold"),
+                        dcc.Dropdown(
+                            id=DEPARTMENT_FILTER_ID,
+                            options=department_options,
+                            multi=True,
+                            placeholder="Все подразделения",
+                            clearable=True
+                        )
+                    ], md=8, xs=12, className="mb-3"),
+                    dbc.Col(
+                        dbc.ButtonGroup([
+                            dbc.Button("Применить", id=APPLY_BUTTON_ID, color="primary"),
+                            dbc.Button("Сбросить", id=RESET_BUTTON_ID, color="secondary", className="ms-2"),
+                        ], className="mt-4"),
+                        md=4, xs=12, className="mb-3 d-flex justify-content-end"
+                    )
+                ])
+            ]),
+            className="mb-4"
+        ),
+        dcc.Tabs([
+            dcc.Tab(
+                label="Список записанных",
+                children=[card_table(TABLE_LIST_ID, "Список записанных", page_size=20)]
+            ),
+            dcc.Tab(
+                label="Анализ записанных",
+                children=[card_table(TABLE_ANALYSIS_ID, "Рейтинг пациентов по числу записей", page_size=20)]
             )
         ])
-
-        return "", info, field_selector, False
-
-    except Exception as e:
-        error = dbc.Alert([
-            html.Strong(f"❌ Ошибка загрузки {filename}"),
-            html.Br(),
-            str(e)
-        ], color="danger", className="mb-0")
-        return "", error, "", True
+    ],
+    style={"padding": "20px"}
+)
 
 
-# Callback для показа индикатора загрузки при загрузке CSV файла
 @app.callback(
-    Output(f"requests-loading-{type_page}", "children"),
-    Input(f"upload-requests-{type_page}", "contents"),
+    Output(TABLE_LIST_ID, 'data'),
+    Output(TABLE_LIST_ID, 'columns'),
+    Output(TABLE_ANALYSIS_ID, 'data'),
+    Output(TABLE_ANALYSIS_ID, 'columns'),
+    Output(DATE_RANGE_ID, 'start_date'),
+    Output(DATE_RANGE_ID, 'end_date'),
+    Input(APPLY_BUTTON_ID, 'n_clicks'),
+    Input(RESET_BUTTON_ID, 'n_clicks'),
+    State(DATE_RANGE_ID, 'start_date'),
+    State(DATE_RANGE_ID, 'end_date'),
+    State(SCHEDULE_FILTER_ID, 'value'),
+    State(SOURCE_FILTER_ID, 'value'),
+    State(DEPARTMENT_FILTER_ID, 'value'),
     prevent_initial_call=True
 )
-def show_requests_loading(contents):
-    if contents is None:
+def update_appointments(
+    apply_clicks,
+    reset_clicks,
+    start_date,
+    end_date,
+    schedule_types,
+    record_sources,
+    departments
+):
+    if not apply_clicks and not reset_clicks:
         raise PreventUpdate
 
-    return dbc.Alert([
-        dbc.Spinner(
-            html.Div([
-                html.Strong("📤 Загружаю CSV файл..."),
-                html.Br(),
-                "Пожалуйста, подождите"
-            ])
+    trigger = ctx.triggered_id
+    if trigger == RESET_BUTTON_ID:
+        current_start = default_start.isoformat()
+        current_end = default_end.isoformat()
+        schedule_types = None
+        record_sources = None
+        departments = None
+    else:
+        current_start = start_date or default_start.isoformat()
+        current_end = end_date or default_end.isoformat()
+
+    parsed_start = datetime.fromisoformat(current_start).replace(hour=0, minute=0, second=0, microsecond=0)
+    parsed_end = datetime.fromisoformat(current_end).replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    df = _fetch_appointments(parsed_start, parsed_end, schedule_types, record_sources, departments)
+
+    if df.empty:
+        return [], [], [], [], current_start, current_end
+
+    df['Пациент'] = (
+        df['patient_last_name'].str.title() + ' ' +
+        df['patient_first_name'].str.title() + ' ' +
+        df['patient_middle_name'].str.title()
+    )
+    employee_cols = ['employee_last_name', 'employee_first_name', 'employee_middle_name']
+    for col in employee_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna('')
+
+    df['Врач'] = (
+        df['employee_last_name'].str.title().str.strip() + ' ' +
+        df['employee_first_name'].str.title().str.strip() + ' ' +
+        df['employee_middle_name'].str.title().str.strip()
+    ).str.replace(r'\s+', ' ', regex=True).str.strip().replace({'- - -': '', '-': ''})
+
+    df['Дата приема'] = df['acceptance_ts'].dt.strftime('%d.%m.%Y %H:%M')
+
+    list_df = df.rename(columns={
+        'birth_date': 'Дата рождения',
+        'gender': 'Пол',
+        'phone': 'Телефон',
+        'enp': 'ЕНП',
+        'attachment': 'Прикрепление',
+        'series': 'Серия',
+        'number': 'Номер',
+        'record_date': 'Дата записи',
+        'schedule_type': 'Тип расписания',
+        'record_source': 'Источник записи',
+        'department': 'Подразделение',
+        'position': 'Должность',
+        'creator': 'Создавший',
+        'no_show': 'Не явился',
+        'epmz': 'ЭПМЗ'
+    })
+
+    hidden_cols = [
+        'patient_last_name', 'patient_first_name', 'patient_middle_name',
+        'employee_last_name', 'employee_first_name', 'employee_middle_name',
+        'acceptance_ts'
+    ]
+    list_df.drop(columns=[col for col in hidden_cols if col in list_df.columns], inplace=True)
+
+    desired_order = [
+        'Пациент', 'Дата рождения', 'Пол', 'Телефон', 'ЕНП', 'Прикрепление',
+        'Врач', 'Должность', 'Подразделение', 'Дата приема', 'Дата записи',
+        'Тип расписания', 'Источник записи', 'Создавший', 'Не явился', 'ЭПМЗ'
+    ]
+    list_df = list_df[[col for col in desired_order if col in list_df.columns]]
+
+    if 'Врач' in list_df.columns:
+        list_df['_missing_doctor'] = list_df['Врач'].isna() | (list_df['Врач'].astype(str).str.strip() == '')
+        list_df.sort_values(by=['_missing_doctor'], ascending=True, inplace=True)
+        list_df.drop(columns=['_missing_doctor'], inplace=True)
+    list_columns = [{"name": col, "id": col} for col in list_df.columns]
+
+    analysis_group_cols = [
+        col for col in ['Пациент', 'Дата рождения', 'ЕНП', 'Прикрепление']
+        if col in list_df.columns
+    ]
+
+    if analysis_group_cols:
+        analysis_df = (
+            list_df.groupby(analysis_group_cols, dropna=False)
+            .size()
+            .reset_index(name='Количество записей')
+            .sort_values('Количество записей', ascending=False)
         )
-    ], color="info", className="mb-2")
+    else:
+        analysis_df = pd.DataFrame(columns=['Количество записей'])
 
+    analysis_columns = [{"name": col, "id": col} for col in analysis_df.columns]
 
-# Callback для обработки загрузки файла с обращениями
-@app.callback(
-    Output(f"requests-loading-{type_page}", "children", allow_duplicate=True),
-    Output(f"requests-file-info-{type_page}", "children"),
-    Output(f"analyze-button-{type_page}", "disabled", allow_duplicate=True),
-    Input(f"upload-requests-{type_page}", "contents"),
-    State(f"upload-requests-{type_page}", "filename"),
-    prevent_initial_call=True
-)
-def handle_requests_upload(contents, filename):
-    if contents is None:
-        return "", "", True
-
-    try:
-        # Декодируем файл
-        content_type, content_string = contents.split(',')
-        decoded = base64.b64decode(content_string)
-
-        # Определяем кодировку
-        encoding = detect_encoding(decoded)
-
-        # Читаем CSV файл
-        df = read_csv_with_encoding(decoded, encoding)
-
-        info = dbc.Alert([
-            html.Strong(f"✅ {filename}"),
-            html.Br(),
-            f"Загружено записей: {len(df)}",
-            html.Br(),
-            f"Кодировка: {encoding}",
-            html.Br(),
-            f"Колонки: {', '.join(df.columns.tolist())}"
-        ], color="success", className="mb-0")
-
-        return "", info, False
-
-    except Exception as e:
-        error = dbc.Alert([
-            html.Strong(f"❌ Ошибка загрузки {filename}"),
-            html.Br(),
-            str(e)
-        ], color="danger", className="mb-0")
-        return "", error, True
-
-
-# Callback для показа индикатора загрузки
-@app.callback(
-    Output(f"loading-indicator-{type_page}", "children"),
-    Input(f"analyze-button-{type_page}", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_loading_indicator(n_clicks):
-    if n_clicks is None:
-        raise PreventUpdate
-
-    return dbc.Alert([
-        dbc.Spinner(
-            html.Div([
-                html.Strong("🔄 Анализирую данные..."),
-                html.Br(),
-                "Пожалуйста, подождите, это может занять некоторое время."
-            ])
-        )
-    ], color="info", className="mb-3")
-
-
-# Callback для анализа данных
-@app.callback(
-    Output(f"loading-indicator-{type_page}", "children", allow_duplicate=True),
-    Output(f"analysis-results-{type_page}", "children"),
-    Output(f"analysis-table-{type_page}", "children"),
-    Input(f"analyze-button-{type_page}", "n_clicks"),
-    State(f"upload-enp-{type_page}", "contents"),
-    State(f"upload-requests-{type_page}", "contents"),
-    State(f"enp-field-dropdown-{type_page}", "value"),
-    prevent_initial_call=True
-)
-def analyze_data(n_clicks, enp_contents, requests_contents, enp_field):
-    if n_clicks is None or enp_contents is None or requests_contents is None:
-        raise PreventUpdate
-
-    try:
-        # Декодируем файлы
-        _, enp_string = enp_contents.split(',')
-        enp_decoded = base64.b64decode(enp_string)
-        enp_df = pd.read_excel(io.BytesIO(enp_decoded))
-
-        _, requests_string = requests_contents.split(',')
-        requests_decoded = base64.b64decode(requests_string)
-        encoding = detect_encoding(requests_decoded)
-        requests_df = read_csv_with_encoding(requests_decoded, encoding)
-
-        # Обрабатываем данные
-        result_df, stats = process_data(enp_df, requests_df, enp_field)
-
-        if result_df is None:
-            # Ошибка обработки
-            error_alert = dbc.Alert([
-                html.Strong("❌ Ошибка анализа"),
-                html.Br(),
-                stats
-            ], color="danger")
-            return "", error_alert, ""
-
-        # Статистика
-        stats_html = build_stats_card(stats)
-        stats_html2 = dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardBody([
-                        html.H5("Статистика", className="card-title"),
-                        html.P([
-                            html.Strong("Записей в файле с ЕНП: "), str(stats['total_enp_records']), html.Br(),
-                            html.Strong("Записей в файле с обращениями: "), str(stats['total_requests_records']),
-                            html.Br(),
-                            html.Strong("Поле для поиска ЕНП: "), str(stats.get('enp_field_used', 'ЕНП')), html.Br(),
-                            html.Strong("Уникальных ЕНП в файле с ЕНП: "), str(stats['unique_enp_in_file']), html.Br(),
-                            html.Strong("Уникальных ЕНП в файле с обращениями: "),
-                            str(stats['unique_requests_in_file']), html.Br(),
-                            html.Strong("Общих ЕНП: "), str(stats['common_enp']), html.Br(),
-                            html.Strong("Записей в результате: "), str(stats['result_records'])
-                        ])
-                    ])
-                ])
-            ], width=12)
-        ])
-
-        # Таблица с результатами
-        table = dash_table.DataTable(
-            id=f"results-table-{type_page}",
-            data=result_df.to_dict('records'),
-            columns=[{"name": i, "id": i} for i in result_df.columns],
-            page_size=15,
-            sort_action="native",
-            filter_action="native",
-            style_cell={"textAlign": "left", "minWidth": "120px", "maxWidth": "400px", "whiteSpace": "normal"},
-            style_header={"fontWeight": "bold"},
-            export_format="xlsx",
-            # Настройки для прокрутки внутри контейнера
-            style_table={
-                "height": "500px",
-                "overflowY": "auto",
-                "overflowX": "auto",
-                "border": "1px solid #dee2e6",
-                "borderRadius": "0.375rem"
-            },
-            fixed_rows={"headers": True},
-            virtualization=True
-        )
-
-        return "", stats_html, table
-
-    except Exception as e:
-        error_alert = dbc.Alert([
-            html.Strong("❌ Ошибка анализа"),
-            html.Br(),
-            str(e)
-        ], color="danger")
-        return "", error_alert, ""
+    return (
+        list_df.to_dict('records'),
+        list_columns,
+        analysis_df.to_dict('records'),
+        analysis_columns,
+        current_start,
+        current_end
+    )

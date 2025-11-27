@@ -20,7 +20,16 @@ cards_row_1 = dbc.Row(
                             "Анализ школ здоровья",
                             "Отслеживание плановых явок пациентов в школах здоровья.")),
     ],
-    className="mb-4 align-items-stretch",
+    className="row-cols-1 row-cols-md-3 g-4 mb-4 align-items-stretch",
+)
+
+cards_row_2 = dbc.Row(
+    [
+        dbc.Col(create_card(4, type_page,
+                            "Журнал заказов анализов",
+                            "Дашборд по выгрузке из журнала заказов анализов.")),
+    ],
+    className="row-cols-1 row-cols-md-3 g-4 mb-4 align-items-stretch",
 )
 
 registry_main = html.Div([
@@ -30,13 +39,14 @@ registry_main = html.Div([
     ),
     html.Hr(),
     dcc.Location(id=f'url-{type_page}', refresh=True),
-    html.Div(cards_row_1, style={"marginBottom": "20px", "display": "flex", "justify-content": "center"}),
+    cards_row_1,
+    cards_row_2,
 ])
 
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 2, 3]],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 2, 3, 4]],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -50,7 +60,8 @@ def navigate_pages(*n_clicks):
     route_map = {
         1: f"/{main_link}/not_hospitalized",
         2: f"/{main_link}/appointment_analysis",
-        3: f"/{main_link}/health_schools"
+        3: f"/{main_link}/health_schools",
+        4: f"/{main_link}/analysis_orders",
     }
     
     return route_map[report_num]
