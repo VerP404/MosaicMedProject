@@ -372,7 +372,7 @@
     },
     "load_data_analysis_orders": {
       "file": {
-        "file_pattern": "Журнал заказов анализов*",
+        "file_pattern": "Журнал заказов*",
         "file_format": "csv"
       },
       "mapping_fields": {
