@@ -131,6 +131,12 @@ kvazar_job_reference = create_etl_job(
     "kvazar/reference",
     "mapping.json",
 )
+kvazar_job_analysis_orders = create_etl_job(
+    "kvazar_job_analysis_orders",
+    "load_data_analysis_orders",
+    "kvazar/analysis_orders",
+    "mapping.json",
+)
 iszl_job_dn = create_etl_job(
     "iszl_job_dn",
     "load_data_dispansery_iszl",
@@ -292,6 +298,7 @@ kvazar_jobs = [
     kvazar_job_recipes,
     kvazar_job_death,
     kvazar_job_reference,
+    kvazar_job_analysis_orders,
     iszl_job_dn,
     iszl_job_dn_work,
     iszl_job_people,

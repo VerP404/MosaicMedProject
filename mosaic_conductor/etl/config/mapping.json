@@ -370,6 +370,32 @@
       "encoding": "cp1251",
       "delimiter": ";"
     },
+    "load_data_analysis_orders": {
+      "file": {
+        "file_pattern": "Журнал заказов анализов*",
+        "file_format": "csv"
+      },
+      "mapping_fields": {
+        "Номер": "number",
+        "Статус": "status",
+        "ЛИС": "lis",
+        "Пациент": "patient",
+        "Врач": "doctor",
+        "Оператор": "operator",
+        "Диагноз": "diagnosis",
+        "Услуги": "services",
+        "Создан": "created_at",
+        "Источник оплаты": "payment_source",
+        "Статус ЭМД": "emd_status",
+        "Статус ННС ВИМИС": "nns_vimis_status",
+        "Статус (Р)НС ВИМИС": "rns_vimis_status"
+      },
+      "column_check": [
+        "number"
+      ],
+      "encoding": "cp1251",
+      "delimiter": ";"
+    },
     "load_data_dispansery_iszl": {
       "file": {
         "file_pattern": "Report*",

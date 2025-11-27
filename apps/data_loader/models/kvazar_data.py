@@ -143,3 +143,27 @@ class KvazarMedicalCertificate(models.Model):
     class Meta:
         verbose_name = "Квазар: медицинская справка"
         verbose_name_plural = "Квазар: медицинские справки"
+
+
+class KvazarAnalysisOrder(models.Model):
+    number = models.CharField(max_length=255, verbose_name="Номер")
+    status = models.CharField(max_length=255, verbose_name="Статус")
+    lis = models.CharField(max_length=255, verbose_name="ЛИС")
+    patient = models.CharField(max_length=255, verbose_name="Пациент")
+    doctor = models.CharField(max_length=255, verbose_name="Врач")
+    operator = models.CharField(max_length=255, verbose_name="Оператор")
+    diagnosis = models.CharField(max_length=255, verbose_name="Диагноз")
+    services = models.TextField(verbose_name="Услуги")
+    created_at = models.CharField(max_length=255, verbose_name="Создан")
+    payment_source = models.CharField(max_length=255, verbose_name="Источник оплаты")
+    emd_status = models.CharField(max_length=255, verbose_name="Статус ЭМД")
+    nns_vimis_status = models.CharField(max_length=255, verbose_name="Статус ННС ВИМИС")
+    rns_vimis_status = models.CharField(max_length=255, verbose_name="Статус (Р)НС ВИМИС")
+
+    def __str__(self):
+        return f"KvazarAnalysisOrder: {self.number} - {self.patient}"
+
+    class Meta:
+        verbose_name = "Квазар: Заказ анализа"
+        verbose_name_plural = "Квазар: Заказы анализов"
+        db_table = "load_data_analysis_orders"

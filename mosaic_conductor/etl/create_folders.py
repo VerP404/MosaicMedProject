@@ -6,7 +6,7 @@ def create_folders():
 
     # Структура папок
     folder_structure = {
-        'kvazar': ['eln', 'emd', 'recipe', 'death', 'reference'],
+        'kvazar': ['eln', 'emd', 'recipe', 'death', 'reference', 'analysis_orders'],
         'iszl': ['dn', 'people'],
         'weboms': ['doctor', 'talon', 'detailed', 'errorlog'],
     }

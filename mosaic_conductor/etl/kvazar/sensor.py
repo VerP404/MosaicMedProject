@@ -13,6 +13,7 @@ from mosaic_conductor.etl.kvazar import (
     kvazar_job_recipes,
     kvazar_job_death,
     kvazar_job_reference,
+    kvazar_job_analysis_orders,
     iszl_job_dn,
     iszl_job_people,
     wo_old_job_talon,
@@ -212,6 +213,15 @@ kvazar_sensor_reference = create_sensor(
     "mosaic_conductor/etl/config/mapping.json"
 )
 
+kvazar_sensor_analysis_orders = create_sensor(
+    kvazar_job_analysis_orders,
+    "kvazar_sensor_analysis_orders",
+    "Квазар: Журнал заказов анализов",
+    "mosaic_conductor/etl/data/kvazar/analysis_orders",
+    "load_data_analysis_orders",
+    "mosaic_conductor/etl/config/mapping.json"
+)
+
 
 @sensor(job=kvazar_job_load_journal_appeals, name="kvazar_sensor_journal_appeals", description="Квазар: Журнал обращений (CSV управление)")
 def kvazar_sensor_journal_appeals(context):
@@ -361,6 +371,7 @@ kvazar_sensors = [
     kvazar_sensor_recipes,
     kvazar_sensor_death,
     kvazar_sensor_reference,
+    kvazar_sensor_analysis_orders,
     iszl_sensor_dn,
     iszl_sensor_dn_work,
     iszl_sensor_people,
