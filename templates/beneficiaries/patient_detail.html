@@ -1,0 +1,234 @@
+{% extends 'home/base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} - МозаикаМед{% endblock %}
+
+{% block content %}
+<main class="content">
+    <div class="container-fluid p-0">
+        <!-- Навигация -->
+        <div class="row mb-2">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'beneficiaries:list' %}">Льготники</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">{{ patient.full_name }}</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Информация о пациенте -->
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-user"></i> Информация о пациенте
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>ФИО:</strong><br>
+                            <span class="text-primary fs-5">{{ patient.full_name }}</span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <strong>Дата рождения:</strong><br>
+                            {{ patient.birth_date|date:"d.m.Y" }} ({{ patient.age }} лет)
+                        </div>
+                        
+                        {% if patient.snils %}
+                        <div class="mb-3">
+                            <strong>СНИЛС:</strong><br>
+                            {{ patient.snils }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if patient.enp %}
+                        <div class="mb-3">
+                            <strong>ЕНП:</strong><br>
+                            {{ patient.enp }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if patient.benefit_category %}
+                        <div class="mb-3">
+                            <strong>Категория льготы:</strong><br>
+                            <span class="badge bg-info fs-6">{{ patient.benefit_category.name }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if patient.diagnosis_code %}
+                        <div class="mb-3">
+                            <strong>Диагноз:</strong><br>
+                            <span class="badge bg-secondary">{{ patient.diagnosis_code }}</span>
+                            {% if patient.diagnosis_name %}
+                            <br><small>{{ patient.diagnosis_name }}</small>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        {% if patient.phone %}
+                        <div class="mb-3">
+                            <strong>Телефон:</strong><br>
+                            <a href="tel:{{ patient.phone }}">{{ patient.phone }}</a>
+                        </div>
+                        {% endif %}
+                        
+                        {% if patient.address %}
+                        <div class="mb-3">
+                            <strong>Адрес:</strong><br>
+                            {{ patient.address }}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <strong>Статус:</strong><br>
+                            {% if patient.is_active %}
+                                <span class="badge bg-success">Активен</span>
+                            {% else %}
+                                <span class="badge bg-danger">Неактивен</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-pills"></i> Препараты
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="drugs-container">
+                            <div class="text-center">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Загрузка...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+const patientId = {{ patient.id }};
+
+// Загрузка данных о препаратах
+function loadDrugs() {
+    fetch(`{% url 'beneficiaries:patient_detail_api' 0 %}`.replace('0', patientId))
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderDrugs(data.patient.drug_supplies);
+            } else {
+                document.getElementById('drugs-container').innerHTML = 
+                    '<div class="alert alert-danger">Ошибка при загрузке данных</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            document.getElementById('drugs-container').innerHTML = 
+                '<div class="alert alert-danger">Ошибка при загрузке данных</div>';
+        });
+}
+
+// Отрисовка препаратов
+function renderDrugs(supplies) {
+    const container = document.getElementById('drugs-container');
+    
+    if (supplies.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">У пациента нет назначенных препаратов</div>';
+        return;
+    }
+    
+    const html = supplies.map(supply => {
+        let statusClass = 'secondary';
+        let statusIcon = 'circle';
+        
+        if (supply.is_expired) {
+            statusClass = 'danger';
+            statusIcon = 'times-circle';
+        } else if (supply.is_urgent) {
+            statusClass = 'warning';
+            statusIcon = 'exclamation-triangle';
+        } else if (supply.status === 'active') {
+            statusClass = 'success';
+            statusIcon = 'check-circle';
+        }
+        
+        let daysRemaining = '';
+        if (supply.days_remaining !== null) {
+            if (supply.is_expired) {
+                daysRemaining = `<span class="badge bg-danger">Истекло ${Math.abs(supply.days_remaining)} дн. назад</span>`;
+            } else if (supply.is_urgent) {
+                daysRemaining = `<span class="badge bg-warning">⚠ Осталось ${supply.days_remaining} дн.</span>`;
+            } else {
+                daysRemaining = `<span class="badge bg-success">Осталось ${supply.days_remaining} дн.</span>`;
+            }
+        }
+        
+        return `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h5 class="card-title">
+                                <i class="fas fa-${statusIcon} text-${statusClass}"></i>
+                                ${supply.drug_name}
+                            </h5>
+                            <p class="text-muted mb-2">${supply.drug_inn}</p>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <small><strong>Месячная потребность:</strong> ${supply.monthly_need}</small><br>
+                                    <small><strong>Режим приема:</strong> ${supply.dose_regimen}</small><br>
+                                    <small><strong>Выписано:</strong> ${supply.prescribed}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <small><strong>Дата назначения:</strong> ${supply.prescription_date}</small><br>
+                                    <small><strong>Дата выдачи:</strong> ${supply.issue_date}</small><br>
+                                    <small><strong>Обеспечен до:</strong> ${supply.supplied_until}</small>
+                                </div>
+                            </div>
+                            
+                            ${supply.doctor_name !== '-' ? `<small><strong>Врач:</strong> ${supply.doctor_name}</small><br>` : ''}
+                            ${supply.recipe_number !== '-' ? `<small><strong>Рецепт №:</strong> ${supply.recipe_number}</small><br>` : ''}
+                            ${supply.note ? `<small><strong>Примечание:</strong> ${supply.note}</small>` : ''}
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <span class="badge bg-${statusClass} mb-2">${supply.status_display}</span><br>
+                            ${daysRemaining}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = html;
+}
+
+// Инициализация
+document.addEventListener('DOMContentLoaded', function() {
+    loadDrugs();
+});
+</script>
+
+<style>
+.card-title i {
+    margin-right: 8px;
+}
+
+.badge {
+    font-size: 0.85rem;
+}
+</style>
+{% endblock %}
+

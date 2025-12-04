@@ -8,6 +8,7 @@ from apps.home.views import custom_404, custom_500, custom_403
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('apps.home.urls')),
+    path('beneficiaries/', include('apps.beneficiaries.urls', namespace='beneficiaries')),
     path('data_loader/', include('apps.data_loader.urls', namespace='data_loader')),
     path('organization/', include('apps.organization.urls')),
     path('personnel/', include('apps.personnel.urls')),
@@ -17,6 +18,7 @@ urlpatterns = [
     path('people/', include('apps.people.urls')),
     path('api/', include('apps.api.urls')),
     path('reports/', include('apps.reports.urls')),
+    path('dn_app/', include('apps.dn_app.urls')),
     path('', include('apps.references.urls')),
 ]
 # Обслуживание медиа файлов

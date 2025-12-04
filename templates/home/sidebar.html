@@ -14,6 +14,25 @@
                 </a>
             </li>
 
+            <!-- Реестры пациентов -->
+            <li class="sidebar-item">
+                <a data-bs-target="#patient-registries" data-bs-toggle="collapse" class="sidebar-link collapsed">
+                    <i class="align-middle" data-feather="clipboard"></i> <span class="align-middle">Реестры пациентов</span>
+                </a>
+                <ul id="patient-registries" class="sidebar-dropdown list-unstyled collapse">
+                    <li class="sidebar-item">
+                        <a class="sidebar-link" href="{% url 'beneficiaries:home' %}">
+                            <i class="fas fa-heart-pulse align-middle"></i> <span class="align-middle">Льготники</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a class="sidebar-link" href="{% url 'dn_app:upload_csv' %}">
+                            <i class="align-middle" data-feather="activity"></i> <span class="align-middle">Диспансерное наблюдение</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+
             <!-- Аналитическая система -->
             <li class="sidebar-item">
                 <a href="{{ dash_url }}" class="sidebar-link">

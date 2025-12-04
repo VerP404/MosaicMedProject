@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'apps.dn_app',
     'apps.beneficiaries',
     'apps.references',
+    'apps.gar',
 
 
     'import_export',
@@ -287,6 +288,7 @@ UNFOLD = {
                 "collapsible": True,
                 "items": [
                     {"title": "Общие справочники", "icon": "library_books", "link": "/admin/references/"},
+                    {"title": "ГАР (Адреса)", "icon": "location_on", "link": "/admin/gar/"},
                 ],
             },
         ],

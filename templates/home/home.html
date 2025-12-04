@@ -249,6 +249,36 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Система льготников -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="system-card beneficiaries-system">
+                        <div class="system-card-header">
+                            <div class="system-icon">
+                                <i class="fas fa-heart-pulse"></i>
+                            </div>
+                            <div class="system-status">
+                                <span class="status-indicator online"></span>
+                                <span class="status-text">Онлайн</span>
+                            </div>
+                        </div>
+                        <div class="system-card-body">
+                            <h4 class="system-title">Реестр льготников</h4>
+                            <p class="system-description">Система учёта пациентов-льготников, контроль обеспеченности лекарственными препаратами и управление рецептами</p>
+                            <div class="system-features">
+                                <span class="feature-tag">Льготники</span>
+                                <span class="feature-tag">Препараты</span>
+                                <span class="feature-tag">Рецепты</span>
+                            </div>
+                        </div>
+                        <div class="system-card-footer">
+                            <a href="{% url 'beneficiaries:home' %}" class="btn btn-primary">
+                                <i class="fas fa-external-link-alt me-2"></i>
+                                Открыть систему
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -425,6 +455,7 @@
 .admin-system .system-icon { background: linear-gradient(135deg, #43e97b, #38f9d7); }
 .personnel-system .system-icon { background: linear-gradient(135deg, #fa709a, #fee140); }
 .reports-system .system-icon { background: linear-gradient(135deg, #a8edea, #fed6e3); }
+.beneficiaries-system .system-icon { background: linear-gradient(135deg, #ff6a88, #ff99ac); }
 
 .system-status {
     display: flex;

@@ -139,6 +139,15 @@ else
     echo "[INFO] Папки успешно созданы."
 fi
 
+# Импорт структуры индикаторов
+echo "[INFO] Импорт структуры индикаторов (python3.12 manage.py import_indicators_structure)..."
+python3.12 manage.py import_indicators_structure apps/plan/fixtures/indicators_structure.json --update-existing
+if [ $? -ne 0 ]; then
+    echo "[ERROR] Импорт структуры индикаторов завершился с ошибкой!"
+else
+    echo "[INFO] Структура индикаторов успешно импортирована."
+fi
+
 # Остановка текущих процессов
 echo "[INFO] Остановка текущих процессов..."
 pkill -f 'python3.12 manage.py runserver' 2>/dev/null

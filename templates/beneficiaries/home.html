@@ -1,0 +1,247 @@
+{% extends 'home/base.html' %}
+{% load static %}
+
+{% block content %}
+<main class="content">
+    <div class="container-fluid p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0"><i class="fas fa-heart-pulse text-danger"></i> Система льготников</h1>
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> На главную
+            </a>
+        </div>
+
+        <!-- Статистика -->
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6 mb-3">
+                <div class="card border-left-primary shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Пациентов-льготников</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_patients }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-users fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-3">
+                <div class="card border-left-success shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Категорий льгот</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_categories }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-list fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-3">
+                <div class="card border-left-warning shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Срочных назначений</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ urgent_supplies }}</div>
+                                <div class="text-xs text-muted">Заканчиваются ≤7 дней</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-3">
+                <div class="card border-left-danger shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Истекших назначений</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ expired_supplies }}</div>
+                                <div class="text-xs text-muted">Требуют обновления</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-times-circle fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Модули системы -->
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow">
+                    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="m-0 font-weight-bold text-primary">
+                            <i class="fas fa-users"></i> Реестр пациентов-льготников
+                        </h6>
+                        <span class="badge badge-primary badge-pill">{{ total_patients }}</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            Полный список пациентов-льготников с информацией о категориях льгот, 
+                            назначенных препаратах и сроках обеспеченности.
+                        </p>
+                        <ul class="list-unstyled mb-3">
+                            <li><i class="fas fa-check text-success"></i> Поиск по ФИО, СНИЛС, ЕНП</li>
+                            <li><i class="fas fa-check text-success"></i> Фильтрация по категориям</li>
+                            <li><i class="fas fa-check text-success"></i> Детальные карточки пациентов</li>
+                            <li><i class="fas fa-check text-success"></i> Контроль сроков обеспеченности</li>
+                        </ul>
+                        <a href="{% url 'beneficiaries:list' %}" class="btn btn-primary btn-block">
+                            <i class="fas fa-arrow-right"></i> Открыть реестр
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow">
+                    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="m-0 font-weight-bold text-info">
+                            <i class="fas fa-pills"></i> Лекарственные препараты
+                        </h6>
+                        <span class="badge badge-info badge-pill">{{ total_drugs }}</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            Справочник лекарственных препаратов с информацией о МНН, производителях, 
+                            остатках на складе и назначениях пациентам.
+                        </p>
+                        <ul class="list-unstyled mb-3">
+                            <li><i class="fas fa-check text-success"></i> Полная информация о препаратах</li>
+                            <li><i class="fas fa-check text-success"></i> Учёт остатков на складе</li>
+                            <li><i class="fas fa-check text-success"></i> История назначений</li>
+                            <li><i class="fas fa-check text-success"></i> МНН и АТХ коды</li>
+                        </ul>
+                        <a href="/admin/beneficiaries/drug/" class="btn btn-info btn-block">
+                            <i class="fas fa-arrow-right"></i> Справочник препаратов
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Интеграция с рецептами -->
+        <div class="row">
+            <div class="col-lg-12 mb-4">
+                <div class="card shadow">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-success">
+                            <i class="fas fa-database"></i> Интеграция с системой рецептов
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <p class="text-muted mb-3">
+                                    Система льготников интегрирована с базой рецептов. Данные автоматически 
+                                    загружаются из таблицы <code>load_data_recipes</code> и синхронизируются 
+                                    с карточками пациентов.
+                                </p>
+                                <div class="alert alert-info mb-3">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Всего рецептов в системе:</strong> {{ total_recipes }}
+                                </div>
+                                <p><strong>Для синхронизации данных выполните команду:</strong></p>
+                                <pre class="bg-dark text-white p-3 rounded"><code>python manage.py sync_from_recipes</code></pre>
+                                <small class="text-muted">
+                                    Команда извлечёт данные о пациентах, категориях льгот и препаратах из рецептов
+                                </small>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <div class="p-3">
+                                    <i class="fas fa-sync fa-5x text-success mb-3"></i>
+                                    <h5>Синхронизация</h5>
+                                    <p class="text-muted small">Данные из рецептов автоматически связываются с пациентами по СНИЛС</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Админка -->
+        <div class="row">
+            <div class="col-lg-12 mb-4">
+                <div class="card shadow">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-secondary">
+                            <i class="fas fa-cogs"></i> Управление данными
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <a href="/admin/beneficiaries/benefitcategory/" class="btn btn-outline-primary btn-block">
+                                    <i class="fas fa-list"></i> Категории льгот
+                                </a>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <a href="/admin/beneficiaries/patient/" class="btn btn-outline-primary btn-block">
+                                    <i class="fas fa-users"></i> Пациенты
+                                </a>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <a href="/admin/beneficiaries/drug/" class="btn btn-outline-primary btn-block">
+                                    <i class="fas fa-pills"></i> Препараты
+                                </a>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <a href="/admin/beneficiaries/patientdrugsupply/" class="btn btn-outline-primary btn-block">
+                                    <i class="fas fa-clipboard-list"></i> Назначения
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<style>
+.border-left-primary {
+    border-left: 4px solid #4e73df !important;
+}
+
+.border-left-success {
+    border-left: 4px solid #1cc88a !important;
+}
+
+.border-left-warning {
+    border-left: 4px solid #f6c23e !important;
+}
+
+.border-left-danger {
+    border-left: 4px solid #e74a3b !important;
+}
+
+.card {
+    border-radius: 0.35rem;
+}
+
+.shadow {
+    box-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15)!important;
+}
+
+pre code {
+    font-size: 0.9rem;
+}
+</style>
+{% endblock %}
+
