@@ -253,21 +253,21 @@ def build_tables(n_clicks, months_range, year, building_ids,
                 WHEN emd.sending_status IS NULL OR emd.sending_status = '' THEN 'нет ЭМД'
                 WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
                 ELSE emd.sending_status
-            END AS sending_status,
-            oms.talon,
-            oms.source_id,
-            oms.report_month,
-            oms.report_year,
-            oms.status,
-            oms.goal,
-            oms.patient,
-            oms.birth_date,
-            oms.treatment_start,
-            oms.treatment_end,
-            oms.enp,
-            oms.building,
-            oms.doctor_code,
-            oms.doctor
+            END AS "Статус ЭМД",
+            oms.talon AS "Талон",
+            oms.source_id AS "ID источника",
+            oms.report_month AS "Месяц",
+            oms.report_year AS "Год",
+            oms.status AS "Статус",
+            oms.goal AS "Цель",
+            oms.patient AS "Пациент",
+            oms.birth_date AS "Дата рождения",
+            oms.treatment_start AS "Начало лечения",
+            oms.treatment_end AS "Окончание лечения",
+            oms.enp AS "ЕНП",
+            oms.building AS "Корпус",
+            oms.doctor_code AS "Код врача",
+            oms.doctor AS "Врач"
         FROM load_data_oms_data oms
         LEFT JOIN load_data_emd emd
             ON oms.source_id = emd.original_epmz_id
@@ -281,18 +281,18 @@ def build_tables(n_clicks, months_range, year, building_ids,
     # — Анализ по корпусам —
     sql_buildings = f"""
         SELECT
-            oms.building AS корпус,
+            oms.building AS "Корпус",
             CASE
                 WHEN emd.sending_status IS NULL OR emd.sending_status = '' THEN 'нет ЭМД'
                 WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
                 ELSE emd.sending_status
-            END AS sending_status,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ4') AS dv4,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ2') AS dv2,
-            COUNT(*) FILTER (WHERE oms.goal='ОПВ') AS opv,
-            COUNT(*) FILTER (WHERE oms.goal='УД1') AS ud1,
-            COUNT(*) FILTER (WHERE oms.goal='УД2') AS ud2,
-            COUNT(*) AS итого
+            END AS "Статус ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ4') AS "ДВ4",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ2') AS "ДВ2",
+            COUNT(*) FILTER (WHERE oms.goal='ОПВ') AS "ОПВ",
+            COUNT(*) FILTER (WHERE oms.goal='УД1') AS "УД1",
+            COUNT(*) FILTER (WHERE oms.goal='УД2') AS "УД2",
+            COUNT(*) AS "Итого"
         FROM load_data_oms_data oms
         LEFT JOIN load_data_emd emd
             ON oms.source_id = emd.original_epmz_id
@@ -304,7 +304,7 @@ def build_tables(n_clicks, months_range, year, building_ids,
                     WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
                     ELSE emd.sending_status
                  END
-        ORDER BY oms.building, sending_status
+        ORDER BY oms.building, "Статус ЭМД"
     """
 
     columns_bld, data_bld = TableUpdater.query_to_df(engine, sql_buildings)
@@ -312,19 +312,19 @@ def build_tables(n_clicks, months_range, year, building_ids,
     # — Анализ по врачам —
     sql_doctors = f"""
         SELECT
-            oms.building AS корпус,
-            oms.doctor AS врач,
+            oms.building AS "Корпус",
+            oms.doctor AS "Врач",
             CASE
                 WHEN emd.sending_status IS NULL OR emd.sending_status = '' THEN 'нет ЭМД'
                 WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
                 ELSE emd.sending_status
-            END AS sending_status,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ4') AS dv4,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ2') AS dv2,
-            COUNT(*) FILTER (WHERE oms.goal='ОПВ') AS opv,
-            COUNT(*) FILTER (WHERE oms.goal='УД1') AS ud1,
-            COUNT(*) FILTER (WHERE oms.goal='УД2') AS ud2,
-            COUNT(*) AS итого
+            END AS "Статус ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ4') AS "ДВ4",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ2') AS "ДВ2",
+            COUNT(*) FILTER (WHERE oms.goal='ОПВ') AS "ОПВ",
+            COUNT(*) FILTER (WHERE oms.goal='УД1') AS "УД1",
+            COUNT(*) FILTER (WHERE oms.goal='УД2') AS "УД2",
+            COUNT(*) AS "Итого"
         FROM load_data_oms_data oms
         LEFT JOIN load_data_emd emd
             ON oms.source_id = emd.original_epmz_id
@@ -336,7 +336,7 @@ def build_tables(n_clicks, months_range, year, building_ids,
                     WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
                     ELSE emd.sending_status
                  END
-        ORDER BY oms.building, oms.doctor, sending_status
+        ORDER BY oms.building, oms.doctor, "Статус ЭМД"
     """
 
     columns_doc, data_doc = TableUpdater.query_to_df(engine, sql_doctors)
@@ -345,19 +345,19 @@ def build_tables(n_clicks, months_range, year, building_ids,
     # — Новый Анализ: с/без ЭМД по целям и итоги —
     sql_analysis_buildings = f"""
         SELECT
-            oms.building AS корпус,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS dv4_emd,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NULL) AS dv4_no_emd,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS dv2_emd,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NULL) AS dv2_no_emd,
-            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS opv_emd,
-            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NULL) AS opv_no_emd,
-            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS ud1_emd,
-            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NULL) AS ud1_no_emd,
-            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS ud2_emd,
-            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NULL) AS ud2_no_emd,
-            COUNT(*) FILTER (WHERE emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS всего_с_эмд,
-            COUNT(*) FILTER (WHERE emd.sending_status IS NULL) AS всего_без_эмд
+            oms.building AS "Корпус",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "ДВ4 с ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NULL) AS "ДВ4 без ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "ДВ2 с ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NULL) AS "ДВ2 без ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "ОПВ с ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NULL) AS "ОПВ без ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "УД1 с ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NULL) AS "УД1 без ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "УД2 с ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NULL) AS "УД2 без ЭМД",
+            COUNT(*) FILTER (WHERE emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "Всего с ЭМД",
+            COUNT(*) FILTER (WHERE emd.sending_status IS NULL) AS "Всего без ЭМД"
         FROM load_data_oms_data oms
         LEFT JOIN load_data_emd emd
             ON oms.source_id = emd.original_epmz_id
@@ -369,20 +369,20 @@ def build_tables(n_clicks, months_range, year, building_ids,
 
     sql_analysis_doctors = f"""
         SELECT
-            oms.building AS корпус,
-            oms.doctor AS врач,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS dv4_emd,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NULL) AS dv4_no_emd,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS dv2_emd,
-            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NULL) AS dv2_no_emd,
-            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS opv_emd,
-            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NULL) AS opv_no_emd,
-            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS ud1_emd,
-            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NULL) AS ud1_no_emd,
-            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS ud2_emd,
-            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NULL) AS ud2_no_emd,
-            COUNT(*) FILTER (WHERE emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS всего_с_эмд,
-            COUNT(*) FILTER (WHERE emd.sending_status IS NULL) AS всего_без_эмд
+            oms.building AS "Корпус",
+            oms.doctor AS "Врач",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "ДВ4 с ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ4' AND emd.sending_status IS NULL) AS "ДВ4 без ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "ДВ2 с ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ДВ2' AND emd.sending_status IS NULL) AS "ДВ2 без ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "ОПВ с ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='ОПВ' AND emd.sending_status IS NULL) AS "ОПВ без ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "УД1 с ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='УД1' AND emd.sending_status IS NULL) AS "УД1 без ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "УД2 с ЭМД",
+            COUNT(*) FILTER (WHERE oms.goal='УД2' AND emd.sending_status IS NULL) AS "УД2 без ЭМД",
+            COUNT(*) FILTER (WHERE emd.sending_status IS NOT NULL AND emd.sending_status <> '') AS "Всего с ЭМД",
+            COUNT(*) FILTER (WHERE emd.sending_status IS NULL) AS "Всего без ЭМД"
         FROM load_data_oms_data oms
         LEFT JOIN load_data_emd emd
             ON oms.source_id = emd.original_epmz_id
