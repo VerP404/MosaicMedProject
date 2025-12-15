@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2025-12-15 13:57:43.383313",
+  "export_date": "2025-12-15 14:22:25.218977",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -505,21 +505,6 @@
           "field_name": "ksg",
           "filter_type": "not_like",
           "values": "'ds37%'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "2df897c1-3699-40a9-b101-3bc25de2a894",
-      "name": "В приемном отделении",
-      "level": 2,
-      "is_distributable": false,
-      "parent_external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'52'",
           "year": 2025
         }
       ]
@@ -1117,6 +1102,21 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'ДС1'",
+          "year": 2025
+        }
+      ]
+    },
+    {
+      "external_id": "2df897c1-3699-40a9-b101-3bc25de2a894",
+      "name": "В приемном отделении",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "80397d9b-a8f8-4d75-b2da-03181db8d262",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'52'",
           "year": 2025
         }
       ]
