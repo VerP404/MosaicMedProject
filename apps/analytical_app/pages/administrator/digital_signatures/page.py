@@ -1,11 +1,15 @@
 from dash import dcc, html, Input, Output, State, callback
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from datetime import datetime
+from urllib.parse import urlparse
+from flask import request
 
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.administrator.digital_signatures.query import (
     sql_query_digital_signatures,
     sql_query_doctors_without_signature,
+    sql_query_persons_without_signature,
 )
 from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.query_executor import engine
@@ -20,6 +24,23 @@ def fetch_doctors_without_signature(filter_department_name=None):
     """
     sql_query = sql_query_doctors_without_signature(
         filter_department_name=filter_department_name
+    )
+    _, data = TableUpdater.query_to_df(engine, sql_query)
+    return data
+
+
+def fetch_persons_without_signature(
+    filter_department_name=None,
+    filter_category=None,
+    show_working_only=True,
+):
+    """
+    Возвращает список активных сотрудников/врачей без ЭЦП с учетом фильтров.
+    """
+    sql_query = sql_query_persons_without_signature(
+        filter_department_name=filter_department_name,
+        filter_category=filter_category,
+        show_working_only=show_working_only,
     )
     _, data = TableUpdater.query_to_df(engine, sql_query)
     return data
@@ -145,7 +166,19 @@ def layout():
                             color="primary",
                             className="mt-2 w-100"
                         )
-                    ], width=1)
+                    ], width=2),
+                    # Кнопка создания физлица
+                    dbc.Col([
+                        html.Label("", className="fw-bold"),
+                        dbc.Button(
+                            "Создать физлицо",
+                            id=f'create-person-button-{type_page}',
+                            color="secondary",
+                            className="mt-2 w-100",
+                            href="#",
+                            target="_blank"
+                        )
+                    ], width=2),
                 ], className="mb-3"),
                 
                 # Информационные блоки
@@ -214,6 +247,25 @@ def layout():
             ]
         )
     ])
+
+
+# Обновляем ссылку "Создать физлицо" динамически на основании текущего хоста/порта
+@callback(
+    Output(f'create-person-button-{type_page}', 'href'),
+    Input('url', 'href')
+)
+def update_create_person_href(current_href):
+    if not current_href:
+        raise PreventUpdate
+    parsed = urlparse(current_href)
+    hostname = parsed.hostname or "127.0.0.1"
+    scheme = parsed.scheme or "http"
+    try:
+        from apps.analytical_app.components.sidebar import get_main_app_port
+        port = get_main_app_port()
+    except Exception:
+        port = parsed.port or 8000
+    return f"{scheme}://{hostname}:{port}/admin/personnel/person/add/"
 
 
 # Callback для загрузки списка подразделений
@@ -324,14 +376,13 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
         
         columns, data = TableUpdater.query_to_df(engine, sql_query)
 
-        include_doctor_category = category_filter in (None, 'all', 'doctor')
-        doctors_without_signature = (
-            fetch_doctors_without_signature(filter_department_name)
-            if include_doctor_category
-            else []
+        persons_without_signature = fetch_persons_without_signature(
+            filter_department_name=filter_department_name,
+            filter_category=filter_category,
+            show_working_only=show_working_only,
         )
         
-        if not data and not doctors_without_signature:
+        if not data and not persons_without_signature:
             return html.Div("Нет данных для отображения", className="text-muted")
 
         # Фильтры
@@ -353,7 +404,7 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
         if status_filter == 'no_signature':
             data = []
 
-        if not data and not doctors_without_signature:
+        if not data and not persons_without_signature:
             return html.Div("Нет данных с выбранными фильтрами", className="text-muted")
         
         # Подсчитываем статистику
@@ -367,13 +418,13 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
         
         # Уникальные сотрудники
         unique_persons = len(set(row.get('person_id') for row in data if row.get('person_id')))
-        doctors_with_signature = len(set(
+        persons_with_signature = len(set(
             row.get('person_id')
             for row in data
-            if row.get('person_id') and row.get('category') in ('doctor', 'both')
+            if row.get('person_id')
         ))
-        doctors_without_count = len(set(row.get('person_id') for row in doctors_without_signature))
-        total_doctors_scope = doctors_with_signature + doctors_without_count
+        persons_without_count = len(set(row.get('person_id') for row in persons_without_signature))
+        total_persons_scope = persons_with_signature + persons_without_count
         
         # Сотрудники с просроченными ЭЦП
         persons_with_expired = len(set(
@@ -404,24 +455,24 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
-                        html.H4(total_doctors_scope, className="text-primary mb-1"),
-                        html.P("Врачей (всего)", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                        html.H4(total_persons_scope, className="text-primary mb-1"),
+                        html.P("Сотрудников (всего)", className="text-muted mb-0", style={"font-size": "0.9rem"})
                     ])
                 ], className="text-center")
             ], width=2),
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
-                        html.H4(doctors_with_signature, className="text-success mb-1"),
-                        html.P("Врачей с ЭЦП", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                        html.H4(persons_with_signature, className="text-success mb-1"),
+                        html.P("С ЭЦП", className="text-muted mb-0", style={"font-size": "0.9rem"})
                     ])
                 ], className="text-center")
             ], width=2),
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
-                        html.H4(doctors_without_count, className="text-danger mb-1"),
-                        html.P("Врачей без ЭЦП", className="text-muted mb-0", style={"font-size": "0.9rem"})
+                        html.H4(persons_without_count, className="text-danger mb-1"),
+                        html.P("Без ЭЦП", className="text-muted mb-0", style={"font-size": "0.9rem"})
                     ])
                 ], className="text-center")
             ], width=2),
@@ -536,8 +587,8 @@ def update_stats(n_clicks, show_working_only, show_mode, status_filter, process_
                     html.Strong("Требуют внимания: "),
                     f"{persons_with_expired} сотрудников с просроченными ЭЦП, ",
                     f"{persons_with_expiring} сотрудников с истекающими ЭЦП (≤60 дней), ",
-                    f"{doctors_without_count} врачей без ЭЦП"
-                ], color="warning" if (persons_with_expired > 0 or persons_with_expiring > 0 or doctors_without_count > 0) else "success")
+                    f"{persons_without_count} сотрудников без ЭЦП"
+                ], color="warning" if (persons_with_expired > 0 or persons_with_expiring > 0 or persons_without_count > 0) else "success")
             ], width=12)
         ], className="mt-3")
         
@@ -593,11 +644,28 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
         filter_category = None if category_filter == 'all' else category_filter
         filter_department_name = department_filter if department_filter else None
         
+        # Определяем базовый URL для админки динамически (по текущему хосту/схеме)
+        parsed_url = urlparse(request.base_url)
+        hostname = parsed_url.hostname or "127.0.0.1"
+        scheme = parsed_url.scheme or "http"
+        # порт основного приложения может отличаться от порта Dash, берем из настроек если есть
+        try:
+            from apps.analytical_app.components.sidebar import get_main_app_port
+            admin_port = get_main_app_port()
+        except Exception:
+            admin_port = parsed_url.port or 8000
+        admin_base_url = f"{scheme}://{hostname}:{admin_port}"
+
+        persons_without_signature = []
+        if status_filter in ('all', 'no_signature', None):
+            persons_without_signature = fetch_persons_without_signature(
+                filter_department_name=filter_department_name,
+                filter_category=filter_category,
+                show_working_only=show_working_only,
+            )
+
         if show_no_signature_only:
-            if filter_category == 'staff':
-                data = []
-            else:
-                data = fetch_doctors_without_signature(filter_department_name)
+            data = persons_without_signature
         else:
             sql_query = sql_query_digital_signatures(
                 show_only_latest=show_only_latest,
@@ -618,6 +686,9 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
             # Фильтрация по процессу
             if process_filter != 'all':
                 data = [row for row in data if row.get('process_status') == process_filter]
+
+            if status_filter in ('all', None):
+                data.extend(persons_without_signature)
         
         # Форматируем колонки
         formatted_columns = [
@@ -652,20 +723,20 @@ def update_table(n_clicks, show_working_only, show_mode, status_filter, process_
             
             # Ссылка на редактирование существующей ЭЦП
             if signature_id:
-                admin_url = f"http://10.136.29.166:8000/admin/personnel/digitalsignature/{signature_id}/change/"
+                admin_url = f"{admin_base_url}/admin/personnel/digitalsignature/{signature_id}/change/"
                 action_links.append(f"[Открыть]({admin_url})")
             
             # Ссылка на создание новой ЭЦП для сотрудника
             if person_id:
                 position_id = row.get('position_id')
                 if position_id:
-                    create_url = f"http://10.136.29.166:8000/admin/personnel/digitalsignature/add/?person={person_id}&position={position_id}"
+                    create_url = f"{admin_base_url}/admin/personnel/digitalsignature/add/?person={person_id}&position={position_id}"
                 else:
-                    create_url = f"http://10.136.29.166:8000/admin/personnel/digitalsignature/add/?person={person_id}"
+                    create_url = f"{admin_base_url}/admin/personnel/digitalsignature/add/?person={person_id}"
                 action_links.append(f"[Создать ЭЦП]({create_url})")
 
                 # Ссылка на карточку физлица (для обновления записей работы)
-                person_url = f"http://10.136.29.166:8000/admin/personnel/person/{person_id}/change/"
+                person_url = f"{admin_base_url}/admin/personnel/person/{person_id}/change/"
                 action_links.append(f"[Редактировать физлицо]({person_url})")
             
             # Объединяем ссылки с переносом строки (двойной перенос для markdown)

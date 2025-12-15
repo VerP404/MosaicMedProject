@@ -304,56 +304,127 @@ def sql_query_doctors_without_signature(
     Возвращает SQL-запрос, который выбирает активных врачей без каких-либо ЭЦП.
     """
 
+    # Оставлено для совместимости: используем общий запрос по всем категориям
+    return sql_query_persons_without_signature(
+        filter_department_name=filter_department_name,
+        filter_category='doctor',
+        show_working_only=True,
+    )
+
+
+def sql_query_persons_without_signature(
+    filter_department_name=None,
+    filter_category=None,  # None/all, 'doctor', 'staff'
+    show_working_only=True,
+):
+    """
+    Возвращает SQL-запрос, который выбирает активных сотрудников (врачей и/или сотрудников)
+    без каких-либо ЭЦП.
+    """
+
     query = """
-    WITH active_doctors AS (
-        SELECT
-            dr.person_id,
-            dr.structural_unit,
-            dr.department_id,
-            ROW_NUMBER() OVER (
-                PARTITION BY dr.person_id
-                ORDER BY
-                    dr.end_date DESC NULLS FIRST,
-                    dr.start_date DESC NULLS LAST,
-                    dr.id DESC
-            ) as rn
-        FROM personnel_doctorrecord dr
-        WHERE dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE
-    ),
-    latest_doctors AS (
-        SELECT
-            ad.person_id,
-            ad.structural_unit,
-            ad.department_id
-        FROM active_doctors ad
-        WHERE ad.rn = 1
-    ),
-    person_departments AS (
-        SELECT
-            ld.person_id,
-            COALESCE(ld.structural_unit, dept.name, '-') as department_name,
-            ld.department_id
-        FROM latest_doctors ld
-        LEFT JOIN organization_department dept ON dept.id = ld.department_id
+    WITH working_persons AS (
+        SELECT DISTINCT p.id as person_id
+        FROM personnel_person p
+        WHERE 1=1
+    """
+
+    if show_working_only:
+        query += """
+            AND (
+                EXISTS (
+                    SELECT 1 
+                    FROM personnel_doctorrecord dr
+                    WHERE dr.person_id = p.id
+                    AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                )
+                OR
+                EXISTS (
+                    SELECT 1 
+                    FROM personnel_staffrecord sr
+                    WHERE sr.person_id = p.id
+                    AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+                )
+            )
+        """
+
+    query += """
     ),
     person_categories AS (
         SELECT DISTINCT
             p.id as person_id,
-            CASE
+            CASE 
                 WHEN EXISTS (
-                    SELECT 1
+                    SELECT 1 
+                    FROM personnel_doctorrecord dr
+                    WHERE dr.person_id = p.id
+                    AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                ) AND EXISTS (
+                    SELECT 1 
                     FROM personnel_staffrecord sr
                     WHERE sr.person_id = p.id
                     AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
                 ) THEN 'both'
-                ELSE 'doctor'
+                WHEN EXISTS (
+                    SELECT 1 
+                    FROM personnel_doctorrecord dr
+                    WHERE dr.person_id = p.id
+                    AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                ) THEN 'doctor'
+                WHEN EXISTS (
+                    SELECT 1 
+                    FROM personnel_staffrecord sr
+                    WHERE sr.person_id = p.id
+                    AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+                ) THEN 'staff'
+                ELSE 'none'
             END as category
         FROM personnel_person p
-        WHERE EXISTS (
-            SELECT 1
-            FROM active_doctors ad
-            WHERE ad.person_id = p.id
-        )
+        WHERE p.id IN (SELECT person_id FROM working_persons)
+    ),
+    person_departments AS (
+        SELECT DISTINCT
+            p.id as person_id,
+            COALESCE(
+                (SELECT dr.structural_unit 
+                 FROM personnel_doctorrecord dr
+                 WHERE dr.person_id = p.id
+                 AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                 ORDER BY dr.end_date DESC NULLS FIRST, dr.start_date DESC
+                 LIMIT 1),
+                (SELECT dept.name 
+                 FROM personnel_doctorrecord dr
+                 INNER JOIN organization_department dept ON dept.id = dr.department_id
+                 WHERE dr.person_id = p.id
+                 AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                 ORDER BY dr.end_date DESC NULLS FIRST, dr.start_date DESC
+                 LIMIT 1),
+                (SELECT dept.name 
+                 FROM personnel_staffrecord sr
+                 INNER JOIN organization_department dept ON dept.id = sr.department_id
+                 WHERE sr.person_id = p.id
+                 AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+                 ORDER BY sr.end_date DESC NULLS FIRST, sr.start_date DESC
+                 LIMIT 1)
+            ) as department_name,
+            COALESCE(
+                (SELECT dept.id 
+                 FROM personnel_doctorrecord dr
+                 INNER JOIN organization_department dept ON dept.id = dr.department_id
+                 WHERE dr.person_id = p.id
+                 AND (dr.end_date IS NULL OR dr.end_date >= CURRENT_DATE)
+                 ORDER BY dr.end_date DESC NULLS FIRST, dr.start_date DESC
+                 LIMIT 1),
+                (SELECT dept.id 
+                 FROM personnel_staffrecord sr
+                 INNER JOIN organization_department dept ON dept.id = sr.department_id
+                 WHERE sr.person_id = p.id
+                 AND (sr.end_date IS NULL OR sr.end_date >= CURRENT_DATE)
+                 ORDER BY sr.end_date DESC NULLS FIRST, sr.start_date DESC
+                 LIMIT 1)
+            ) as department_id
+        FROM personnel_person p
+        WHERE p.id IN (SELECT person_id FROM working_persons)
     )
     SELECT
         NULL::integer as id,
@@ -376,17 +447,18 @@ def sql_query_doctors_without_signature(
         NULL::text as position_name,
         NULL::text as position_code,
         NULL::integer as position_id,
-        COALESCE(pc.category, 'doctor') as category,
-        pd.department_name,
+        COALESCE(pc.category, 'none') as category,
+        COALESCE(pd.department_name, '-') as department_name,
         pd.department_id,
         'no_signature' as status,
         'no_signature' as process_status,
         NULL::integer as days_until_expiration,
         1 as signature_rank,
         false as is_replaced
-    FROM person_departments pd
-    INNER JOIN personnel_person p ON p.id = pd.person_id
+    FROM working_persons wp
+    INNER JOIN personnel_person p ON p.id = wp.person_id
     LEFT JOIN person_categories pc ON pc.person_id = p.id
+    LEFT JOIN person_departments pd ON pd.person_id = p.id
     WHERE NOT EXISTS (
         SELECT 1
         FROM personnel_digitalsignature ds
@@ -394,9 +466,18 @@ def sql_query_doctors_without_signature(
     )
     """
 
+    if filter_category == 'doctor':
+        query += """
+    AND (pc.category = 'doctor' OR pc.category = 'both')
+        """
+    elif filter_category == 'staff':
+        query += """
+    AND (pc.category = 'staff' OR pc.category = 'both')
+        """
+
     if filter_department_name:
         escaped_department = filter_department_name.replace("'", "''")
-        query += f"\n    AND pd.department_name = '{escaped_department}'"
+        query += f"\n    AND COALESCE(pd.department_name, '-') = '{escaped_department}'"
 
     query += "\n    ORDER BY fio"
 
