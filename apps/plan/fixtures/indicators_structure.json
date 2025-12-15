@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2025-12-15 14:22:25.218977",
+  "export_date": "2025-12-15 16:03:57.863603",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -122,8 +122,8 @@
       "filters": [
         {
           "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'22'",
+          "filter_type": "in",
+          "values": "'22', '52'",
           "year": 2025
         }
       ]
