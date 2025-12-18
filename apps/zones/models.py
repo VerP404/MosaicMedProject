@@ -339,6 +339,85 @@ class Organization(PolygonBase):
         
         return Address.objects.filter(id__in=[a.id for a in result])
 
+    def assign_addresses_in_polygon(self):
+        """
+        Автоматически привязывает все адреса внутри полигона к организации.
+        Создает записи OrganizationAddress для адресов, которые еще не привязаны.
+        """
+        if not self.polygon:
+            return 0
+        
+        addresses = self.get_addresses_in_polygon()
+        assigned_count = 0
+        
+        for address in addresses:
+            # Проверяем, не привязан ли уже адрес к этой организации
+            if not OrganizationAddress.objects.filter(
+                organization=self,
+                address=address
+            ).exists():
+                OrganizationAddress.objects.create(
+                    organization=self,
+                    address=address,
+                    assigned_method='auto'
+                )
+                assigned_count += 1
+        
+        return assigned_count
+
+    def save(self, *args, **kwargs):
+        """Переопределяем save для автоматической привязки адресов при сохранении полигона."""
+        # Вызываем валидацию перед сохранением
+        self.full_clean()
+        # Сохраняем, чтобы получить ID
+        super().save(*args, **kwargs)
+        
+        # Если полигон установлен, привязываем адреса
+        if self.polygon:
+            self.assign_addresses_in_polygon()
+
+
+class OrganizationAddress(models.Model):
+    """
+    Связь между адресом и организацией.
+    
+    Автоматически создается при сохранении полигона организации для всех
+    адресов, попадающих внутрь полигона.
+    """
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="organization_addresses",
+        verbose_name="Организация",
+    )
+    address = models.ForeignKey(
+        Address,
+        on_delete=models.CASCADE,
+        related_name="organization_links",
+        verbose_name="Адрес",
+    )
+    assigned_at = models.DateTimeField(
+        "Привязан",
+        auto_now_add=True,
+    )
+    assigned_method = models.CharField(
+        "Метод привязки",
+        max_length=16,
+        default='auto',
+        help_text="auto / manual",
+    )
+
+    class Meta:
+        verbose_name = "Привязка адреса к организации"
+        verbose_name_plural = "Привязки адресов к организациям"
+        unique_together = ("organization", "address")
+        indexes = [
+            models.Index(fields=["organization", "assigned_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.address} → {self.organization}"
+
 
 class SiteType(models.Model):
     code = models.CharField(max_length=32, primary_key=True)
@@ -389,20 +468,92 @@ class Corpus(PolygonBase):
         unique_together = ("organization", "name")
 
     def clean(self):
-        """Валидация: проверка, что полигон корпуса находится внутри полигона организации."""
-        if self.polygon and self.organization and self.organization.polygon:
-            corpus_coords = self.get_polygon_coords()
-            org_coords = self.organization.get_polygon_coords()
-            
-            if not corpus_coords or not org_coords:
-                return
-            
-            # Проверяем, что все точки полигона корпуса находятся внутри полигона организации
-            for lon, lat in corpus_coords:
-                if not self.organization.contains_point(lon, lat):
-                    raise ValidationError({
-                        "polygon": "Полигон корпуса должен находиться внутри полигона организации"
-                    })
+        """Валидация корпуса. Полигон корпуса опционален и вычисляется автоматически из участков."""
+        # Полигон корпуса не обязателен, поэтому валидация не требуется
+        pass
+
+    def update_polygon_from_sites(self):
+        """
+        Обновляет полигон корпуса на основе полигонов всех привязанных участков.
+        
+        Создает минимальный охватывающий полигон (bounding box) из всех
+        полигонов участков, привязанных к корпусу.
+        """
+        sites = self.sites.filter(is_active=True).exclude(polygon__isnull=True)
+        
+        if not sites.exists():
+            # Если нет участков, очищаем полигон
+            self.polygon = None
+            self.area = None
+            return False
+        
+        # Собираем все координаты из всех полигонов участков
+        all_coords = []
+        for site in sites:
+            coords = site.get_polygon_coords()
+            if coords and len(coords) >= 3:
+                all_coords.extend(coords)
+        
+        if not all_coords or len(all_coords) < 3:
+            return False
+        
+        # Создаем bounding box (минимальный охватывающий прямоугольник)
+        min_lon = min(c[0] for c in all_coords)
+        max_lon = max(c[0] for c in all_coords)
+        min_lat = min(c[1] for c in all_coords)
+        max_lat = max(c[1] for c in all_coords)
+        
+        # Добавляем небольшой буфер
+        buffer = 0.001  # ~100 метров
+        polygon_coords = [
+            [min_lon - buffer, min_lat - buffer],
+            [max_lon + buffer, min_lat - buffer],
+            [max_lon + buffer, max_lat + buffer],
+            [min_lon - buffer, max_lat + buffer],
+            [min_lon - buffer, min_lat - buffer],  # Закрываем полигон
+        ]
+        
+        self.polygon = polygon_coords
+        self.save()
+        return True
+
+    def get_computed_polygon(self):
+        """
+        Возвращает вычисленный полигон корпуса на основе участков.
+        Если у корпуса есть явно заданный полигон, возвращает его.
+        Иначе вычисляет из участков.
+        """
+        if self.polygon:
+            return self.get_polygon_coords()
+        
+        # Вычисляем из участков
+        sites = self.sites.filter(is_active=True).exclude(polygon__isnull=True)
+        if not sites.exists():
+            return []
+        
+        all_coords = []
+        for site in sites:
+            coords = site.get_polygon_coords()
+            if coords and len(coords) >= 3:
+                all_coords.extend(coords)
+        
+        if not all_coords or len(all_coords) < 3:
+            return []
+        
+        # Создаем bounding box
+        min_lon = min(c[0] for c in all_coords)
+        max_lon = max(c[0] for c in all_coords)
+        min_lat = min(c[1] for c in all_coords)
+        max_lat = max(c[1] for c in all_coords)
+        
+        buffer = 0.001
+        return [
+            [min_lon - buffer, min_lat - buffer],
+            [max_lon + buffer, min_lat - buffer],
+            [max_lon + buffer, max_lat + buffer],
+            [min_lon - buffer, max_lat + buffer],
+            [min_lon - buffer, min_lat - buffer],
+        ]
 
     def save(self, *args, **kwargs):
         """Переопределяем save для вызова clean перед сохранением."""
@@ -500,25 +651,61 @@ class Site(PolygonBase):
         ordering = ["corpus", "type", "name"]
 
     def clean(self):
-        """Валидация: проверка, что полигон участка находится внутри полигона корпуса."""
-        if self.polygon and self.corpus and self.corpus.polygon:
+        """Валидация: проверка, что полигон участка находится внутри полигона организации."""
+        if self.polygon and self.corpus and self.corpus.organization:
             site_coords = self.get_polygon_coords()
-            corpus_coords = self.corpus.get_polygon_coords()
             
-            if not site_coords or not corpus_coords:
+            if not site_coords:
                 return
             
-            # Проверяем, что все точки полигона участка находятся внутри полигона корпуса
-            for lon, lat in site_coords:
-                if not self.corpus.contains_point(lon, lat):
-                    raise ValidationError({
-                        "polygon": "Полигон участка должен находиться внутри полигона корпуса"
-                    })
+            # Проверяем, что участок находится внутри полигона организации
+            org_coords = self.corpus.organization.get_polygon_coords()
+            if org_coords:
+                for lon, lat in site_coords:
+                    if not self.corpus.organization.contains_point(lon, lat):
+                        raise ValidationError({
+                            "polygon": "Полигон участка должен находиться внутри полигона организации"
+                        })
+
+    def assign_addresses_in_polygon(self):
+        """
+        Автоматически привязывает все адреса внутри полигона к участку.
+        Создает записи SiteAddress для адресов, которые еще не привязаны.
+        """
+        if not self.polygon:
+            return 0
+        
+        addresses = self.get_addresses_in_polygon()
+        assigned_count = 0
+        
+        for address in addresses:
+            # Проверяем, не привязан ли уже адрес к этому участку
+            if not SiteAddress.objects.filter(
+                site=self,
+                address=address
+            ).exists():
+                SiteAddress.objects.create(
+                    site=self,
+                    address=address,
+                    type=self.type,  # Используем тип участка
+                    assigned_method='auto'
+                )
+                assigned_count += 1
+        
+        return assigned_count
 
     def save(self, *args, **kwargs):
-        """Переопределяем save для вызова clean перед сохранением."""
+        """Переопределяем save для вызова clean перед сохранением и обновления полигона корпуса."""
         self.full_clean()
         super().save(*args, **kwargs)
+        
+        # Если полигон установлен, привязываем адреса
+        if self.polygon:
+            self.assign_addresses_in_polygon()
+        
+        # Обновляем полигон корпуса на основе всех участков
+        if self.corpus:
+            self.corpus.update_polygon_from_sites()
 
     def __str__(self):
         return f"{self.name} ({self.type.code})"

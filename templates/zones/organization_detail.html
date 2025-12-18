@@ -1,0 +1,573 @@
+{% extends 'home/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'zones:organizations_list' %}">Система участков</a></li>
+                    <li class="breadcrumb-item active">{{ organization.name }}</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-building me-2"></i>
+                {{ organization.name }}
+            </h1>
+            <p class="text-muted">{{ organization.code }}</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Информация об организации -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Информация
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Код:</dt>
+                        <dd class="col-sm-7">{{ organization.code }}</dd>
+                        
+                        <dt class="col-sm-5">Название:</dt>
+                        <dd class="col-sm-7">{{ organization.name }}</dd>
+                        
+                        {% if organization.description %}
+                        <dt class="col-sm-5">Описание:</dt>
+                        <dd class="col-sm-7">{{ organization.description }}</dd>
+                        {% endif %}
+                        
+                        {% if organization.area %}
+                        <dt class="col-sm-5">Площадь:</dt>
+                        <dd class="col-sm-7">{{ organization.area|floatformat:0 }} м²</dd>
+                        {% endif %}
+                        
+                        <dt class="col-sm-5">Привязано адресов:</dt>
+                        <dd class="col-sm-7">
+                            <span class="badge bg-primary">{{ assigned_addresses.count }}</span>
+                        </dd>
+                        
+                        <dt class="col-sm-5">Корпусов:</dt>
+                        <dd class="col-sm-7">
+                            <span class="badge bg-success">{{ corpora.count }}</span>
+                        </dd>
+                    </dl>
+                </div>
+                <div class="card-footer">
+                    <a href="/admin/zones/organization/{{ organization.id }}/change/" 
+                       class="btn btn-primary btn-sm w-100 mb-2">
+                        <i class="fas fa-edit me-1"></i>
+                        Редактировать в админке
+                    </a>
+                    <a href="/admin/zones/corpus/add/?organization={{ organization.id }}" 
+                       class="btn btn-success btn-sm w-100">
+                        <i class="fas fa-plus me-1"></i>
+                        Добавить корпус
+                    </a>
+                </div>
+            </div>
+
+            <!-- Список корпусов -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-building me-2"></i>
+                        Корпуса
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for corpus in corpora %}
+                        <a href="{% url 'zones:corpus_detail' corpus.pk %}" 
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">{{ corpus.name }}</h6>
+                                {% if corpus.address %}
+                                <small class="text-muted">
+                                    {{ corpus.address.street }} {{ corpus.address.housenumber }}
+                                </small>
+                                {% endif %}
+                            </div>
+                            <span class="badge bg-primary rounded-pill">
+                                {{ corpus.sites.count }} уч.
+                            </span>
+                        </a>
+                        {% empty %}
+                        <div class="list-group-item text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                            <p>Нет корпусов</p>
+                            <a href="/admin/zones/corpus/add/?organization={{ organization.id }}" 
+                               class="btn btn-sm btn-success">
+                                <i class="fas fa-plus me-1"></i>
+                                Создать корпус
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Панель управления -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tools me-2"></i>
+                        Управление полигоном
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Цвет полигона:</label>
+                        <input type="color" 
+                               id="polygon-color" 
+                               class="form-control form-control-color" 
+                               value="{{ organization.color|default:'#3388ff' }}">
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="button" 
+                                id="btn-draw-polygon" 
+                                class="btn btn-success">
+                            <i class="fas fa-draw-polygon me-1"></i>
+                            Нарисовать полигон
+                        </button>
+                        <button type="button" 
+                                id="btn-edit-polygon" 
+                                class="btn btn-warning">
+                            <i class="fas fa-edit me-1"></i>
+                            Редактировать полигон
+                        </button>
+                        <button type="button" 
+                                id="btn-delete-polygon" 
+                                class="btn btn-danger">
+                            <i class="fas fa-trash me-1"></i>
+                            Удалить полигон
+                        </button>
+                        <button type="button" 
+                                id="btn-save-polygon" 
+                                class="btn btn-primary" 
+                                disabled>
+                            <i class="fas fa-save me-1"></i>
+                            Сохранить изменения
+                        </button>
+                    </div>
+                    <div id="save-status" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Карта -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-map me-2"></i>
+                        Карта организации
+                    </h5>
+                    <div>
+                        <button type="button" 
+                                id="btn-toggle-addresses" 
+                                class="btn btn-sm btn-light">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                            Показать адреса
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="map" style="height: 700px; width: 100%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Список адресов -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Привязанные адреса ({{ assigned_addresses.count }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Улица</th>
+                                    <th>Дом</th>
+                                    <th>Координаты</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for addr in page_obj %}
+                                <tr>
+                                    <td>{{ addr.street|default:"—" }}</td>
+                                    <td>{{ addr.housenumber|default:"—" }}</td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ addr.latitude|floatformat:6 }}, {{ addr.longitude|floatformat:6 }}
+                                        </small>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-4">
+                                        Нет привязанных адресов. Нарисуйте полигон и сохраните изменения.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Пагинация -->
+                    {% if page_obj.has_other_pages %}
+                    <nav aria-label="Навигация по страницам">
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1">&laquo; Первая</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Предыдущая</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">&laquo; Первая</span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">Предыдущая</span>
+                            </li>
+                            {% endif %}
+                            
+                            <li class="page-item active">
+                                <span class="page-link">
+                                    Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
+                                </span>
+                            </li>
+                            
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}">Следующая</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Последняя &raquo;</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Следующая</span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">Последняя &raquo;</span>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Leaflet Draw CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+
+<style>
+    #map {
+        border-radius: 0 0 0.375rem 0.375rem;
+    }
+    .leaflet-draw-toolbar {
+        margin-top: 10px;
+    }
+    /* Скрываем флаг SVG в атрибуции Leaflet */
+    .leaflet-attribution-flag,
+    .leaflet-control-attribution svg,
+    .leaflet-control-attribution .leaflet-attribution-flag {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        opacity: 0 !important;
+    }
+</style>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet Draw JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+<script>
+    // Данные организации
+    const organizationData = {{ organization_data|safe }};
+    const addressesData = {{ addresses_data|safe }};
+
+    // Инициализация карты
+    let map;
+    let drawnItems = new L.FeatureGroup();
+    let currentPolygon = null;
+    let drawControl = null;
+    let addressesLayer = null;
+    let showAddresses = false;
+
+    // Инициализация карты
+    function initMap() {
+        map = L.map('map');
+
+        // Добавляем тайлы OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Добавляем группу для нарисованных элементов
+        drawnItems.addTo(map);
+
+        // Если есть существующий полигон, отображаем его
+        if (organizationData.polygon) {
+            try {
+                let coords = organizationData.polygon;
+                
+                if (typeof organizationData.polygon === 'object' && organizationData.polygon.type === 'Polygon') {
+                    coords = organizationData.polygon.coordinates[0];
+                } else if (Array.isArray(organizationData.polygon)) {
+                    coords = organizationData.polygon;
+                }
+
+                const latLngs = coords.map(function(coord) {
+                    return [coord[1], coord[0]];
+                });
+
+                currentPolygon = L.polygon(latLngs, {
+                    color: organizationData.color || '#3388ff',
+                    fillColor: organizationData.color || '#3388ff',
+                    fillOpacity: 0.3,
+                    weight: 2
+                }).addTo(drawnItems);
+
+                map.fitBounds(currentPolygon.getBounds().pad(0.1));
+            } catch (e) {
+                console.error('Ошибка при отображении полигона:', e);
+                map.setView([59.9343, 30.3351], 10);
+            }
+        } else {
+            map.setView([59.9343, 30.3351], 10);
+        }
+
+        // Инициализируем Leaflet Draw
+        drawControl = new L.Control.Draw({
+            draw: {
+                polygon: {
+                    allowIntersection: false,
+                    showArea: true
+                },
+                polyline: false,
+                rectangle: false,
+                circle: false,
+                marker: false,
+                circlemarker: false
+            },
+            edit: {
+                featureGroup: drawnItems,
+                remove: true
+            }
+        });
+        map.addControl(drawControl);
+
+        // Обработчики событий рисования
+        map.on(L.Draw.Event.CREATED, function(e) {
+            const layer = e.layer;
+            
+            // Удаляем предыдущий полигон, если есть
+            if (currentPolygon) {
+                drawnItems.removeLayer(currentPolygon);
+            }
+            
+            drawnItems.addLayer(layer);
+            currentPolygon = layer;
+            
+            // Активируем кнопку сохранения
+            document.getElementById('btn-save-polygon').disabled = false;
+        });
+
+        map.on(L.Draw.Event.EDITED, function(e) {
+            document.getElementById('btn-save-polygon').disabled = false;
+        });
+
+        map.on(L.Draw.Event.DELETED, function(e) {
+            currentPolygon = null;
+            document.getElementById('btn-save-polygon').disabled = false;
+        });
+    }
+
+    // Кнопки управления
+    document.getElementById('btn-draw-polygon').addEventListener('click', function() {
+        const drawPolygon = new L.Draw.Polygon(map, {
+            allowIntersection: false,
+            showArea: true
+        });
+        drawPolygon.enable();
+    });
+
+    document.getElementById('btn-edit-polygon').addEventListener('click', function() {
+        if (currentPolygon) {
+            const editPolygon = new L.Edit.Polygon(map, {
+                featureGroup: drawnItems
+            });
+            editPolygon.enable();
+        } else {
+            alert('Сначала нарисуйте полигон');
+        }
+    });
+
+    document.getElementById('btn-delete-polygon').addEventListener('click', function() {
+        if (currentPolygon) {
+            if (confirm('Вы уверены, что хотите удалить полигон?')) {
+                drawnItems.removeLayer(currentPolygon);
+                currentPolygon = null;
+                document.getElementById('btn-save-polygon').disabled = false;
+            }
+        } else {
+            alert('Нет полигона для удаления');
+        }
+    });
+
+    document.getElementById('btn-save-polygon').addEventListener('click', function() {
+        const btn = this;
+        const statusDiv = document.getElementById('save-status');
+        
+        if (!currentPolygon) {
+            statusDiv.innerHTML = '<div class="alert alert-warning">Нет полигона для сохранения</div>';
+            return;
+        }
+
+        // Получаем координаты полигона
+        const latlngs = currentPolygon.getLatLngs()[0];
+        const coords = latlngs.map(function(latlng) {
+            return [latlng.lng, latlng.lat]; // [lon, lat] формат
+        });
+
+        // Закрываем полигон, если нужно
+        if (coords[0][0] !== coords[coords.length - 1][0] || 
+            coords[0][1] !== coords[coords.length - 1][1]) {
+            coords.push(coords[0]);
+        }
+
+        btn.disabled = true;
+        statusDiv.innerHTML = '<div class="alert alert-info">Сохранение...</div>';
+
+        // Отправляем на сервер
+        fetch('{% url "zones:organization_update_polygon" organization.pk %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                polygon: coords
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                statusDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                btn.disabled = true;
+                // Обновляем страницу через 2 секунды
+                setTimeout(function() {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                statusDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${data.error}</div>`;
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            statusDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+            btn.disabled = false;
+        });
+    });
+
+    // Переключение отображения адресов
+    document.getElementById('btn-toggle-addresses').addEventListener('click', function() {
+        showAddresses = !showAddresses;
+        
+        if (showAddresses) {
+            if (!addressesLayer) {
+                addressesLayer = L.layerGroup().addTo(map);
+                
+                addressesData.forEach(function(addr) {
+                    if (addr.coordinates) {
+                        const marker = L.marker([addr.coordinates[1], addr.coordinates[0]]);
+                        marker.bindPopup(`
+                            <div>
+                                <strong>${addr.street || ''} ${addr.housenumber || ''}</strong><br>
+                                ${addr.city || ''}<br>
+                                <small class="text-muted">
+                                    ${addr.is_assigned ? '<span class="badge bg-success">Привязан</span>' : ''}
+                                </small>
+                            </div>
+                        `);
+                        addressesLayer.addLayer(marker);
+                    }
+                });
+            }
+            addressesLayer.addTo(map);
+            this.innerHTML = '<i class="fas fa-eye-slash me-1"></i> Скрыть адреса';
+        } else {
+            if (addressesLayer) {
+                map.removeLayer(addressesLayer);
+            }
+            this.innerHTML = '<i class="fas fa-map-marker-alt me-1"></i> Показать адреса';
+        }
+    });
+
+    // Изменение цвета полигона
+    document.getElementById('polygon-color').addEventListener('change', function() {
+        if (currentPolygon) {
+            const color = this.value;
+            currentPolygon.setStyle({
+                color: color,
+                fillColor: color
+            });
+        }
+    });
+
+    // Инициализация при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        initMap();
+        
+        // Убираем флаг SVG из атрибуции после загрузки карты
+        function removeFlagFromAttribution() {
+            const flags = document.querySelectorAll('.leaflet-attribution-flag, .leaflet-control-attribution svg');
+            flags.forEach(function(flag) {
+                flag.style.display = 'none';
+                flag.remove();
+            });
+        }
+        removeFlagFromAttribution();
+        setTimeout(removeFlagFromAttribution, 100);
+        setTimeout(removeFlagFromAttribution, 500);
+        setTimeout(removeFlagFromAttribution, 1000);
+        
+        // Отслеживаем появление новых элементов
+        const observer = new MutationObserver(function(mutations) {
+            removeFlagFromAttribution();
+        });
+        
+        setTimeout(function() {
+            const attribution = document.querySelector('.leaflet-control-attribution');
+            if (attribution) {
+                observer.observe(attribution, { childList: true, subtree: true });
+            }
+        }, 500);
+    });
+</script>
+{% endblock %}

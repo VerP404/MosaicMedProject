@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/', include('apps.api.urls')),
     path('reports/', include('apps.reports.urls')),
     path('dn_app/', include('apps.dn_app.urls')),
+    path('zones/', include('apps.zones.urls', namespace='zones')),
     path('', include('apps.references.urls')),
 ]
 # Обслуживание медиа файлов

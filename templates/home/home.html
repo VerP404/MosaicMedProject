@@ -279,6 +279,36 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Система участков -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="system-card zones-system">
+                        <div class="system-card-header">
+                            <div class="system-icon">
+                                <i class="fas fa-map-marked-alt"></i>
+                            </div>
+                            <div class="system-status">
+                                <span class="status-indicator online"></span>
+                                <span class="status-text">Онлайн</span>
+                            </div>
+                        </div>
+                        <div class="system-card-body">
+                            <h4 class="system-title">Система участков</h4>
+                            <p class="system-description">Управление организациями и их территориальными участками. Создание полигонов на карте и автоматическая привязка адресов</p>
+                            <div class="system-features">
+                                <span class="feature-tag">Карты</span>
+                                <span class="feature-tag">Организации</span>
+                                <span class="feature-tag">Участки</span>
+                            </div>
+                        </div>
+                        <div class="system-card-footer">
+                            <a href="{% url 'zones:organizations_list' %}" class="btn btn-primary">
+                                <i class="fas fa-external-link-alt me-2"></i>
+                                Открыть систему
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -456,6 +486,7 @@
 .personnel-system .system-icon { background: linear-gradient(135deg, #fa709a, #fee140); }
 .reports-system .system-icon { background: linear-gradient(135deg, #a8edea, #fed6e3); }
 .beneficiaries-system .system-icon { background: linear-gradient(135deg, #ff6a88, #ff99ac); }
+.zones-system .system-icon { background: linear-gradient(135deg, #4ecdc4, #44a08d); }
 
 .system-status {
     display: flex;

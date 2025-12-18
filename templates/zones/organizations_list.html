@@ -1,0 +1,218 @@
+{% extends 'home/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-map-marked-alt me-2"></i>
+                Система участков
+            </h1>
+            <p class="text-muted">Управление организациями и их территориальными участками</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Список организаций -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-building me-2"></i>
+                        Организации
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for org in organizations %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <h6 class="mb-1">{{ org.name }}</h6>
+                                    <small class="text-muted">{{ org.code }}</small>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">
+                                    {{ org.organization_addresses.count }} адр.
+                                </span>
+                            </div>
+                            <div class="btn-group btn-group-sm w-100" role="group">
+                                <a href="{% url 'zones:organization_view' org.pk %}" 
+                                   class="btn btn-outline-primary">
+                                    <i class="fas fa-eye me-1"></i>
+                                    Просмотр
+                                </a>
+                                <a href="{% url 'zones:organization_detail' org.pk %}" 
+                                   class="btn btn-outline-success">
+                                    <i class="fas fa-edit me-1"></i>
+                                    Редактировать
+                                </a>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="list-group-item text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                            <p>Нет активных организаций</p>
+                            <a href="/admin/zones/organization/add/" class="btn btn-sm btn-primary">
+                                <i class="fas fa-plus me-1"></i>
+                                Создать организацию
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="/admin/zones/organization/add/" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-plus me-1"></i>
+                        Добавить организацию
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Карта -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-map me-2"></i>
+                        Карта организаций
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="map" style="height: 600px; width: 100%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Leaflet Draw CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+
+<style>
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+    }
+    #map {
+        border-radius: 0 0 0.375rem 0.375rem;
+    }
+    /* Скрываем флаг SVG в атрибуции Leaflet */
+    .leaflet-attribution-flag,
+    .leaflet-control-attribution svg,
+    .leaflet-control-attribution .leaflet-attribution-flag {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        opacity: 0 !important;
+    }
+</style>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet Draw JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+<script>
+    // Инициализация карты
+    const map = L.map('map').setView([59.9343, 30.3351], 10); // Санкт-Петербург по умолчанию
+
+    // Добавляем тайлы OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19
+    }).addTo(map);
+
+    // Данные организаций
+    const organizationsData = {{ organizations_data|safe }};
+
+    // Группа для полигонов
+    const polygonsGroup = L.layerGroup().addTo(map);
+
+    // Отображаем полигоны организаций
+    organizationsData.forEach(function(org) {
+        if (org.polygon) {
+            try {
+                let coords = org.polygon;
+                
+                // Если это GeoJSON объект, извлекаем координаты
+                if (typeof org.polygon === 'object' && org.polygon.type === 'Polygon') {
+                    coords = org.polygon.coordinates[0];
+                } else if (Array.isArray(org.polygon) && org.polygon.length > 0) {
+                    // Если это массив координат
+                    coords = org.polygon;
+                }
+
+                // Преобразуем координаты в формат Leaflet [lat, lon]
+                const latLngs = coords.map(function(coord) {
+                    return [coord[1], coord[0]]; // Leaflet использует [lat, lon]
+                });
+
+                // Создаем полигон
+                const polygon = L.polygon(latLngs, {
+                    color: org.color,
+                    fillColor: org.color,
+                    fillOpacity: 0.3,
+                    weight: 2
+                }).addTo(polygonsGroup);
+
+                // Добавляем popup
+                const popupContent = `
+                    <div>
+                        <h6><strong>${org.name}</strong></h6>
+                        <p class="mb-1"><small>Код: ${org.code}</small></p>
+                        <p class="mb-1"><small>Адресов: ${org.address_count}</small></p>
+                        <a href="/zones/organization/${org.id}/" class="btn btn-sm btn-primary mt-2">
+                            <i class="fas fa-edit me-1"></i>
+                            Редактировать
+                        </a>
+                    </div>
+                `;
+                polygon.bindPopup(popupContent);
+
+                // Привязываем данные организации к полигону
+                polygon.organizationId = org.id;
+            } catch (e) {
+                console.error('Ошибка при отображении полигона организации:', org.name, e);
+            }
+        }
+    });
+
+    // Автоматически подстраиваем карту под все полигоны
+    if (polygonsGroup.getLayers().length > 0) {
+        const group = new L.featureGroup(polygonsGroup.getLayers());
+        map.fitBounds(group.getBounds().pad(0.1));
+    }
+
+    // Убираем флаг SVG из атрибуции после загрузки карты
+    function removeFlagFromAttribution() {
+        // Удаляем SVG флаги напрямую
+        const flags = document.querySelectorAll('.leaflet-attribution-flag, .leaflet-control-attribution svg');
+        flags.forEach(function(flag) {
+            flag.style.display = 'none';
+            flag.remove();
+        });
+    }
+    
+    // Вызываем сразу и после небольших задержек
+    removeFlagFromAttribution();
+    setTimeout(removeFlagFromAttribution, 100);
+    setTimeout(removeFlagFromAttribution, 500);
+    setTimeout(removeFlagFromAttribution, 1000);
+    
+    // Также отслеживаем появление новых элементов
+    const observer = new MutationObserver(function(mutations) {
+        removeFlagFromAttribution();
+    });
+    
+    setTimeout(function() {
+        const attribution = document.querySelector('.leaflet-control-attribution');
+        if (attribution) {
+            observer.observe(attribution, { childList: true, subtree: true });
+        }
+    }, 500);
+</script>
+{% endblock %}

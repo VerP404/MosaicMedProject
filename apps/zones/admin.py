@@ -12,6 +12,7 @@ from unfold.decorators import action
 from .models import (
     Address,
     Organization,
+    OrganizationAddress,
     SiteType,
     Corpus,
     CorpusAddress,
@@ -178,12 +179,20 @@ class AddressAdmin(ModelAdmin):
         return request.user.is_staff
 
 
+class OrganizationAddressInline(TabularInline):
+    model = OrganizationAddress
+    extra = 0
+    autocomplete_fields = ("address",)
+    readonly_fields = ("assigned_at", "assigned_method")
+
+
 @admin.register(Organization)
 class OrganizationAdmin(ModelAdmin):
     list_display = ("code", "name", "address", "is_active", "created_at")
     list_filter = ("is_active", "created_at")
     search_fields = ("code", "name", "address__street", "address__housenumber")
     autocomplete_fields = ("address",)
+    inlines = [OrganizationAddressInline]
     fieldsets = (
         ("Основная информация", {
             "fields": ("code", "name", "description", "address"),
@@ -198,6 +207,29 @@ class OrganizationAdmin(ModelAdmin):
     )
     readonly_fields = ("area", "created_at", "updated_at")
     list_per_page = 50
+    actions = ["assign_addresses_in_polygon"]
+
+    @admin.action(description="Привязать адреса внутри полигона")
+    def assign_addresses_in_polygon(self, request, queryset):
+        """Действие для привязки адресов к организациям."""
+        total_assigned = 0
+        for org in queryset:
+            if org.polygon:
+                assigned = org.assign_addresses_in_polygon()
+                total_assigned += assigned
+        
+        if total_assigned:
+            self.message_user(
+                request,
+                f"Привязано {total_assigned} адресов к организациям.",
+                messages.SUCCESS,
+            )
+        else:
+            self.message_user(
+                request,
+                "Не удалось привязать адреса. Проверьте, что у организаций установлены полигоны.",
+                messages.WARNING,
+            )
 
 
 @admin.register(SiteType)
@@ -298,6 +330,20 @@ class SiteAddressAdmin(ModelAdmin):
         "site__corpus__name",
     )
     autocomplete_fields = ("address", "site", "type")
+    readonly_fields = ("assigned_at",)
+
+
+@admin.register(OrganizationAddress)
+class OrganizationAddressAdmin(ModelAdmin):
+    list_display = ("address", "organization", "assigned_method", "assigned_at")
+    list_filter = ("assigned_method", "organization", "assigned_at")
+    search_fields = (
+        "address__street",
+        "address__housenumber",
+        "organization__name",
+        "organization__code",
+    )
+    autocomplete_fields = ("address", "organization")
     readonly_fields = ("assigned_at",)
 
 
