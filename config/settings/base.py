@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'apps.beneficiaries',
     'apps.references',
     'apps.gar',
+    'apps.zones',
 
 
     'import_export',
