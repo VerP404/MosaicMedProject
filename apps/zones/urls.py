@@ -8,6 +8,7 @@ urlpatterns = [
     path('organization/<int:pk>/', views.organization_detail, name='organization_detail'),
     path('organization/<int:pk>/view/', views.organization_view, name='organization_view'),
     path('organization/<int:pk>/update-polygon/', views.organization_update_polygon, name='organization_update_polygon'),
+    path('organization/<int:pk>/assign-addresses/', views.organization_assign_addresses, name='organization_assign_addresses'),
     path('organization/<int:pk>/addresses/', views.organization_addresses, name='organization_addresses'),
     path('corpus/<int:pk>/', views.corpus_detail, name='corpus_detail'),
     path('corpus/<int:corpus_pk>/site/', views.site_create_or_update, name='site_create_or_update'),

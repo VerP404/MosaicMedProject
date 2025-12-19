@@ -119,6 +119,32 @@ def organization_update_polygon(request, pk):
 
 
 @login_required
+@require_http_methods(["POST"])
+def organization_assign_addresses(request, pk):
+    """Явное обновление привязок адресов внутри полигона организации."""
+    organization = get_object_or_404(Organization, pk=pk)
+
+    try:
+        assigned_count = organization.assign_addresses_in_polygon()
+        total_in_polygon = organization.get_addresses_in_polygon().count()
+        total_assigned = organization.organization_addresses.count()
+
+        return JsonResponse({
+            'success': True,
+            'assigned_count': assigned_count,
+            'total_in_polygon': total_in_polygon,
+            'total_assigned': total_assigned,
+            'message': (
+                f'Привязано новых адресов: {assigned_count}. '
+                f'Всего в полигоне: {total_in_polygon}. '
+                f'Всего привязано: {total_assigned}.'
+            )
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
 @require_http_methods(["GET"])
 def organization_addresses(request, pk):
     """API для получения адресов организации."""
@@ -250,9 +276,10 @@ def organization_view(request, pk):
     )
     
     unallocated_addresses = assigned_addresses.exclude(id__in=site_address_ids)
-    
+
     unallocated_addresses_data = []
-    for addr in unallocated_addresses[:1000]:  # Ограничиваем для производительности
+    # Убираем лимит на количество нераспределённых адресов для отображения
+    for addr in unallocated_addresses:
         if addr.longitude and addr.latitude:
             unallocated_addresses_data.append({
                 'id': addr.id,

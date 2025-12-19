@@ -18,6 +18,7 @@ PORT_DASH_CHIEF = env.int('PORT_DASH_CHIEF', default=5001)
 ALLOWED_HOSTS = ['*']
 
 # Редиректы после аутентификации
+LOGIN_URL = '/admin/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
@@ -290,6 +291,13 @@ UNFOLD = {
                 "items": [
                     {"title": "Общие справочники", "icon": "library_books", "link": "/admin/references/"},
                     {"title": "ГАР (Адреса)", "icon": "location_on", "link": "/admin/gar/"},
+                ],
+            },
+            {
+                "title": _("Карта"),
+                "collapsible": True,
+                "items": [
+                    {"title": "Участки", "icon": "map", "link": "/admin/zones/"},
                 ],
             },
         ],
