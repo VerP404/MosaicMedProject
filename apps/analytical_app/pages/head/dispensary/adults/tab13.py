@@ -8,10 +8,54 @@ from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.components.filters import filter_years, date_picker, update_buttons
 from sqlalchemy import text
-from apps.analytical_app.query_executor import engine
+from apps.analytical_app.query_executor import engine, execute_query
 
 
 type_page = "tab13-da"
+
+
+def filter_lpuuch(type_page):
+    """Создает мультиселект дропдаун для выбора участков, отсортированных по последним 3 цифрам"""
+    query = """
+        SELECT DISTINCT lpuuch
+        FROM data_loader_iszlpeople
+        WHERE COALESCE(NULLIF(lpuuch, '-'), '') <> ''
+    """
+    try:
+        lpuuch_list = [row[0] for row in execute_query(query) if row[0]]
+        
+        # Функция для извлечения последних 3 цифр после подчеркивания для сортировки
+        def get_sort_key(lpu):
+            if '_' in lpu:
+                parts = lpu.split('_')
+                if len(parts) == 2 and parts[1].isdigit() and len(parts[1]) >= 3:
+                    return parts[1][-3:]  # Последние 3 цифры после подчеркивания
+                else:
+                    return lpu[-3:] if len(lpu) >= 3 else lpu
+            else:
+                return lpu[-3:] if len(lpu) >= 3 else lpu
+        
+        # Сортируем участки по последним 3 цифрам после подчеркивания
+        sorted_lpuuch = sorted(lpuuch_list, key=lambda x: (get_sort_key(x), x))
+        
+        # Создаем опции для дропдауна
+        options = [{'label': lpu, 'value': lpu} for lpu in sorted_lpuuch]
+        
+    except Exception:
+        options = []
+    
+    return html.Div([
+        html.Label("Участки"),
+        dcc.Dropdown(
+            id=f'dropdown-lpuuch-{type_page}',
+            options=options,
+            value=[],
+            multi=True,
+            clearable=True,
+            placeholder="Выберите участки...",
+            searchable=True
+        )
+    ])
 
 
 adults_dv13 = html.Div([
@@ -78,6 +122,9 @@ adults_dv13 = html.Div([
                     ]), width=2
                 ),
             ], align="center"),
+            dbc.Row([
+                dbc.Col(filter_lpuuch(type_page), width=4),
+            ], align="center", className="mt-2"),
         ]),
         style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)", "border-radius": "10px"}
     ),
@@ -104,9 +151,10 @@ adults_dv13 = html.Div([
      State(f'dropdown-gender-{type_page}', 'value'),
      State(f'input-age-from-{type_page}', 'value'),
      State(f'input-age-to-{type_page}', 'value'),
-     State(f'dropdown-disp-type-{type_page}', 'value')]
+     State(f'dropdown-disp-type-{type_page}', 'value'),
+     State(f'dropdown-lpuuch-{type_page}', 'value')]
 )
-def update_table(n_clicks, year_value, gender_value, age_from, age_to, disp_type):
+def update_table(n_clicks, year_value, gender_value, age_from, age_to, disp_type, lpuuch_values):
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
@@ -131,6 +179,13 @@ def update_table(n_clicks, year_value, gender_value, age_from, age_to, disp_type
     disp_condition = ""
     if disp_type and disp_type != 'all':
         disp_condition = f"AND o.goal = '{disp_type}'"
+
+    lpuuch_condition = ""
+    if lpuuch_values and len(lpuuch_values) > 0:
+        # Экранируем одинарные кавычки в значениях участков
+        safe_lpuuch = [f"'{lpu.replace(chr(39), chr(39)+chr(39))}'" for lpu in lpuuch_values if lpu]
+        if safe_lpuuch:
+            lpuuch_condition = f"AND a.lpuuch IN ({', '.join(safe_lpuuch)})"
 
     query = f"""
 WITH attached_patients AS (
@@ -198,6 +253,7 @@ patients_without_disp AS (
     WHERE a.age_years >= 18
       {gender_condition}
       {age_condition}
+      {lpuuch_condition}
       AND NOT EXISTS (
             SELECT 1 
             FROM load_data_oms_data o
@@ -269,11 +325,13 @@ ORDER BY p.lpuuch, p.fio
 Пол: {gender_value if gender_value != 'all' else 'Все'}
 Возраст: {age_from}-{age_to}
 Тип диспансеризации: {disp_type if disp_type != 'all' else 'Все'}
+Участки: {', '.join(lpuuch_values) if lpuuch_values and len(lpuuch_values) > 0 else 'Все'}
 
 SQL условия:
 - Пол: {gender_condition or 'Не указано'}
 - Возраст: {age_condition}
 - Тип диспансеризации: {disp_condition or 'Не указано'}
+- Участки: {lpuuch_condition or 'Не указано'}
 """
 
     return columns, data, stat_text, debug_info, html.Div([dcc.Loading(type="default")])
