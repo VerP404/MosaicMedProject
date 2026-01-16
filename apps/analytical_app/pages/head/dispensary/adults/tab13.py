@@ -206,17 +206,41 @@ patients_without_disp AS (
               AND o.report_year = {int(year_value)}
               {disp_condition}
         )
+),
+patient_phones AS (
+    SELECT DISTINCT ON (regexp_replace(enp, '\\D', '', 'g'))
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        phone
+    FROM load_data_journal_appeals
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND COALESCE(NULLIF(phone, '-'), '') <> ''
+    ORDER BY regexp_replace(enp, '\\D', '', 'g'), 
+             COALESCE(
+                 CASE WHEN acceptance_date ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' 
+                      THEN to_date(SUBSTRING(acceptance_date FROM 1 FOR 10), 'YYYY-MM-DD') END,
+                 CASE WHEN acceptance_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}[ ]+[0-9]{{2}}:[0-9]{{2}}' 
+                      THEN to_timestamp(acceptance_date, 'DD.MM.YYYY HH24:MI')::date END,
+                 CASE WHEN acceptance_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}$' 
+                      THEN to_date(acceptance_date, 'DD.MM.YYYY') END,
+                 CASE WHEN record_date ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' 
+                      THEN to_date(SUBSTRING(record_date FROM 1 FOR 10), 'YYYY-MM-DD') END,
+                 CASE WHEN record_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}$' 
+                      THEN to_date(record_date, 'DD.MM.YYYY') END
+             ) DESC NULLS LAST,
+             id DESC
 )
 SELECT 
-    fio AS "ФИО",
-    dr AS "ДР",
-    enp_norm AS "ЕНП",
-    gender AS "Пол",
-    lpuuch AS "Участок",
-    age_years AS "Возраст",
-    required_disp_type AS "Требуемый тип"
-FROM patients_without_disp
-ORDER BY lpuuch, fio
+    p.fio AS "ФИО",
+    p.dr AS "ДР",
+    p.enp_norm AS "ЕНП",
+    p.gender AS "Пол",
+    p.lpuuch AS "Участок",
+    p.age_years AS "Возраст",
+    p.required_disp_type AS "Требуемый тип",
+    COALESCE(ph.phone, '') AS "Телефон"
+FROM patients_without_disp p
+LEFT JOIN patient_phones ph ON p.enp_norm = ph.enp_norm
+ORDER BY p.lpuuch, p.fio
 """
 
     try:
