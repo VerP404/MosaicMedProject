@@ -15,7 +15,7 @@ def sql_query_oms_dispensary(
         status_filter = ""
     
     return f"""
-    SELECT
+    SELECT DISTINCT ON (t.talon)
         t.talon,
         t.source_id,
         t.status,
@@ -42,9 +42,14 @@ def sql_query_oms_dispensary(
     FROM load_data_talons t
     LEFT JOIN data_loader_doctordata d
         ON SPLIT_PART(t.doctor, ' ', 1) = d.doctor_code
-    LEFT JOIN load_data_emd e
-        ON t.id = e.talon_id
-    WHERE t.goal IN ('ДВ4', 'ДВ2', 'ОПВ', 'УД1', 'УД2', 'ДР1', 'ДР2', 'ПН1')
+    LEFT JOIN LATERAL (
+        SELECT e1.id, e1.sending_status
+        FROM load_data_emd e1
+        WHERE e1.talon_id = t.id
+        ORDER BY e1.id DESC
+        LIMIT 1
+    ) e ON TRUE
+    WHERE t.goal IN ('ДВ4', 'ДВ2', 'ОПВ', 'УД1', 'УД2', 'ДР1', 'ДР2', 'ПН1', 'ДС2')
           AND t.report_year = '{selected_year}'
           AND t.report_month = {selected_month}
           AND t.sanctions IN ('0', '-')
@@ -67,7 +72,7 @@ def sql_query_detailed_dispensary(
         status_filter = ""
     
     return f"""
-    SELECT
+    SELECT DISTINCT ON (d.talon_number, d.service_name)
         d.talon_number,
         d.talon_type,
         d.gender,
@@ -101,11 +106,11 @@ def sql_query_detailed_dispensary(
         AND d.talon_number IN (
             SELECT o.talon
             FROM load_data_talons o
-            WHERE o.goal IN ('ДВ4', 'ДВ2', 'ОПВ', 'УД1', 'УД2', 'ДР1', 'ДР2', 'ПН1')
+            WHERE o.goal IN ('ДВ4', 'ДВ2', 'ОПВ', 'УД1', 'УД2', 'ДР1', 'ДР2', 'ПН1', 'ДС2')
               AND o.report_year = '{selected_year}'
               AND o.report_month = {selected_month}
               AND o.sanctions IN ('0', '-')
               {status_filter}
         )
-    ORDER BY d.talon_number, d.service_name
+    ORDER BY d.talon_number, d.service_name, e.id DESC NULLS LAST
     """
