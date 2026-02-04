@@ -1,0 +1,145 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:plan_groupindicators_changelist' %}">Объемы (группы)</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+    <h1>{{ title }}</h1>
+    {% if groups_count %}
+    <p class="help">Выбрано групп: <strong>{{ groups_count }}</strong>. Условия фильтрации для этих групп будут скопированы с года-источника на год-назначение.</p>
+    {% endif %}
+    
+    <div class="module">
+        <form method="post" action="" class="form">
+            {% csrf_token %}
+            {% if ids %}<input type="hidden" name="ids" value="{{ ids }}" />{% endif %}
+            
+            {% if form.errors %}
+                <ul class="errorlist">
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+            
+            <fieldset class="module aligned">
+                <div class="form-row">
+                    <div class="field-box">
+                        <label for="{{ form.source_year.id_for_label }}" class="required">
+                            {{ form.source_year.label }}:
+                        </label>
+                        {{ form.source_year }}
+                        {% if form.source_year.help_text %}
+                            <p class="help">{{ form.source_year.help_text }}</p>
+                        {% endif %}
+                        {% if form.source_year.errors %}
+                            <ul class="errorlist">
+                                {% for error in form.source_year.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field-box">
+                        <label for="{{ form.target_year.id_for_label }}" class="required">
+                            {{ form.target_year.label }}:
+                        </label>
+                        {{ form.target_year }}
+                        {% if form.target_year.help_text %}
+                            <p class="help">{{ form.target_year.help_text }}</p>
+                        {% endif %}
+                        {% if form.target_year.errors %}
+                            <ul class="errorlist">
+                                {% for error in form.target_year.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+            </fieldset>
+            
+            <div class="submit-row">
+                <input type="submit" value="Скопировать условия" class="default" />
+                <a href="{% url 'admin:plan_groupindicators_changelist' %}" class="button">
+                    <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">arrow_back</span>
+                    Назад
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .content { padding: 20px; }
+    .module {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+    .form-row { margin-bottom: 20px; }
+    .field-box { display: flex; flex-direction: column; gap: 8px; }
+    .field-box label { font-weight: 600; color: #374151; font-size: 14px; }
+    .field-box input[type="number"] {
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        width: 200px;
+    }
+    .field-box input[type="number"]:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .submit-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+    }
+    .submit-row input[type="submit"] {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .submit-row input[type="submit"]:hover { background: #2563eb; }
+    .submit-row .button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 20px;
+        background: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 14px;
+    }
+    .submit-row .button:hover { background: #e5e7eb; border-color: #9ca3af; }
+    .errorlist { color: #dc2626; margin: 8px 0 0 0; padding-left: 20px; font-size: 13px; }
+    .help { color: #6b7280; font-size: 12px; margin-top: 4px; }
+</style>
+{% endblock %}
