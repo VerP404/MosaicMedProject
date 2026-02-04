@@ -669,7 +669,7 @@
         {
           "field_name": "amount_numeric",
           "filter_type": "in",
-          "values": "21618.9, 25427.7",
+          "values": "27169.8",
           "year": 2026
         },
         {
