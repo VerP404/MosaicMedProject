@@ -48,3 +48,60 @@ class ExportStructureForm(forms.Form):
 class ImportStructureForm(forms.Form):
     """Пустая форма для подтверждения импорта"""
     pass
+
+
+class CopyPlansForm(forms.Form):
+    """Форма для копирования планов с одного года на другой"""
+    source_year = forms.IntegerField(
+        label='Год-источник',
+        min_value=2000,
+        max_value=2100,
+        initial=datetime.now().year,
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        help_text='С какого года копировать планы (значения по месяцам)',
+    )
+    target_year = forms.IntegerField(
+        label='Год-назначение',
+        min_value=2000,
+        max_value=2100,
+        initial=datetime.now().year + 1,
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        help_text='На какой год скопировать планы',
+    )
+
+    def clean(self):
+        data = super().clean()
+        if data.get('source_year') == data.get('target_year'):
+            raise forms.ValidationError('Год-источник и год-назначение должны отличаться.')
+        return data
+
+
+class CopyFiltersForm(forms.Form):
+    """Форма для копирования условий фильтрации с одного года на другой"""
+    source_year = forms.IntegerField(
+        label='Год-источник',
+        min_value=2000,
+        max_value=2100,
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        help_text='С какого года копировать условия фильтрации',
+    )
+    target_year = forms.IntegerField(
+        label='Год-назначение',
+        min_value=2000,
+        max_value=2100,
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        help_text='На какой год скопировать условия',
+    )
+
+    def __init__(self, *args, source_year=None, target_year=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if source_year is not None:
+            self.fields['source_year'].initial = source_year
+        if target_year is not None:
+            self.fields['target_year'].initial = target_year
+
+    def clean(self):
+        data = super().clean()
+        if data.get('source_year') == data.get('target_year'):
+            raise forms.ValidationError('Год-источник и год-назначение должны отличаться.')
+        return data

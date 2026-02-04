@@ -34,6 +34,8 @@ from .forms import (
     ImportPlansForm,
     ExportStructureForm,
     ImportStructureForm,
+    CopyPlansForm,
+    CopyFiltersForm,
 )
 from .models import (
     GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition,
@@ -41,7 +43,7 @@ from .models import (
     GroupBuildingDepartment, ChiefDashboard, MonthlyDoctorPlan, AnnualDoctorPlan, GoalGroupConfig,
     OrganizationIndicatorConfig
 )
-from .utils import copy_filters_to_new_year
+from .utils import copy_filters_to_new_year, copy_filters_from_year_to_year, copy_plans_to_year
 from ..organization.models import Department, Building
 
 
@@ -113,14 +115,17 @@ class FilterConditionInline(TabularInline):
             return []
 
 
-# Действие для копирования фильтров на следующий год
+# Действие для копирования условий фильтрации с года на год (открывает форму выбора лет)
 def copy_filters_action(modeladmin, request, queryset):
-    new_year = datetime.now().year + 1  # Копируем на следующий год
-    copy_filters_to_new_year(queryset, new_year)
-    modeladmin.message_user(request, f"Фильтры для выбранных групп скопированы на {new_year}", messages.SUCCESS)
+    if not queryset.exists():
+        modeladmin.message_user(request, "Выберите хотя бы одну группу.", messages.WARNING)
+        return
+    ids = ','.join(str(pk) for pk in queryset.values_list('pk', flat=True))
+    url = reverse('admin:plan_groupindicators_copy_filters') + '?ids=' + ids
+    return redirect(url)
 
 
-copy_filters_action.short_description = "Скопировать фильтры на следующий год для выбранных групп"
+copy_filters_action.short_description = "Скопировать условия фильтрации на другой год для выбранных групп"
 
 
 # Действия для изменения статуса отображения в отчете нарастающе
@@ -380,6 +385,54 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
 
     view_subgroups.short_description = "Вложенные группы"
 
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        extra = [
+            path(
+                'copy-filters/',
+                self.admin_site.admin_view(self.copy_filters_view),
+                name='plan_groupindicators_copy_filters',
+            ),
+        ]
+        return extra + urls
+
+    def copy_filters_view(self, request):
+        ids_param = request.GET.get('ids') or (request.POST.get('ids') if request.method == 'POST' else None)
+        ids = [int(x) for x in ids_param.split(',') if x.strip()] if ids_param else []
+        if not ids:
+            self.message_user(request, "Не выбраны группы. Вернитесь в список и выберите группы.", messages.WARNING)
+            return redirect('admin:plan_groupindicators_changelist')
+        groups = GroupIndicators.objects.filter(pk__in=ids)
+        current_year = datetime.now().year
+        form = CopyFiltersForm(
+            request.POST or None,
+            source_year=current_year,
+            target_year=current_year + 1,
+        )
+        if request.method == 'POST' and form.is_valid():
+            source_year = form.cleaned_data['source_year']
+            target_year = form.cleaned_data['target_year']
+            result = copy_filters_from_year_to_year(groups, source_year, target_year)
+            if result.get('error'):
+                self.message_user(request, result['error'], messages.ERROR)
+            else:
+                self.message_user(
+                    request,
+                    f"Скопировано условий: {result['copied_count']} для {result['groups_count']} групп (с {source_year} на {target_year}).",
+                    messages.SUCCESS,
+                )
+                return redirect('admin:plan_groupindicators_changelist')
+        context = {
+            'form': form,
+            'title': 'Скопировать условия фильтрации на другой год',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+            'ids': ids_param,
+            'groups_count': groups.count(),
+        }
+        return render(request, 'admin/plan/copy_filters.html', context)
+
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = super().get_readonly_fields(request, obj)
         if obj:
@@ -414,7 +467,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     readonly_fields = ('external_id',)
     actions = [enable_cumulative_report_action, disable_cumulative_report_action, 
                enable_indicators_report_action, disable_indicators_report_action]
-    actions_list = ["export_plans", "import_plans"]
+    actions_list = ["export_plans", "import_plans", "copy_plans_action"]
     ordering = ['year', 'sort_order', 'group__level', 'group__name']
 
     def has_quantity_plan(self, obj):
@@ -649,12 +702,46 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
         
         return {'imported': imported, 'updated': updated}
 
+    @action(description="Скопировать планы с года на год", url_path="copy-plans", permissions=["change_annualplan"])
+    def copy_plans_action(self, request):
+        """Копирование планов (значения по месяцам) с одного года на другой"""
+        form = CopyPlansForm(request.POST or None)
+        if request.method == 'POST' and form.is_valid():
+            source_year = form.cleaned_data['source_year']
+            target_year = form.cleaned_data['target_year']
+            try:
+                result = copy_plans_to_year(source_year, target_year)
+            except Exception as exc:
+                self.message_user(request, f'Ошибка при копировании: {exc}', messages.ERROR)
+            else:
+                if 'error' in result:
+                    self.message_user(request, result['error'], messages.ERROR)
+                else:
+                    self.message_user(
+                        request,
+                        f'Планы скопированы с {source_year} на {target_year}: '
+                        f'годовых планов создано {result["created_annual"]}, обновлено {result["updated_annual"]}; '
+                        f'месячных значений обновлено {result["created_monthly"] + result["updated_monthly"]}.',
+                        messages.SUCCESS,
+                    )
+                    return redirect('admin:plan_annualplan_changelist')
+
+        context = {
+            'form': form,
+            'title': 'Скопировать планы с года на год',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/plan/copy_plans.html', context)
+
     def has_export_plans_permission(self, request):
         return request.user.has_perm('plan.export_plans')
     
     def has_import_plans_permission(self, request):
         return request.user.has_perm('plan.import_plans')
-
+        
+    def has_change_annualplan_permission(self, request):
+        return request.user.has_perm('plan.change_annualplan')
 
 # Инлайн для MonthlyBuildingPlan
 class MonthlyBuildingPlanInline(TabularInline):
