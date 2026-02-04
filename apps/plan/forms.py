@@ -41,8 +41,21 @@ class ImportPlansForm(forms.Form):
 
 
 class ExportStructureForm(forms.Form):
-    """Пустая форма для подтверждения экспорта"""
-    pass
+    """Форма экспорта структуры: опции для условий фильтрации"""
+    include_filters = forms.BooleanField(
+        label='Включить условия фильтрации',
+        initial=True,
+        required=False,
+        help_text='Экспортировать условия фильтрации (FilterCondition) для каждой группы',
+    )
+    filter_year = forms.IntegerField(
+        label='Год фильтров',
+        min_value=2000,
+        max_value=2100,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Все годы'}),
+        help_text='Оставьте пустым, чтобы выгрузить условия за все годы; укажите год — только за этот год',
+    )
 
 
 class ImportStructureForm(forms.Form):

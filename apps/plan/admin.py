@@ -287,16 +287,22 @@ class GroupIndicatorsAdmin(ModelAdmin, ImportExportModelAdmin):
         form = ExportStructureForm(request.POST or None)
         if request.method == 'POST' and form.is_valid():
             output_path = self._fixtures_path()
+            include_filters = form.cleaned_data.get('include_filters', False)
+            filter_year = form.cleaned_data.get('filter_year')
             try:
-                call_command('export_indicators_structure', output=str(output_path))
+                call_kw = {'output': str(output_path)}
+                if include_filters:
+                    call_kw['include_filters'] = True
+                    if filter_year is not None:
+                        call_kw['year'] = filter_year
+                call_command('export_indicators_structure', **call_kw)
             except Exception as exc:
                 self.message_user(request, f'Ошибка экспорта: {exc}', messages.ERROR)
             else:
-                self.message_user(
-                    request,
-                    f'Структура сохранена в {self._relative_path_display(output_path)}',
-                    messages.SUCCESS
-                )
+                msg = f'Структура сохранена в {self._relative_path_display(output_path)}'
+                if include_filters:
+                    msg += f'. Условия фильтрации: за все годы.' if filter_year is None else f'. Условия фильтрации: за {filter_year} год.'
+                self.message_user(request, msg, messages.SUCCESS)
                 return redirect('admin:plan_groupindicators_changelist')
 
         context = {
@@ -739,7 +745,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     
     def has_import_plans_permission(self, request):
         return request.user.has_perm('plan.import_plans')
-        
+
     def has_change_annualplan_permission(self, request):
         return request.user.has_perm('plan.change_annualplan')
 
