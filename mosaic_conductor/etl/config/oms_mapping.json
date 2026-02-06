@@ -139,7 +139,7 @@
         "Дата начала работы:": "start_date",
         "Дата окончания работы:": "end_date",
         "Структурное подразделение:": "department",
-        "Код профиля медпомощи:": "medical_profile_code",
+        "Код профиля МП (ФФОМС):": "medical_profile_code",
         "Код специальности:": "specialty_code",
         "Код отделения:": "department_code",
         "Комментарий:": "comment"
