@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-02-04 12:20:32.015167",
+  "export_date": "2026-02-09 13:21:09.711897",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -121,13 +121,13 @@
           "field_name": "goal",
           "filter_type": "in",
           "values": "'ДВ4','ДВ2','ОПВ','УД1','УД2','ДР1','ДР2','ПН1','ДС1','ДС2'",
-          "year": 2024
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "in",
           "values": "'ДВ4','ДВ2','ОПВ','УД1','УД2','ДР1','ДР2','ПН1','ДС1','ДС2'",
-          "year": 2025
+          "year": 2024
         },
         {
           "field_name": "goal",
@@ -145,12 +145,6 @@
       "parent_external_id": null,
       "filters": [
         {
-          "field_name": "ksg",
-          "filter_type": "not_like",
-          "values": "'ds37%'",
-          "year": 2025
-        },
-        {
           "field_name": "goal",
           "filter_type": "in",
           "values": "'Стационарно', 'В дневном стационаре', 'На дому'",
@@ -160,12 +154,18 @@
           "field_name": "ksg",
           "filter_type": "not_like",
           "values": "'ds37%'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'Стационарно', 'В дневном стационаре', 'На дому'",
           "year": 2026
         },
         {
-          "field_name": "goal",
-          "filter_type": "in",
-          "values": "'Стационарно', 'В дневном стационаре', 'На дому'",
+          "field_name": "ksg",
+          "filter_type": "not_like",
+          "values": "'ds37%'",
           "year": 2026
         }
       ]
@@ -177,6 +177,12 @@
       "is_distributable": false,
       "parent_external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
       "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'1','5','7','9','10','13','14','140','32','113'.'307','64','640','ДВ4','ОПВ','ПН1'",
+          "year": 2024
+        },
         {
           "field_name": "goal",
           "filter_type": "in",
@@ -198,6 +204,12 @@
       "is_distributable": false,
       "parent_external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
       "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'22'",
+          "year": 2024
+        },
         {
           "field_name": "goal",
           "filter_type": "in",
@@ -223,6 +235,12 @@
           "field_name": "goal",
           "filter_type": "in",
           "values": "'30','301','305'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'30','301','305'",
           "year": 2025
         },
         {
@@ -240,6 +258,18 @@
       "is_distributable": false,
       "parent_external_id": "f663405c-19cb-4e4b-93e3-2b067916ae85",
       "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'3'",
+          "year": 2024
+        },
+        {
+          "field_name": "main_diagnosis_code",
+          "filter_type": "like",
+          "values": "any (array ['C%', 'D0%'])",
+          "year": 2024
+        },
         {
           "field_name": "goal",
           "filter_type": "exact",
@@ -289,6 +319,18 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'3'",
+          "year": 2024
+        },
+        {
+          "field_name": "main_diagnosis_code",
+          "filter_type": "like",
+          "values": "'I%'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'3'",
           "year": 2026
         },
         {
@@ -306,6 +348,18 @@
       "is_distributable": false,
       "parent_external_id": "f663405c-19cb-4e4b-93e3-2b067916ae85",
       "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'3'",
+          "year": 2024
+        },
+        {
+          "field_name": "main_diagnosis_code",
+          "filter_type": "like",
+          "values": "'E11%'",
+          "year": 2024
+        },
         {
           "field_name": "goal",
           "filter_type": "exact",
@@ -340,9 +394,21 @@
       "parent_external_id": "f663405c-19cb-4e4b-93e3-2b067916ae85",
       "filters": [
         {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'3'",
+          "year": 2024
+        },
+        {
           "field_name": "main_diagnosis_code",
           "filter_type": "not_like",
-          "values": "'E11%'",
+          "values": "any (array ['I%','E11%','C%','D0%'])",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'3'",
           "year": 2025
         },
         {
@@ -354,13 +420,13 @@
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "not_like",
-          "values": "'C%'",
+          "values": "'E11%'",
           "year": 2025
         },
         {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'3'",
+          "field_name": "main_diagnosis_code",
+          "filter_type": "not_like",
+          "values": "'C%'",
           "year": 2025
         },
         {
@@ -370,15 +436,33 @@
           "year": 2025
         },
         {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'3'",
+          "year": 2026
+        },
+        {
           "field_name": "main_diagnosis_code",
           "filter_type": "not_like",
           "values": "'E11%'",
           "year": 2026
         },
         {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'3'",
+          "field_name": "main_diagnosis_code",
+          "filter_type": "not_like",
+          "values": "'C%'",
+          "year": 2026
+        },
+        {
+          "field_name": "main_diagnosis_code",
+          "filter_type": "not_like",
+          "values": "'D0%'",
+          "year": 2026
+        },
+        {
+          "field_name": "main_diagnosis_code",
+          "filter_type": "not_like",
+          "values": "'I%'",
           "year": 2026
         }
       ]
@@ -390,6 +474,12 @@
       "is_distributable": false,
       "parent_external_id": "5690482a-c775-43dd-ad44-abbac7ef99e3",
       "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'561'",
+          "year": 2024
+        },
         {
           "field_name": "goal",
           "filter_type": "exact",
@@ -411,6 +501,18 @@
       "is_distributable": false,
       "parent_external_id": "5690482a-c775-43dd-ad44-abbac7ef99e3",
       "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2024
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "in",
+          "values": "589.82, 1179.64, 2359,28",
+          "year": 2024
+        },
         {
           "field_name": "goal",
           "filter_type": "exact",
@@ -448,6 +550,12 @@
           "field_name": "goal",
           "filter_type": "in",
           "values": "'ДВ4','ДВ2','ОПВ','УД1','УД2','ДР1','ДР2'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'ДВ4','ДВ2','ОПВ','УД1','УД2','ДР1','ДР2'",
           "year": 2025
         },
         {
@@ -469,13 +577,19 @@
           "field_name": "goal",
           "filter_type": "in",
           "values": "'ПН1','ДС1','ДС2'",
-          "year": 2026
+          "year": 2024
         },
         {
           "field_name": "goal",
           "filter_type": "in",
           "values": "'ПН1','ДС1','ДС2'",
           "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'ПН1','ДС1','ДС2'",
+          "year": 2026
         }
       ]
     },
@@ -490,18 +604,6 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'541'",
-          "year": 2026
-        },
-        {
-          "field_name": "amount_numeric",
-          "filter_type": "in",
-          "values": "1061.84, 2549.4",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'541'",
           "year": 2025
         },
         {
@@ -509,6 +611,18 @@
           "filter_type": "in",
           "values": "994.23, 2387.07",
           "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "in",
+          "values": "1061.84, 2549.4",
+          "year": 2026
         }
       ]
     },
@@ -523,13 +637,13 @@
           "field_name": "goal",
           "filter_type": "in",
           "values": "'30','301','305','ДВ2'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "in",
           "values": "'30','301','305','ДВ2'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -544,25 +658,25 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'307'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "like",
           "values": "'E1%'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'307'",
-          "year": 2025
+          "year": 2026
         },
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "like",
           "values": "'E1%'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -577,25 +691,25 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'307'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "not_like",
           "values": "'E1%'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'307'",
-          "year": 2025
+          "year": 2026
         },
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "not_like",
           "values": "'E1%'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -610,13 +724,13 @@
           "field_name": "goal",
           "filter_type": "in",
           "values": "'1','5','7','9','10','14','32','64'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "in",
           "values": "'1','5','7','9','10','14','32','64'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -631,25 +745,25 @@
           "field_name": "goal",
           "filter_type": "in",
           "values": "'В дневном стационаре', 'На дому'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "ksg",
           "filter_type": "like",
           "values": "'ds37%'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "in",
           "values": "'В дневном стационаре', 'На дому'",
-          "year": 2025
+          "year": 2026
         },
         {
           "field_name": "ksg",
           "filter_type": "like",
           "values": "'ds37%'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -664,18 +778,6 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'30'",
-          "year": 2026
-        },
-        {
-          "field_name": "amount_numeric",
-          "filter_type": "in",
-          "values": "27169.8",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'30'",
           "year": 2025
         },
         {
@@ -683,6 +785,18 @@
           "filter_type": "in",
           "values": "21618.9, 25427.7",
           "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'30'",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "in",
+          "values": "27169.8",
+          "year": 2026
         }
       ]
     },
@@ -694,16 +808,16 @@
       "parent_external_id": "5690482a-c775-43dd-ad44-abbac7ef99e3",
       "filters": [
         {
-          "field_name": "amount_numeric",
-          "filter_type": "in",
-          "values": "10323.6, 2591.73, 4063.44",
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
           "year": 2025
         },
         {
           "field_name": "amount_numeric",
           "filter_type": "in",
           "values": "10323.6, 2591.73, 4063.44",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
@@ -712,10 +826,10 @@
           "year": 2026
         },
         {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'541'",
-          "year": 2025
+          "field_name": "amount_numeric",
+          "filter_type": "in",
+          "values": "10323.6, 2591.73, 4063.44",
+          "year": 2026
         }
       ]
     },
@@ -727,12 +841,6 @@
       "parent_external_id": "476f2f4d-1676-4f98-ae98-d75fc602f390",
       "filters": [
         {
-          "field_name": "ksg",
-          "filter_type": "not_like",
-          "values": "'ds37%'",
-          "year": 2025
-        },
-        {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'Стационарно'",
@@ -742,12 +850,18 @@
           "field_name": "ksg",
           "filter_type": "not_like",
           "values": "'ds37%'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'Стационарно'",
           "year": 2026
         },
         {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'Стационарно'",
+          "field_name": "ksg",
+          "filter_type": "not_like",
+          "values": "'ds37%'",
           "year": 2026
         }
       ]
@@ -760,6 +874,12 @@
       "parent_external_id": "476f2f4d-1676-4f98-ae98-d75fc602f390",
       "filters": [
         {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'В дневном стационаре', 'На дому'",
+          "year": 2025
+        },
+        {
           "field_name": "ksg",
           "filter_type": "not_like",
           "values": "'ds37%'",
@@ -769,18 +889,543 @@
           "field_name": "goal",
           "filter_type": "in",
           "values": "'В дневном стационаре', 'На дому'",
-          "year": 2025
+          "year": 2026
         },
         {
           "field_name": "ksg",
           "filter_type": "not_like",
           "values": "'ds37%'",
           "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "52702b6a-fec1-4a5c-8ff9-961cf7c897c3",
+      "name": "Неотложка на дому",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "80397d9b-a8f8-4d75-b2da-03181db8d262",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'22'",
+          "year": 2024
+        },
+        {
+          "field_name": "home_visits",
+          "filter_type": "exact",
+          "values": "'1'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'22'",
+          "year": 2025
+        },
+        {
+          "field_name": "home_visits",
+          "filter_type": "exact",
+          "values": "'1'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'22'",
+          "year": 2026
+        },
+        {
+          "field_name": "home_visits",
+          "filter_type": "exact",
+          "values": "'1'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "13972b34-e607-430a-b79a-384db4fc240f",
+      "name": "Неотложка в МО",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "80397d9b-a8f8-4d75-b2da-03181db8d262",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'22'",
+          "year": 2024
+        },
+        {
+          "field_name": "mo_visits",
+          "filter_type": "exact",
+          "values": "'1'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'22'",
+          "year": 2025
+        },
+        {
+          "field_name": "mo_visits",
+          "filter_type": "exact",
+          "values": "'1'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'22'",
+          "year": 2026
+        },
+        {
+          "field_name": "mo_visits",
+          "filter_type": "exact",
+          "values": "'1'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "60d0c417-5a44-45ae-be33-e14d874b3d04",
+      "name": "ДН беременных",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "38892798-a9b4-4550-a32b-359a58db87ac",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'301'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'301'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'301'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "504cf7d1-dc20-47db-bfe3-85350c67fa28",
+      "name": "ДН не входящих в 168н",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "38892798-a9b4-4550-a32b-359a58db87ac",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'305'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'305'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'305'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "7a81cd50-f9ff-40df-9611-7800b68a2561",
+      "name": "цель 30",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "38892798-a9b4-4550-a32b-359a58db87ac",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'30'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'30'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'30'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "1fe92e6d-1439-44f8-bba1-0b5a0d949144",
+      "name": "Гериатрия",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'64'",
+          "year": 2024
         },
         {
           "field_name": "goal",
           "filter_type": "in",
-          "values": "'В дневном стационаре', 'На дому'",
+          "values": "'64'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'64'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "b0a6286a-7b28-4778-bfd4-f8fe9cfba065",
+      "name": "УЗИ ССС (541) - 1 услуга",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "5c4e6302-0195-4771-bbd0-d45bc09dece1",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2024
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "589.82",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2025
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "693.79",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "740.97",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "bd0991a5-afdd-493a-b73f-a8273f4d2a67",
+      "name": "УЗИ ССС (541) - 2 услуги",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "5c4e6302-0195-4771-bbd0-d45bc09dece1",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2024
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "1179.64",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2025
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "1387.58",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "1481.94",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "6e7677f1-5620-486f-ad4d-2a95c64748bd",
+      "name": "1 этап - ДВ4",
+      "level": 3,
+      "is_distributable": true,
+      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДВ4'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДВ4'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДВ4'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "3dfd7847-2531-4ba3-8544-7319bfb683ee",
+      "name": "2 этап - ДВ2",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДВ2'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДВ2'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДВ2'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "7cb155e0-45f1-4d1f-ac3e-30dd8b6a4915",
+      "name": "ПМО - ОПВ",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ОПВ'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ОПВ'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ОПВ'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "16176420-c156-494c-ae7d-5ad8599a1bd7",
+      "name": "Углубленная - УД1",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'УД1'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'УД1'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'УД1'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "a48e0117-a2b8-4365-919a-7cd85dfbe776",
+      "name": "Углубленная - УД2",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'УД2'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'УД2'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'УД2'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "6d1e7a46-2704-4902-bf29-28041f15a0f0",
+      "name": "Репродуктивное - ДР1",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДР1'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДР1'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДР1'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "08f2a841-fc6e-4aff-a65c-216f0d85f5c5",
+      "name": "Репродуктивное - ДР2",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДР2'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДР2'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДР2'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "213ad3ef-4077-4808-8572-d35c383abff9",
+      "name": "Профосмотр (талоны) - ПН1",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "c1b512c4-91ee-45d0-ad84-c50e9b6e349d",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ПН1'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ПН1'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ПН1'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "ba1ce356-52d0-4cad-a01f-0f7c816684af",
+      "name": "Диспансеризация сирот (талоны) - ДС2",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "c1b512c4-91ee-45d0-ad84-c50e9b6e349d",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДС2'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДС2'",
+          "year": 2025
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДС2'",
           "year": 2026
         }
       ]
@@ -796,25 +1441,25 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'На дому'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "ksg",
           "filter_type": "not_like",
           "values": "'ds37%'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'На дому'",
-          "year": 2025
+          "year": 2026
         },
         {
           "field_name": "ksg",
           "filter_type": "not_like",
           "values": "'ds37%'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -829,430 +1474,25 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'В дневном стационаре'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "ksg",
           "filter_type": "not_like",
           "values": "'ds37%'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'В дневном стационаре'",
-          "year": 2025
+          "year": 2026
         },
         {
           "field_name": "ksg",
           "filter_type": "not_like",
           "values": "'ds37%'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "52702b6a-fec1-4a5c-8ff9-961cf7c897c3",
-      "name": "Неотложка на дому",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "80397d9b-a8f8-4d75-b2da-03181db8d262",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'22'",
           "year": 2026
-        },
-        {
-          "field_name": "home_visits",
-          "filter_type": "exact",
-          "values": "'1'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'22'",
-          "year": 2025
-        },
-        {
-          "field_name": "home_visits",
-          "filter_type": "exact",
-          "values": "'1'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "13972b34-e607-430a-b79a-384db4fc240f",
-      "name": "Неотложка в МО",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "80397d9b-a8f8-4d75-b2da-03181db8d262",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'22'",
-          "year": 2026
-        },
-        {
-          "field_name": "mo_visits",
-          "filter_type": "exact",
-          "values": "'1'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'22'",
-          "year": 2025
-        },
-        {
-          "field_name": "mo_visits",
-          "filter_type": "exact",
-          "values": "'1'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "60d0c417-5a44-45ae-be33-e14d874b3d04",
-      "name": "ДН беременных",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "38892798-a9b4-4550-a32b-359a58db87ac",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'301'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'301'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "504cf7d1-dc20-47db-bfe3-85350c67fa28",
-      "name": "ДН не входящих в 168н",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "38892798-a9b4-4550-a32b-359a58db87ac",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'305'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'305'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "7a81cd50-f9ff-40df-9611-7800b68a2561",
-      "name": "цель 30",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "38892798-a9b4-4550-a32b-359a58db87ac",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'30'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'30'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "1fe92e6d-1439-44f8-bba1-0b5a0d949144",
-      "name": "Гериатрия",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "in",
-          "values": "'64'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "in",
-          "values": "'64'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "b0a6286a-7b28-4778-bfd4-f8fe9cfba065",
-      "name": "УЗИ ССС (541) - 1 услуга",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "5c4e6302-0195-4771-bbd0-d45bc09dece1",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'541'",
-          "year": 2026
-        },
-        {
-          "field_name": "amount_numeric",
-          "filter_type": "exact",
-          "values": "740.97",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'541'",
-          "year": 2025
-        },
-        {
-          "field_name": "amount_numeric",
-          "filter_type": "exact",
-          "values": "693.79",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "bd0991a5-afdd-493a-b73f-a8273f4d2a67",
-      "name": "УЗИ ССС (541) - 2 услуги",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "5c4e6302-0195-4771-bbd0-d45bc09dece1",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'541'",
-          "year": 2026
-        },
-        {
-          "field_name": "amount_numeric",
-          "filter_type": "exact",
-          "values": "1481.94",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'541'",
-          "year": 2025
-        },
-        {
-          "field_name": "amount_numeric",
-          "filter_type": "exact",
-          "values": "1387.58",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "6e7677f1-5620-486f-ad4d-2a95c64748bd",
-      "name": "1 этап - ДВ4",
-      "level": 3,
-      "is_distributable": true,
-      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДВ4'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДВ4'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "3dfd7847-2531-4ba3-8544-7319bfb683ee",
-      "name": "2 этап - ДВ2",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДВ2'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДВ2'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "7cb155e0-45f1-4d1f-ac3e-30dd8b6a4915",
-      "name": "ПМО - ОПВ",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ОПВ'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ОПВ'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "16176420-c156-494c-ae7d-5ad8599a1bd7",
-      "name": "Углубленная - УД1",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'УД1'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'УД1'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "a48e0117-a2b8-4365-919a-7cd85dfbe776",
-      "name": "Углубленная - УД2",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'УД2'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'УД2'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "6d1e7a46-2704-4902-bf29-28041f15a0f0",
-      "name": "Репродуктивное - ДР1",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДР1'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДР1'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "08f2a841-fc6e-4aff-a65c-216f0d85f5c5",
-      "name": "Репродуктивное - ДР2",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "d42e67d6-e07f-4e10-bcef-11d4fd2f62be",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДР2'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДР2'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "213ad3ef-4077-4808-8572-d35c383abff9",
-      "name": "Профосмотр (талоны) - ПН1",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "c1b512c4-91ee-45d0-ad84-c50e9b6e349d",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ПН1'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ПН1'",
-          "year": 2025
-        }
-      ]
-    },
-    {
-      "external_id": "ba1ce356-52d0-4cad-a01f-0f7c816684af",
-      "name": "Диспансеризация сирот (талоны) - ДС2",
-      "level": 3,
-      "is_distributable": false,
-      "parent_external_id": "c1b512c4-91ee-45d0-ad84-c50e9b6e349d",
-      "filters": [
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДС2'",
-          "year": 2026
-        },
-        {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДС2'",
-          "year": 2025
         }
       ]
     },
@@ -1267,13 +1507,13 @@
           "field_name": "goal",
           "filter_type": "in",
           "values": "'1','5','7','9','10','14','140'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "in",
           "values": "'1','5','7','9','10','14','140'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -1288,13 +1528,13 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'32'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'32'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -1309,13 +1549,13 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'113'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'113'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -1330,25 +1570,25 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'307'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "like",
           "values": "'I1%'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'307'",
-          "year": 2025
+          "year": 2026
         },
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "like",
           "values": "'I1%'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -1363,25 +1603,25 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'307'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "like",
           "values": "'I5%'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'307'",
-          "year": 2025
+          "year": 2026
         },
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "like",
           "values": "'I5%'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -1396,25 +1636,25 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'307'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "like",
           "values": "'J4%'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'307'",
-          "year": 2025
+          "year": 2026
         },
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "like",
           "values": "'J4%'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -1429,13 +1669,13 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'640'",
-          "year": 2026
+          "year": 2025
         },
         {
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'640'",
-          "year": 2025
+          "year": 2026
         }
       ]
     },
@@ -1561,15 +1801,15 @@
           "year": 2026
         },
         {
-          "field_name": "amount_numeric",
-          "filter_type": "in",
-          "values": "21618.9, 25427.7",
-          "year": 2026
-        },
-        {
           "field_name": "age",
           "filter_type": ">",
           "values": "18",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "in",
+          "values": "27169.8",
           "year": 2026
         }
       ]
@@ -1606,15 +1846,15 @@
           "year": 2026
         },
         {
-          "field_name": "amount_numeric",
-          "filter_type": "in",
-          "values": "21618.9, 25427.7",
-          "year": 2026
-        },
-        {
           "field_name": "age",
           "filter_type": "<",
           "values": "19",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "in",
+          "values": "27169.8",
           "year": 2026
         }
       ]
@@ -1714,6 +1954,18 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'ДР1'",
+          "year": 2024
+        },
+        {
+          "field_name": "gender",
+          "filter_type": "exact",
+          "values": "'М'",
+          "year": 2024
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДР1'",
           "year": 2025
         },
         {
@@ -1743,6 +1995,18 @@
       "is_distributable": false,
       "parent_external_id": "6d1e7a46-2704-4902-bf29-28041f15a0f0",
       "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'ДР1'",
+          "year": 2024
+        },
+        {
+          "field_name": "gender",
+          "filter_type": "exact",
+          "values": "'Ж'",
+          "year": 2024
+        },
         {
           "field_name": "goal",
           "filter_type": "exact",
@@ -1810,12 +2074,6 @@
       "parent_external_id": "08f2a841-fc6e-4aff-a65c-216f0d85f5c5",
       "filters": [
         {
-          "field_name": "goal",
-          "filter_type": "exact",
-          "values": "'ДР2'",
-          "year": 2025
-        },
-        {
           "field_name": "gender",
           "filter_type": "exact",
           "values": "'Ж'",
@@ -1825,12 +2083,18 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'ДР2'",
+          "year": 2025
+        },
+        {
+          "field_name": "gender",
+          "filter_type": "exact",
+          "values": "'Ж'",
           "year": 2026
         },
         {
-          "field_name": "gender",
+          "field_name": "goal",
           "filter_type": "exact",
-          "values": "'Ж'",
+          "values": "'ДР2'",
           "year": 2026
         }
       ]
