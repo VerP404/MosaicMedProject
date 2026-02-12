@@ -70,7 +70,7 @@ def filter_input_op(context, site_url: str):
     start_date_input = wait.until(
         EC.presence_of_element_located(
             (By.XPATH,
-             '//*[@id="menu"]/div/div[2]/div/div/div[2]/div/div/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div[1]/div[7]/div/div[2]/div[1]/div/div/div/input')
+             '//*[@id="menu"]/div/div[2]/div/div/div[2]/div/div/div/div/div[1]/div/div[2]/div/div/div/div/div/div/div[3]/div[5]/div[2]/div[1]/div/div/div/input')
         )
     )
     if not set_input_value(start_date_input, start_date, "Дата изменений талонов"):
