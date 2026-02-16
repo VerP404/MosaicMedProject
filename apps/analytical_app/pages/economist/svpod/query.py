@@ -1,8 +1,37 @@
+import inspect
 import pandas as pd
 from sqlalchemy import text
 
 from apps.analytical_app.pages.SQL_query.query import base_query
 from apps.analytical_app.query_executor import engine
+
+
+def _call_base_query(selected_year, months_placeholder, inogorod, sanction, amount_null,
+                     building, department, profile, doctor,
+                     input_start, input_end, treatment_start, treatment_end,
+                     status_list, include_status4_override=False):
+    """Вызов base_query с поддержкой разных версий (с/без include_status4_override)."""
+    kwargs = dict(
+        year=selected_year,
+        months=months_placeholder,
+        inogorodniy=inogorod,
+        sanction=sanction,
+        amount_null=amount_null,
+        building_ids=building,
+        department_ids=department,
+        profile_ids=profile,
+        doctor_ids=doctor,
+        initial_input_date_start=input_start,
+        initial_input_date_end=input_end,
+        treatment_start=treatment_start,
+        treatment_end=treatment_end,
+        cel_list=None,
+        status_list=status_list,
+    )
+    sig = inspect.signature(base_query)
+    if 'include_status4_override' in sig.parameters:
+        kwargs['include_status4_override'] = include_status4_override
+    return base_query(**kwargs)
 from datetime import datetime
 
 
@@ -754,11 +783,10 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
                          treatment_end=None,
                          status_list=None,
                          include_status4_override=False):
-    base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
-                      doctor,
-                      input_start, input_end,
-                      treatment_start, treatment_end, status_list,
-                      include_status4_override=include_status4_override)
+    base = _call_base_query(selected_year, months_placeholder, inogorod, sanction, amount_null,
+                            building, department, profile, doctor,
+                            input_start, input_end, treatment_start, treatment_end,
+                            status_list, include_status4_override)
     # Получаем динамические условия из groupindicators
     dynamic_conditions = get_dynamic_conditions(selected_year)
     
