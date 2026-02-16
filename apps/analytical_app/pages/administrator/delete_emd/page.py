@@ -13,6 +13,11 @@ import io
 import base64
 from copy import deepcopy
 from docx import Document
+try:
+    from dateutil import parser as date_parser
+    HAS_DATEUTIL = True
+except ImportError:
+    HAS_DATEUTIL = False
 
 from apps.analytical_app.app import app, DJANGO_API_BASE
 from flask import request
@@ -57,6 +62,70 @@ def format_date_for_api(date_str):
         return date_obj.strftime('%Y-%m-%d')
     except:
         return date_str
+
+
+def format_datetime_with_utc(datetime_value):
+    """Форматирует дату и время в формат DD.MM.YYYY HH:MM:SS.mmm UTC(+03:00)
+    Принимает: ISO строку, datetime объект, date объект, или None
+    """
+    if not datetime_value:
+        return ''
+    
+    try:
+        dt = None
+        # Если это строка, пытаемся распарсить
+        if isinstance(datetime_value, str):
+            # Сначала пробуем стандартные форматы ISO
+            formats = [
+                '%Y-%m-%dT%H:%M:%S.%f%z',  # ISO с микросекундами и таймзоной
+                '%Y-%m-%dT%H:%M:%S.%f',     # ISO с микросекундами
+                '%Y-%m-%dT%H:%M:%S%z',      # ISO с таймзоной
+                '%Y-%m-%dT%H:%M:%S',        # ISO без таймзоны
+                '%Y-%m-%d %H:%M:%S.%f',     # С пробелом и микросекундами
+                '%Y-%m-%d %H:%M:%S',        # С пробелом
+                '%Y-%m-%d',                 # Только дата
+            ]
+            
+            # Пробуем распарсить стандартными форматами
+            for fmt in formats:
+                try:
+                    dt = datetime.strptime(datetime_value, fmt)
+                    break
+                except ValueError:
+                    continue
+            
+            # Если не удалось распарсить стандартными форматами и есть dateutil
+            if dt is None and HAS_DATEUTIL:
+                try:
+                    dt = date_parser.parse(datetime_value)
+                except:
+                    pass
+            
+            # Если все еще не удалось, пробуем просто дату
+            if dt is None:
+                try:
+                    dt = datetime.strptime(datetime_value.split()[0], '%Y-%m-%d')
+                except:
+                    pass
+        # Если это date объект, конвертируем в datetime с временем 00:00:00
+        elif isinstance(datetime_value, date) and not isinstance(datetime_value, datetime):
+            dt = datetime.combine(datetime_value, datetime.min.time())
+        # Если это уже datetime объект
+        elif isinstance(datetime_value, datetime):
+            dt = datetime_value
+        
+        if dt is None:
+            return str(datetime_value) if datetime_value else ''
+        
+        # Форматируем в требуемый формат: DD.MM.YYYY HH:MM:SS.mmm UTC(+03:00)
+        # Миллисекунды берём из микросекунд (первые 3 цифры)
+        milliseconds = dt.microsecond // 1000
+        formatted = dt.strftime(f'%d.%m.%Y %H:%M:%S.{milliseconds:03d} UTC(+03:00)')
+        return formatted
+    except Exception as e:
+        print(f"DEBUG: Ошибка форматирования даты {datetime_value}: {e}")
+        # Если не удалось распарсить, возвращаем исходное значение
+        return str(datetime_value) if datetime_value else ''
 
 
 # Универсальный конвертер в date для DatePickerSingle
@@ -153,6 +222,23 @@ def delete_api_data(endpoint, id):
 def create_excel_export(record_data):
     """Создание CSV файла для экспорта записи"""
     try:
+        # Получаем исходные данные из API, если есть ID (для получения полной даты с временем)
+        record_id = record_data.get('id')
+        if record_id:
+            # Получаем исходные данные из API
+            api_data = get_api_data(f'delete-emd/{record_id}/')
+            if api_data and isinstance(api_data, dict):
+                # Используем данные из API, если они получены
+                source_data = api_data
+            elif api_data and isinstance(api_data, list) and len(api_data) > 0:
+                # Если API вернул список, берем первый элемент
+                source_data = api_data[0]
+            else:
+                # Если не удалось получить данные из API, используем данные из таблицы
+                source_data = record_data
+        else:
+            source_data = record_data
+        
         # Создаем простой CSV файл
         headers = [
             "OID Медицинской организации",
@@ -167,15 +253,16 @@ def create_excel_export(record_data):
         
         # Получаем данные для экспорта
         # Для экспорта берем OID медицинской организации
-        oid_medical_org = record_data.get('oid_medical_organization_oid', '') \
-            or record_data.get('oid_medical_organization', '')
-        oid_document = record_data.get('oid_document', '')
-        creation_date = format_date_for_display(record_data.get('creation_date', ''))
-        registration_date = format_date_for_display(record_data.get('registration_date', ''))
-        reestr_number = record_data.get('reestr_number', '')
-        local_identifier = record_data.get('local_identifier', '')
-        reason_text = record_data.get('reason_not_actual_text', '') or record_data.get('reason_not_actual', '')
-        document_number = record_data.get('document_number', '') or ''
+        oid_medical_org = source_data.get('oid_medical_organization_oid', '') \
+            or source_data.get('oid_medical_organization', '')
+        oid_document = source_data.get('oid_document', '')
+        creation_date = format_date_for_display(source_data.get('creation_date', ''))
+        # Дата регистрации должна быть в формате с временем и UTC
+        registration_date = format_datetime_with_utc(source_data.get('registration_date', ''))
+        reestr_number = source_data.get('reestr_number', '')
+        local_identifier = source_data.get('local_identifier', '')
+        reason_text = source_data.get('reason_not_actual_text', '') or source_data.get('reason_not_actual', '')
+        document_number = source_data.get('document_number', '') or ''
         
         # Создаем CSV содержимое с правильной кодировкой (разделитель ; для Excel RU)
         csv_content = []
@@ -253,19 +340,34 @@ def render_docx_from_template(record_data_list):
             else:
                 row = row_template
 
+            # Получаем исходные данные из API для получения полной даты с временем
+            record_id = rec.get('id')
+            if record_id:
+                # Получаем исходные данные из API
+                api_data = get_api_data(f'delete-emd/{record_id}/')
+                if api_data and isinstance(api_data, dict):
+                    source_rec = api_data
+                elif api_data and isinstance(api_data, list) and len(api_data) > 0:
+                    source_rec = api_data[0]
+                else:
+                    source_rec = rec
+            else:
+                source_rec = rec
+
             # Заполняем ячейки: №, OID МО, OID документа, дата создания, дата регистрации, № РЭМД, локальный идентификатор, причина, номер взамен
             cells = row.cells
             # Защитимся от различий в макете — заполним по индексу, если хватает колонок
             if len(cells) >= 9:
                 cells[0].text = str(idx)
-                cells[1].text = str(rec.get('oid_medical_organization_oid') or rec.get('oid_medical_organization', ''))
-                cells[2].text = str(rec.get('oid_document', ''))
-                cells[3].text = str(format_date_for_display(rec.get('creation_date', '')) or '')
-                cells[4].text = str(format_date_for_display(rec.get('registration_date', '')) or '')
-                cells[5].text = str(rec.get('reestr_number', ''))
-                cells[6].text = str(rec.get('local_identifier', ''))
-                cells[7].text = str(rec.get('reason_not_actual_text', '') or '')
-                cells[8].text = str(rec.get('document_number', '') or '')
+                cells[1].text = str(source_rec.get('oid_medical_organization_oid') or source_rec.get('oid_medical_organization', ''))
+                cells[2].text = str(source_rec.get('oid_document', ''))
+                cells[3].text = str(format_date_for_display(source_rec.get('creation_date', '')) or '')
+                # Дата регистрации должна быть в формате с временем и UTC
+                cells[4].text = str(format_datetime_with_utc(source_rec.get('registration_date', '')) or '')
+                cells[5].text = str(source_rec.get('reestr_number', ''))
+                cells[6].text = str(source_rec.get('local_identifier', ''))
+                cells[7].text = str(source_rec.get('reason_not_actual_text', '') or '')
+                cells[8].text = str(source_rec.get('document_number', '') or '')
 
         bio = io.BytesIO()
         doc.save(bio)
