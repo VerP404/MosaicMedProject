@@ -40,7 +40,7 @@ def get_cached_indicators_query(selected_year, months_placeholder, inogorod, san
                                building_ids_tuple, department_ids_tuple, value_profile_tuple, selected_doctor_ids_tuple,
                                start_date_input_formatted, end_date_input_formatted,
                                start_date_treatment_formatted, end_date_treatment_formatted,
-                               selected_status_tuple, cache_key):
+                               selected_status_tuple, include_status4_override, cache_key):
     """Кэшированный результат SQL-запроса для ускорения повторных запросов"""
     # Преобразуем кортежи обратно в списки для передачи в SQL-функции
     building_ids = list(building_ids_tuple) if building_ids_tuple else None
@@ -57,7 +57,8 @@ def get_cached_indicators_query(selected_year, months_placeholder, inogorod, san
         selected_doctor_ids,
         start_date_input_formatted, end_date_input_formatted,
         start_date_treatment_formatted, end_date_treatment_formatted,
-        status_list=selected_status_tuple
+        status_list=selected_status_tuple,
+        include_status4_override=include_status4_override
     )
 
 
@@ -392,7 +393,16 @@ indicators_tab = html.Div(
                                             value=False,
                                             style={'margin-top': '8px'}
                                         ),
-                                        width=6
+                                        width=3
+                                    ),
+                                    dbc.Col(
+                                        dbc.Switch(
+                                            id=f'include-status4-{type_page_indicators}',
+                                            label="Включить превышение объёмов",
+                                            value=False,
+                                            style={'margin-top': '8px'}
+                                        ),
+                                        width=3
                                     ),
                                 ]
                             ),
@@ -1529,10 +1539,7 @@ def update_filters_indicators(building_id, department_id, profile_id, doctor_id)
     else:
         profiles = get_available_profiles()
 
-    if department_id or profile_id:
-        doctors = get_available_doctors(building_id, department_id, profile_id)
-    else:
-        doctors = get_available_doctors()
+    doctors = get_available_doctors(building_id, department_id, profile_id)
 
     return buildings, departments, profiles, doctors
 
@@ -1598,12 +1605,14 @@ def update_selected_period_list_indicators(selected_months_range, selected_year,
      State(f'status-group-radio-{type_page_indicators}', 'value'),
      State(f'status-individual-dropdown-{type_page_indicators}', 'value'),
      State(f'show-plan-{type_page_indicators}', 'value'),
+     State(f'include-status4-{type_page_indicators}', 'value'),
      ]
 )
 def update_table_indicators(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
                  amount_null, building_ids, department_ids, start_date_input, end_date_input,
                  start_date_treatment, end_date_treatment, report_type,
-                 status_mode, selected_status_group, selected_individual_statuses, show_plan):
+                 status_mode, selected_status_group, selected_individual_statuses, show_plan,
+                 include_status4_override):
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
@@ -1621,9 +1630,18 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
         progress_value = 20
         
         if status_mode == 'group':
-            selected_status_values = status_groups[selected_status_group]
+            selected_status_values = status_groups.get(selected_status_group, [])
         else:
             selected_status_values = selected_individual_statuses if selected_individual_statuses else []
+
+        if isinstance(selected_status_values, str):
+            selected_status_values = [selected_status_values]
+        else:
+            selected_status_values = list(selected_status_values)
+
+        include_status4 = bool(include_status4_override)
+        if include_status4 and '4' not in selected_status_values:
+            selected_status_values.append('4')
 
         selected_status_tuple = tuple(selected_status_values)
 
@@ -1666,7 +1684,7 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
             tuple(selected_doctor_ids) if selected_doctor_ids else None,
             start_date_input_formatted, end_date_input_formatted,
             start_date_treatment_formatted, end_date_treatment_formatted,
-            selected_status_tuple, cache_key
+            selected_status_tuple, include_status4, cache_key
         )
 
         status_text = "Выполнение запроса к базе данных..."
@@ -1827,14 +1845,16 @@ def update_details_button_state_indicators(active_cell):
         State(f'dropdown-report-type-{type_page_indicators}', 'value'),
         State(f'status-selection-mode-{type_page_indicators}', 'value'),
         State(f'status-group-radio-{type_page_indicators}', 'value'),
-        State(f'status-individual-dropdown-{type_page_indicators}', 'value')
+        State(f'status-individual-dropdown-{type_page_indicators}', 'value'),
+        State(f'include-status4-{type_page_indicators}', 'value')
     ]
 )
 def show_indicators_details(n_clicks, table_data, active_cell,
                            value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
                            amount_null, building_ids, department_ids, start_date_input, end_date_input,
                            start_date_treatment, end_date_treatment, report_type,
-                           status_mode, selected_status_group, selected_individual_statuses):
+                           status_mode, selected_status_group, selected_individual_statuses,
+                           include_status4_override):
     if not n_clicks or not active_cell or not table_data:
         return '', [], []
     
@@ -1846,9 +1866,18 @@ def show_indicators_details(n_clicks, table_data, active_cell,
     
     try:
         if status_mode == 'group':
-            selected_status_values = status_groups[selected_status_group]
+            selected_status_values = status_groups.get(selected_status_group, [])
         else:
             selected_status_values = selected_individual_statuses if selected_individual_statuses else []
+
+        if isinstance(selected_status_values, str):
+            selected_status_values = [selected_status_values]
+        else:
+            selected_status_values = list(selected_status_values)
+
+        include_status4 = bool(include_status4_override)
+        if include_status4 and '4' not in selected_status_values:
+            selected_status_values.append('4')
         
         selected_status_tuple = tuple(selected_status_values)
         
@@ -1881,7 +1910,8 @@ def show_indicators_details(n_clicks, table_data, active_cell,
             selected_doctor_ids,
             start_date_input_formatted, end_date_input_formatted,
             start_date_treatment_formatted, end_date_treatment_formatted,
-            indicator_type, selected_status_tuple
+            indicator_type, selected_status_tuple,
+            include_status4_override=include_status4
         )
         
         columns, data = TableUpdater.query_to_df(engine, sql_query)

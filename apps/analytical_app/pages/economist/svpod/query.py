@@ -752,11 +752,13 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
                          input_start=None, input_end=None,
                          treatment_start=None,
                          treatment_end=None,
-                         status_list=None):
+                         status_list=None,
+                         include_status4_override=False):
     base = base_query(selected_year, months_placeholder, inogorod, sanction, amount_null, building, department, profile,
                       doctor,
                       input_start, input_end,
-                      treatment_start, treatment_end, status_list)
+                      treatment_start, treatment_end, status_list,
+                      include_status4_override=include_status4_override)
     # Получаем динамические условия из groupindicators
     dynamic_conditions = get_dynamic_conditions(selected_year)
     
@@ -846,7 +848,8 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
                                  department=None, profile=None, doctor=None,
                                  input_start=None, input_end=None,
                                  treatment_start=None, treatment_end=None,
-                                 indicator_type=None, status_list=None):
+                                 indicator_type=None, status_list=None,
+                                 include_status4_override=False):
     """
     SQL-запрос для детализации индикаторов по талонам
     Возвращает детальную информацию по талонам для выбранного индикатора
@@ -915,6 +918,8 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
     
     if status_list:
         status = "AND status IN (" + ",".join(f"'{cel}'" for cel in status_list) + ")"
+
+    status4_override_clause = " OR status = '4'" if include_status4_override else ""
     
     query = f"""
     WITH report_data AS (SELECT oms.*,
@@ -1061,7 +1066,7 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
              ),
      oms as (select * from oms_data 
              WHERE report_year = '{selected_year}' 
-                   AND report_month_number IN ({months_placeholder})
+                   AND (report_month_number IN ({months_placeholder}){status4_override_clause})
                    {inogorodniy_filter}
                    {sanction_filter}
                    {amount_null_filter}
