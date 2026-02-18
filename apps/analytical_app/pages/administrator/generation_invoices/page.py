@@ -10,9 +10,11 @@ from apps.analytical_app.components.filters import \
     get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
     get_doctor_details, filter_inogorod, filter_amount_null, \
-    filter_status, status_groups, status_descriptions
+    filter_status, status_groups, status_descriptions, filter_years, filter_months, get_current_reporting_month
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.administrator.generation_invoices.query import sql_query_fen_inv, sql_query_details
+from apps.analytical_app.pages.administrator.generation_invoices.query import (
+    sql_query_fen_inv, sql_query_details, sql_query_formed_registries
+)
 from apps.analytical_app.query_executor import engine
 from sqlalchemy import text
 
@@ -44,9 +46,15 @@ def date_picker_custom(type_page):
 
 admin_gen_inv = html.Div(
     [
-        dbc.Row(
-            dbc.Col(
-                dbc.Card(
+        dbc.Tabs(
+            [
+                dbc.Tab(
+                    label="Сборка талонов",
+                    tab_id="tab-assembly",
+                    children=[
+                        dbc.Row(
+                            dbc.Col(
+                                dbc.Card(
                     dbc.CardBody(
                         [
                             dbc.CardHeader([
@@ -448,6 +456,87 @@ admin_gen_inv = html.Div(
                 width=12,
                 className="mt-3"
             )
+        ),
+                    ],  # end tab-assembly children
+                ),
+                dbc.Tab(
+                    label="Сформированные реестры счетов",
+                    tab_id="tab-formed",
+                    children=[
+                        dbc.Row(
+                            dbc.Col(
+                                dbc.Card(
+                                    dbc.CardBody([
+                                        dbc.CardHeader([
+                                            html.H4("Сформированные реестры счетов", className="mb-0"),
+                                            html.Small("Фильтр по отчётному месяцу", className="text-muted")
+                                        ]),
+                                        dbc.Row(
+                                            [
+                                                dbc.Col(filter_years(f'formed-{type_page}'), width=2),
+                                                dbc.Col(filter_months(f'formed-{type_page}'), width=8),
+                                                dbc.Col(
+                                                    dbc.Button(
+                                                        "Обновить",
+                                                        id=f'update-button-formed-{type_page}',
+                                                        color="primary",
+                                                        className="mt-3",
+                                                        style={"width": "100%"}
+                                                    ),
+                                                    width=2
+                                                ),
+                                            ]
+                                        ),
+                                        dbc.Row(
+                                            [
+                                                dbc.Col(
+                                                    dbc.Checklist(
+                                                        options=[
+                                                            {
+                                                                "label": "Показать только выгрузки старше 10 дней",
+                                                                "value": "only_10d"
+                                                            }
+                                                        ],
+                                                        value=[],
+                                                        id=f'formed-only-10d-{type_page}',
+                                                        switch=True,
+                                                    ),
+                                                    width=12,
+                                                    className="mt-2"
+                                                )
+                                            ]
+                                        ),
+                                    ]),
+                                    style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)", "border-radius": "10px"}
+                                ),
+                                width=12
+                            ),
+                            style={"margin": "0 auto", "padding": "0rem"}
+                        ),
+                        dcc.Loading(id=f'loading-formed-{type_page}', type='default'),
+                        dbc.Alert(
+                            [
+                                html.Strong("Цвета строк: "),
+                                html.Span(
+                                    "розовая — с даты выгрузки прошло более 10 дней и есть талоны в статусе «В ТФОМС» (2); "
+                                    "зелёная — талонов в статусе 2 нет (все обработаны); "
+                                    "без подсветки — остальные случаи."
+                                ),
+                            ],
+                            color="light",
+                            className="mb-3 py-2",
+                        ),
+                        card_table(
+                            f'result-table-formed-{type_page}',
+                            "Реестры по номеру счета и статусам",
+                            page_size=20,
+                            hidden_columns=['__row_color']
+                        ),
+                    ]
+                ),
+            ],
+            id=f'tabs-gen-inv-{type_page}',
+            active_tab="tab-assembly"
         ),
     ],
     style={"padding": "0rem"}
@@ -864,6 +953,96 @@ def update_table(n_clicks, value_doctor, value_profile, selected_year, inogorodn
             })
     
     return columns1, data1, style_data_conditional, loading_output
+
+
+# Callback для вкладки "Сформированные реестры счетов"
+def _parse_upload_date(value):
+    """Парсит дату выгрузки из строки (DD.MM.YYYY, YYYY-MM-DD и т.д.). Возвращает date или None."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    s = str(value).strip()
+    if not s or s == '-':
+        return None
+    for fmt in ('%d.%m.%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y.%m.%d'):
+        try:
+            return datetime.strptime(s[:10], fmt).date()
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+@app.callback(
+    [
+        Output(f'result-table-formed-{type_page}', 'columns'),
+        Output(f'result-table-formed-{type_page}', 'data'),
+        Output(f'result-table-formed-{type_page}', 'style_data_conditional'),
+        Output(f'loading-formed-{type_page}', 'children'),
+    ],
+    Input(f'update-button-formed-{type_page}', 'n_clicks'),
+    [
+        State(f'dropdown-year-formed-{type_page}', 'value'),
+        State(f'range-slider-month-formed-{type_page}', 'value'),
+        State(f'formed-only-10d-{type_page}', 'value'),
+    ],
+    prevent_initial_call=True,
+)
+def update_formed_registries_table(n_clicks, selected_year, selected_months, only_10d_value):
+    if n_clicks is None:
+        raise PreventUpdate
+    if not selected_year:
+        selected_year = datetime.now().year
+    if not selected_months or len(selected_months) < 2:
+        cur_month, _ = get_current_reporting_month()
+        selected_months = [cur_month, cur_month]
+    only_10d = bool(only_10d_value) and ('only_10d' in only_10d_value)
+    months_placeholder = ', '.join(str(m) for m in range(selected_months[0], selected_months[1] + 1))
+    sql = sql_query_formed_registries(selected_year, months_placeholder)
+    columns, data = TableUpdater.query_to_df(engine, sql)
+    today = datetime.now().date()
+    data = data or []
+    filtered_data = []
+    for row in data:
+        upload_date_val = row.get('Дата выгрузки')
+        status2_count = row.get('2', 0)
+        if isinstance(status2_count, str):
+            try:
+                status2_count = int(status2_count)
+            except (ValueError, TypeError):
+                status2_count = 0
+        parsed = _parse_upload_date(upload_date_val)
+        row_color = 'none'
+        if status2_count == 0:
+            row_color = 'green'
+        if parsed is not None:
+            days_ago = (today - parsed).days
+            if days_ago > 10 and status2_count > 0:
+                row_color = 'pink'
+            if only_10d and not (days_ago > 10):
+                row['__row_color'] = row_color
+                continue
+        elif only_10d:
+            row['__row_color'] = row_color
+            continue
+        row['__row_color'] = row_color
+        filtered_data.append(row)
+
+    # Колонка нужна, чтобы Dash мог использовать hidden_columns
+    if not any(c.get('id') == '__row_color' for c in (columns or [])):
+        columns = (columns or []) + [{'name': '__row_color', 'id': '__row_color'}]
+
+    style_data_conditional = [
+        {
+            'if': {'filter_query': '{__row_color} = "pink"'},
+            'backgroundColor': '#f8d7da',
+            'color': '#721c24'
+        },
+        {
+            'if': {'filter_query': '{__row_color} = "green"'},
+            'backgroundColor': '#d4edda',
+            'color': '#155724'
+        },
+    ]
+    return columns, filtered_data, style_data_conditional, html.Div()
 
 
 # Callback для активации кнопки детализации при выборе ячейки

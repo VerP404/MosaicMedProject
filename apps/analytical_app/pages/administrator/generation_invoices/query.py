@@ -1,4 +1,4 @@
-from apps.analytical_app.pages.SQL_query.query import base_query
+from apps.analytical_app.pages.SQL_query.query import base_query, columns_by_status_oms
 
 
 def sql_query_fen_inv(selected_year, months_placeholder, inogorod, sanction, amount_null, building: None,
@@ -186,3 +186,52 @@ def sql_query_details(selected_year, months_placeholder, inogorod, sanction, amo
     ORDER BY talon
     """
     return query
+
+
+def sql_query_formed_registries(selected_year, months_placeholder):
+    """
+    Реестры счетов по номеру счета и дате выгрузки для отчётного периода.
+    Группировка по account_number, upload_date с разбивкой по статусам (как в doctor).
+    """
+    if not months_placeholder or months_placeholder.strip() == '':
+        months_placeholder = ', '.join(map(str, range(1, 13)))
+
+    return f"""
+    WITH report_data AS (
+        SELECT
+            account_number,
+            upload_date,
+            goal,
+            status,
+            CASE WHEN report_period = '-' THEN RIGHT(treatment_end, 4) ELSE RIGHT(report_period, 4) END AS report_year,
+            CASE
+                WHEN report_period = '-' THEN
+                    CASE
+                        WHEN EXTRACT(DAY FROM CURRENT_DATE)::INT <= 4 THEN
+                            CASE
+                                WHEN TO_NUMBER(SUBSTRING(treatment_end FROM 4 FOR 2), '99') = EXTRACT(MONTH FROM CURRENT_DATE) THEN EXTRACT(MONTH FROM CURRENT_DATE)::INT
+                                ELSE CASE WHEN EXTRACT(MONTH FROM CURRENT_DATE)::INT = 1 THEN 12 ELSE EXTRACT(MONTH FROM CURRENT_DATE)::INT - 1 END
+                            END
+                        ELSE EXTRACT(MONTH FROM CURRENT_DATE)::INT
+                    END
+                ELSE
+                    CASE TRIM(SUBSTRING(report_period FROM 1 FOR POSITION(' ' IN report_period) - 1))
+                        WHEN 'Января' THEN 1 WHEN 'Февраля' THEN 2 WHEN 'Марта' THEN 3 WHEN 'Апреля' THEN 4
+                        WHEN 'Мая' THEN 5 WHEN 'Июня' THEN 6 WHEN 'Июля' THEN 7 WHEN 'Августа' THEN 8
+                        WHEN 'Сентября' THEN 9 WHEN 'Октября' THEN 10 WHEN 'Ноября' THEN 11 WHEN 'Декабря' THEN 12
+                        ELSE NULL
+                    END
+            END AS report_month_number
+        FROM data_loader_omsdata
+        WHERE account_number IS NOT NULL AND account_number != '' AND account_number != '-'
+    )
+    SELECT
+        account_number AS "Номер счета",
+        STRING_AGG(DISTINCT goal, ', ' ORDER BY goal) FILTER (WHERE goal IS NOT NULL AND TRIM(goal) != '' AND goal != '-') AS "Цели",
+        upload_date AS "Дата выгрузки",
+        {columns_by_status_oms()}
+    FROM report_data
+    WHERE report_year = '{selected_year}' AND report_month_number IN ({months_placeholder})
+    GROUP BY account_number, upload_date
+    ORDER BY account_number, upload_date
+    """
