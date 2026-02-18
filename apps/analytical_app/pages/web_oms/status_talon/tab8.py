@@ -172,6 +172,9 @@ def update_table_talons_by_dates(
             color="info",
         )
 
+    # Количество дат = количество строк с датами (без служебных строк)
+    dates_count = len(data)
+
     # Первая строка — Итого по выбранному периоду
     total_row = {"Дата": "Итого"}
     for c in cols:
@@ -182,7 +185,17 @@ def update_table_talons_by_dates(
             (row.get(cid) or 0) if isinstance(row.get(cid), (int, float)) else 0
             for row in data
         )
-    data_with_total = [total_row] + data
+
+    # Вторая строка — Среднее по выгрузившимся датам
+    avg_row = {"Дата": "Среднее"}
+    for c in cols:
+        cid = c["id"] if isinstance(c, dict) else c
+        if cid == "Дата":
+            continue
+        total_val = total_row.get(cid, 0) if isinstance(total_row.get(cid), (int, float)) else 0
+        avg_row[cid] = round(total_val / dates_count) if dates_count else 0
+
+    data_with_total = [total_row, avg_row] + data
 
     return html.Div(
         [
@@ -203,7 +216,12 @@ def update_table_talons_by_dates(
                         "if": {"row_index": 0},
                         "fontWeight": "bold",
                         "backgroundColor": "rgba(0, 0, 0, 0.05)",
-                    }
+                    },
+                    {
+                        "if": {"row_index": 1},
+                        "fontWeight": "bold",
+                        "backgroundColor": "rgba(0, 0, 0, 0.03)",
+                    },
                 ],
             )
         ]
