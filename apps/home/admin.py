@@ -127,3 +127,13 @@ class TelegramGroupAdmin(ModelAdmin):
     list_display = ('name', 'group_id', 'bot')
     search_fields = ('name', 'group_id')
     list_filter = ('bot',)
+
+
+@admin.register(MenuItem)
+class MenuItemAdmin(ModelAdmin):
+    list_display = ('title', 'link', 'order', 'is_visible', 'parent')
+    list_editable = ('order', 'is_visible')
+    list_filter = ('is_visible', 'parent')
+    search_fields = ('title', 'link')
+    ordering = ('order',)
+    list_display_links = ('title',)

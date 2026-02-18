@@ -13,6 +13,28 @@ load_dotenv()
 
 from header import header_func
 
+
+def get_default_organization_name():
+    """Имя дефолтной организации из БД (первая по id)."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            dbname=os.getenv("DB_NAME", "mosaicmed"),
+            user=os.getenv("DB_USER", "postgres"),
+            password=os.getenv("DB_PASSWORD", ""),
+            host=os.getenv("DB_HOST", "localhost"),
+            port=os.getenv("DB_PORT", "5432"),
+        )
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT name FROM organization_medicalorganization ORDER BY id LIMIT 1"
+            )
+            row = cur.fetchone()
+        conn.close()
+        return row[0] if row else ""
+    except Exception:
+        return ""
+
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, '/assets/style.css'])
 
 # Определение цветов и стилей блоков
@@ -467,7 +489,7 @@ card_container = dbc.Container([
 
 
 app.layout = html.Div([
-    header_func(datetime.now().strftime('%d.%m.%Y %H:%M')),
+    header_func(datetime.now().strftime('%d.%m.%Y %H:%M'), get_default_organization_name()),
     card_container
 ])
 

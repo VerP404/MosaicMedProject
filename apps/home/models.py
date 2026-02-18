@@ -86,3 +86,49 @@ class TelegramGroup(models.Model):
     class Meta:
         verbose_name = "Телеграм группа"
         verbose_name_plural = "Телеграм группы"
+
+
+class MenuItem(models.Model):
+    """Пункт меню в боковой панели. Управление видимостью в админке."""
+    ICON_FEATHER = 'feather'
+    ICON_FA = 'fa'
+    ICON_CHOICES = [
+        (ICON_FEATHER, 'Feather (data-feather)'),
+        (ICON_FA, 'Font Awesome (класс)'),
+    ]
+
+    title = models.CharField('Название', max_length=100)
+    link = models.CharField(
+        'Ссылка',
+        max_length=255,
+        blank=True,
+        help_text='Имя URL (например: home, beneficiaries:home), путь (/admin/) или спец. код: dash_url, dash_chief_url, dash_update'
+    )
+    icon_type = models.CharField('Тип иконки', max_length=10, choices=ICON_CHOICES, default=ICON_FEATHER)
+    icon_name = models.CharField('Иконка', max_length=50, blank=True, help_text='Например: home, bar-chart-2 или fa-heart-pulse')
+    order = models.PositiveSmallIntegerField('Порядок', default=0)
+    is_visible = models.BooleanField('Показывать', default=True)
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='children',
+        verbose_name='Родитель (для подменю)'
+    )
+    slug = models.SlugField(
+        'Идентификатор (для выпадающего блока)',
+        max_length=50,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text='Латиница без пробелов, например: patient-registries (для пунктов с подменю)'
+    )
+
+    class Meta:
+        verbose_name = 'Пункт меню'
+        verbose_name_plural = 'Пункты меню'
+        ordering = ['order', 'pk']
+
+    def __str__(self):
+        return self.title

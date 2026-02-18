@@ -1,20 +1,16 @@
 from dash import html, dcc
-from datetime import datetime
 import dash_bootstrap_components as dbc
 
 
-def header_func(_date_update):
+def header_func(_date_update, organization_name=""):
     return dbc.Container([
         dbc.Row([
             dbc.Col([
-                html.Img(src='/assets/logo-vgp3.png', style={'height': '100px', 'width': 'auto'}),
-            ], width=3, className="d-flex align-items-center justify-content-center"),
-            dbc.Col([
-                html.H2("БУЗ ВО ВГКП №3", 
+                html.H2(organization_name or "Медицинская организация",
                         style={'textAlign': 'center', 'color': 'white', 'marginTop': '5px', 'marginBottom': '5px', 'fontSize': '32px', 'fontWeight': 'bold'}),
-                html.H4("Система мониторинга показателей для главного врача", 
+                html.H4("Система мониторинга показателей для главного врача",
                         style={'textAlign': 'center', 'color': 'white', 'marginTop': '5px', 'marginBottom': '5px', 'fontSize': '20px'}),
-            ], width=6, className="d-flex flex-column justify-content-center"),
+            ], width=6, className="d-flex flex-column justify-content-center offset-3"),
             dbc.Col([
                 html.H5([
                     html.Span("Обновлено: ", style={'color': 'white'}),
