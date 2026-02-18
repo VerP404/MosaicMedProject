@@ -199,3 +199,92 @@ LEFT JOIN SortedDiagnoses d ON f.enp = d.enp
 LEFT JOIN SortedGoals g ON f.enp = g.enp
 order by patient
 """
+
+
+def sql_query_talons_by_dates(
+    selected_year,
+    months_placeholder,
+    inogorod,
+    sanction,
+    amount_null,
+    report_type,
+    goals,
+    input_start=None,
+    input_end=None,
+    treatment_start=None,
+    treatment_end=None,
+    status_list=None,
+):
+    """
+    Талоны по датам: группировка по дате формирования или дате окончания лечения.
+    Столбцы: Дата, Итого, затем все доступные цели (динамически, как в economist/doctors).
+    """
+    from apps.analytical_app.pages.SQL_query.query import base_query
+
+    if not months_placeholder or months_placeholder.strip() == "":
+        months_placeholder = ", ".join(map(str, range(1, 13)))
+
+    input_start = input_start if report_type == "initial_input" else None
+    input_end = input_end if report_type == "initial_input" else None
+    treatment_start = treatment_start if report_type == "treatment" else None
+    treatment_end = treatment_end if report_type == "treatment" else None
+
+    base = base_query(
+        selected_year,
+        months_placeholder,
+        inogorod,
+        sanction,
+        amount_null,
+        building_ids=None,
+        department_ids=None,
+        profile_ids=None,
+        doctor_ids=None,
+        initial_input_date_start=input_start,
+        initial_input_date_end=input_end,
+        treatment_start=treatment_start,
+        treatment_end=treatment_end,
+        status_list=status_list,
+    )
+
+    if report_type == "treatment":
+        date_expr = "TO_DATE(treatment_end, 'DD-MM-YYYY')"
+        date_char = "TO_CHAR(TO_DATE(treatment_end, 'DD-MM-YYYY'), 'DD-MM-YYYY')"
+    else:
+        date_expr = "TO_DATE(initial_input_date, 'DD-MM-YYYY')"
+        date_char = "TO_CHAR(TO_DATE(initial_input_date, 'DD-MM-YYYY'), 'DD-MM-YYYY')"
+
+    if not goals:
+        return f"""
+        {base}
+        SELECT {date_char} AS "Дата", 0 AS "Итого"
+        FROM oms
+        WHERE 1=0
+        GROUP BY {date_expr}
+        """
+
+    quoted_goals = ", ".join(f"'{g.replace(chr(39), chr(39) + chr(39))}'" for g in goals)
+    goal_filter = f"AND goal IN ({quoted_goals})"
+
+    goal_exprs = []
+    for g in goals:
+        safe_g = g.replace('"', '""')
+        esc = g.replace("'", "''")
+        goal_exprs.append(f"COUNT(*) FILTER (WHERE goal = '{esc}') AS \"{safe_g}\"")
+
+    sum_parts = [expr.split(" AS ")[0] for expr in goal_exprs]
+    total_expr = "(" + " + ".join(sum_parts) + ") AS \"Итого\""
+    # Порядок: Дата, Итого, затем все цели
+    pivot_cols = total_expr + ",\n       " + ",\n       ".join(goal_exprs)
+    having_expr = " + ".join(sum_parts) + " > 0"
+
+    return f"""
+    {base}
+SELECT {date_char} AS "Дата",
+       {pivot_cols}
+FROM oms
+WHERE 1=1
+  {goal_filter}
+GROUP BY {date_expr}
+HAVING ({having_expr})
+ORDER BY {date_expr} DESC
+"""
