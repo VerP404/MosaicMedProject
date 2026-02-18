@@ -14,6 +14,7 @@
                 Быстрые действия
             </h3>
             <div class="row">
+                {% if 'dash_url' in visible_menu_links %}
                 <div class="col-lg-3 col-md-6 mb-3">
                     <a href="{{ dash_url }}" class="quick-action-card analytics">
                         <div class="quick-action-icon">
@@ -25,6 +26,8 @@
                         </div>
                     </a>
                 </div>
+                {% endif %}
+                {% if '/admin/' in visible_menu_links %}
                 <div class="col-lg-3 col-md-6 mb-3">
                     <a href="/admin/" class="quick-action-card admin">
                         <div class="quick-action-icon">
@@ -36,6 +39,8 @@
                         </div>
                     </a>
                 </div>
+                {% endif %}
+                {% if 'dash_update' in visible_menu_links %}
                 <div class="col-lg-3 col-md-6 mb-3">
                     <a href="{{ dash_url }}/admin/admin_update_data" class="quick-action-card data">
                         <div class="quick-action-icon">
@@ -47,6 +52,7 @@
                         </div>
                     </a>
                 </div>
+                {% endif %}
                 <div class="col-lg-3 col-md-6 mb-3">
                     <a href="{% url 'people:people_report' %}" class="quick-action-card reports">
                         <div class="quick-action-icon">
@@ -71,6 +77,7 @@
             </h3>
             <div class="row">
                 <!-- Аналитическая система -->
+                {% if 'dash_url' in visible_menu_links %}
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="system-card analytics-system">
                         <div class="system-card-header">
@@ -99,8 +106,10 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Панель главного врача -->
+                {% if 'dash_chief_url' in visible_menu_links %}
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="system-card chief-system">
                         <div class="system-card-header">
@@ -129,8 +138,10 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Панель пациента -->
+                {% if 'peopledash_home' in visible_menu_links %}
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="system-card patient-system">
                         <div class="system-card-header">
@@ -159,8 +170,10 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Административная система -->
+                {% if '/admin/' in visible_menu_links %}
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="system-card admin-system">
                         <div class="system-card-header">
@@ -189,8 +202,10 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Кадровая система -->
+                {% if '/admin/personnel/' in visible_menu_links %}
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="system-card personnel-system">
                         <div class="system-card-header">
@@ -219,8 +234,10 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Система отчетов -->
+                {% if '/admin/reports/' in visible_menu_links %}
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="system-card reports-system">
                         <div class="system-card-header">
@@ -249,8 +266,10 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Система льготников -->
+                {% if 'beneficiaries:home' in visible_menu_links %}
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="system-card beneficiaries-system">
                         <div class="system-card-header">
@@ -279,8 +298,10 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Система участков -->
+                {% if 'zones:organizations_list' in visible_menu_links %}
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="system-card zones-system">
                         <div class="system-card-header">
@@ -309,6 +330,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
             </div>
         </div>
     </section>
