@@ -12,6 +12,7 @@ from apps.analytical_app.pages.economist.main import economist_main
 from apps.analytical_app.pages.economist.stationary.page import economist_stationary
 from apps.analytical_app.pages.economist.svpod.page import economist_sv_pod
 from apps.analytical_app.pages.economist.dispensary.page import economist_dispensary_analysis
+from apps.analytical_app.pages.economist.dispensary_age.page import layout_dispensary_age
 from apps.analytical_app.pages.economist.financial_indicators.page import layout
 from apps.analytical_app.pages.economist.goal_groups_report.page import economist_goal_groups_report_def
 from apps.analytical_app.pages.economist.gis_oms.page import economist_gis_oms_def
@@ -42,6 +43,7 @@ from apps.analytical_app.pages.web_oms.status_talon.tab4 import web_oms_4
 from apps.analytical_app.pages.web_oms.status_talon.tab5 import web_oms_5
 from apps.analytical_app.pages.web_oms.status_talon.tab6 import web_oms_6
 from apps.analytical_app.pages.web_oms.status_talon.tab7 import adults_dv10 as web_oms_7
+from apps.analytical_app.pages.web_oms.status_talon.tab8 import web_oms_8
 
 # Все маршруты для страниц
 routes = {
@@ -116,6 +118,13 @@ routes = {
             {"label": "для ГИС ОМС", "active": True},
         ]),
         economist_gis_oms_def()
+    ]),
+    "/economist/dispensary_age": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "Анализ вторых этапов диспансеризации", "active": True},
+        ]),
+        layout_dispensary_age
     ]),
 
     "/statistic": statistic_main,
@@ -241,6 +250,13 @@ routes = {
             {"label": "Отчет 7 - Уникальные талоны по диагнозам", "active": True},
         ]),
         web_oms_7
+    ]),
+    "/web_oms/web_oms_rep8": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "WEB.ОМС", "href": "/web_oms"},
+            {"label": "Талоны по датам", "active": True},
+        ]),
+        web_oms_8
     ]),
 
     "/iszl": iszl_main,
