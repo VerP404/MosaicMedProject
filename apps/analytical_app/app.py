@@ -2,6 +2,10 @@
 import dash
 import os
 
+# Dash 3 can ping Plotly for version updates in Dev Tools.
+# In closed/offline networks this produces noisy browser console errors.
+os.environ.setdefault("DASH_DISABLE_VERSION_CHECK", "true")
+
 # Получаем абсолютный путь к текущей директории
 CURRENT_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 

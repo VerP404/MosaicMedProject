@@ -246,8 +246,8 @@ def filter_doctor(type_page):
 
 
 def filter_years(type_page):
-    # Генерируем список годов от 2023 до текущего года
-    year_options = [{'label': str(year), 'value': year} for year in range(2023, current_year + 1)]
+    # Генерируем список годов от 2023 до следующего (в т.ч. для отчётов на 2026 и далее)
+    year_options = [{'label': str(year), 'value': year} for year in range(2023, current_year + 2)]
 
     return dbc.Col(
         dcc.Dropdown(

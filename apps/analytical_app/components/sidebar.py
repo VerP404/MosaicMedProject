@@ -24,7 +24,7 @@ def create_sidebar():
             # Кнопка сворачивания рядом с пунктами навигации
             html.Div(
                 dbc.Button(html.I(className="bi bi-sliders"), color="secondary", id="btn_sidebar", n_clicks=0),
-                style={"width": "100%", "text-align": "left", "margin-bottom": "1rem"}
+                style={"width": "100%", "textAlign": "left", "marginBottom": "1rem"}
             ),
             # Навигация
             dbc.Nav(
@@ -156,7 +156,7 @@ def create_sidebar():
             # Меняем состояние на противоположное
             if sidebar_state == "collapsed":
                 sidebar_style["width"] = "5rem"
-                page_content_style["margin-left"] = "5rem"
+                page_content_style["marginLeft"] = "5rem"
             return (sidebar_style, page_content_style,
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
                     {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"},
@@ -165,7 +165,7 @@ def create_sidebar():
         else:
             # Развернутый вид
             sidebar_style["width"] = "14rem"
-            page_content_style["margin-left"] = "14rem"
+            page_content_style["marginLeft"] = "14rem"
             return (sidebar_style, page_content_style,
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},
                     {"display": "inline"}, {"display": "inline"}, {"display": "inline"}, {"display": "inline"},

@@ -25,11 +25,11 @@ from apps.analytical_app.components.footer import create_footer, get_content_sty
 
 # Стили для основного контейнера
 content_style = {
-    'margin-left': '5rem',  # Отступ для сайдбара
-    'margin-top': '56px',  # Отступ для навбара
+    'marginLeft': '5rem',  # Отступ для сайдбара
+    'marginTop': '56px',  # Отступ для навбара
     'padding': '2rem 1rem',
-    'padding-bottom': '60px',  # Отступ снизу для футера
-    'min-height': 'calc(100vh - 96px)'  # Минимальная высота контента
+    'paddingBottom': '60px',  # Отступ снизу для футера
+    'minHeight': 'calc(100vh - 96px)'  # Минимальная высота контента
 }
 
 app.layout = html.Div(
@@ -52,4 +52,9 @@ app.layout = html.Div(
 register_routes(app)
 
 if __name__ == "__main__":
-    app.run(debug=DEBUG_DASH, host=HOST_DASH, port=PORT_DASH)
+    app.run(
+        debug=DEBUG_DASH,
+        host=HOST_DASH,
+        port=PORT_DASH,
+        dev_tools_disable_version_check=True,
+    )

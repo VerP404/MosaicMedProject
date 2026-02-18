@@ -6,24 +6,24 @@ from apps.analytical_app.app import app
 
 year = datetime.now().year
 
-# Обновленные стили футера
+# Обновленные стили футера (camelCase для React/Dash)
 footer_style = {
-    'position': 'fixed',  # Оставляем fixed для постоянного отображения внизу
+    'position': 'fixed',
     'bottom': 0,
     'left': 0,
     'right': 0,
     'height': '40px',
     'width': '100%',
-    'background-color': '#0d6efd',
+    'backgroundColor': '#0d6efd',
     'color': 'white',
     'display': 'flex',
-    'align-items': 'center',
-    'z-index': 1030,  # Высокий z-index чтобы футер был поверх другого контента
+    'alignItems': 'center',
+    'zIndex': 1030,
 }
 
 # Стили для отступов основного контента
 main_content_padding = {
-    'padding-bottom': '50px',  # Отступ для основного контента, чтобы футер не перекрывал
+    'paddingBottom': '50px',
 }
 
 

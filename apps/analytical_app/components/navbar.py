@@ -315,7 +315,7 @@ def create_updates_offcanvas():
                                 ),
                                 dbc.Col(
                                     dbc.Button(
-                                        html.I(className="bi bi-arrow-repeat"),  # Используем иконку Bootstrap
+                                        html.I(className="bi bi-arrow-repeat"),
                                         id="refresh-updates-button",
                                         color="primary",
                                         size="sm",
