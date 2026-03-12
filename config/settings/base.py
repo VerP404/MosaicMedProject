@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'apps.person',
     'apps.talon',
     'apps.dn_app',
+    'apps.dn_reference',
     'apps.beneficiaries',
     'apps.references',
     'apps.gar',
@@ -268,6 +269,7 @@ UNFOLD = {
                 "collapsible": True,
                 "items": [
                     {"title": "ДН-модуль", "icon": "monitor_heart", "link": "/admin/dn_app/"},
+                    {"title": "Справочники ДН (диагнозы, услуги)", "icon": "menu_book", "link": "/admin/dn_reference/"},
                 ],
             },
             {
