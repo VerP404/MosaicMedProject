@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-03-19 16:31:35.181365",
+  "export_date": "2026-03-19 16:40:44.068375",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -810,7 +810,7 @@
         {
           "field_name": "goal",
           "filter_type": "in",
-          "values": "('55', '552')",
+          "values": "'55', '552'",
           "year": 2026
         }
       ]
@@ -1729,6 +1729,36 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'52'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "eaf60324-3b6a-4df9-82c2-0f410631f2af",
+      "name": "Врач-врач",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "a2b29671-9d44-4d37-8d6f-9a1250acd632",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'55'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "9e3c048e-5770-4153-81ad-3347f3117514",
+      "name": "Врач-пациент",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "a2b29671-9d44-4d37-8d6f-9a1250acd632",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'552'",
           "year": 2026
         }
       ]
