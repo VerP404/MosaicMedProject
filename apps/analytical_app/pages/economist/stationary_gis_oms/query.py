@@ -1,11 +1,11 @@
 """
 Отчёт «Стационарная помощь для ГИС ОМС»: КСГ × профиль врача в талоне (кол-во и сумма).
-Источник: load_data_talons (как вкладка «Стационары» в для ГИС ОМС).
+Источник: load_data_talons + привязка к personnel (как фильтры на странице врача).
 """
 
 
 def _profile_case_sql():
-    dp = "LOWER(COALESCE(doctor_profile, ''))"
+    dp = "LOWER(COALESCE(t.doctor_profile, ''))"
     return f"""
     CASE
         WHEN {dp} LIKE '%общей врачебной%' OR {dp} LIKE '%семейной медицине%' THEN 'opp'
@@ -20,7 +20,6 @@ def _profile_case_sql():
     """
 
 
-# Ключ CASE → заголовки столбцов (кол-во / сумма)
 _PROFILES = [
     ("opp", "общая врачебная практика"),
     ("ther", "терапия"),
@@ -33,12 +32,64 @@ _PROFILES = [
 ]
 
 
-def sql_query_stationary_gis_oms(months_placeholder_sql, selected_year):
+def _talon_filters_sql(inogorodniy, sanction, amount_null):
+    """Как в base_query для data_loader_omsdata, адаптировано под load_data_talons (t)."""
+    parts = []
+    if inogorodniy == "1":
+        parts.append("AND t.smo_code LIKE '360%'")
+    elif inogorodniy == "2":
+        parts.append("AND (t.smo_code IS NULL OR t.smo_code NOT LIKE '360%')")
+    if sanction == "1":
+        parts.append("AND COALESCE(NULLIF(TRIM(t.sanctions), ''), '-') IN ('-', '0')")
+    elif sanction == "2":
+        parts.append("AND COALESCE(NULLIF(TRIM(t.sanctions), ''), '-') NOT IN ('-', '0')")
+    if amount_null == "1":
+        parts.append(
+            "AND t.amount ~ '^[0-9]+(\\.[0-9]+)?$' AND (t.amount)::numeric != 0"
+        )
+    elif amount_null == "2":
+        parts.append(
+            "AND (NOT (t.amount ~ '^[0-9]+(\\.[0-9]+)?$') OR (t.amount)::numeric = 0)"
+        )
+    return "\n          ".join(parts)
+
+
+def _personnel_filters_sql(building_ids, department_ids, profile_ids, doctor_ids):
+    parts = []
+    if building_ids:
+        parts.append(f"AND ob.id IN ({','.join(map(str, building_ids))})")
+    if department_ids:
+        parts.append(f"AND od.id IN ({','.join(map(str, department_ids))})")
+    if profile_ids:
+        parts.append(f"AND pd.profile_id IN ({','.join(map(str, profile_ids))})")
+    if doctor_ids:
+        parts.append(f"AND pd.id IN ({','.join(map(str, doctor_ids))})")
+    return "\n          ".join(parts)
+
+
+def sql_query_stationary_gis_oms(
+    months_placeholder_sql,
+    selected_year,
+    inogorodniy="3",
+    sanction="3",
+    amount_null="3",
+    building_ids=None,
+    department_ids=None,
+    profile_ids=None,
+    doctor_ids=None,
+):
     """
-    months_placeholder_sql: строка вида "'Января 2025', 'Февраля 2025'" (как в gis_oms).
-    Биндинг: status_list, goals_list (кортежи для IN).
+    Биндинг: status_list, goals_list.
+    Остальное — безопасные числовые списки и флаги '1'/'2'/'3'.
     """
     prof_case = _profile_case_sql().strip()
+    talon_f = _talon_filters_sql(inogorodniy, sanction, amount_null)
+    pers_f = _personnel_filters_sql(
+        building_ids or [],
+        department_ids or [],
+        profile_ids or [],
+        doctor_ids or [],
+    )
 
     agg_count_parts = []
     agg_sum_parts = []
@@ -63,22 +114,31 @@ def sql_query_stationary_gis_oms(months_placeholder_sql, selected_year):
     prof_list_sql = ",\n            ".join(numbered_select_profile)
 
     query = f"""
-    WITH     raw AS (
+    WITH raw AS (
         SELECT
-            TRIM(ksg) AS ksg_trim,
+            TRIM(t.ksg) AS ksg_trim,
             CASE
-                WHEN amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN amount::numeric
+                WHEN t.amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN t.amount::numeric
                 ELSE NULL
             END AS amt,
             ({prof_case}) AS prof_key
-        FROM load_data_talons
-        WHERE ksg IS NOT NULL
-          AND TRIM(ksg) <> ''
-          AND TRIM(ksg) <> '-'
-          AND report_period IN ({months_placeholder_sql})
-          AND treatment_end LIKE '%{selected_year}%'
-          AND status IN :status_list
-          AND goal IN :goals_list
+        FROM load_data_talons t
+        INNER JOIN (
+            SELECT DISTINCT ON (doctor_code) id, doctor_code, department_id, profile_id
+            FROM personnel_doctorrecord
+            ORDER BY doctor_code, id
+        ) AS pd ON SUBSTRING(TRIM(t.doctor) FROM 1 FOR POSITION(' ' IN TRIM(t.doctor)) - 1) = pd.doctor_code
+        INNER JOIN organization_department od ON od.id = pd.department_id
+        INNER JOIN organization_building ob ON ob.id = od.building_id
+        WHERE t.ksg IS NOT NULL
+          AND TRIM(t.ksg) <> ''
+          AND TRIM(t.ksg) <> '-'
+          AND t.report_period IN ({months_placeholder_sql})
+          AND t.treatment_end LIKE '%{selected_year}%'
+          AND t.status IN :status_list
+          AND t.goal IN :goals_list
+          {talon_f}
+          {pers_f}
     ),
     norm AS (
         SELECT
