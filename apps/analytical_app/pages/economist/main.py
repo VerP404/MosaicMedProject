@@ -59,6 +59,15 @@ cards_row_3 = dbc.Row(
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
 
+cards_row_4 = dbc.Row(
+    [
+        dbc.Col(create_card(13, type_page,
+                            "Стационарная помощь для ГИС ОМС",
+                            "КСГ и суммы/количество случаев с разбивкой по профилю врача в талоне; фильтр по целям.")),
+    ],
+    className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
+)
+
 
 # Основной layout
 economist_main = html.Div([
@@ -71,12 +80,13 @@ economist_main = html.Div([
     cards_row_1,
     cards_row_2,
     cards_row_3,
+    cards_row_4,
 ])
 
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12]],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13]],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -99,6 +109,7 @@ def navigate_pages(*n_clicks):
         10: f"/{main_link}/goal_groups_report",
         11: f"/{main_link}/gis_oms",
         12: f"/{main_link}/dispensary_age",
+        13: f"/{main_link}/stationary_gis_oms",
     }
     
     return route_map[report_num]

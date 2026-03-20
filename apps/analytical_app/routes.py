@@ -16,6 +16,7 @@ from apps.analytical_app.pages.economist.dispensary_age.page import layout_dispe
 from apps.analytical_app.pages.economist.financial_indicators.page import layout
 from apps.analytical_app.pages.economist.goal_groups_report.page import economist_goal_groups_report_def
 from apps.analytical_app.pages.economist.gis_oms.page import economist_gis_oms_def
+from apps.analytical_app.pages.economist.stationary_gis_oms.page import economist_stationary_gis_oms_def
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
@@ -297,6 +298,31 @@ routes.update(routes_registry)
 routes.update(routes_laboratory)
 
 
+def _economist_stationary_gis_oms_page():
+    return html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "Стационарная помощь для ГИС ОМС", "active": True},
+        ]),
+        economist_stationary_gis_oms_def(),
+    ])
+
+
+# После всех update — чтобы маршрут не перезаписывался и был единственным источником правды
+routes["/economist/stationary_gis_oms"] = _economist_stationary_gis_oms_page
+routes["/economist/stationary-gis-oms"] = _economist_stationary_gis_oms_page
+
+
+def _normalize_pathname(pathname):
+    if pathname is None:
+        return "/"
+    p = pathname.strip()
+    if not p:
+        return "/"
+    p = p.rstrip("/")
+    return p if p else "/"
+
+
 def page_not_found(pathname):
     return html.Div([
         html.H1("404: Страница не найдена", style={"textAlign": "center", "color": "red"}),
@@ -312,7 +338,8 @@ def register_routes(app):
         [Input('url', 'pathname')]
     )
     def display_page(pathname):
-        view = routes.get(pathname)
+        key = _normalize_pathname(pathname)
+        view = routes.get(key) or routes.get(pathname)
         if view is None:
             return page_not_found(pathname)
         # Если маршрут — функция, вызываем её для динамической генерации layout
