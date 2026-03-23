@@ -15,6 +15,7 @@ def card_table(
     show_sum_button=False,
     merge_duplicate_headers=False,
     style_cell_conditional=None,
+    style_header_conditional=None,
     markdown_options=None
 ):
     """
@@ -30,6 +31,7 @@ def card_table(
     - show_sum_button:          показывать кнопку «Суммировать»
     - merge_duplicate_headers:  склеивать дублирующиеся первые уровни заголовков
     - style_cell_conditional:   условные стили для ячеек
+    - style_header_conditional: условные стили для заголовков столбцов
     """
     table_kwargs = {
         'id': id_table,
@@ -56,6 +58,8 @@ def card_table(
         table_kwargs['hidden_columns'] = hidden_columns
     if style_cell_conditional is not None:
         table_kwargs['style_cell_conditional'] = style_cell_conditional
+    if style_header_conditional is not None:
+        table_kwargs['style_header_conditional'] = style_header_conditional
     if markdown_options is not None:
         table_kwargs['markdown_options'] = markdown_options
 
