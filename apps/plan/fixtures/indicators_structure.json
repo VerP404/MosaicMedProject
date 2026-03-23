@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-02-09 13:21:09.711897",
+  "export_date": "2026-03-23 12:51:16.150798",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -450,6 +450,12 @@
         {
           "field_name": "main_diagnosis_code",
           "filter_type": "not_like",
+          "values": "'I%'",
+          "year": 2026
+        },
+        {
+          "field_name": "main_diagnosis_code",
+          "filter_type": "not_like",
           "values": "'C%'",
           "year": 2026
         },
@@ -457,12 +463,6 @@
           "field_name": "main_diagnosis_code",
           "filter_type": "not_like",
           "values": "'D0%'",
-          "year": 2026
-        },
-        {
-          "field_name": "main_diagnosis_code",
-          "filter_type": "not_like",
-          "values": "'I%'",
           "year": 2026
         }
       ]
@@ -895,6 +895,36 @@
           "field_name": "ksg",
           "filter_type": "not_like",
           "values": "'ds37%'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "21abee52-33c6-4d2f-90d3-cd9015c02f2a",
+      "name": "Дистанционное наблюдение",
+      "level": 2,
+      "is_distributable": false,
+      "parent_external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'553'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "a2b29671-9d44-4d37-8d6f-9a1250acd632",
+      "name": "Телемедицина",
+      "level": 2,
+      "is_distributable": false,
+      "parent_external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "in",
+          "values": "'55', '552'",
           "year": 2026
         }
       ]
@@ -1944,6 +1974,204 @@
       ]
     },
     {
+      "external_id": "c31d4bc4-4f41-43ef-a120-edd5e65ca696",
+      "name": "Колоноскопия",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "f5f57f64-c253-4111-a9b6-85c009dab633",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "2549.40",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "173b12dc-4d43-428a-8df3-4c39af4c02d3",
+      "name": "Эндоскопия",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "f5f57f64-c253-4111-a9b6-85c009dab633",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "1296.78",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "b2a9a1d4-ecd9-4567-9ea4-cc6e3a16aba5",
+      "name": "ЭГДС",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "f5f57f64-c253-4111-a9b6-85c009dab633",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'541'",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "1061.84",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "eaf60324-3b6a-4df9-82c2-0f410631f2af",
+      "name": "Врач-врач",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "a2b29671-9d44-4d37-8d6f-9a1250acd632",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'55'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "9e3c048e-5770-4153-81ad-3347f3117514",
+      "name": "Врач-пациент",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "a2b29671-9d44-4d37-8d6f-9a1250acd632",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'552'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "f123f8a2-30fb-4348-a05e-1c544e73b707",
+      "name": "ЦЗ - 13",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'13'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "141c5d2d-5645-4d1a-aa06-41a86dc6e56c",
+      "name": "ЦЗ - 131",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'131'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "e525a0c0-b958-439e-83e3-47d93bf0c3b3",
+      "name": "ЦЗ - 140",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'140'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "a576eaa4-84b2-40e5-9ca0-48b47a6be331",
+      "name": "ЦЗ - 141",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'141'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "1b5c70b3-a36c-4173-a161-e7f1c46c47f1",
+      "name": "ЦЗ - 142",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'142'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "6ea6319c-3a9e-4422-ab70-b041b620b094",
+      "name": "ЦЗ - 143",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'143'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "faa4cd46-c70e-4566-93a5-9797a3697a02",
+      "name": "ЦЗ - 144",
+      "level": 3,
+      "is_distributable": false,
+      "parent_external_id": "fa74ec35-a8ea-4c5f-a053-f50f14418d27",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'144'",
+          "year": 2026
+        }
+      ]
+    },
+    {
       "external_id": "dfddba0c-3050-4fc6-a681-9d7c3a8a5287",
       "name": "Репродуктивное - ДР1 (М)",
       "level": 4,
@@ -2095,6 +2323,90 @@
           "field_name": "goal",
           "filter_type": "exact",
           "values": "'ДР2'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "99e72386-8042-4f18-9299-46183edd5556",
+      "name": "ЦОЗ",
+      "level": 4,
+      "is_distributable": false,
+      "parent_external_id": "23c592b3-8bda-4651-a258-d684d89d439d",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'32'",
+          "year": 2026
+        },
+        {
+          "field_name": "profile",
+          "filter_type": "like",
+          "values": "'%офтальмо%'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "a192d735-8d34-47f8-867e-29ea545ce7cf",
+      "name": "МЭЦ",
+      "level": 4,
+      "is_distributable": false,
+      "parent_external_id": "23c592b3-8bda-4651-a258-d684d89d439d",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'32'",
+          "year": 2026
+        },
+        {
+          "field_name": "profile",
+          "filter_type": "like",
+          "values": "'%эндокрино%'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "72b1fff7-610e-4784-ab27-99e6cb6eb47b",
+      "name": "ЭхоКГ",
+      "level": 4,
+      "is_distributable": false,
+      "parent_external_id": "a48e0117-a2b8-4365-919a-7cd85dfbe776",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'УД2'",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "740.97",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "1ea5b68c-2cd5-44e8-90af-b98c73ff75c2",
+      "name": "УЗДС",
+      "level": 4,
+      "is_distributable": false,
+      "parent_external_id": "a48e0117-a2b8-4365-919a-7cd85dfbe776",
+      "filters": [
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'УД2'",
+          "year": 2026
+        },
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "1481.94",
           "year": 2026
         }
       ]
