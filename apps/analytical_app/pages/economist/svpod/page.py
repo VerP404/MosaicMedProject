@@ -449,7 +449,7 @@ indicators_tab = html.Div(
              type='default',
              children=[card_table(f'result-table1-{type_page_indicators}', "Индикаторные показатели", page_size=25, 
                                  style_cell_conditional=[
-                                     {'if': {'column_id': 'type'}, 'width': '20%'},
+                                     {'if': {'column_id': 'type'}, 'width': '20%', 'textAlign': 'left'},
                                      {'if': {'column_id': 'План 1/12 (количество)'}, 'width': '8%'},
                                      {'if': {'column_id': 'План 1/12 (сумма)'}, 'width': '8%'},
                                      {'if': {'column_id': 'План (количество)'}, 'width': '8%'},
@@ -457,6 +457,9 @@ indicators_tab = html.Div(
                                      {'if': {'column_id': 'К-во'}, 'width': '8%'},
                                      {'if': {'column_id': 'Сумма'}, 'width': '8%'},
                                      {'if': {'column_id': 'Условия фильтра'}, 'width': '32%'}
+                                 ],
+                                 style_header_conditional=[
+                                     {'if': {'column_id': 'type'}, 'textAlign': 'left'},
                                  ])]
          ),
          # Таблица детализации
