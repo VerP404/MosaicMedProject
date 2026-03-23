@@ -40,7 +40,25 @@ def copy_filters_from_year_to_year(groups_queryset, source_year, target_year):
                 fc.save()
                 copied_count += 1
         if source_filters.exists():
-            AnnualPlan.objects.get_or_create(group=group, year=target_year)
+            ap_src = AnnualPlan.objects.filter(group=group, year=source_year).first()
+            defaults = {}
+            if ap_src:
+                defaults = {
+                    'show_in_cumulative_report': ap_src.show_in_cumulative_report,
+                    'show_in_indicators_report': ap_src.show_in_indicators_report,
+                    'sort_order': ap_src.sort_order,
+                }
+            ap_dst, created = AnnualPlan.objects.get_or_create(
+                group=group,
+                year=target_year,
+                defaults=defaults or {},
+            )
+            if not created and ap_src:
+                ap_dst.show_in_cumulative_report = ap_src.show_in_cumulative_report
+                ap_dst.show_in_indicators_report = ap_src.show_in_indicators_report
+                if ap_src.sort_order is not None:
+                    ap_dst.sort_order = ap_src.sort_order
+                ap_dst.save(update_fields=['show_in_cumulative_report', 'show_in_indicators_report', 'sort_order'])
     return {'copied_count': copied_count, 'groups_count': groups_queryset.count(), 'error': None}
 
 
