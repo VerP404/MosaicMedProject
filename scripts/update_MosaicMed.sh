@@ -155,6 +155,8 @@ pkill -f 'python3.12 apps/analytical_app/index.py' 2>/dev/null
 pkill -f 'python3.12 apps/chief_app/main.py' 2>/dev/null
 pkill -f 'python3.12 apps/masterd_dashboard/app.py' 2>/dev/null
 pkill -f 'python3.12 start_dagster.py --host 0.0.0.0 --port 3000' 2>/dev/null
+pkill -f 'python3.12 apps/dash_dn/index.py' 2>/dev/null
+pkill -f 'python3.12 -m apps.dash_dn' 2>/dev/null
 echo "[INFO] Основные процессы остановлены (если были запущены)."
 
 echo "[INFO] Поиск и остановка процессов dagster-daemon..."
@@ -182,6 +184,8 @@ nohup python3.12 apps/analytical_app/index.py > /dev/null 2>&1 &
 nohup python3.12 apps/chief_app/main.py > /dev/null 2>&1 &
 nohup python3.12 apps/masterd_dashboard/app.py --host 0.0.0.0 --port 5020 > /dev/null 2>&1 &
 nohup python3.12 start_dagster.py --host 0.0.0.0 --port 3000 > /dev/null 2>&1 &
+# Подбор услуг ДН (Dash, SQLite): порт PORT_DASH_DN или 7777, HOST_DASH_DN из .env
+nohup python3.12 apps/dash_dn/index.py > /dev/null 2>&1 &
 
 echo "=============================================="
 echo "Скрипт обновления завершён: $(date)"
