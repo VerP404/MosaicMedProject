@@ -1,0 +1,8 @@
+# Автономный запуск apps/dash_dn (без Django).
+# Установка: pip install -r apps/dash_dn/requirements.txt
+
+dash>=2.14,<4
+dash-bootstrap-components>=1.5,<2
+sqlalchemy>=2.0,<3
+python-dotenv>=1.0,<2
+openpyxl>=3.1,<4

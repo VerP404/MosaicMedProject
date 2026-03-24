@@ -1,0 +1,144 @@
+{
+  "format": "dash_dn_catalog",
+  "version": 1,
+  "catalog": "global",
+  "tables": {
+    "dn_diagnosis_category": [
+      {
+        "id": 1,
+        "catalog": "global",
+        "name": "Прочие",
+        "is_active": 1
+      }
+    ],
+    "dn_specialty": [
+      {
+        "id": 1,
+        "catalog": "global",
+        "name": "Терапевт участковый",
+        "is_active": 1
+      }
+    ],
+    "dn_diagnosis_group": [
+      {
+        "id": 1,
+        "catalog": "global",
+        "code": "I10-I15",
+        "title": "Гипертензия (пример)",
+        "sort_order": 0,
+        "rule": "I10-I15",
+        "is_active": 1
+      }
+    ],
+    "dn_service": [
+      {
+        "id": 1,
+        "catalog": "global",
+        "code": "B01.047.001",
+        "name": "Приём врача-терапевта участкового первичный",
+        "sort_order": 0,
+        "is_active": 1
+      },
+      {
+        "id": 2,
+        "catalog": "global",
+        "code": "B01.047.002",
+        "name": "Приём врача-терапевта участкового повторный",
+        "sort_order": 1,
+        "is_active": 1
+      }
+    ],
+    "dn_service_price_period": [
+      {
+        "id": 1,
+        "catalog": "global",
+        "date_start": "2020-01-01",
+        "date_end": null,
+        "title": "Базовый период",
+        "is_active": 1
+      }
+    ],
+    "dn_diagnosis": [
+      {
+        "id": 1,
+        "catalog": "global",
+        "code": "I10",
+        "category_id": 1,
+        "is_active": 1
+      },
+      {
+        "id": 2,
+        "catalog": "global",
+        "code": "E11.7",
+        "category_id": 1,
+        "is_active": 1
+      }
+    ],
+    "dn_diagnosis_specialty": [
+      {
+        "id": 1,
+        "catalog": "global",
+        "diagnosis_id": 1,
+        "specialty_id": 1,
+        "source": "primary"
+      },
+      {
+        "id": 2,
+        "catalog": "global",
+        "diagnosis_id": 2,
+        "specialty_id": 1,
+        "source": "primary"
+      }
+    ],
+    "dn_diagnosis_group_membership": [
+      {
+        "id": 1,
+        "catalog": "global",
+        "group_id": 1,
+        "diagnosis_id": 1,
+        "is_active": 1
+      },
+      {
+        "id": 2,
+        "catalog": "global",
+        "group_id": 1,
+        "diagnosis_id": 2,
+        "is_active": 1
+      }
+    ],
+    "dn_service_price": [
+      {
+        "id": 1,
+        "catalog": "global",
+        "service_id": 1,
+        "period_id": 1,
+        "price": 3680.7
+      },
+      {
+        "id": 2,
+        "catalog": "global",
+        "service_id": 2,
+        "period_id": 1,
+        "price": 1215.1
+      }
+    ],
+    "dn_service_requirement": [
+      {
+        "id": 1,
+        "catalog": "global",
+        "service_id": 1,
+        "group_id": 1,
+        "specialty_id": 1,
+        "is_required": 1
+      },
+      {
+        "id": 2,
+        "catalog": "global",
+        "service_id": 2,
+        "group_id": 1,
+        "specialty_id": 1,
+        "is_required": 1
+      }
+    ]
+  }
+}
