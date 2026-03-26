@@ -244,8 +244,10 @@ def layout_body():
                             sort_mode="multi",
                             export_format="xlsx",
                             export_headers="display",
+                            # fixed_rows отключён: при columns=[] / data=[] до выбора диагноза — падение в async-table.js
                             style_table={
                                 "overflowX": "auto",
+                                "maxHeight": "420px",
                                 "borderRadius": "0.375rem",
                             },
                             style_cell={
