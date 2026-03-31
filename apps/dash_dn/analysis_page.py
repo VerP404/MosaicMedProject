@@ -80,7 +80,8 @@ def layout_body():
         [
             html.P(
                 "Загрузите Детализацию талонов по услугам из web.ОМС (csv-файл). "
-                ,
+                "Сначала исключаются строки, где в «Код услуги» прочерк «-» или пусто (как в Квазар для части строк). "
+                "Далее своды по оставшимся строкам; замечания — на вкладке «Ошибки».",
                 className="text-muted small",
             ),
             dcc.Upload(
@@ -97,6 +98,8 @@ def layout_body():
                 multiple=False,
             ),
             html.Div(id=f"{PREFIX}-msg", className="mb-2"),
+            dcc.Store(id=f"{PREFIX}-report-store", data=None),
+            dcc.Store(id=f"{PREFIX}-cat-sum-applied", data=None),
             dcc.Store(id=f"{PREFIX}-claim-base-url", data=_default_claim_ambulatory_base()),
             html.Div(id=f"{PREFIX}-dummy-clientside", style={"display": "none"}),
             dcc.Loading(
@@ -165,56 +168,182 @@ def layout_body():
                                 ),
                             ),
                             dbc.Tab(
-                                label="Коды вне справочника / формат",
-                                tab_id="a-inv",
-                                children=html.Div(_table("tbl-inv", selectable_ticket=True), className="pt-3"),
-                            ),
-                            dbc.Tab(
-                                label="Свод по «левым» кодам",
-                                tab_id="a-codes",
-                                children=html.Div(_table("tbl-codes", page_size=50), className="pt-3"),
-                            ),
-                            dbc.Tab(
-                                label="Строки без кода услуги",
-                                tab_id="a-nocode",
-                                children=html.Div(_table("tbl-nocode", selectable_ticket=True), className="pt-3"),
-                            ),
-                            dbc.Tab(
-                                label="Талоны — проблемы по услугам",
-                                tab_id="a-svc-ticket",
+                                label="Свод по категориям",
+                                tab_id="a-cat",
                                 children=html.Div(
-                                    _table(
-                                        "tbl-svc-ticket",
-                                        page_size=25,
-                                        wrap_long_text=True,
-                                        selectable_ticket=True,
-                                    ),
+                                    [
+                                        dbc.Row(
+                                            [
+                                                dbc.Col(
+                                                    [
+                                                        dbc.Label("Показать", className="small fw-semibold"),
+                                                        dcc.RadioItems(
+                                                            id=f"{PREFIX}-cat-axis",
+                                                            options=[
+                                                                {"label": " DS1 (основной)", "value": "ds1"},
+                                                                {
+                                                                    "label": " DS2 (сопутствующие)",
+                                                                    "value": "ds2",
+                                                                },
+                                                            ],
+                                                            value="ds1",
+                                                            className="small",
+                                                            inputClassName="me-1",
+                                                            labelStyle={"display": "inline-block", "marginRight": "1rem"},
+                                                        ),
+                                                    ],
+                                                    md=6,
+                                                    lg=5,
+                                                ),
+                                                dbc.Col(
+                                                    [
+                                                        dbc.Label(
+                                                            "Разбивка по подразделению (только DS1)",
+                                                            className="small fw-semibold",
+                                                        ),
+                                                        dcc.RadioItems(
+                                                            id=f"{PREFIX}-cat-unit",
+                                                            options=[
+                                                                {"label": " Нет", "value": "no"},
+                                                                {"label": " Да", "value": "yes"},
+                                                            ],
+                                                            value="no",
+                                                            className="small",
+                                                            inputClassName="me-1",
+                                                            labelStyle={"display": "inline-block", "marginRight": "1rem"},
+                                                        ),
+                                                    ],
+                                                    md=6,
+                                                    lg=7,
+                                                ),
+                                            ],
+                                            className="g-2 mb-2",
+                                        ),
+                                        dbc.Row(
+                                            [
+                                                dbc.Col(
+                                                    [
+                                                        dbc.Checkbox(
+                                                            id=f"{PREFIX}-cat-sum-enabled",
+                                                            value=False,
+                                                            className="me-2",
+                                                        ),
+                                                        dbc.Label(
+                                                            "Фильтр по стоимости талона",
+                                                            html_for=f"{PREFIX}-cat-sum-enabled",
+                                                            className="small fw-semibold mb-0",
+                                                        ),
+                                                    ],
+                                                    className="d-flex align-items-center",
+                                                    md=6,
+                                                    lg=5,
+                                                ),
+                                                dbc.Col(
+                                                    html.Div(
+                                                        [
+                                                            dbc.Label(
+                                                                "Режим",
+                                                                className="small fw-semibold mb-1",
+                                                            ),
+                                                            dbc.Select(
+                                                                id=f"{PREFIX}-cat-sum-op",
+                                                                options=[
+                                                                    {
+                                                                        "label": "Больше (>)",
+                                                                        "value": "gt",
+                                                                    },
+                                                                    {
+                                                                        "label": "Меньше (<)",
+                                                                        "value": "lt",
+                                                                    },
+                                                                    {
+                                                                        "label": "Равно (=)",
+                                                                        "value": "eq",
+                                                                    },
+                                                                ],
+                                                                value="gt",
+                                                                size="sm",
+                                                                className="mb-2",
+                                                            ),
+                                                            dbc.Label(
+                                                                "Сумма",
+                                                                className="small fw-semibold mb-1",
+                                                            ),
+                                                            dbc.Input(
+                                                                id=f"{PREFIX}-cat-sum-value",
+                                                                type="number",
+                                                                min=0,
+                                                                step="0.01",
+                                                                placeholder="Введите сумму талона",
+                                                                size="sm",
+                                                            ),
+                                                            dbc.Button(
+                                                                "Обновить таблицу",
+                                                                id=f"{PREFIX}-cat-sum-apply",
+                                                                color="primary",
+                                                                size="sm",
+                                                                className="mt-2",
+                                                            ),
+                                                        ],
+                                                        id=f"{PREFIX}-cat-sum-controls",
+                                                        style={"display": "none"},
+                                                    ),
+                                                    md=6,
+                                                    lg=7,
+                                                ),
+                                            ],
+                                            className="g-2 mb-2",
+                                        ),
+                                        _table("tbl-cat", page_size=40),
+                                    ],
                                     className="pt-3",
                                 ),
                             ),
                             dbc.Tab(
-                                label="Свод по категориям (DS1)",
-                                tab_id="a-cat-ds1",
-                                children=html.Div(_table("tbl-cat-ds1", page_size=40), className="pt-3"),
-                            ),
-                            dbc.Tab(
-                                label="Категории (DS1) по подразделениям",
-                                tab_id="a-cat-ds1-unit",
+                                label="Ошибки",
+                                tab_id="a-errors",
                                 children=html.Div(
-                                    _table("tbl-cat-ds1-unit", page_size=40),
-                                    className="pt-3",
-                                ),
-                            ),
-                            dbc.Tab(
-                                label="Сопутствующие по категориям",
-                                tab_id="a-cat-ds2",
-                                children=html.Div(_table("tbl-cat-ds2", page_size=40), className="pt-3"),
-                            ),
-                            dbc.Tab(
-                                label="Диагнозы — несоответствия",
-                                tab_id="a-dx-mismatch",
-                                children=html.Div(
-                                    _table("tbl-dx-mismatch", selectable_ticket=True),
+                                    [
+                                        dbc.Label("Что показывать", className="small fw-semibold"),
+                                        dcc.RadioItems(
+                                            id=f"{PREFIX}-errors-filter",
+                                            options=[
+                                                {"label": " Все", "value": "all"},
+                                                {"label": " По услугам", "value": "svc"},
+                                                {"label": " По диагнозам", "value": "dx"},
+                                            ],
+                                            value="all",
+                                            className="small mb-3",
+                                            inputClassName="me-1",
+                                            labelStyle={"display": "inline-block", "marginRight": "1.25rem"},
+                                        ),
+                                        html.Div(
+                                            [
+                                                html.P(
+                                                    "Замечания по услугам (код/формат и обязательные услуги по диагнозам)",
+                                                    className="small text-muted mb-1",
+                                                ),
+                                                _table(
+                                                    "tbl-errors-svc",
+                                                    page_size=25,
+                                                    wrap_long_text=True,
+                                                    selectable_ticket=True,
+                                                ),
+                                            ],
+                                            id=f"{PREFIX}-errors-svc-wrap",
+                                            className="mb-3",
+                                        ),
+                                        html.Div(
+                                            [
+                                                html.P(
+                                                    "Несоответствия диагнозов справочнику dn_diagnosis",
+                                                    className="small text-muted mb-1",
+                                                ),
+                                                _table("tbl-errors-dx", selectable_ticket=True),
+                                            ],
+                                            id=f"{PREFIX}-errors-dx-wrap",
+                                        ),
+                                    ],
                                     className="pt-3",
                                 ),
                             ),
@@ -232,27 +361,19 @@ def layout_body():
 
 
 def _summary_cards(report: dict, ref_line: str, dx_line: str) -> html.Div:
+    raw_n = report.get("rows_raw_total", report["total_rows"])
+    total_tickets = int(report.get("unique_tickets", 0))
+    per_ticket = report.get("per_ticket") or []
+    tickets_ok = sum(1 for t in per_ticket if bool(t.get("svc_ok")))
+    tickets_err = int(len(report.get("tickets_service_mismatch") or []))
     return html.Div(
         [
             html.P(ref_line, className="small text-muted mb-2"),
             html.P(dx_line, className="small text-muted mb-2"),
             dbc.Row(
                 [
-                    _card("Уникальных талонов", str(report["unique_tickets"])),
-                    _card("Строк в выгрузке", str(report["total_rows"])),
-                    _card("Талонов с 1 услугой", str(len(report["single_service"]))),
-                    _card(
-                        "Строк с проблемным кодом / без кода",
-                        f"{len(report['invalid_lines'])} / {len(report['no_code_lines'])}",
-                    ),
-                    _card(
-                        "Замечаний по диагнозам (справочник)",
-                        str(len(report.get("diagnosis_mismatches") or [])),
-                    ),
-                    _card(
-                        "Талонов с проблемами по услугам",
-                        str(len(report.get("tickets_service_mismatch") or [])),
-                    ),
+                    _card("Талоны / правильные / с ошибками", f"{total_tickets} / {tickets_ok} / {tickets_err}"),
+                    _card("Строк в файле", str(raw_n)),
                 ],
                 className="g-2",
             ),
@@ -341,43 +462,16 @@ def _rows_multi(report: dict) -> list[dict]:
     ]
 
 
-def _rows_invalid(report: dict) -> list[dict]:
-    return [
-        {
-            "tal": x["талон"],
-            "enp": x.get("енп", ""),
-            "status": x.get("статус", ""),
-            "unit": x.get("подразделение", ""),
-            "doctor": x.get("врач", ""),
-            "diag": x["диагноз"],
-            "ds2": x.get("диагноз_ds2", ""),
-            "code": x["код_услуги"],
-            "reason": x["причина"],
-            "sum": round(float(x["сумма_услуги"]), 2),
-        }
-        for x in report["invalid_lines"]
-    ]
-
-
-def _rows_invalid_codes(report: dict) -> list[dict]:
-    return [{"code": c, "n": n} for c, n in report["invalid_by_code"].items()]
-
-
-def _rows_no_code(report: dict) -> list[dict]:
-    return [
-        {
-            "tal": x["талон"],
-            "enp": x.get("енп", ""),
-            "status": x.get("статус", ""),
-            "unit": x.get("подразделение", ""),
-            "doctor": x.get("врач", ""),
-            "diag": x["диагноз"],
-            "ds2": x.get("диагноз_ds2", ""),
-            "code": x["код_услуги"],
-            "sum": round(float(x["сумма_услуги"]), 2),
-        }
-        for x in report["no_code_lines"]
-    ]
+def _report_store_payload(report: dict) -> dict:
+    """Кэш для вкладок «Свод по категориям» и «Ошибки» (после загрузки CSV)."""
+    return {
+        "svc_ticket": _rows_svc_ticket(report),
+        "dx_mismatch": _rows_dx_mismatch(report),
+        "cat_ds1": _rows_cat_ds1(report),
+        "cat_ds1_unit": _rows_cat_ds1_unit(report),
+        "cat_ds2": _rows_cat_ds2(report),
+        "cat_ticket_rows": _rows_cat_ticket_filter(report),
+    }
 
 
 def _rows_cat_ds1(report: dict) -> list[dict]:
@@ -387,13 +481,19 @@ def _rows_cat_ds1(report: dict) -> list[dict]:
         bc.items(),
         key=lambda x: (-x[1]["талонов"], x[0]),
     ):
+        n = int(agg["талонов"])
+        n_ok = int(agg.get("талонов_услуги_ок", 0))
+        s = round(float(agg["сумма_талонов"]), 2)
+        s_ok = round(float(agg.get("сумма_услуги_ок", 0.0)), 2)
         out.append(
             {
                 "cat": cat,
-                "n": agg["талонов"],
-                "sum": round(float(agg["сумма_талонов"]), 2),
-                "n_ok": int(agg.get("талонов_услуги_ок", 0)),
-                "sum_ok": round(float(agg.get("сумма_услуги_ок", 0.0)), 2),
+                "n": n,
+                "sum": s,
+                "n_ok": n_ok,
+                "sum_ok": s_ok,
+                "n_bad": n - n_ok,
+                "sum_bad": round(s - s_ok, 2),
             }
         )
     return out
@@ -403,14 +503,20 @@ def _rows_cat_ds1_unit(report: dict) -> list[dict]:
     rows = report.get("by_category_ds1_by_unit") or []
     out = []
     for r in rows:
+        n = int(r["талонов"])
+        n_ok = int(r["талонов_услуги_ок"])
+        s = float(r["сумма_талонов"])
+        s_ok = float(r["сумма_услуги_ок"])
         out.append(
             {
                 "cat": r["категория"],
                 "unit": r["подразделение"],
-                "n": r["талонов"],
-                "sum": r["сумма_талонов"],
-                "n_ok": r["талонов_услуги_ок"],
-                "sum_ok": r["сумма_услуги_ок"],
+                "n": n,
+                "sum": round(s, 2),
+                "n_ok": n_ok,
+                "sum_ok": round(s_ok, 2),
+                "n_bad": n - n_ok,
+                "sum_bad": round(s - s_ok, 2),
             }
         )
     return out
@@ -447,7 +553,8 @@ def _rows_svc_ticket(report: dict) -> list[dict]:
             "status": t.get("статус", ""),
             "unit": t.get("подразделение", ""),
             "doctor": t.get("врач", ""),
-            "diag": t["диагноз"],
+            "diag": t.get("диагноз", ""),
+            "ds2_mkb": t.get("сопутствующие_мкб", ""),
             "svc_dx": t.get("услуги_по_диагнозам", ""),
             "n_lines": t["число_строк_услуг"],
             "sum": round(float(t["сумма_талона"]), 2),
@@ -498,33 +605,6 @@ COLS_MULTI = [
     {"name": "Сумма талона", "id": "sum", "type": "numeric"},
     {"name": "Число строк услуг", "id": "n", "type": "numeric"},
 ]
-COLS_INV = [
-    {"name": "Талон", "id": "tal"},
-    {"name": "ЕНП", "id": "enp"},
-    {"name": "Статус", "id": "status"},
-    {"name": "Подразделение", "id": "unit"},
-    {"name": "Врач", "id": "doctor"},
-    {"name": "Диагноз (DS1)", "id": "diag"},
-    {"name": "Сопутствующий (DS2)", "id": "ds2"},
-    {"name": "Код услуги", "id": "code"},
-    {"name": "Причина", "id": "reason"},
-    {"name": "Сумма услуги", "id": "sum", "type": "numeric"},
-]
-COLS_CODES = [
-    {"name": "Код услуги", "id": "code"},
-    {"name": "Строк в выгрузке", "id": "n", "type": "numeric"},
-]
-COLS_NOCODE = [
-    {"name": "Талон", "id": "tal"},
-    {"name": "ЕНП", "id": "enp"},
-    {"name": "Статус", "id": "status"},
-    {"name": "Подразделение", "id": "unit"},
-    {"name": "Врач", "id": "doctor"},
-    {"name": "Диагноз (DS1)", "id": "diag"},
-    {"name": "Сопутствующий (DS2)", "id": "ds2"},
-    {"name": "Поле «Код услуги»", "id": "code"},
-    {"name": "Сумма услуги", "id": "sum", "type": "numeric"},
-]
 COLS_CAT_DS1 = [
     {"name": "Категория / статус (основной DS1)", "id": "cat"},
     {"name": "Талонов", "id": "n", "type": "numeric"},
@@ -537,6 +617,16 @@ COLS_CAT_DS1 = [
     {
         "name": "Сумма (услуги по справочнику)",
         "id": "sum_ok",
+        "type": "numeric",
+    },
+    {
+        "name": "Талонов (услуги не по справочнику)",
+        "id": "n_bad",
+        "type": "numeric",
+    },
+    {
+        "name": "Сумма (услуги не по справочнику)",
+        "id": "sum_bad",
         "type": "numeric",
     },
 ]
@@ -553,6 +643,16 @@ COLS_CAT_DS1_UNIT = [
     {
         "name": "Сумма (услуги по справочнику)",
         "id": "sum_ok",
+        "type": "numeric",
+    },
+    {
+        "name": "Талонов (услуги не по справочнику)",
+        "id": "n_bad",
+        "type": "numeric",
+    },
+    {
+        "name": "Сумма (услуги не по справочнику)",
+        "id": "sum_bad",
         "type": "numeric",
     },
 ]
@@ -576,7 +676,8 @@ COLS_SVC_TICKET = [
     {"name": "Статус", "id": "status"},
     {"name": "Подразделение", "id": "unit"},
     {"name": "Врач", "id": "doctor"},
-    {"name": "Диагноз (DS1)", "id": "diag"},
+    {"name": "МКБ (DS1)", "id": "diag"},
+    {"name": "МКБ сопутствующие (DS2)", "id": "ds2_mkb"},
     {
         "name": "Услуги по диагнозам (справочник ДН)",
         "id": "svc_dx",
@@ -596,22 +697,7 @@ COLS_SVC_TICKET = [
     Output(f"{PREFIX}-tbl-one", "columns"),
     Output(f"{PREFIX}-tbl-multi", "data"),
     Output(f"{PREFIX}-tbl-multi", "columns"),
-    Output(f"{PREFIX}-tbl-inv", "data"),
-    Output(f"{PREFIX}-tbl-inv", "columns"),
-    Output(f"{PREFIX}-tbl-codes", "data"),
-    Output(f"{PREFIX}-tbl-codes", "columns"),
-    Output(f"{PREFIX}-tbl-nocode", "data"),
-    Output(f"{PREFIX}-tbl-nocode", "columns"),
-    Output(f"{PREFIX}-tbl-svc-ticket", "data"),
-    Output(f"{PREFIX}-tbl-svc-ticket", "columns"),
-    Output(f"{PREFIX}-tbl-cat-ds1", "data"),
-    Output(f"{PREFIX}-tbl-cat-ds1", "columns"),
-    Output(f"{PREFIX}-tbl-cat-ds1-unit", "data"),
-    Output(f"{PREFIX}-tbl-cat-ds1-unit", "columns"),
-    Output(f"{PREFIX}-tbl-cat-ds2", "data"),
-    Output(f"{PREFIX}-tbl-cat-ds2", "columns"),
-    Output(f"{PREFIX}-tbl-dx-mismatch", "data"),
-    Output(f"{PREFIX}-tbl-dx-mismatch", "columns"),
+    Output(f"{PREFIX}-report-store", "data"),
     Input(f"{PREFIX}-upload", "contents"),
     State(f"{PREFIX}-upload", "filename"),
     prevent_initial_call=True,
@@ -655,9 +741,13 @@ def run_analysis(contents, upload_filename):
     )
     summary = _summary_cards(report, ref_line, dx_line)
     shown_name = upload_filename or "файл"
+    sk_m = report.get("skipped_service_missing", 0)
+    sk_r = report.get("skipped_service_rejected", 0)
     msg = dbc.Alert(
         f"Обработан файл: {shown_name}. "
-        f"Уникальных талонов: {report['unique_tickets']}; строк: {report['total_rows']}.",
+        f"Уникальных талонов: {report['unique_tickets']}; строк: {report['total_rows']}. "
+        f"Строк услуг без кода / не из справочника: {sk_m} / {sk_r}. "
+        f"Своды по категориям и диагнозам — по всем талонам; замечания по услугам и диагнозам — вкладка «Ошибки».",
         color="success",
         className="py-2 mb-0",
     )
@@ -671,22 +761,7 @@ def run_analysis(contents, upload_filename):
         COLS_ONE,
         _rows_multi(report),
         COLS_MULTI,
-        _rows_invalid(report),
-        COLS_INV,
-        _rows_invalid_codes(report),
-        COLS_CODES,
-        _rows_no_code(report),
-        COLS_NOCODE,
-        _rows_svc_ticket(report),
-        COLS_SVC_TICKET,
-        _rows_cat_ds1(report),
-        COLS_CAT_DS1,
-        _rows_cat_ds1_unit(report),
-        COLS_CAT_DS1_UNIT,
-        _rows_cat_ds2(report),
-        COLS_CAT_DS2,
-        _rows_dx_mismatch(report),
-        COLS_DX_MISMATCH,
+        _report_store_payload(report),
     )
 
 
@@ -698,28 +773,230 @@ def _empty_tables():
         COLS_ONE,
         [],
         COLS_MULTI,
-        [],
-        COLS_INV,
-        [],
-        COLS_CODES,
-        [],
-        COLS_NOCODE,
-        [],
+        None,
+    )
+
+
+def _cat_table_from_store(store: dict | None, axis: str, unit: str):
+    if not store:
+        return [], COLS_CAT_DS1
+    if axis == "ds2":
+        return store.get("cat_ds2") or [], COLS_CAT_DS2
+    if unit == "yes":
+        return store.get("cat_ds1_unit") or [], COLS_CAT_DS1_UNIT
+    return store.get("cat_ds1") or [], COLS_CAT_DS1
+
+
+def _cat_ticket_rows_for_filter(store: dict | None) -> list[dict]:
+    if not store:
+        return []
+    return store.get("cat_ticket_rows") or []
+
+
+def _ticket_filter_match(ticket_sum: float, op: str, threshold: float) -> bool:
+    if op == "lt":
+        return ticket_sum < threshold
+    if op == "eq":
+        return ticket_sum == threshold
+    return ticket_sum > threshold
+
+
+def _filtered_ok_metrics(
+    ticket_rows: list[dict],
+    op: str,
+    threshold: float,
+    *,
+    by_unit: bool,
+) -> dict:
+    out: dict = {}
+    for row in ticket_rows:
+        if not row.get("svc_ok"):
+            continue
+        ticket_sum = float(row.get("ticket_sum", 0.0))
+        if not _ticket_filter_match(ticket_sum, op, threshold):
+            continue
+        key = (row.get("cat"), row.get("unit")) if by_unit else row.get("cat")
+        if key not in out:
+            out[key] = {"n": 0, "sum": 0.0}
+        out[key]["n"] += 1
+        out[key]["sum"] += ticket_sum
+    return out
+
+
+def _append_cat_filtered_columns(
+    data: list[dict],
+    cols: list[dict],
+    ticket_rows: list[dict],
+    op: str | None,
+    threshold: float | None,
+    *,
+    by_unit: bool,
+) -> tuple[list[dict], list[dict]]:
+    cols_ext = cols + [
+        {
+            "name": "Талонов отфильтровано (услуги по справочнику)",
+            "id": "n_ok_filtered",
+            "type": "numeric",
+        },
+        {
+            "name": "Сумма отфильтровано (услуги по справочнику)",
+            "id": "sum_ok_filtered",
+            "type": "numeric",
+        },
+    ]
+    if op is None or threshold is None:
+        data_ext = [{**row, "n_ok_filtered": 0, "sum_ok_filtered": 0.0} for row in data]
+        return data_ext, cols_ext
+
+    metrics = _filtered_ok_metrics(ticket_rows, op, threshold, by_unit=by_unit)
+    out = []
+    for row in data:
+        key = (row.get("cat"), row.get("unit")) if by_unit else row.get("cat")
+        agg = metrics.get(key) or {"n": 0, "sum": 0.0}
+        out.append(
+            {
+                **row,
+                "n_ok_filtered": int(agg["n"]),
+                "sum_ok_filtered": round(float(agg["sum"]), 2),
+            }
+        )
+    return out, cols_ext
+
+
+def _cat_sum_filter_from_applied(applied: dict | None) -> tuple[str | None, float | None]:
+    if not applied:
+        return None, None
+    op = (applied.get("op") or "gt").strip()
+    try:
+        threshold = float(applied.get("value"))
+    except (TypeError, ValueError):
+        return None, None
+    if op not in {"gt", "lt", "eq"}:
+        op = "gt"
+    return op, threshold
+
+
+def _rows_cat_ticket_filter(report: dict) -> list[dict]:
+    tickets = report.get("per_ticket") or []
+    mismatch_ids = {
+        str(t.get("талон"))
+        for t in (report.get("tickets_service_mismatch") or [])
+        if t.get("талон") is not None
+    }
+    out: list[dict] = []
+    for t in tickets:
+        diagnosis = str(t.get("диагноз", ""))
+        ds1_code = str(t.get("ds1_code", "")).strip()
+        ds1_cat = str(t.get("ds1_category", "")).strip()
+        if ds1_code:
+            if ds1_cat:
+                cat = ds1_cat
+            elif "DS1: нет в справочнике" in str(t.get("diagnosis_note", "")):
+                cat = "нет в справочнике (основной)"
+            else:
+                cat = "(без категории в справочнике)"
+        else:
+            cat = "(нет диагноза DS1)" if diagnosis == "(без диагноза)" else "(нет извлечённого кода МКБ в DS1)"
+        unit = str(t.get("подразделение", "")).strip() or "(не указано)"
+        tal = str(t.get("талон", "")).strip()
+        out.append(
+            {
+                "tal": tal,
+                "cat": cat,
+                "unit": unit,
+                "ticket_sum": float(t.get("сумма_талона", 0.0) or 0.0),
+                "svc_ok": tal not in mismatch_ids,
+            }
+        )
+    return out
+
+
+def _errors_visibility(flt: str):
+    show_svc = flt in ("all", "svc")
+    show_dx = flt in ("all", "dx")
+    return (
+        {} if show_svc else {"display": "none"},
+        {} if show_dx else {"display": "none"},
+    )
+
+
+@app.callback(
+    Output(f"{PREFIX}-cat-sum-applied", "data"),
+    Input(f"{PREFIX}-cat-sum-apply", "n_clicks"),
+    State(f"{PREFIX}-cat-sum-op", "value"),
+    State(f"{PREFIX}-cat-sum-value", "value"),
+    prevent_initial_call=True,
+)
+def apply_cat_sum_filter(n_clicks, op, value):
+    _ = n_clicks
+    return {
+        "op": op or "gt",
+        "value": value,
+    }
+
+
+@app.callback(
+    Output(f"{PREFIX}-tbl-cat", "data"),
+    Output(f"{PREFIX}-tbl-cat", "columns"),
+    Input(f"{PREFIX}-report-store", "data"),
+    Input(f"{PREFIX}-cat-axis", "value"),
+    Input(f"{PREFIX}-cat-unit", "value"),
+    Input(f"{PREFIX}-cat-sum-enabled", "value"),
+    Input(f"{PREFIX}-cat-sum-applied", "data"),
+)
+def update_cat_table(store, axis, unit, sum_enabled, cat_sum_applied):
+    axis = axis or "ds1"
+    unit = unit or "no"
+    data, cols = _cat_table_from_store(store, axis, unit)
+    if bool(sum_enabled) and axis == "ds1":
+        op, threshold = _cat_sum_filter_from_applied(cat_sum_applied)
+        data, cols = _append_cat_filtered_columns(
+            data,
+            cols,
+            _cat_ticket_rows_for_filter(store),
+            op,
+            threshold,
+            by_unit=(unit == "yes"),
+        )
+    return data, cols
+
+
+@app.callback(
+    Output(f"{PREFIX}-cat-sum-controls", "style"),
+    Input(f"{PREFIX}-cat-sum-enabled", "value"),
+)
+def toggle_cat_sum_controls(sum_enabled):
+    return {} if bool(sum_enabled) else {"display": "none"}
+
+
+@app.callback(
+    Output(f"{PREFIX}-tbl-errors-svc", "data"),
+    Output(f"{PREFIX}-tbl-errors-svc", "columns"),
+    Output(f"{PREFIX}-tbl-errors-dx", "data"),
+    Output(f"{PREFIX}-tbl-errors-dx", "columns"),
+    Output(f"{PREFIX}-errors-svc-wrap", "style"),
+    Output(f"{PREFIX}-errors-dx-wrap", "style"),
+    Input(f"{PREFIX}-report-store", "data"),
+    Input(f"{PREFIX}-errors-filter", "value"),
+)
+def update_errors_tables(store, flt):
+    flt = flt or "all"
+    st_svc, st_dx = _errors_visibility(flt)
+    if not store:
+        return [], COLS_SVC_TICKET, [], COLS_DX_MISMATCH, st_svc, st_dx
+    return (
+        store.get("svc_ticket") or [],
         COLS_SVC_TICKET,
-        [],
-        COLS_CAT_DS1,
-        [],
-        COLS_CAT_DS1_UNIT,
-        [],
-        COLS_CAT_DS2,
-        [],
+        store.get("dx_mismatch") or [],
         COLS_DX_MISMATCH,
+        st_svc,
+        st_dx,
     )
 
 
 app.clientside_callback(
     """
-    function(n_clicks, active_tab, sel_one, data_one, sel_multi, data_multi, sel_inv, data_inv, sel_nocode, data_nocode, sel_svc, data_svc, sel_dx, data_dx, base) {
+    function(n_clicks, active_tab, sel_one, data_one, sel_multi, data_multi, err_flt, sel_esvc, data_esvc, sel_edx, data_edx, base) {
         if (!n_clicks) {
             return '';
         }
@@ -730,11 +1007,23 @@ app.clientside_callback(
         var data = null;
         if (active_tab === 'a-one') { sel = sel_one; data = data_one; }
         else if (active_tab === 'a-multi') { sel = sel_multi; data = data_multi; }
-        else if (active_tab === 'a-inv') { sel = sel_inv; data = data_inv; }
-        else if (active_tab === 'a-nocode') { sel = sel_nocode; data = data_nocode; }
-        else if (active_tab === 'a-svc-ticket') { sel = sel_svc; data = data_svc; }
-        else if (active_tab === 'a-dx-mismatch') { sel = sel_dx; data = data_dx; }
-        else { return ''; }
+        else if (active_tab === 'a-errors') {
+            var f = err_flt || 'all';
+            if (f === 'svc') {
+                sel = sel_esvc; data = data_esvc;
+            } else if (f === 'dx') {
+                sel = sel_edx; data = data_edx;
+            } else {
+                if (sel_esvc && sel_esvc.length && data_esvc && data_esvc.length) {
+                    sel = sel_esvc; data = data_esvc;
+                } else if (sel_edx && sel_edx.length && data_edx && data_edx.length) {
+                    sel = sel_edx; data = data_edx;
+                }
+            }
+            if (!sel || !sel.length) {
+                return '';
+            }
+        } else { return ''; }
         if (!sel || !sel.length || !data || !data.length) {
             return '';
         }
@@ -760,14 +1049,11 @@ app.clientside_callback(
     State(f"{PREFIX}-tbl-one", "data"),
     State(f"{PREFIX}-tbl-multi", "selected_rows"),
     State(f"{PREFIX}-tbl-multi", "data"),
-    State(f"{PREFIX}-tbl-inv", "selected_rows"),
-    State(f"{PREFIX}-tbl-inv", "data"),
-    State(f"{PREFIX}-tbl-nocode", "selected_rows"),
-    State(f"{PREFIX}-tbl-nocode", "data"),
-    State(f"{PREFIX}-tbl-svc-ticket", "selected_rows"),
-    State(f"{PREFIX}-tbl-svc-ticket", "data"),
-    State(f"{PREFIX}-tbl-dx-mismatch", "selected_rows"),
-    State(f"{PREFIX}-tbl-dx-mismatch", "data"),
+    State(f"{PREFIX}-errors-filter", "value"),
+    State(f"{PREFIX}-tbl-errors-svc", "selected_rows"),
+    State(f"{PREFIX}-tbl-errors-svc", "data"),
+    State(f"{PREFIX}-tbl-errors-dx", "selected_rows"),
+    State(f"{PREFIX}-tbl-errors-dx", "data"),
     State(f"{PREFIX}-claim-base-url", "data"),
     prevent_initial_call=True,
 )
