@@ -1003,7 +1003,7 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
                             # Исправлено берется из total_ispravleno_all_months (за ВСЕ месяцы)
                             month_conditions.append(f"(report_month_number = {m} AND status IN ('1', '2', '3'))")
                             # Добавляем исправленные записи за ВСЕ месяцы для предыдущего месяца
-                            month_conditions.append(f"(status IN ('6', '8'))")
+                            month_conditions.append(f"(status IN ('6', '8', '4', '19'))")
                         else:
                             # Предыдущий месяц, день > 10: только оплаченные
                             month_conditions.append(f"(report_month_number = {m} AND status = '3')")
@@ -1012,7 +1012,7 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
                         # Исправлено берется из total_ispravleno_all_months (за ВСЕ месяцы)
                         month_conditions.append(f"(report_month_number = {m} AND status IN ('1', '2', '3'))")
                         # Добавляем исправленные записи за ВСЕ месяцы для текущего месяца
-                        month_conditions.append(f"(status IN ('6', '8'))")
+                        month_conditions.append(f"(status IN ('6', '8', '4', '19'))")
                     # Будущие месяцы не учитываются (Факт = 0)
                 
                 # Объединяем условия через OR
@@ -1047,7 +1047,7 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
                         status_filter = ['3']
                     elif month_num and (month_num == current_month - 1 or month_num == current_month):
                         # Для текущего и предыдущего месяца - новые + в_тфомс + оплачено + исправлено
-                        status_filter = ['1', '2', '3', '6', '8']
+                        status_filter = ['1', '2', '3', '4', '6', '8', '19']
                     else:
                         # По умолчанию - только оплаченные
                         status_filter = ['3']
@@ -1058,9 +1058,9 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
         elif column_id == 'оплачено':
             status_filter = ['3']  # Оплачено
         elif column_id == 'исправлено':
-            status_filter = ['6', '8']  # Исправлено
+            status_filter = ['6', '8', '4', '19']  # Исправлено (как в sql_query_rep)
         elif column_id == 'отказано':
-            status_filter = ['5', '7', '12']  # Отказано
+            status_filter = ['5', '7', '12', '18']  # Отказано
         elif column_id == 'отменено':
             status_filter = ['0', '13', '17']  # Отменено
         
@@ -1701,16 +1701,11 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
             # Получаем список месяцев
             months_list = list(range(selected_period[0], selected_period[1] + 1))
             
-            # Получаем группы для получения ID групп
-            groups = get_groups_for_indicators_report(selected_year)
-            group_name_to_id = {}
-            if not groups.empty:
-                group_name_to_id = dict(zip(groups['name'], groups['id']))
-            
             # Для каждой строки рассчитываем нарастающий план
             for row in data1:
-                group_name = row.get('type')
-                group_id = group_name_to_id.get(group_name)
+                group_id = row.get('group_id')
+                if isinstance(group_id, str) and group_id.isdigit():
+                    group_id = int(group_id)
                 
                 if group_id:
                     # Получаем планы по месяцам для этой группы

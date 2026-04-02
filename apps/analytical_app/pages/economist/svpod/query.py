@@ -117,8 +117,8 @@ def sql_query_rep(selected_year, group_id,
                 SUM(CASE WHEN status = '1' THEN amount_numeric END) AS новые,
                 SUM(CASE WHEN status = '2' THEN amount_numeric END) AS в_тфомс,
                 SUM(CASE WHEN status = '3' THEN amount_numeric END) AS оплачено,
-                SUM(CASE WHEN status IN ('5', '7', '12') THEN amount_numeric END) AS отказано,
-                SUM(CASE WHEN status IN ('6', '8', '4') THEN amount_numeric END) AS исправлено,
+                SUM(CASE WHEN status IN ('5', '7', '12', '18') THEN amount_numeric END) AS отказано,
+                SUM(CASE WHEN status IN ('6', '8', '4', '19') THEN amount_numeric END) AS исправлено,
                 SUM(CASE WHEN status IN ('0', '13', '17') THEN amount_numeric END) AS отменено
         """
     else:
@@ -126,8 +126,8 @@ def sql_query_rep(selected_year, group_id,
                 COUNT(CASE WHEN status = '1' THEN 1 END) AS новые,
                 COUNT(CASE WHEN status = '2' THEN 1 END) AS в_тфомс,
                 COUNT(CASE WHEN status = '3' THEN 1 END) AS оплачено,
-                COUNT(CASE WHEN status IN ('5', '7', '12') THEN 1 END) AS отказано,
-                COUNT(CASE WHEN status IN ('6', '8', '4') THEN 1 END) AS исправлено,
+                COUNT(CASE WHEN status IN ('5', '7', '12', '18') THEN 1 END) AS отказано,
+                COUNT(CASE WHEN status IN ('6', '8', '4', '19') THEN 1 END) AS исправлено,
                 COUNT(CASE WHEN status IN ('0', '13', '17') THEN 1 END) AS отменено
         """
 
@@ -157,10 +157,12 @@ prioritized AS (
                  WHEN '4' THEN 2
                  WHEN '6' THEN 3
                  WHEN '8' THEN 4
+                 WHEN '19' THEN 4
                  WHEN '1' THEN 5
                  WHEN '5' THEN 6
                  WHEN '7' THEN 7
                  WHEN '12' THEN 8
+                 WHEN '18' THEN 8
                  WHEN '13' THEN 9
                  WHEN '17' THEN 10
                  WHEN '0' THEN 11
@@ -501,6 +503,7 @@ def get_groups_for_indicators_report(selected_year):
             g.id,
             g.name,
             g.parent_id,
+            g.external_id,
             g.name::text as full_path,
             0 as level,
             COALESCE(ap.sort_order, 999999) as sort_order
@@ -515,6 +518,7 @@ def get_groups_for_indicators_report(selected_year):
             gp.id,
             p.name,
             p.parent_id,
+            p.external_id,
             p.name || ' \\ ' || gp.full_path as full_path,
             gp.level + 1,
             gp.sort_order
@@ -524,6 +528,7 @@ def get_groups_for_indicators_report(selected_year):
     SELECT DISTINCT ON (id)
         id,
         full_path as name,
+        external_id,
         sort_order
     FROM group_paths
     ORDER BY id, level DESC
@@ -712,8 +717,10 @@ def get_dynamic_conditions(year):
         filter_conditions = get_filter_conditions([group_id], year)
         if filter_conditions:
             # Используем имя группы как type
-            group_name = groups[groups['id'] == group_id]['name'].iloc[0]
-            conditions.append((group_name, filter_conditions, "AND"))
+            group_row = groups[groups['id'] == group_id].iloc[0]
+            group_name = group_row['name']
+            external_id = group_row.get('external_id')
+            conditions.append((group_name, filter_conditions, "AND", int(group_id), external_id))
     
     return conditions
 
@@ -790,12 +797,6 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
     # Получаем динамические условия из groupindicators
     dynamic_conditions = get_dynamic_conditions(selected_year)
     
-    # Получаем группы для получения планов
-    groups = get_groups_for_indicators_report(selected_year)
-    group_name_to_id = {}
-    if not groups.empty:
-        group_name_to_id = dict(zip(groups['name'], groups['id']))
-    
     # Парсим список месяцев из months_placeholder
     try:
         months_list = [int(m.strip()) for m in months_placeholder.split(',') if m.strip().isdigit()]
@@ -836,12 +837,18 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
     additional_where = " AND " + " AND ".join(additional_filters) if additional_filters else ""
     
     # Создаем запросы для каждой группы
-    for condition_type, where_clause, operator in dynamic_conditions:
+    for item in dynamic_conditions:
+        # Backward compatible unpack (старые данные могли быть 3-элементным tuple)
+        if isinstance(item, (list, tuple)) and len(item) >= 5:
+            condition_type, where_clause, operator, group_id, group_external_id = item[:5]
+        else:
+            condition_type, where_clause, operator = item
+            group_id, group_external_id = None, None
+
         # Экранируем одинарные кавычки для SQL
         escaped_filter_description = where_clause.replace("'", "''")
         
         # Получаем план для этой группы
-        group_id = group_name_to_id.get(condition_type)
         plan_quantity = 0
         plan_amount = 0.0
         if group_id:
@@ -850,6 +857,8 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
         # Используем правильную логику группировки статусов как в svpod
         union_query = f"""
             SELECT '{condition_type}' AS type,
+                   {int(group_id) if group_id else 'NULL'} AS "group_id",
+                   {f"'{group_external_id}'" if group_external_id else 'NULL'} AS "external_id",
                    {plan_quantity} AS "План 1/12 (количество)",
                    ROUND({plan_amount}::numeric, 2) AS "План 1/12 (сумма)",
                    COUNT(*) AS "К-во",
