@@ -39,6 +39,8 @@ app.layout = html.Div(
         dcc.Store(id='sidebar-state', data="collapsed"),  # Хранилище для состояния сайдбара
         dcc.Interval(id='date-interval-main', interval=600000, n_intervals=0),  # 10 минут
         dcc.Location(id="url", refresh=True),
+        # Редирект на внешний dash_dn (тот же хост, другой порт); callback в pages/doctor/main.py
+        dcc.Location(id="redirect-dn-external", refresh=True),
         create_navbar(),
         create_modal_168n(),
         create_modal_status(),
