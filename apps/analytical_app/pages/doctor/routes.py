@@ -17,6 +17,7 @@ routes_doctors = {
         ]),
         doctor_talon
     ]),
+    # Встроенная страница (legacy): основной вход — отдельное приложение apps.dash_dn на порту dash_dn_port (см. doctor/main)
     "/doctor/dn_services": html.Div([
         dbc.Breadcrumb(items=[
             {"label": "Врач", "href": "/doctor"},
