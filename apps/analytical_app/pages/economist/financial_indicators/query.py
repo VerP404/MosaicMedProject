@@ -1,15 +1,31 @@
-import pandas as pd
-from sqlalchemy import text
-from apps.analytical_app.query_executor import engine
-
-
-def sql_query_financial_indicators(selected_year, selected_month, building_ids=None, department_ids=None):
+def sql_query_financial_indicators(
+    selected_year,
+    selected_months=None,
+    building_ids=None,
+    department_ids=None,
+    profile_ids=None,
+    inogorodniy='3',
+    amount_null='3',
+    doctor_ids=None,
+    report_type='month',
+    input_start=None,
+    input_end=None,
+    treatment_start=None,
+    treatment_end=None,
+    status_list=None
+):
     """
     SQL-запрос для финансовых показателей по целям и СМО
     """
     # Формируем фильтры по корпусу и отделению
     building_filter = ""
     department_filter = ""
+    profile_filter = ""
+    doctor_filter = ""
+    inogorod_filter = ""
+    amount_filter = ""
+    report_type_filter = ""
+    status_filter = ""
     
     if building_ids:
         building_ids_str = ', '.join(map(str, building_ids))
@@ -18,6 +34,57 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
     if department_ids:
         department_ids_str = ', '.join(map(str, department_ids))
         department_filter = f"AND department.id IN ({department_ids_str})"
+
+    if profile_ids:
+        profile_ids_str = ', '.join(map(str, profile_ids))
+        profile_filter = f"AND pd.profile_id IN ({profile_ids_str})"
+
+    if doctor_ids:
+        doctor_ids_str = ', '.join(map(str, doctor_ids))
+        doctor_filter = f"AND pd.id IN ({doctor_ids_str})"
+
+    if inogorodniy == '1':
+        inogorod_filter = "AND report_data.smo_code IN ('36065', '36071', '36079')"
+    elif inogorodniy == '2':
+        inogorod_filter = "AND report_data.smo_code NOT IN ('36065', '36071', '36079')"
+
+    amount_numeric_expr = (
+        "COALESCE(CASE "
+        "WHEN report_data.amount ~ '^[0-9]+(\\.[0-9]+)?$' "
+        "THEN CAST(report_data.amount AS NUMERIC) "
+        "ELSE NULL END, 0)"
+    )
+    if amount_null == '1':
+        amount_filter = f"AND {amount_numeric_expr} <> 0"
+    elif amount_null == '2':
+        amount_filter = f"AND {amount_numeric_expr} = 0"
+
+    if status_list:
+        safe_statuses = [str(s).strip() for s in status_list if str(s).strip().isdigit()]
+        if safe_statuses:
+            statuses_str = ', '.join(f"'{s}'" for s in safe_statuses)
+            status_filter = f"AND report_data.status IN ({statuses_str})"
+
+    if report_type == 'initial_input' and input_start and input_end:
+        report_type_filter = (
+            "AND report_data.initial_input_date_parsed BETWEEN "
+            f"TO_DATE('{input_start}', 'DD-MM-YYYY') AND TO_DATE('{input_end}', 'DD-MM-YYYY')"
+        )
+    elif report_type == 'treatment' and treatment_start and treatment_end:
+        report_type_filter = (
+            "AND report_data.treatment_end_date_parsed BETWEEN "
+            f"TO_DATE('{treatment_start}', 'DD-MM-YYYY') AND TO_DATE('{treatment_end}', 'DD-MM-YYYY')"
+        )
+    else:
+        selected_month_start = 1
+        selected_month_end = 12
+        if selected_months and isinstance(selected_months, (list, tuple)) and len(selected_months) == 2:
+            selected_month_start = int(selected_months[0])
+            selected_month_end = int(selected_months[1])
+        report_type_filter = (
+            f"AND report_data.report_year = '{selected_year}' "
+            f"AND report_data.report_month_number BETWEEN {selected_month_start} AND {selected_month_end}"
+        )
     
     # Адаптация вашего рабочего запроса с правильной фильтрацией по месяцам
     query = f"""
@@ -57,7 +124,17 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
                            WHEN 'Декабря' THEN 12
                            ELSE NULL
                            END
-                   END AS report_month_number
+                   END AS report_month_number,
+               CASE
+                   WHEN oms.initial_input_date ~ '^\\d{2}-\\d{2}-\\d{4}$'
+                       THEN TO_DATE(oms.initial_input_date, 'DD-MM-YYYY')
+                   ELSE NULL
+               END AS initial_input_date_parsed,
+               CASE
+                   WHEN oms.treatment_end ~ '^\\d{2}-\\d{2}-\\d{4}$'
+                       THEN TO_DATE(oms.treatment_end, 'DD-MM-YYYY')
+                   ELSE NULL
+               END AS treatment_end_date_parsed
         FROM data_loader_omsdata oms
     ),
     oms_data AS (
@@ -71,6 +148,7 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
             report_data.status,
             report_data.report_year,
             report_data.report_month_number,
+            pd.id as doctor_id,
             department.id as department_id,
             building.id as building_id
         FROM report_data
@@ -81,11 +159,15 @@ def sql_query_financial_indicators(selected_year, selected_month, building_ids=N
         ) pd ON SUBSTRING(report_data.doctor FROM 1 FOR POSITION(' ' IN report_data.doctor) - 1) = pd.doctor_code
         LEFT JOIN public.organization_department department ON department.id = pd.department_id
         LEFT JOIN public.organization_building building ON building.id = department.building_id
-        WHERE report_data.status = '3'
-          AND report_data.report_year = '{selected_year}'
-          AND report_data.report_month_number = {selected_month}
+        WHERE 1=1
+          {status_filter}
+          {report_type_filter}
+          {inogorod_filter}
           {building_filter}
           {department_filter}
+          {profile_filter}
+          {doctor_filter}
+          {amount_filter}
     )
     SELECT *
     FROM (
