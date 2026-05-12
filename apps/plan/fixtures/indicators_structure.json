@@ -828,7 +828,7 @@
         {
           "field_name": "amount_numeric",
           "filter_type": "in",
-          "values": "10323.6, 2591.73, 4063.44",
+          "values": "10323.6, 2591.73, 4063.44, 5183.46",
           "year": 2026
         }
       ]
