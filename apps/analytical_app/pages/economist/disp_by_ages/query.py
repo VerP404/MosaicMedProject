@@ -1,3 +1,6 @@
+# ПН1 и ДС2 смотрите на странице «Детализация детских профосмотров» (economist/child_prof_exams_detail).
+
+
 def sql_query_disp_dv4(sql_cond, selected_year, selected_buildings):
     # Включаем фильтрацию по выбранным корпусам
     building_filter = " AND ob.name_kvazar IN :building_list"

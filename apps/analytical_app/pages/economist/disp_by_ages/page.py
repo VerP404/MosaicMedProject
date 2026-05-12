@@ -52,8 +52,6 @@ economist_dispensary_age = html.Div(
                                             {"label": "УД2", "value": 'УД2'},
                                             {"label": "ДР1", "value": 'ДР1'},
                                             {"label": "ДР2", "value": 'ДР2'},
-                                            {"label": "ПН1", "value": 'ПН1'},
-                                            {"label": "ДС2", "value": 'ДС2'},
                                         ],
                                         value=['ДВ4'],
                                         id=f"checklist-input-{type_page}",

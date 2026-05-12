@@ -5,6 +5,7 @@ from apps.analytical_app.pages.administrator.main import admin_main
 from apps.analytical_app.pages.administrator.routes import routes_administrator
 from apps.analytical_app.pages.chief.main import chief_main
 from apps.analytical_app.pages.doctor.routes import routes_doctors
+from apps.analytical_app.pages.economist.child_prof_exams_detail.page import economist_child_prof_exams_detail_layout
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.economist.doctor_stac.tab1 import economist_doctor_stac
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list_def
@@ -126,6 +127,13 @@ routes = {
             {"label": "Анализ вторых этапов диспансеризации", "active": True},
         ]),
         layout_dispensary_age
+    ]),
+    "/economist/child_prof_exams_detail": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "Детализация детских профосмотров", "active": True},
+        ]),
+        economist_child_prof_exams_detail_layout
     ]),
 
     "/statistic": statistic_main,
