@@ -139,29 +139,84 @@ def delete_diagnosis_group(conn: Connection, catalog: str, group_id: int) -> int
     return int(res.rowcount or 0)
 
 
-def copy_global_to_user(engine: Engine) -> None:
+def copy_catalog_to_user(engine: Engine, source_slug: str) -> None:
+    """Полная копия каталога source_slug → user (перезапись user)."""
     with engine.begin() as conn:
-        data = export_catalog(conn, "global")
+        data = export_catalog(conn, source_slug)
         data["catalog"] = "user"
         import_catalog(conn, data, target_catalog="user")
 
 
+def copy_global_to_user(engine: Engine) -> None:
+    """Совместимость: копирует в user базовую матрицу (после, иначе до)."""
+    from apps.dash_dn.catalog_periods import default_matrix_source_for_user_copy
+
+    copy_catalog_to_user(engine, default_matrix_source_for_user_copy())
+
+
+def copy_catalog(engine: Engine, src: str, dst: str) -> None:
+    """Полная копия каталога src → dst (перезапись dst)."""
+    with engine.begin() as conn:
+        data = export_catalog(conn, src)
+        import_catalog(conn, data, target_catalog=dst)
+
+
+def migrate_global_to_matrix_before_if_empty(engine: Engine, before_slug: str) -> None:
+    """Старые БД: данные только в global, slug «до» пуст — один раз копируем global → before."""
+    if before_slug == "global":
+        return
+    q = text(
+        "SELECT COUNT(*) FROM dn_diagnosis WHERE catalog = :c AND is_active = 1"
+    )
+
+    def _n(conn: Connection, cat: str) -> int:
+        return int(conn.execute(q, {"c": cat}).scalar() or 0)
+
+    with engine.connect() as conn:
+        n_before = _n(conn, before_slug)
+        n_global = _n(conn, "global")
+    if n_before > 0 or n_global == 0:
+        return
+
+    copy_catalog(engine, "global", before_slug)
+    from apps.dash_dn.sqlite_catalog.migrations import backfill_catalog_registry
+
+    with engine.begin() as conn:
+        backfill_catalog_registry(conn)
+
+
 def seed_if_empty(engine: Engine, seed_path: Path) -> None:
+    from apps.dash_dn.catalog_periods import matrix_catalog_before
+
+    slug = matrix_catalog_before()
     if not seed_path.is_file():
         return
     with engine.begin() as conn:
         n = conn.execute(
-            text("SELECT COUNT(*) FROM dn_diagnosis_category WHERE catalog = 'global'")
+            text("SELECT COUNT(*) FROM dn_diagnosis_category WHERE catalog = :c"),
+            {"c": slug},
         ).scalar()
         if int(n or 0) > 0:
             return
         data = load_json_file(seed_path)
-        import_catalog(conn, data, target_catalog="global")
+        import_catalog(conn, data, target_catalog=slug)
 
 
 def init_app_database(engine: Engine | None = None, seed_path: Path | None = None) -> Engine:
-    from apps.dash_dn.sqlite_catalog.paths import SEED_GLOBAL_JSON
+    from apps.dash_dn.catalog_periods import matrix_catalog_before
+    from apps.dash_dn.sqlite_catalog.paths import (
+        SEED_GLOBAL_JSON,
+        SEED_MATRIX_BEFORE_JSON,
+    )
 
     eng = ensure_database(engine)
-    seed_if_empty(eng, seed_path or SEED_GLOBAL_JSON)
+    resolved = seed_path
+    if resolved is None:
+        resolved = (
+            SEED_MATRIX_BEFORE_JSON
+            if SEED_MATRIX_BEFORE_JSON.is_file()
+            else SEED_GLOBAL_JSON
+        )
+    migrate_global_to_matrix_before_if_empty(eng, matrix_catalog_before())
+    seed_if_empty(eng, resolved)
     return eng

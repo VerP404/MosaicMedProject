@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 from datetime import datetime
 
 import dash_bootstrap_components as dbc
@@ -13,8 +14,9 @@ from dash import dash_table
 from sqlalchemy import text
 
 from apps.dash_dn.app import dash_dn_app as app
+from apps.dash_dn.catalog_periods import default_active_catalog, default_matrix_source_for_user_copy
 from apps.dash_dn.sqlite_catalog.catalog_ops import (
-    copy_global_to_user,
+    copy_catalog_to_user,
     export_catalog,
     import_catalog,
 )
@@ -34,12 +36,9 @@ def _engine():
     return get_engine()
 
 
-def _is_user(cat: str) -> bool:
-    return (cat or "global") == "user"
-
-
-def _global_admin_password() -> str:
-    return (os.environ.get("DASH_DN_GLOBAL_ADMIN_PASSWORD") or "").strip()
+def _work_cat(active_catalog: str | None) -> str:
+    c = (active_catalog or "").strip()
+    return c or default_active_catalog()
 
 
 def _tag_catalog(rows: list[dict], cat: str) -> list[dict]:
@@ -48,12 +47,43 @@ def _tag_catalog(rows: list[dict], cat: str) -> list[dict]:
     return rows
 
 
+def _is_user(cat: str) -> bool:
+    return (cat or "").strip() == "user"
+
+
+def _catalog_is_read_only(slug: str) -> bool:
+    if _is_user(slug):
+        return False
+    try:
+        with _engine().connect() as c:
+            r = c.execute(
+                text("SELECT read_only FROM dn_catalog_registry WHERE slug = :s"),
+                {"s": slug},
+            ).fetchone()
+        if r is not None:
+            return bool(int(r[0]))
+    except Exception:
+        pass
+    return slug.startswith("matrix_")
+
+
+def _global_admin_password() -> str:
+    return (os.environ.get("DASH_DN_GLOBAL_ADMIN_PASSWORD") or "").strip()
+
+
+def _can_baseline_to_user(unlocked) -> bool:
+    """Копирование базовой матрицы в user и импорт JSON в user — после пароля в шапке."""
+    return bool(unlocked) and bool(_global_admin_password())
+
+
 def _can_edit_tables(catalog: str | None, global_unlocked) -> bool:
-    """Редактирование таблиц: user — всегда; global — только после ввода пароля."""
-    cat = catalog or "global"
+    """Правка строк таблиц: только каталог user (matrix_* — только просмотр)."""
+    cat = (catalog or "").strip()
     if _is_user(cat):
         return True
-    return cat == "global" and bool(global_unlocked) and bool(_global_admin_password())
+    if _catalog_is_read_only(cat):
+        return False
+    return False
 
 
 def _as_int01(v) -> int:
@@ -88,6 +118,134 @@ def _as_int_sort(v) -> int:
         return int(v)
     except (TypeError, ValueError):
         return 0
+
+
+def _norm_code(value: object) -> str:
+    s = str(value or "").strip().upper().replace(" ", "")
+    return s
+
+
+def _fix_truncated_c_chapter_range(token: str) -> str:
+    m = re.fullmatch(r"(\d{2})-(C[\d.].*)", token, flags=re.IGNORECASE)
+    if not m:
+        return token
+    return f"C{m.group(1)}-{m.group(2).upper()}"
+
+
+def _expand_range_token(token: str) -> set[str]:
+    token = token.replace("–", "-").replace("—", "-").replace(" ", "")
+    if "-" not in token:
+        return {token}
+    left, right = token.split("-", 1)
+    if not left or not right:
+        return {token}
+
+    def split_icd(code: str):
+        code = code.upper()
+        if not code:
+            return None
+        letter = code[0]
+        rest = code[1:]
+        if "." in rest:
+            major, minor = rest.split(".", 1)
+            if not major.isdigit() or not minor.isdigit():
+                return None
+            return letter, int(major), int(minor), True
+        if not rest.isdigit():
+            return None
+        return letter, int(rest), None, False
+
+    l = split_icd(left)
+    r = split_icd(right)
+    if not l or not r or l[0] != r[0]:
+        return {token}
+
+    letter = l[0]
+    if not l[3] and not r[3]:
+        if l[1] > r[1]:
+            return {token}
+        return {f"{letter}{num:02d}" for num in range(l[1], r[1] + 1)}
+    if l[3] and r[3] and l[1] == r[1]:
+        if l[2] > r[2]:
+            return {token}
+        return {f"{letter}{l[1]:02d}.{num}" for num in range(l[2], r[2] + 1)}
+    return {token}
+
+
+def _rule_to_codes(rule: str) -> set[str]:
+    out: set[str] = set()
+    for raw in str(rule or "").split(","):
+        token = _norm_code(raw)
+        if not token:
+            continue
+        token = _fix_truncated_c_chapter_range(token)
+        out.update(_expand_range_token(token))
+    return out
+
+
+def _diagnosis_matches_rule(diagnosis_code: str, rule_codes: set[str]) -> bool:
+    d = _norm_code(diagnosis_code)
+    if not d:
+        return False
+    primary = d.split()[0]
+    base = primary.split(".")[0]
+    return any(
+        d.startswith(rc) or primary.startswith(rc) or base == rc
+        for rc in rule_codes
+    )
+
+
+def _sync_group_memberships(conn, catalog: str, group_id: int, rule: str) -> int:
+    """Пересчитать состав dn_diagnosis_group_membership по правилу группы."""
+    rule_codes = _rule_to_codes(rule or "")
+    conn.execute(
+        text("DELETE FROM dn_diagnosis_group_membership WHERE catalog = :c AND group_id = :gid"),
+        {"c": catalog, "gid": int(group_id)},
+    )
+    if not rule_codes:
+        return 0
+
+    diags = conn.execute(
+        text("SELECT id, code FROM dn_diagnosis WHERE catalog = :c AND is_active = 1"),
+        {"c": catalog},
+    ).mappings().all()
+    inserted = 0
+    for d in diags:
+        did = int(d["id"])
+        code = str(d.get("code") or "")
+        if not _diagnosis_matches_rule(code, rule_codes):
+            continue
+        conn.execute(
+            text(
+                """
+                INSERT INTO dn_diagnosis_group_membership (catalog, group_id, diagnosis_id, is_active)
+                VALUES (:c, :gid, :did, 1)
+                ON CONFLICT(catalog, group_id, diagnosis_id) DO UPDATE SET is_active = 1
+                """
+            ),
+            {"c": catalog, "gid": int(group_id), "did": did},
+        )
+        inserted += 1
+    return inserted
+
+
+def _specialty_ids_for_group_from_matrix(conn, catalog: str, group_id: int) -> list[int]:
+    rows = conn.execute(
+        text(
+            """
+            SELECT DISTINCT ds.specialty_id
+            FROM dn_diagnosis_group_membership gm
+            JOIN dn_diagnosis_specialty ds
+              ON ds.diagnosis_id = gm.diagnosis_id AND ds.catalog = :c
+            JOIN dn_specialty sp
+              ON sp.id = ds.specialty_id AND sp.catalog = :c AND sp.is_active = 1
+            WHERE gm.catalog = :c AND gm.group_id = :gid AND gm.is_active = 1
+            ORDER BY ds.specialty_id
+            """
+        ),
+        {"c": catalog, "gid": int(group_id)},
+    ).fetchall()
+    return [int(r[0]) for r in rows]
 
 
 DELETE_ALLOWED = frozenset(
@@ -634,7 +792,7 @@ def layout_body():
                 children=html.Div(
                     [
                         html.P(
-                            "Связка: услуга обязательна для группы диагнозов при наблюдении у указанной специальности (ячейка «+» в матрице).",
+                            "Связка: услуга (обязательная или необязательная) назначается для группы диагнозов при наблюдении у указанной специальности.",
                             className="text-muted small",
                         ),
                         html.Div(
@@ -654,9 +812,49 @@ def layout_body():
                                             md=3,
                                         ),
                                         dbc.Col(
-                                            dbc.Button("Добавить", id=f"{PREFIX}-btn-add-req", color="primary", className="mt-4"),
-                                            md=1,
+                                            [
+                                                dbc.Label("Тип услуги", className="small"),
+                                                dcc.Dropdown(
+                                                    id=f"{PREFIX}-dd-req-required",
+                                                    options=[
+                                                        {"label": "Обязательная", "value": 1},
+                                                        {"label": "Необязательная", "value": 0},
+                                                    ],
+                                                    value=1,
+                                                    clearable=False,
+                                                ),
+                                            ],
+                                            md=2,
                                         ),
+                                        dbc.Col(
+                                            dbc.Button("Добавить", id=f"{PREFIX}-btn-add-req", color="primary", className="mt-4"),
+                                            md=2,
+                                        ),
+                                    ],
+                                    className="g-2 mb-2",
+                                ),
+                                dbc.Row(
+                                    [
+                                        dbc.Col(
+                                            [
+                                                dbc.Checklist(
+                                                    id=f"{PREFIX}-req-opts",
+                                                    options=[
+                                                        {
+                                                            "label": " Добавить по всем специальностям группы (по матрице диагноз-специальность)",
+                                                            "value": "matrix_specs",
+                                                        }
+                                                    ],
+                                                    value=[],
+                                                    className="small",
+                                                ),
+                                                html.Div(
+                                                    "Если включено: поле «Специальность» игнорируется, и требование добавляется сразу по всем специальностям, связанным с диагнозами группы.",
+                                                    className="text-muted small",
+                                                ),
+                                            ],
+                                            md=12,
+                                        )
                                     ],
                                     className="g-2 mb-2",
                                 ),
@@ -721,7 +919,7 @@ def layout_body():
                             dbc.Col(
                                 [
                                     dbc.Button(
-                                        [html.I(className="bi bi-copy me-1"), "Копировать global → user"],
+                                        [html.I(className="bi bi-copy me-1"), "Копировать базу в user"],
                                         id=f"{PREFIX}-btn-copy",
                                         color="secondary",
                                         outline=True,
@@ -942,7 +1140,6 @@ def _load_reqs(catalog: str) -> list[dict]:
         JOIN dn_specialty sp ON sp.id = sr.specialty_id AND sp.catalog = :c
         WHERE sr.catalog = :c
         ORDER BY sp.name, g.code, s.code
-        LIMIT 800
         """
     )
     with _engine().connect() as conn:
@@ -1049,10 +1246,11 @@ def _edit_tuple_prices(on: bool):
         Output(f"{PREFIX}-btn-save-req", "disabled"),
         Output(f"{PREFIX}-btn-del-sel-req", "disabled"),
     ],
+    Input("dash-dn-active-catalog", "data"),
     Input("dash-dn-global-unlocked", "data"),
 )
-def ref_toggle_table_edit_mode(unlocked):
-    on = _can_edit_tables("global", unlocked)
+def ref_toggle_table_edit_mode(active_catalog, unlocked):
+    on = _can_edit_tables(_work_cat(active_catalog), unlocked)
     t = _edit_tuple(on)
     tp = _edit_tuple_prices(on)
     return t + t + tp + t + t + t + t + t
@@ -1068,25 +1266,29 @@ def ref_toggle_table_edit_mode(unlocked):
     Output(f"{PREFIX}-ref-edit-diag", "style"),
     Output(f"{PREFIX}-ref-edit-grp", "style"),
     Output(f"{PREFIX}-ref-edit-req", "style"),
+    Input("dash-dn-active-catalog", "data"),
     Input("dash-dn-global-unlocked", "data"),
 )
-def ref_toggle_admin_sections_visibility(unlocked):
-    """Без пароля эталона скрываем формы добавления и кнопки — остаётся просмотр таблиц."""
-    show = _can_edit_tables("global", unlocked)
-    st = {"display": "block"} if show else {"display": "none"}
-    return (st,) * 9
+def ref_toggle_admin_sections_visibility(active_catalog, unlocked):
+    """Копия базы в user / импорт JSON — по паролю; формы правки таблиц — только в каталоге user."""
+    show_baseline = _can_baseline_to_user(unlocked)
+    show_edits = _can_edit_tables(_work_cat(active_catalog), unlocked)
+    st_b = {"display": "block"} if show_baseline else {"display": "none"}
+    st_e = {"display": "block"} if show_edits else {"display": "none"}
+    return (st_b,) + (st_e,) * 8
 
 
 @app.callback(
     Output(f"{PREFIX}-ref-view-hint", "children"),
+    Input("dash-dn-active-catalog", "data"),
     Input("dash-dn-global-unlocked", "data"),
 )
-def ref_view_mode_hint(unlocked):
-    if _can_edit_tables("global", unlocked):
+def ref_view_mode_hint(active_catalog, unlocked):
+    if _can_edit_tables(_work_cat(active_catalog), unlocked):
         return ""
     return dbc.Alert(
-        "Справочники эталона в режиме просмотра: таблицы ниже можно фильтровать и смотреть. "
-        "Добавление записей, копирование global→user, импорт/экспорт JSON и правка таблиц — после «Включить» с паролем в шапке.",
+        "Базовые каталоги (до / после 01.04.2026) только для просмотра. "
+        "Правки — в «Правки (копия)»; копирование базы в user и импорт JSON — после «Включить» с паролем в шапке.",
         color="info",
         className="py-2 mb-0 small",
     )
@@ -1118,7 +1320,7 @@ def ref_clear_selected_on_catalog_change(_catalog):
     Input("dash-dn-active-catalog", "data"),
 )
 def ref_load_dropdowns(_active_catalog):
-    cat = "global"
+    cat = _work_cat(_active_catalog)
     return (
         _dd_periods(cat),
         _dd_services(cat),
@@ -1209,6 +1411,9 @@ def sync_price_form_from_table_or_filter(selected_rows, period_filter, amount_fi
     State(f"{PREFIX}-dd-req-svc", "value"),
     State(f"{PREFIX}-dd-req-grp", "value"),
     State(f"{PREFIX}-dd-req-spec", "value"),
+    State(f"{PREFIX}-dd-req-required", "value"),
+    State(f"{PREFIX}-req-opts", "value"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=False,
 )
@@ -1244,18 +1449,21 @@ def ref_refresh_all_tables(
     req_svc,
     req_grp,
     req_spec,
+    req_required,
+    req_opts,
+    active_catalog,
     unlocked,
 ):
     ctx = callback_context
     eng = _engine()
-    cat = "global"
+    cat = _work_cat(active_catalog)
     triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
     msg_ops = no_update
 
     if triggered == f"{PREFIX}-btn-copy" and n_copy:
-        if _can_edit_tables("global", unlocked):
+        if _can_baseline_to_user(unlocked):
             try:
-                copy_global_to_user(eng)
+                copy_catalog_to_user(eng, default_matrix_source_for_user_copy())
             except Exception:
                 pass
         else:
@@ -1266,7 +1474,7 @@ def ref_refresh_all_tables(
             )
 
     elif triggered == f"{PREFIX}-upload" and upload_contents:
-        if _can_edit_tables("global", unlocked):
+        if _can_baseline_to_user(unlocked):
             try:
                 _ct, cs = upload_contents.split(",", 1)
                 payload = json.loads(base64.b64decode(cs).decode("utf-8"))
@@ -1281,7 +1489,7 @@ def ref_refresh_all_tables(
                 className="py-2 mb-0",
             )
 
-    elif _can_edit_tables("global", unlocked):
+    elif _can_edit_tables(_work_cat(active_catalog), unlocked):
         try:
             with eng.begin() as conn:
                 if triggered == f"{PREFIX}-btn-add-svc" and n_add_svc:
@@ -1295,6 +1503,17 @@ def ref_refresh_all_tables(
                             ),
                             {"c": cat, "code": code, "name": name},
                         )
+                        msg_ops = dbc.Alert(
+                            f"Услуга добавлена: {code}.",
+                            color="success",
+                            className="py-2 mb-0",
+                        )
+                    else:
+                        msg_ops = dbc.Alert(
+                            "Для добавления услуги заполните код и наименование.",
+                            color="warning",
+                            className="py-2 mb-0",
+                        )
                 elif triggered == f"{PREFIX}-btn-add-per" and n_add_per:
                     ds = (per_start or "").strip()
                     if ds:
@@ -1305,6 +1524,17 @@ def ref_refresh_all_tables(
                                 "VALUES (:c, :ds, :de, :t, 1)"
                             ),
                             {"c": cat, "ds": ds, "de": de, "t": (per_title or "").strip()[:128]},
+                        )
+                        msg_ops = dbc.Alert(
+                            f"Период добавлен: {ds} — {de or '...'}",
+                            color="success",
+                            className="py-2 mb-0",
+                        )
+                    else:
+                        msg_ops = dbc.Alert(
+                            "Для добавления периода заполните дату начала.",
+                            color="warning",
+                            className="py-2 mb-0",
                         )
                 elif triggered == f"{PREFIX}-btn-add-price" and n_add_price:
                     if (
@@ -1320,6 +1550,17 @@ def ref_refresh_all_tables(
                             ),
                             {"c": cat, "sid": int(price_svc), "pid": int(period_filter), "pr": float(price_val)},
                         )
+                        msg_ops = dbc.Alert(
+                            "Цена сохранена для выбранной услуги и периода.",
+                            color="success",
+                            className="py-2 mb-0",
+                        )
+                    else:
+                        msg_ops = dbc.Alert(
+                            "Для добавления цены выберите период, услугу и укажите цену.",
+                            color="warning",
+                            className="py-2 mb-0",
+                        )
                 elif triggered == f"{PREFIX}-btn-add-spec" and n_add_spec:
                     nm = (spec_name or "").strip()
                     if nm:
@@ -1327,12 +1568,34 @@ def ref_refresh_all_tables(
                             text("INSERT INTO dn_specialty (catalog, name, is_active) VALUES (:c, :n, 1)"),
                             {"c": cat, "n": nm},
                         )
+                        msg_ops = dbc.Alert(
+                            f"Специальность добавлена: {nm}.",
+                            color="success",
+                            className="py-2 mb-0",
+                        )
+                    else:
+                        msg_ops = dbc.Alert(
+                            "Для добавления специальности заполните название.",
+                            color="warning",
+                            className="py-2 mb-0",
+                        )
                 elif triggered == f"{PREFIX}-btn-add-cat" and n_add_cat:
                     nm = (cat_name or "").strip()
                     if nm:
                         conn.execute(
                             text("INSERT INTO dn_diagnosis_category (catalog, name, is_active) VALUES (:c, :n, 1)"),
                             {"c": cat, "n": nm},
+                        )
+                        msg_ops = dbc.Alert(
+                            f"Категория добавлена: {nm}.",
+                            color="success",
+                            className="py-2 mb-0",
+                        )
+                    else:
+                        msg_ops = dbc.Alert(
+                            "Для добавления категории заполните название.",
+                            color="warning",
+                            className="py-2 mb-0",
                         )
                 elif triggered == f"{PREFIX}-btn-add-diag" and n_add_diag:
                     dc = _norm_diag_code(diag_code)
@@ -1345,11 +1608,22 @@ def ref_refresh_all_tables(
                             ),
                             {"c": cat, "code": dc, "cid": cid},
                         )
+                        msg_ops = dbc.Alert(
+                            f"Диагноз добавлен: {dc}.",
+                            color="success",
+                            className="py-2 mb-0",
+                        )
+                    else:
+                        msg_ops = dbc.Alert(
+                            "Для добавления диагноза укажите код МКБ.",
+                            color="warning",
+                            className="py-2 mb-0",
+                        )
                 elif triggered == f"{PREFIX}-btn-add-grp" and n_add_grp:
                     gc = (grp_code or "").strip()[:256]
                     if gc:
                         so = int(grp_order) if grp_order not in (None, "") else 0
-                        conn.execute(
+                        res = conn.execute(
                             text(
                                 "INSERT INTO dn_diagnosis_group (catalog, code, title, sort_order, rule, is_active) "
                                 "VALUES (:c, :code, :title, :so, :rule, 1)"
@@ -1362,17 +1636,93 @@ def ref_refresh_all_tables(
                                 "rule": (grp_rule or "")[:2000],
                             },
                         )
+                        new_gid = int(res.lastrowid)
+                        matched = _sync_group_memberships(conn, cat, new_gid, (grp_rule or ""))
+                        msg_ops = dbc.Alert(
+                            f"Группа добавлена: {gc}. Диагнозов по правилу: {matched}.",
+                            color="success",
+                            className="py-2 mb-0",
+                        )
+                    else:
+                        msg_ops = dbc.Alert(
+                            "Для добавления группы заполните код группы.",
+                            color="warning",
+                            className="py-2 mb-0",
+                        )
                 elif triggered == f"{PREFIX}-btn-add-req" and n_add_req:
-                    if req_svc and req_grp and req_spec:
+                    opts = set(req_opts or [])
+                    req_val = 1 if int(req_required or 1) == 1 else 0
+                    if req_svc and req_grp and ("matrix_specs" in opts):
+                        sp_ids = _specialty_ids_for_group_from_matrix(conn, cat, int(req_grp))
+                        if not sp_ids:
+                            msg_ops = dbc.Alert(
+                                "Для выбранной группы не найдены специальности по матрице (диагноз-специальность).",
+                                color="warning",
+                                className="py-2 mb-0",
+                            )
+                        added = 0
+                        updated = 0
+                        for spid in sp_ids:
+                            exists = conn.execute(
+                                text(
+                                    "SELECT 1 FROM dn_service_requirement "
+                                    "WHERE catalog=:c AND service_id=:sid AND group_id=:gid AND specialty_id=:spid"
+                                ),
+                                {"c": cat, "sid": int(req_svc), "gid": int(req_grp), "spid": int(spid)},
+                            ).fetchone()
+                            conn.execute(
+                                text(
+                                    "INSERT INTO dn_service_requirement (catalog, service_id, group_id, specialty_id, is_required) "
+                                    "VALUES (:c, :sid, :gid, :spid, :ir) "
+                                    "ON CONFLICT(catalog, service_id, group_id, specialty_id) DO UPDATE SET is_required = excluded.is_required"
+                                ),
+                                {"c": cat, "sid": int(req_svc), "gid": int(req_grp), "spid": int(spid), "ir": req_val},
+                            )
+                            if exists:
+                                updated += 1
+                            else:
+                                added += 1
+                        if sp_ids:
+                            msg_ops = dbc.Alert(
+                                f"Требование добавлено по матрице: новых {added}, обновленных {updated}.",
+                                color="success" if added > 0 else "info",
+                                className="py-2 mb-0",
+                            )
+                    elif req_svc and req_grp and req_spec:
+                        exists = conn.execute(
+                            text(
+                                "SELECT 1 FROM dn_service_requirement "
+                                "WHERE catalog=:c AND service_id=:sid AND group_id=:gid AND specialty_id=:spid"
+                            ),
+                            {"c": cat, "sid": int(req_svc), "gid": int(req_grp), "spid": int(req_spec)},
+                        ).fetchone()
                         conn.execute(
                             text(
                                 "INSERT INTO dn_service_requirement (catalog, service_id, group_id, specialty_id, is_required) "
-                                "VALUES (:c, :sid, :gid, :spid, 1) ON CONFLICT(catalog, service_id, group_id, specialty_id) DO NOTHING"
+                                "VALUES (:c, :sid, :gid, :spid, :ir) "
+                                "ON CONFLICT(catalog, service_id, group_id, specialty_id) DO UPDATE SET is_required = excluded.is_required"
                             ),
-                            {"c": cat, "sid": int(req_svc), "gid": int(req_grp), "spid": int(req_spec)},
+                            {"c": cat, "sid": int(req_svc), "gid": int(req_grp), "spid": int(req_spec), "ir": req_val},
+                        )
+                        msg_ops = dbc.Alert(
+                            "Требование добавлено."
+                            if not exists
+                            else "Связка уже была, признак обязательности обновлён.",
+                            color="success" if not exists else "info",
+                            className="py-2 mb-0",
+                        )
+                    else:
+                        msg_ops = dbc.Alert(
+                            "Для добавления требования выберите услугу, группу и специальность (или режим по матрице).",
+                            color="warning",
+                            className="py-2 mb-0",
                         )
         except Exception:
-            pass
+            msg_ops = dbc.Alert(
+                "Ошибка при добавлении записи. Проверьте заполнение полей и уникальность связки.",
+                color="danger",
+                className="py-2 mb-0",
+            )
 
     return (
         _load_services(cat),
@@ -1393,7 +1743,7 @@ def _norm_diag_code(s) -> str:
     return str(s).strip().upper().split()[0]
 
 
-# --- сохранение / удаление строк таблиц (эталон; правка global после пароля на вкладке «Подбор услуг») ---
+# --- сохранение / удаление строк таблиц (только каталог user; matrix_* — просмотр) ---
 
 
 @app.callback(
@@ -1402,13 +1752,14 @@ def _norm_diag_code(s) -> str:
     Output(f"{PREFIX}-msg-edit", "children"),
     Input(f"{PREFIX}-btn-save-svc", "n_clicks"),
     State(f"{PREFIX}-table-services", "data"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def save_table_services(n, data, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def save_table_services(n, data, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for row in data or []:
@@ -1440,13 +1791,14 @@ def save_table_services(n, data, unlocked):
     Input(f"{PREFIX}-btn-del-sel-svc", "n_clicks"),
     State(f"{PREFIX}-table-services", "data"),
     State(f"{PREFIX}-table-services", "selected_rows"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def del_table_services(n, data, selected_rows, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def del_table_services(n, data, selected_rows, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for idx in selected_rows or []:
@@ -1466,13 +1818,14 @@ def del_table_services(n, data, selected_rows, unlocked):
     Output(f"{PREFIX}-msg-edit", "children", allow_duplicate=True),
     Input(f"{PREFIX}-btn-save-per", "n_clicks"),
     State(f"{PREFIX}-table-periods", "data"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def save_table_periods(n, data, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def save_table_periods(n, data, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for row in data or []:
@@ -1506,13 +1859,14 @@ def save_table_periods(n, data, unlocked):
     Input(f"{PREFIX}-btn-del-sel-per", "n_clicks"),
     State(f"{PREFIX}-table-periods", "data"),
     State(f"{PREFIX}-table-periods", "selected_rows"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def del_table_periods(n, data, selected_rows, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def del_table_periods(n, data, selected_rows, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for idx in selected_rows or []:
@@ -1534,13 +1888,14 @@ def del_table_periods(n, data, selected_rows, unlocked):
     State(f"{PREFIX}-table-prices", "data"),
     State(f"{PREFIX}-filter-price-period", "value"),
     State(f"{PREFIX}-filter-price-amount", "value"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def save_table_prices(n, data, period_filter, amount_filter, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def save_table_prices(n, data, period_filter, amount_filter, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for row in data or []:
@@ -1582,13 +1937,14 @@ def save_table_prices(n, data, period_filter, amount_filter, unlocked):
     State(f"{PREFIX}-table-prices", "selected_rows"),
     State(f"{PREFIX}-filter-price-period", "value"),
     State(f"{PREFIX}-filter-price-amount", "value"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def del_table_prices(n, data, selected_rows, period_filter, amount_filter, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def del_table_prices(n, data, selected_rows, period_filter, amount_filter, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for idx in selected_rows or []:
@@ -1612,13 +1968,14 @@ def del_table_prices(n, data, selected_rows, period_filter, amount_filter, unloc
     Output(f"{PREFIX}-msg-edit", "children", allow_duplicate=True),
     Input(f"{PREFIX}-btn-save-spec", "n_clicks"),
     State(f"{PREFIX}-table-specs", "data"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def save_table_specs(n, data, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def save_table_specs(n, data, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for row in data or []:
@@ -1646,13 +2003,14 @@ def save_table_specs(n, data, unlocked):
     Input(f"{PREFIX}-btn-del-sel-spec", "n_clicks"),
     State(f"{PREFIX}-table-specs", "data"),
     State(f"{PREFIX}-table-specs", "selected_rows"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def del_table_specs(n, data, selected_rows, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def del_table_specs(n, data, selected_rows, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for idx in selected_rows or []:
@@ -1672,13 +2030,14 @@ def del_table_specs(n, data, selected_rows, unlocked):
     Output(f"{PREFIX}-msg-edit", "children", allow_duplicate=True),
     Input(f"{PREFIX}-btn-save-cat", "n_clicks"),
     State(f"{PREFIX}-table-cats", "data"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def save_table_cats(n, data, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def save_table_cats(n, data, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for row in data or []:
@@ -1706,13 +2065,14 @@ def save_table_cats(n, data, unlocked):
     Input(f"{PREFIX}-btn-del-sel-cat", "n_clicks"),
     State(f"{PREFIX}-table-cats", "data"),
     State(f"{PREFIX}-table-cats", "selected_rows"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def del_table_cats(n, data, selected_rows, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def del_table_cats(n, data, selected_rows, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for idx in selected_rows or []:
@@ -1732,13 +2092,14 @@ def del_table_cats(n, data, selected_rows, unlocked):
     Output(f"{PREFIX}-msg-edit", "children", allow_duplicate=True),
     Input(f"{PREFIX}-btn-save-diag", "n_clicks"),
     State(f"{PREFIX}-table-diags", "data"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def save_table_diags(n, data, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def save_table_diags(n, data, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for row in data or []:
@@ -1764,13 +2125,14 @@ def save_table_diags(n, data, unlocked):
     Input(f"{PREFIX}-btn-del-sel-diag", "n_clicks"),
     State(f"{PREFIX}-table-diags", "data"),
     State(f"{PREFIX}-table-diags", "selected_rows"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def del_table_diags(n, data, selected_rows, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def del_table_diags(n, data, selected_rows, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for idx in selected_rows or []:
@@ -1790,13 +2152,14 @@ def del_table_diags(n, data, selected_rows, unlocked):
     Output(f"{PREFIX}-msg-edit", "children", allow_duplicate=True),
     Input(f"{PREFIX}-btn-save-grp", "n_clicks"),
     State(f"{PREFIX}-table-grps", "data"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def save_table_grps(n, data, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def save_table_grps(n, data, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for row in data or []:
@@ -1818,6 +2181,12 @@ def save_table_grps(n, data, unlocked):
                         "c": cat,
                     },
                 )
+                _sync_group_memberships(
+                    conn,
+                    cat,
+                    int(rid),
+                    str(row.get("rule") or "").strip()[:2000],
+                )
         return _load_grps(cat), [], dbc.Alert("Таблица «Группы диагнозов» сохранена.", color="success", className="py-2 mb-0")
     except Exception as e:
         return no_update, no_update, dbc.Alert(f"Ошибка: {e}", color="danger", className="py-2 mb-0")
@@ -1830,13 +2199,14 @@ def save_table_grps(n, data, unlocked):
     Input(f"{PREFIX}-btn-del-sel-grp", "n_clicks"),
     State(f"{PREFIX}-table-grps", "data"),
     State(f"{PREFIX}-table-grps", "selected_rows"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def del_table_grps(n, data, selected_rows, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def del_table_grps(n, data, selected_rows, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for idx in selected_rows or []:
@@ -1856,13 +2226,14 @@ def del_table_grps(n, data, selected_rows, unlocked):
     Output(f"{PREFIX}-msg-edit", "children", allow_duplicate=True),
     Input(f"{PREFIX}-btn-save-req", "n_clicks"),
     State(f"{PREFIX}-table-reqs", "data"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def save_table_reqs(n, data, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def save_table_reqs(n, data, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for row in data or []:
@@ -1885,13 +2256,14 @@ def save_table_reqs(n, data, unlocked):
     Input(f"{PREFIX}-btn-del-sel-req", "n_clicks"),
     State(f"{PREFIX}-table-reqs", "data"),
     State(f"{PREFIX}-table-reqs", "selected_rows"),
+    State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     prevent_initial_call=True,
 )
-def del_table_reqs(n, data, selected_rows, unlocked):
-    if not n or not _can_edit_tables("global", unlocked):
+def del_table_reqs(n, data, selected_rows, active_catalog, unlocked):
+    if not n or not _can_edit_tables(_work_cat(active_catalog), unlocked):
         raise PreventUpdate
-    cat = "global"
+    cat = _work_cat(active_catalog)
     try:
         with _engine().begin() as conn:
             for idx in selected_rows or []:
@@ -1919,21 +2291,21 @@ def ref_msg_main(n_copy, upload_contents, upload_name, unlocked):
         return ""
     tid = ctx.triggered[0]["prop_id"].split(".")[0]
     if tid == f"{PREFIX}-btn-copy" and n_copy:
-        if not _can_edit_tables("global", unlocked):
+        if not _can_baseline_to_user(unlocked):
             return dbc.Alert(
-                "Включите режим правки эталона паролем в шапке, чтобы копировать global → user.",
+                "Включите режим паролем в шапке, чтобы копировать базовую матрицу в user.",
                 color="warning",
                 className="py-2",
             )
         try:
-            copy_global_to_user(_engine())
+            copy_catalog_to_user(_engine(), default_matrix_source_for_user_copy())
             return dbc.Alert("Скопировано в пользовательский справочник.", color="success", className="py-2")
         except Exception as e:
             return dbc.Alert(str(e), color="danger", className="py-2")
     if tid == f"{PREFIX}-upload" and upload_contents:
-        if not _can_edit_tables("global", unlocked):
+        if not _can_baseline_to_user(unlocked):
             return dbc.Alert(
-                "Включите режим правки эталона паролем в шапке, чтобы импортировать JSON.",
+                "Включите режим паролем в шапке, чтобы импортировать JSON.",
                 color="warning",
                 className="py-2",
             )
@@ -1958,9 +2330,10 @@ def ref_msg_main(n_copy, upload_contents, upload_name, unlocked):
 def ref_export_json(n, active_catalog, unlocked):
     if not n:
         raise PreventUpdate
-    if not _can_edit_tables("global", unlocked):
+    cat = _work_cat(active_catalog)
+    allow = _is_user(cat) or _catalog_is_read_only(cat) or _can_edit_tables(cat, unlocked)
+    if not allow:
         raise PreventUpdate
-    cat = active_catalog if active_catalog in ("global", "user") else "global"
     with _engine().connect() as conn:
         payload = export_catalog(conn, cat)
     raw = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")

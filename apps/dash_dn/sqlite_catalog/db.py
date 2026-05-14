@@ -37,4 +37,7 @@ def init_schema(engine: Engine) -> None:
 def ensure_database(engine: Engine | None = None) -> Engine:
     eng = engine or get_engine()
     init_schema(eng)
+    from apps.dash_dn.sqlite_catalog.migrations import run_catalog_migrations
+
+    run_catalog_migrations(eng, SCHEMA_SQL)
     return eng

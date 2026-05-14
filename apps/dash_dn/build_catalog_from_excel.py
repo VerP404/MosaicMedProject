@@ -20,6 +20,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+from apps.dash_dn.catalog_periods import matrix_catalog_before
+
 # Корень репоз.: .../MosaicMedProject
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _DEFAULT_DATA = _REPO_ROOT / "apps" / "dn_reference" / "data"
@@ -271,8 +273,8 @@ TABLES_ORDER = [
 
 
 class CatalogBuilder:
-    def __init__(self, catalog: str = "global") -> None:
-        self.catalog = catalog
+    def __init__(self, catalog: str | None = None) -> None:
+        self.catalog = catalog if catalog is not None else matrix_catalog_before()
         self.tables: dict[str, list[dict[str, Any]]] = {t: [] for t in TABLES_ORDER}
         self._seq: dict[str, int] = {t: 0 for t in TABLES_ORDER}
 
@@ -575,24 +577,56 @@ def load_usl_spec_dir(builder: CatalogBuilder, base: Path) -> None:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Excel → JSON dash_dn_catalog")
+    p = argparse.ArgumentParser(
+        description="Excel → JSON dash_dn_catalog",
+        epilog="Два снимка для шапки Dash: DASH_DN_MATRIX_BEFORE и DASH_DN_MATRIX_AFTER "
+        "(по умолчанию matrix_before_20260401 и matrix_after_20260401), импорт: "
+        "--apply-sqlite --target-catalog <slug>. usl_spec: "
+        "py -m apps.dash_dn.build_catalog_from_excel --usl-spec apps/dash_dn/usl_spec ...",
+    )
     p.add_argument("--out", type=Path, default=_REPO_ROOT / "apps" / "dash_dn" / "data" / "bundle_global.json")
     p.add_argument("--diagnoses", type=Path, default=_DEFAULT_DATA / "диагнозы по 168н.xlsx")
     p.add_argument("--services", type=Path, default=_DEFAULT_DATA / "свод услуг.xlsx")
     p.add_argument("--usl-spec", type=Path, default=_DEFAULT_DATA / "usl_spec")
     p.add_argument("--sheet-168n", type=str, default=None)
     p.add_argument("--sheet-services", type=str, default=None)
-    p.add_argument("--also-seed", action="store_true", help="Перезаписать apps/dash_dn/data/seed_global.json")
+    p.add_argument(
+        "--target-catalog",
+        type=str,
+        default=None,
+        help="Slug в SQLite (по умолчанию — DASH_DN_MATRIX_BEFORE / matrix_before_20260401; «после» — DASH_DN_MATRIX_AFTER; user — копия правок)",
+    )
+    p.add_argument(
+        "--catalog-title",
+        type=str,
+        default=None,
+        help="Подпись в реестре каталогов (по умолчанию = slug)",
+    )
+    p.add_argument("--effective-from", type=str, default=None, help="Дата начала действия (YYYY-MM-DD), в реестр")
+    p.add_argument("--effective-to", type=str, default=None, help="Дата окончания (YYYY-MM-DD), в реестр")
+    p.add_argument(
+        "--catalog-read-only",
+        type=int,
+        default=None,
+        choices=(0, 1),
+        help="1 — только чтение в UI для этого slug (по умолчанию: 1 для matrix_*)",
+    )
+    p.add_argument("--also-seed", action="store_true", help="Перезаписать apps/dash_dn/data/seed_matrix_before.json (только для --target-catalog = база «до»)")
     p.add_argument(
         "--apply-sqlite",
         action="store_true",
-        help="Импортировать результат в SQLite dash_dn (DASH_DN_SQLITE или data/dn_catalog.sqlite), каталог global",
+        help="Импортировать результат в SQLite (DASH_DN_SQLITE или data/dn_catalog.sqlite); slug из --target-catalog",
     )
     args = p.parse_args()
 
     root = _REPO_ROOT
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
+
+    cat = (args.target_catalog or "").strip() or matrix_catalog_before()
+    if not re.match(r"^[a-zA-Z][a-zA-Z0-9_\-]*$", cat):
+        print("Некорректный --target-catalog (латиница, цифры, _, -).", file=sys.stderr)
+        sys.exit(2)
 
     if not args.diagnoses.is_file():
         print(f"Пропуск 168н (нет файла): {args.diagnoses}", file=sys.stderr)
@@ -601,7 +635,7 @@ def main() -> None:
     if not args.usl_spec.is_dir():
         print(f"Пропуск usl_spec (нет папки): {args.usl_spec}", file=sys.stderr)
 
-    builder = CatalogBuilder("global")
+    builder = CatalogBuilder(cat)
 
     if args.diagnoses.is_file():
         print("Загрузка диагнозов 168н…")
@@ -620,21 +654,43 @@ def main() -> None:
     print(f"Записано: {args.out} (таблицы: { {k: len(v) for k, v in payload['tables'].items()} })")
 
     if args.also_seed:
-        seed_path = _REPO_ROOT / "apps" / "dash_dn" / "data" / "seed_global.json"
-        with seed_path.open("w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        print(f"Обновлён seed: {seed_path}")
+        mb = matrix_catalog_before()
+        if cat != mb:
+            print(
+                f"--also-seed пропущен: seed пишется только для target-catalog={mb!r}",
+                file=sys.stderr,
+            )
+        else:
+            from apps.dash_dn.sqlite_catalog.paths import SEED_MATRIX_BEFORE_JSON
+
+            with SEED_MATRIX_BEFORE_JSON.open("w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+            print(f"Обновлён seed: {SEED_MATRIX_BEFORE_JSON}")
 
     if args.apply_sqlite:
         from apps.dash_dn.sqlite_catalog.catalog_ops import import_catalog, load_json_file
         from apps.dash_dn.sqlite_catalog.db import ensure_database
+        from apps.dash_dn.sqlite_catalog.migrations import backfill_catalog_registry, upsert_catalog_registry_row
         from apps.dash_dn.sqlite_catalog.paths import get_db_path
 
         eng = ensure_database()
         data = load_json_file(args.out)
+        ro = args.catalog_read_only
+        if ro is None:
+            ro = 1 if cat.startswith("matrix_") else 0
+        title = (args.catalog_title or cat).strip()
         with eng.begin() as conn:
-            import_catalog(conn, data, target_catalog="global")
-        print(f"SQLite обновлена (global): {get_db_path()}")
+            import_catalog(conn, data, target_catalog=cat)
+            upsert_catalog_registry_row(
+                conn,
+                slug=cat,
+                title=title,
+                effective_from=args.effective_from,
+                effective_to=args.effective_to,
+                read_only=ro,
+            )
+            backfill_catalog_registry(conn)
+        print(f"SQLite обновлена ({cat}): {get_db_path()}")
 
 
 if __name__ == "__main__":

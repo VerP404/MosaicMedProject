@@ -13,13 +13,17 @@ from sqlalchemy import text
 
 from apps.dash_dn.app import dash_dn_app as app
 from apps.dash_dn.sqlite_catalog.queries import (
-    DIAGNOSES_FOR_SPECIALTY_SQL,
     DIAGNOSES_OPTIONS_SQL,
     SERVICE_CODE_PRICE_BY_ID_SQL,
     SERVICES_CATALOG_LIST_WITH_PRICE_SQL,
     SERVICES_FOR_DIAGNOSES_FLAT_SQL,
-    SPECIALTIES_FOR_DIAGNOSIS_SQL,
     SPECIALTIES_OPTIONS_SQL,
+)
+from apps.dash_dn.catalog_periods import (
+    default_active_catalog,
+    main_nav_catalog_options,
+    matrix_catalog_after,
+    matrix_catalog_before,
 )
 from apps.dash_dn.sqlite_catalog.db import get_engine
 
@@ -30,18 +34,122 @@ def _global_admin_password() -> str:
     return (os.environ.get("DASH_DN_GLOBAL_ADMIN_PASSWORD") or "").strip()
 
 
-def _fetch_options(sql, params=None, catalog: str = "global"):
+def _fetch_options(sql, params=None, catalog: str | None = None):
     eng = get_engine()
     p = dict(params or {})
-    p["catalog"] = catalog
+    p["catalog"] = (catalog or default_active_catalog()).strip() or default_active_catalog()
     with eng.connect() as connection:
         rows = connection.execute(sql, p).fetchall()
     return [{"label": row[1], "value": row[0]} for row in rows]
 
 
+def _matrix_service_options(
+    catalog: str,
+    diagnosis_code: str | None = None,
+    specialty_name: str | None = None,
+) -> list[dict]:
+    eng = get_engine()
+    q = text(
+        """
+        SELECT DISTINCT srv.id AS value, srv.code || ' — ' || srv.name AS label
+        FROM dn_service_requirement sr
+        JOIN dn_service srv ON srv.id = sr.service_id AND srv.catalog = :c AND srv.is_active = 1
+        JOIN dn_diagnosis_group_membership gm ON gm.group_id = sr.group_id AND gm.catalog = :c AND gm.is_active = 1
+        JOIN dn_diagnosis d ON d.id = gm.diagnosis_id AND d.catalog = :c AND d.is_active = 1
+        JOIN dn_specialty s ON s.id = sr.specialty_id AND s.catalog = :c AND s.is_active = 1
+        WHERE sr.catalog = :c
+          AND (:diag IS NULL OR d.code = :diag)
+          AND (:spec IS NULL OR s.name = :spec)
+        ORDER BY srv.code
+        """
+    )
+    with eng.connect() as connection:
+        rows = connection.execute(
+            q,
+            {
+                "c": catalog,
+                "diag": diagnosis_code or None,
+                "spec": specialty_name or None,
+            },
+        ).fetchall()
+    return [{"value": row[0], "label": row[1]} for row in rows]
+
+
+def _diagnosis_options_for_filters(
+    catalog: str,
+    specialty_name: str | None = None,
+    service_id: int | None = None,
+) -> list[dict]:
+    eng = get_engine()
+    q = text(
+        """
+        SELECT DISTINCT
+            d.code AS value,
+            d.code || COALESCE(' [' || c.name || ']', '') AS label
+        FROM dn_diagnosis d
+        LEFT JOIN dn_diagnosis_category c
+          ON c.id = d.category_id AND c.catalog = :c
+        JOIN dn_diagnosis_group_membership gm
+          ON gm.diagnosis_id = d.id AND gm.catalog = :c AND gm.is_active = 1
+        JOIN dn_service_requirement sr
+          ON sr.group_id = gm.group_id AND sr.catalog = :c
+        JOIN dn_specialty s
+          ON s.id = sr.specialty_id AND s.catalog = :c AND s.is_active = 1
+        WHERE d.catalog = :c AND d.is_active = 1
+          AND (:spec IS NULL OR s.name = :spec)
+          AND (:sid IS NULL OR sr.service_id = :sid)
+        ORDER BY d.code
+        """
+    )
+    with eng.connect() as connection:
+        rows = connection.execute(
+            q,
+            {
+                "c": catalog,
+                "spec": specialty_name or None,
+                "sid": service_id,
+            },
+        ).fetchall()
+    return [{"value": row[0], "label": row[1]} for row in rows]
+
+
+def _specialty_options_for_filters(
+    catalog: str,
+    diagnosis_code: str | None = None,
+    service_id: int | None = None,
+) -> list[dict]:
+    eng = get_engine()
+    q = text(
+        """
+        SELECT DISTINCT s.name AS value, s.name AS label
+        FROM dn_specialty s
+        JOIN dn_service_requirement sr
+          ON sr.specialty_id = s.id AND sr.catalog = :c
+        JOIN dn_diagnosis_group_membership gm
+          ON gm.group_id = sr.group_id AND gm.catalog = :c AND gm.is_active = 1
+        JOIN dn_diagnosis d
+          ON d.id = gm.diagnosis_id AND d.catalog = :c AND d.is_active = 1
+        WHERE s.catalog = :c AND s.is_active = 1
+          AND (:diag IS NULL OR d.code = :diag)
+          AND (:sid IS NULL OR sr.service_id = :sid)
+        ORDER BY s.name
+        """
+    )
+    with eng.connect() as connection:
+        rows = connection.execute(
+            q,
+            {
+                "c": catalog,
+                "diag": diagnosis_code or None,
+                "sid": service_id,
+            },
+        ).fetchall()
+    return [{"value": row[0], "label": row[1]} for row in rows]
+
+
 def _aggregate_services(rows):
     """Сводим плоские строки (услуга × диагноз) в строки таблицы."""
-    by_key = defaultdict(lambda: {"codes": set(), "groups": set()})
+    by_key = defaultdict(lambda: {"codes": set(), "groups": set(), "required_values": set()})
     order = []
     for row in rows:
         m = row._mapping
@@ -55,14 +163,25 @@ def _aggregate_services(rows):
         gt = m.get("group_title") or ""
         if gt:
             by_key[key]["groups"].add(gt)
+        by_key[key]["required_values"].add(int(m.get("is_required") or 0))
     out = []
     for key in order:
         code, name, price = key
         v = by_key[key]
+        req_vals = v["required_values"]
+        is_required = 1 in req_vals
+        has_optional = 0 in req_vals
+        if is_required and has_optional:
+            req_label = "Обязательная и необязательная"
+        elif is_required:
+            req_label = "Обязательная"
+        else:
+            req_label = "Необязательная"
         out.append(
             {
                 "Код услуги": code,
                 "Наименование услуги": name,
+                "Тип услуги": req_label,
                 "Актуальная стоимость": price,
                 "Диагнозы": ", ".join(sorted(v["codes"])),
                 "Группы диагнозов": "; ".join(sorted(x for x in v["groups"] if x)),
@@ -135,9 +254,10 @@ def _filter_row(label_text, control, mb_class="mb-3"):
 
 
 def layout_body():
-    cat0 = "global"
+    cat0 = default_active_catalog()
     initial_diagnosis_options = _fetch_options(DIAGNOSES_OPTIONS_SQL, catalog=cat0)
     initial_specialty_options = _fetch_options(SPECIALTIES_OPTIONS_SQL, catalog=cat0)
+    initial_service_options = _matrix_service_options(cat0)
     return html.Div(
         [
             dcc.Store(id=f"pick-refresh-{type_page}", data=0),
@@ -190,6 +310,18 @@ def layout_body():
                                                 style=_DROPDOWN_STYLE,
                                             ),
                                             mb_class="mb-0",
+                                        ),
+                                        _filter_row(
+                                            "Услуга доступная по матрице",
+                                            dcc.Dropdown(
+                                                id=f"dropdown-matrix-service-{type_page}",
+                                                options=initial_service_options,
+                                                placeholder="Фильтр по услуге матрицы…",
+                                                clearable=True,
+                                                className="dash-dn-dropdown",
+                                                style=_DROPDOWN_STYLE,
+                                            ),
+                                            mb_class="mt-3 mb-0",
                                         ),
                                     ],
                                     xs=12,
@@ -263,6 +395,11 @@ def layout_body():
                                     "minWidth": "420px",
                                     "maxWidth": "720px",
                                 },
+                                {
+                                    "if": {"column_id": "Тип услуги"},
+                                    "minWidth": "180px",
+                                    "maxWidth": "220px",
+                                },
                             ],
                             style_header_conditional=[
                                 {
@@ -309,7 +446,7 @@ def layout_body():
                             [
                                 html.P(
                                     "Выберите одну или несколько услуг и группу диагнозов (входит основной диагноз). "
-                                    "Куда сохраняются связи — по индикатору режима в шапке (рядом с паролем эталона).",
+                                    "Куда запишутся связи — см. зелёный/серый значок в шапке (пароль администратора).",
                                     className="text-muted small mb-3",
                                 ),
                                 dbc.Row(
@@ -341,6 +478,27 @@ def layout_body():
                                             ],
                                             md=5,
                                         ),
+                                    ],
+                                    className="g-2 mb-2",
+                                ),
+                                dbc.Row(
+                                    [
+                                        dbc.Col(
+                                            [
+                                                dbc.Label("Тип добавляемой услуги", className="small fw-semibold"),
+                                                dcc.Dropdown(
+                                                    id=f"pick-add-required-{type_page}",
+                                                    options=[
+                                                        {"label": "Обязательная", "value": 1},
+                                                        {"label": "Необязательная", "value": 0},
+                                                    ],
+                                                    value=1,
+                                                    clearable=False,
+                                                    style=_DROPDOWN_STYLE,
+                                                ),
+                                            ],
+                                            md=4,
+                                        )
                                     ],
                                     className="g-2 mb-2",
                                 ),
@@ -383,12 +541,26 @@ def toggle_pick_add_collapse(n_clicks, is_open):
     return new_open, chevron
 
 
+def _catalog_navbar_options():
+    return main_nav_catalog_options()
+
+
+@app.callback(
+    Output("dash-dn-pick-catalog", "options"),
+    Input("dash-dn-tabs", "active_tab"),
+)
+def refresh_navbar_catalog_options(_tab):
+    return _catalog_navbar_options()
+
+
 @app.callback(
     Output("dash-dn-active-catalog", "data"),
     Input("dash-dn-pick-catalog", "value"),
 )
 def sync_pick_catalog_from_services(pick_value):
-    return pick_value or "global"
+    allowed = {o["value"] for o in main_nav_catalog_options()}
+    v = pick_value or default_active_catalog()
+    return v if v in allowed else default_active_catalog()
 
 
 @app.callback(
@@ -408,7 +580,7 @@ def pick_global_unlock_lock(n_unlock, n_lock, pwd):
         raise PreventUpdate
     expected = _global_admin_password()
     if not expected:
-        return False, "Пароль для правки эталона не настроен."
+        return False, "Пароль администратора в настройках не задан (переменная окружения)."
     if (pwd or "").strip() == expected:
         return True, ""
     return False, "Неверный пароль."
@@ -421,25 +593,17 @@ def pick_global_unlock_lock(n_unlock, n_lock, pwd):
 def render_edit_mode_badge(unlocked: bool | None):
     if bool(unlocked):
         return dbc.Badge(
-            [
-                html.I(className="bi bi-pencil-square me-1"),
-                "Правка эталона: запись в общий справочник и локальный слой",
-            ],
+            html.I(className="bi bi-pencil-square"),
             color="success",
-            className="px-2 py-2 text-wrap text-start",
-            style={"maxWidth": "280px", "whiteSpace": "normal", "lineHeight": "1.25"},
-            title="Режим администратора эталона включён",
+            className="px-2 py-2",
+            title="Можно менять базовые каталоги (до / после 01.04.2026) и рабочую копию (user)",
         )
     return dbc.Badge(
-        [
-            html.I(className="bi bi-person-lock me-1"),
-            "Только локальный слой — эталон не меняется",
-        ],
+        html.I(className="bi bi-shield-lock"),
         color="light",
         text_color="dark",
-        className="px-2 py-2 text-wrap text-start border",
-        style={"maxWidth": "280px", "whiteSpace": "normal", "lineHeight": "1.25"},
-        title="Введите пароль эталона в шапке и нажмите «Включить»",
+        className="px-2 py-2 border",
+        title="Без пароля правки только в копии «Правки»; общий справочник не меняется",
     )
 
 
@@ -448,63 +612,39 @@ def render_edit_mode_badge(unlocked: bool | None):
     Output(f"dropdown-main-diagnosis-{type_page}", "value"),
     Output(f"dropdown-specialty-{type_page}", "options"),
     Output(f"dropdown-specialty-{type_page}", "value"),
+    Output(f"dropdown-matrix-service-{type_page}", "options"),
+    Output(f"dropdown-matrix-service-{type_page}", "value"),
     Input(f"dropdown-main-diagnosis-{type_page}", "value"),
     Input(f"dropdown-specialty-{type_page}", "value"),
+    Input(f"dropdown-matrix-service-{type_page}", "value"),
     Input("dash-dn-active-catalog", "data"),
 )
-def sync_main_diagnosis_and_specialty(main_diagnosis, specialty_name, catalog):
-    ctx = callback_context
-    cat = catalog or "global"
-    triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
+def sync_main_diagnosis_and_specialty(main_diagnosis, specialty_name, matrix_service_id, catalog):
+    cat = catalog or default_active_catalog()
 
-    diagnosis_options = _fetch_options(DIAGNOSES_OPTIONS_SQL, catalog=cat)
-    specialty_options = _fetch_options(SPECIALTIES_OPTIONS_SQL, catalog=cat)
+    try:
+        sid = int(matrix_service_id) if matrix_service_id not in (None, "") else None
+    except (TypeError, ValueError):
+        sid = None
 
-    if triggered == "dash-dn-active-catalog":
-        return diagnosis_options, None, specialty_options, None
+    diagnosis_options = _diagnosis_options_for_filters(cat, specialty_name, sid)
+    specialty_options = _specialty_options_for_filters(cat, main_diagnosis, sid)
+    service_options = _matrix_service_options(cat, main_diagnosis, specialty_name)
 
-    if main_diagnosis and specialty_name:
-        diagnosis_options = _fetch_options(
-            DIAGNOSES_FOR_SPECIALTY_SQL,
-            {"specialty_name": specialty_name},
-            catalog=cat,
-        )
-        specialty_options = _fetch_options(
-            SPECIALTIES_FOR_DIAGNOSIS_SQL,
-            {"diagnosis_code": main_diagnosis},
-            catalog=cat,
-        )
-        diagnosis_values = {opt["value"] for opt in diagnosis_options}
-        specialty_values = {opt["value"] for opt in specialty_options}
-        if main_diagnosis not in diagnosis_values:
-            main_diagnosis = None
-        if specialty_name not in specialty_values:
-            specialty_name = None
-        return diagnosis_options, main_diagnosis, specialty_options, specialty_name
+    diag_values = {opt["value"] for opt in diagnosis_options}
+    spec_values = {opt["value"] for opt in specialty_options}
+    service_values = {opt["value"] for opt in service_options}
 
-    if triggered == f"dropdown-specialty-{type_page}" and specialty_name:
-        diagnosis_options = _fetch_options(
-            DIAGNOSES_FOR_SPECIALTY_SQL,
-            {"specialty_name": specialty_name},
-            catalog=cat,
-        )
-        diagnosis_values = {opt["value"] for opt in diagnosis_options}
-        if main_diagnosis not in diagnosis_values:
-            main_diagnosis = None
-        return diagnosis_options, main_diagnosis, specialty_options, specialty_name
+    new_diag = main_diagnosis if main_diagnosis in diag_values else None
+    new_spec = specialty_name if specialty_name in spec_values else None
+    new_sid = sid if sid in service_values else None
 
-    if triggered == f"dropdown-main-diagnosis-{type_page}" and main_diagnosis:
-        specialty_options = _fetch_options(
-            SPECIALTIES_FOR_DIAGNOSIS_SQL,
-            {"diagnosis_code": main_diagnosis},
-            catalog=cat,
-        )
-        specialty_values = {opt["value"] for opt in specialty_options}
-        if specialty_name not in specialty_values:
-            specialty_name = None
-        return diagnosis_options, main_diagnosis, specialty_options, specialty_name
+    if (new_diag != main_diagnosis) or (new_spec != specialty_name) or (new_sid != sid):
+        diagnosis_options = _diagnosis_options_for_filters(cat, new_spec, new_sid)
+        specialty_options = _specialty_options_for_filters(cat, new_diag, new_sid)
+        service_options = _matrix_service_options(cat, new_diag, new_spec)
 
-    return diagnosis_options, main_diagnosis, specialty_options, specialty_name
+    return diagnosis_options, new_diag, specialty_options, new_spec, service_options, new_sid
 
 
 @app.callback(
@@ -516,7 +656,7 @@ def sync_main_diagnosis_and_specialty(main_diagnosis, specialty_name, catalog):
 )
 def pick_populate_add_dropdowns(main_diagnosis, specialty_name, catalog):
     """Список услуг и групп для текущего справочника и диагноза."""
-    cat = catalog or "global"
+    cat = catalog or default_active_catalog()
     if not main_diagnosis:
         return [], []
     eng = get_engine()
@@ -569,7 +709,7 @@ def pick_add_cost_preview(
     service_ids,
 ):
     """Суммы только в блоке добавления; верхняя сводка не зависит от выбора услуги здесь."""
-    cat = catalog or "global"
+    cat = catalog or default_active_catalog()
     if not main_diagnosis or not specialty_name:
         return html.Div(
             "После выбора диагноза и специальности здесь будет сумма по текущему подбору и просмотр итого при добавлении услуг.",
@@ -715,6 +855,7 @@ def pick_add_cost_preview(
     State(f"dropdown-specialty-{type_page}", "value"),
     State(f"pick-add-service-{type_page}", "value"),
     State(f"pick-add-group-{type_page}", "value"),
+    State(f"pick-add-required-{type_page}", "value"),
     State("dash-dn-active-catalog", "data"),
     State("dash-dn-global-unlocked", "data"),
     State(f"pick-refresh-{type_page}", "data"),
@@ -726,6 +867,7 @@ def pick_add_requirement(
     specialty_name,
     service_ids,
     group_id,
+    required_flag,
     active_catalog,
     global_unlocked_state,
     refresh_val,
@@ -759,9 +901,11 @@ def pick_add_requirement(
         return dbc.Alert("Выберите группу диагнозов.", color="warning", className="py-2 mb-0"), refresh_val
 
     unlocked = bool(global_unlocked_state)
-    targets: list[str] = ["global", "user"] if unlocked else ["user"]
+    req_val = 1 if int(required_flag or 1) == 1 else 0
+    mb, ma = matrix_catalog_before(), matrix_catalog_after()
+    targets: list[str] = [mb, ma, "user"] if unlocked else ["user"]
 
-    source_cat = active_catalog or "global"
+    source_cat = active_catalog or default_active_catalog()
 
     eng = get_engine()
 
@@ -820,7 +964,7 @@ def pick_add_requirement(
                     if err:
                         return (
                             dbc.Alert(
-                                f"В каталоге «{cat}» нет {err}. Скопируйте global→user или добавьте сущности в справочнике.",
+                                f"В каталоге «{cat}» нет {err}. Скопируйте базу в user или добавьте сущности в справочнике.",
                                 color="danger",
                                 className="py-2 mb-0",
                             ),
@@ -834,16 +978,21 @@ def pick_add_requirement(
                     text(
                         """
                         INSERT INTO dn_service_requirement (catalog, service_id, group_id, specialty_id, is_required)
-                        VALUES (:c, :sid, :gid, :spid, 1)
-                        ON CONFLICT(catalog, service_id, group_id, specialty_id) DO NOTHING
+                        VALUES (:c, :sid, :gid, :spid, :ir)
+                        ON CONFLICT(catalog, service_id, group_id, specialty_id) DO UPDATE SET is_required = excluded.is_required
                         """
                     ),
-                    {"c": cat, "sid": sid, "gid": gid, "spid": spid},
+                    {"c": cat, "sid": sid, "gid": gid, "spid": spid, "ir": req_val},
                 )
 
-        layer_hint = "эталон и локальный слой" if unlocked else "только локальный слой"
+        layer_hint = (
+            "общий справочник и рабочая копия"
+            if unlocked
+            else "только в рабочую копию (общий справочник не меняется)"
+        )
+        req_hint = "обязательная" if req_val == 1 else "необязательная"
         msg = dbc.Alert(
-            f"Сохранено связей: {len(resolved)} ({layer_hint}). Таблица ниже обновлена.",
+            f"Сохранено связей: {len(resolved)} ({layer_hint}), тип: {req_hint}. Таблица ниже обновлена.",
             color="success",
             className="py-2 mb-0",
         )
@@ -856,18 +1005,19 @@ def pick_add_requirement(
     Output(f"dropdown-additional-diagnoses-{type_page}", "options"),
     Output(f"dropdown-additional-diagnoses-{type_page}", "value"),
     Input(f"dropdown-specialty-{type_page}", "value"),
+    Input(f"dropdown-matrix-service-{type_page}", "value"),
     Input("dash-dn-active-catalog", "data"),
     State(f"dropdown-main-diagnosis-{type_page}", "value"),
 )
-def update_additional_diagnoses(specialty_name, catalog, main_diagnosis):
+def update_additional_diagnoses(specialty_name, matrix_service_id, catalog, main_diagnosis):
     if not specialty_name:
         return [], []
-    cat = catalog or "global"
-    options = _fetch_options(
-        DIAGNOSES_FOR_SPECIALTY_SQL,
-        {"specialty_name": specialty_name},
-        catalog=cat,
-    )
+    cat = catalog or default_active_catalog()
+    try:
+        sid = int(matrix_service_id) if matrix_service_id not in (None, "") else None
+    except (TypeError, ValueError):
+        sid = None
+    options = _diagnosis_options_for_filters(cat, specialty_name=specialty_name, service_id=sid)
     filtered_options = [opt for opt in options if opt["value"] != main_diagnosis]
     return filtered_options, []
 
@@ -879,11 +1029,12 @@ def update_additional_diagnoses(specialty_name, catalog, main_diagnosis):
     Input(f"dropdown-main-diagnosis-{type_page}", "value"),
     Input(f"dropdown-specialty-{type_page}", "value"),
     Input(f"dropdown-additional-diagnoses-{type_page}", "value"),
+    Input(f"dropdown-matrix-service-{type_page}", "value"),
     Input("dash-dn-active-catalog", "data"),
     Input(f"pick-refresh-{type_page}", "data"),
 )
-def show_dn_services(main_diagnosis, specialty_name, additional_diagnoses, catalog, _pick_refresh):
-    cat = catalog or "global"
+def show_dn_services(main_diagnosis, specialty_name, additional_diagnoses, matrix_service_id, catalog, _pick_refresh):
+    cat = catalog or default_active_catalog()
     if not main_diagnosis:
         return dbc.Alert("Выберите основной диагноз.", color="secondary", className="mb-0"), [], []
     if not specialty_name:
@@ -908,6 +1059,20 @@ def show_dn_services(main_diagnosis, specialty_name, additional_diagnoses, catal
             },
         ).fetchall()
 
+        selected_service_label = None
+        if matrix_service_id not in (None, ""):
+            try:
+                sid = int(matrix_service_id)
+            except (TypeError, ValueError):
+                sid = None
+            if sid:
+                svc_row = connection.execute(
+                    text("SELECT code, name FROM dn_service WHERE id = :id AND catalog = :c"),
+                    {"id": sid, "c": cat},
+                ).mappings().first()
+                if svc_row:
+                    selected_service_label = f"{svc_row['code']} — {svc_row['name']}"
+
     summary_parts = [
         dbc.Row(
             [
@@ -922,6 +1087,16 @@ def show_dn_services(main_diagnosis, specialty_name, additional_diagnoses, catal
             html.Div(
                 [html.Strong("Сопутствующие: ", className="text-secondary"), ", ".join(diagnosis_codes[1:])],
                 className="small",
+            )
+        )
+    if selected_service_label:
+        summary_parts.append(
+            html.Div(
+                [
+                    html.Strong("Услуга-фильтр (для подбора параметров): ", className="text-secondary"),
+                    selected_service_label,
+                ],
+                className="small mt-1",
             )
         )
 

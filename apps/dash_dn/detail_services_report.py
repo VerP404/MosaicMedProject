@@ -91,6 +91,31 @@ def filter_detail_rows_by_valid_service(
 ICD10_CODE_RE = re.compile(r"\b([A-Z]\d{2}(?:\.\d+)?)\b", re.IGNORECASE)
 
 
+def _norm_text(s: str | None) -> str:
+    if s is None:
+        return ""
+    t = str(s).strip().replace("\u00a0", " ").lower()
+    t = t.replace("ё", "е")
+    t = re.sub(r"[\"'`]+", " ", t)
+    t = re.sub(r"[^0-9a-zа-я]+", " ", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s+", " ", t).strip()
+    # часто в поле бывает "врач ...", "врач-терапевт" — это шум
+    t = t.replace("врач ", "").replace("врач", "").strip()
+    return t
+
+
+def _decode_csv_bytes(raw: bytes) -> str:
+    """CSV из web.ОМС встречается как UTF-8-SIG или CP1251."""
+    try:
+        text_u8 = raw.decode("utf-8-sig")
+        # если много replacement-символов, это почти наверняка не utf-8
+        if "\ufffd" in text_u8:
+            raise UnicodeDecodeError("utf-8", raw, 0, 1, "replacement chars")
+        return text_u8
+    except Exception:
+        return raw.decode("cp1251", errors="replace")
+
+
 def resolve_reference_path() -> Path:
     env = os.environ.get("DASH_DN_DETAIL_SERVICES_REF")
     if env:
@@ -168,7 +193,12 @@ def load_allowed_service_codes(xlsx_path: Path) -> set[str]:
         c = _norm_code(str(raw))
         if not c or _is_missing_code(c):
             continue
-        allowed.add(c.upper())
+        uc = c.upper()
+        allowed.add(uc)
+        # Добавляем базовый код (Axx.xx.xxx), чтобы уточнения .xxx не считались «левыми».
+        m = SERVICE_CODE_RE.match(uc)
+        if m:
+            allowed.add(m.group(1).upper())
     wb.close()
     return allowed
 
@@ -248,6 +278,119 @@ def load_required_services_for_icd_codes(
     return out
 
 
+def load_specialties_from_db(
+    catalog: str = "global",
+    *,
+    engine: Engine | None = None,
+) -> list[tuple[int, str]]:
+    """Список активных специальностей (id, name)."""
+    from apps.dash_dn.sqlite_catalog.db import get_engine
+
+    eng = engine or get_engine()
+    q = text(
+        """
+        SELECT id, name
+        FROM dn_specialty
+        WHERE catalog = :cat AND is_active = 1
+        ORDER BY name
+        """
+    )
+    out: list[tuple[int, str]] = []
+    with eng.connect() as conn:
+        for sid, name in conn.execute(q, {"cat": catalog}).fetchall():
+            if sid is None or name is None:
+                continue
+            out.append((int(sid), str(name)))
+    return out
+
+
+def _match_specialty_id(
+    specialty_text: str,
+    position_text: str,
+    specialties: list[tuple[int, str]],
+) -> int | None:
+    """Пытается сопоставить специальность талона со справочником dn_specialty."""
+    src = " ".join([_norm_text(specialty_text), _norm_text(position_text)]).strip()
+    if not src:
+        return None
+    src_tokens = set(src.split())
+    best: tuple[float, int] | None = None
+    for sid, name in specialties:
+        n = _norm_text(name)
+        if not n:
+            continue
+        # 1) точное вхождение
+        if n and (n in src or src in n):
+            score = 10.0 + min(len(n), len(src)) / 100.0
+        else:
+            toks = set(n.split())
+            if not toks:
+                continue
+            inter = len(src_tokens & toks)
+            if inter == 0:
+                continue
+            score = inter / max(len(toks), 1)
+        if best is None or score > best[0]:
+            best = (score, sid)
+    if best is None:
+        return None
+    # слабые совпадения отбрасываем
+    return best[1] if best[0] >= 0.34 else None
+
+
+def load_required_services_for_icd_codes_by_specialty(
+    icd_codes: set[str] | list[str],
+    specialty_ids: set[int],
+    catalog: str = "global",
+    *,
+    engine: Engine | None = None,
+) -> dict[tuple[str, int], list[tuple[str, str]]]:
+    """(МКБ, specialty_id) -> список (код услуги, название) для обязательных услуг."""
+    from apps.dash_dn.sqlite_catalog.db import get_engine
+
+    codes = sorted({c.upper().strip() for c in icd_codes if c and str(c).strip()})
+    spec_ids = sorted({int(x) for x in (specialty_ids or set()) if int(x) > 0})
+    out: dict[tuple[str, int], list[tuple[str, str]]] = {(c, sid): [] for c in codes for sid in spec_ids}
+    if not codes or not spec_ids:
+        return {}
+    eng = engine or get_engine()
+    q = text(
+        """
+        SELECT DISTINCT
+               UPPER(TRIM(d.code)) AS dcode,
+               sr.specialty_id AS sid,
+               srv.code AS scode,
+               srv.name AS sname
+        FROM dn_diagnosis d
+        JOIN dn_diagnosis_group_membership gm
+          ON gm.diagnosis_id = d.id AND gm.catalog = :cat AND gm.is_active = 1
+        JOIN dn_service_requirement sr
+          ON sr.group_id = gm.group_id AND sr.catalog = :cat AND sr.is_required = 1
+        JOIN dn_service srv
+          ON srv.id = sr.service_id AND srv.catalog = :cat AND srv.is_active = 1
+        WHERE d.catalog = :cat AND d.is_active = 1
+          AND UPPER(TRIM(d.code)) IN :codes
+          AND sr.specialty_id IN :specs
+        ORDER BY dcode, sid, scode
+        """
+    ).bindparams(bindparam("codes", expanding=True), bindparam("specs", expanding=True))
+    with eng.connect() as conn:
+        rows = conn.execute(q, {"cat": catalog, "codes": codes, "specs": spec_ids}).fetchall()
+    seen: dict[tuple[str, int], set[tuple[str, str]]] = defaultdict(set)
+    for dcode, sid, scode, sname in rows:
+        if dcode is None or sid is None or scode is None:
+            continue
+        key = (str(dcode).upper(), int(sid))
+        if key not in out:
+            out[key] = []
+        t = (str(scode), str(sname) if sname is not None else "")
+        if t in seen[key]:
+            continue
+        seen[key].add(t)
+        out[key].append(t)
+    return out
+
+
 def _service_codes_only(items: list[tuple[str, str]]) -> list[str]:
     """Только коды услуг, без названий; порядок как в справочнике, без дубликатов."""
     out: list[str] = []
@@ -315,14 +458,14 @@ def _ticket_required_services_issues(
     ds2_codes: list[str],
     trows: list[dict[str, str]],
     allowed_codes: set[str],
-    svc_by_icd: dict[str, list[tuple[str, str]]],
+    required_codes: list[str],
 ) -> list[str]:
     """Проверка обязательных услуг в мягком режиме:
     если обязательные есть, должна быть хотя бы одна из них; лишние не считаются ошибкой.
     """
     # Для текущего свода ориентируемся на основной диагноз (DS1):
     # это убирает ложные срабатывания из-за сопутствующих DS2.
-    required = _required_service_codes_for_ticket(ds1_code, [], svc_by_icd)
+    required = required_codes
     if not required:
         return []
     present = _present_service_code_bases(trows, allowed_codes)
@@ -439,7 +582,18 @@ def load_allowed_service_codes_from_db(
     )
     with eng.connect() as conn:
         rows = conn.execute(q, {"cat": catalog}).fetchall()
-    return {r[0] for r in rows if r[0]}
+    allowed: set[str] = set()
+    for (code,) in rows:
+        if not code:
+            continue
+        uc = str(code).upper()
+        allowed.add(uc)
+        # В справочнике могут храниться уточнения вида A06.09.007.002.
+        # Для валидации выгрузок считаем допустимой и базу A06.09.007, если есть любой A06.09.007.xxx.
+        m = SERVICE_CODE_RE.match(uc)
+        if m:
+            allowed.add(m.group(1).upper())
+    return allowed
 
 
 def pick_csv_path(script_dir: Path, explicit: Path | None) -> Path:
@@ -469,7 +623,7 @@ def read_detail_csv_from_text(text: str) -> tuple[list[str], list[dict[str, str]
 
 
 def read_detail_csv_from_bytes(raw: bytes) -> tuple[list[str], list[dict[str, str]]]:
-    text = raw.decode("utf-8-sig")
+    text = _decode_csv_bytes(raw)
     return read_detail_csv_from_text(text)
 
 
@@ -573,6 +727,13 @@ def build_report(
     col_doctor = "Врач"
     col_unit = "Подразделение"
     col_enp = "ЕНП"
+    col_report_period = "Отчетный период"
+    col_formed_date = (
+        "Дата формирования"
+        if "Дата формирования" in rows[0]
+        else ("Дата выгрузки" if "Дата выгрузки" in rows[0] else "Дата формирования")
+    )
+    col_treatment_end = "Окончание лечения"
 
     if not rows:
         raise ValueError("В CSV нет строк данных.")
@@ -586,6 +747,9 @@ def build_report(
     has_doctor_col = col_doctor in rows[0]
     has_unit_col = col_unit in rows[0]
     has_enp_col = col_enp in rows[0]
+    has_report_period_col = col_report_period in rows[0]
+    has_formed_date_col = col_formed_date in rows[0]
+    has_treatment_end_col = col_treatment_end in rows[0]
 
     rows_raw_total = len(rows)
     tids_in_file = {
@@ -640,7 +804,36 @@ def build_report(
         if has_ds2:
             for c in _icd_codes_in_text(_norm_code(row.get(col_ds2, ""))):
                 all_icd_in_file.add(c.upper())
-    svc_by_icd = load_required_services_for_icd_codes(all_icd_in_file, catalog="global")
+    # Специальность/должность: для подбора обязательных услуг по (МКБ, specialty).
+    # В разных выгрузках названия колонок отличаются, поэтому ищем по подстроке в заголовках.
+    headers = [str(k) for k in (rows[0].keys() if rows else [])]
+
+    def _find_col(*needles: str) -> str | None:
+        for h in headers:
+            hl = str(h or "").lower()
+            if all(n in hl for n in needles):
+                return h
+        return None
+
+    col_specialty = _find_col("спец") or _find_col("special") or _find_col("специал")
+    col_position = _find_col("долж") or _find_col("post") or _find_col("position")
+
+    specialties = load_specialties_from_db(catalog="global")
+    # соберём все speciality_id, которые встречаются в файле
+    spec_ids: set[int] = set()
+    ticket_specialty: dict[str, int | None] = {}
+    for tid, trows in ticket_rows.items():
+        first = trows[0]
+        s_txt = _norm_code(first.get(col_specialty)) if col_specialty else ""
+        p_txt = _norm_code(first.get(col_position)) if col_position else ""
+        sid = _match_specialty_id(s_txt, p_txt, specialties)
+        ticket_specialty[tid] = sid
+        if sid is not None:
+            spec_ids.add(int(sid))
+
+    svc_by_icd_spec = load_required_services_for_icd_codes_by_specialty(
+        all_icd_in_file, spec_ids, catalog="global"
+    )
 
     dx_lookup = diagnosis_lookup if diagnosis_lookup is not None else {}
     use_dx = diagnosis_lookup is not None
@@ -681,17 +874,31 @@ def build_report(
         doctor_t = _norm_code(first.get(col_doctor)) if has_doctor_col else ""
         unit_t = _norm_code(first.get(col_unit)) if has_unit_col else ""
         enp_t = _norm_code(first.get(col_enp)) if has_enp_col else ""
+        specialty_t = _norm_code(first.get(col_specialty)) if col_specialty else ""
+        position_t = _norm_code(first.get(col_position)) if col_position else ""
 
         ds1_category = ""
         ds2_cat_line = ""
+        ds2_bucket_labels: list[str] = []
         ds1_ok = True
         svc_issues = _service_line_issues(trows, allowed_codes)
+        sid = ticket_specialty.get(tid)
+        required_codes: list[str] = []
+        if ds1_code and sid is not None:
+            items = svc_by_icd_spec.get((ds1_code.upper(), int(sid))) or []
+            # сравниваем по базе Axx.xx.xxx
+            seen_req: set[str] = set()
+            for sc, _ in items:
+                base = _service_code_base(sc)
+                if base and base not in seen_req:
+                    seen_req.add(base)
+                    required_codes.append(base)
         svc_issues += _ticket_required_services_issues(
             ds1_code,
             codes_ds2,
             trows,
             allowed_codes,
-            svc_by_icd,
+            required_codes,
         )
         ticket_service_issues[tid] = svc_issues
         svc_ok = not svc_issues
@@ -704,6 +911,7 @@ def build_report(
                 parts2.append(f"{c} — {lab}")
                 key2 = lab if ok else "нет в справочнике (сопутствующий)"
                 by_category_ds2[key2] += 1
+                ds2_bucket_labels.append(key2)
             ds2_cat_line = "; ".join(parts2)
 
             bucket = _main_category_bucket(ds1_code, diagnosis, dx_lookup)
@@ -797,12 +1005,19 @@ def build_report(
                 "статус": _status_from_row(first),
                 "врач": doctor_t,
                 "подразделение": unit_t,
+                "специальность": specialty_t,
+                "должность": position_t,
+                "specialty_id": ticket_specialty.get(tid) if tid in ticket_specialty else None,
+                "отчетный_период": _norm_code(first.get(col_report_period)) if has_report_period_col else "",
+                "дата_формирования": _norm_code(first.get(col_formed_date)) if has_formed_date_col else "",
+                "дата_окончания_лечения": _norm_code(first.get(col_treatment_end)) if has_treatment_end_col else "",
                 "диагноз": diagnosis,
                 "ds1_code": ds1_code,
                 "ds1_category": ds1_category,
                 "ds2_raw": ds2_raw,
                 "ds2_codes": ", ".join(codes_ds2),
                 "ds2_categories_line": ds2_cat_line,
+                "ds2_categories": ds2_bucket_labels,
                 "diagnosis_note": diagnosis_note,
                 "число_строк_услуг": n_services,
                 "сумма_талона": ticket_sum,
@@ -881,7 +1096,13 @@ def build_report(
         ds2_list = (
             _icd_codes_in_text(_norm_code(first.get(col_ds2, ""))) if has_ds2 else []
         )
-        svc_suggest = _ticket_services_suggestion_text(ds1_c, ds2_list, svc_by_icd)
+        # Подсказка услуг: берём только DS1 и только для specialty талона.
+        sid = ticket_specialty.get(tid)
+        if ds1_c and sid is not None:
+            m = {ds1_c.upper(): (svc_by_icd_spec.get((ds1_c.upper(), int(sid))) or [])}
+            svc_suggest = _ticket_services_suggestion_text(ds1_c, [], m)
+        else:
+            svc_suggest = _ticket_services_suggestion_text(ds1_c, [], {})
         ds1_mkb = ds1_c.upper() if ds1_c else ""
         ds2_mkb_line = ", ".join(ds2_list) if ds2_list else ""
         tickets_service_mismatch.append(
@@ -891,6 +1112,9 @@ def build_report(
                 "статус": _status_from_row(first),
                 "врач": _norm_code(first.get(col_doctor)) if has_doctor_col else "",
                 "подразделение": _norm_code(first.get(col_unit)) if has_unit_col else "",
+                "специальность": _norm_code(first.get(col_specialty)) if col_specialty else "",
+                "должность": _norm_code(first.get(col_position)) if col_position else "",
+                "specialty_id": ticket_specialty.get(tid) if tid in ticket_specialty else None,
                 "диагноз": ds1_mkb,
                 "сопутствующие_мкб": ds2_mkb_line,
                 "услуги_по_диагнозам": svc_suggest,

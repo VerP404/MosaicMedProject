@@ -28,7 +28,9 @@ except ImportError:
 
 
 def main() -> None:
-    debug = os.getenv("DEBUG_DASH_DN", "True").lower() == "true"
+    # debug/hot-reload causes full page reloads (looks like F5) and resets UI state.
+    # Default to False; enable explicitly via DEBUG_DASH_DN=True when needed.
+    debug = os.getenv("DEBUG_DASH_DN", "False").lower() == "true"
     port = int(os.getenv("PORT_DASH_DN", "7777"))
     host = os.getenv("HOST_DASH_DN", "0.0.0.0")
 
@@ -39,6 +41,7 @@ def main() -> None:
     import apps.dash_dn.dn_services_page  # noqa: F401 - callbacks
     import apps.dash_dn.reference_pages  # noqa: F401 - reference UI + Store
     import apps.dash_dn.analysis_page  # noqa: F401 - анализ CSV выгрузки
+    import apps.dash_dn.iszl_page  # noqa: F401 - анализ CSV ИСЗЛ
 
     from apps.dash_dn.shell import init_layout
     from apps.dash_dn.app import dash_dn_app
@@ -50,6 +53,7 @@ def main() -> None:
         host=host,
         port=port,
         dev_tools_disable_version_check=True,
+        dev_tools_hot_reload=False,
     )
 
 

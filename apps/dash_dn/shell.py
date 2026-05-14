@@ -1,17 +1,19 @@
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
+from apps.dash_dn.catalog_periods import default_active_catalog
 from apps.dash_dn.app import dash_dn_app
 from apps.dash_dn.components.navbar import create_navbar
 from apps.dash_dn.dn_services_page import layout_body as dn_pick_layout
 from apps.dash_dn.reference_pages import layout_body as ref_layout
 from apps.dash_dn.analysis_page import layout_body as analysis_layout
+from apps.dash_dn.iszl_page import layout_body as iszl_layout
 
 
 def build_layout():
     return html.Div(
         [
-            dcc.Store(id="dash-dn-active-catalog", data="global"),
+            dcc.Store(id="dash-dn-active-catalog", data=default_active_catalog()),
             dcc.Store(id="dash-dn-global-unlocked", data=False),
             create_navbar(),
             html.Main(
@@ -43,6 +45,15 @@ def build_layout():
                                     tab_class_name="fw-semibold",
                                     children=html.Div(
                                         analysis_layout(),
+                                        className="pt-3",
+                                    ),
+                                ),
+                                dbc.Tab(
+                                    label="ИСЗЛ",
+                                    tab_id="tab-iszl",
+                                    tab_class_name="fw-semibold",
+                                    children=html.Div(
+                                        iszl_layout(),
                                         className="pt-3",
                                     ),
                                 ),

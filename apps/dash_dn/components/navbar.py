@@ -1,8 +1,10 @@
-# Навбар dash_dn: бренд, организация, источник данных, пароль режима эталона, дата/время.
+# Навбар dash_dn: бренд, период матрицы (до/после 01.04.2026 + копия правок), пароль админа.
 import os
 
 import dash_bootstrap_components as dbc
 from dash import dcc, html
+
+from apps.dash_dn.catalog_periods import default_active_catalog, main_nav_catalog_options
 
 
 def get_organization_name():
@@ -11,6 +13,8 @@ def get_organization_name():
 
 def create_navbar():
     organization_name = get_organization_name()
+    _nav_opts = main_nav_catalog_options()
+    _nav_val = default_active_catalog()
 
     logo_block = html.A(
         dbc.Row(
@@ -49,30 +53,28 @@ def create_navbar():
         className="text-center px-2",
     )
 
-    # Источник данных + пароль эталона + индикация режима (колбэки в dn_services_page)
     toolbar = html.Div(
         [
             html.Div(
                 [
                     html.Span(
-                        "Данные",
-                        className="text-white-50 small fw-semibold text-uppercase",
-                        style={"letterSpacing": "0.04em"},
+                        "Период матрицы",
+                        className="text-white small fw-semibold text-nowrap me-sm-2",
                     ),
-                    dcc.RadioItems(
+                    dcc.Dropdown(
                         id="dash-dn-pick-catalog",
-                        options=[
-                            {"label": " общий эталон", "value": "global"},
-                            {"label": " локальный слой", "value": "user"},
-                        ],
-                        value="global",
-                        className="d-flex flex-wrap gap-2 gap-sm-3 align-items-center mb-0",
-                        inputClassName="form-check-input border border-2 border-light shadow-none",
-                        labelStyle={
-                            "fontSize": "0.78rem",
-                            "color": "rgba(255,255,255,0.92)",
-                            "cursor": "pointer",
-                            "marginBottom": 0,
+                        options=_nav_opts,
+                        value=_nav_val,
+                        clearable=False,
+                        searchable=False,
+                        className="dash-dn-catalog-dd",
+                        style={
+                            "minWidth": "min(220px, 88vw)",
+                            "maxWidth": "360px",
+                            "fontSize": "0.85rem",
+                            "backgroundColor": "#fff",
+                            "color": "#212529",
+                            "borderRadius": "0.375rem",
                         },
                     ),
                 ],
@@ -87,28 +89,31 @@ def create_navbar():
                     dbc.Input(
                         id="dash-dn-inp-global-pwd",
                         type="password",
-                        placeholder="Пароль эталона",
+                        placeholder="Пароль",
                         autoComplete="off",
                         size="sm",
                         className="text-dark",
-                        style={"width": "min(148px, 38vw)", "minWidth": "96px"},
+                        style={"width": "min(100px, 26vw)", "minWidth": "72px"},
                     ),
                     dbc.Button(
-                        [html.I(className="bi bi-unlock-fill me-1"), "Включить"],
+                        html.I(className="bi bi-unlock-fill"),
                         id="dash-dn-btn-global-unlock",
                         color="warning",
                         size="sm",
-                        className="text-dark fw-semibold",
+                        className="text-dark",
+                        title="Разрешить правку общего справочника",
                     ),
                     dbc.Button(
-                        [html.I(className="bi bi-lock-fill me-1"), "Выйти"],
+                        html.I(className="bi bi-lock-fill"),
                         id="dash-dn-btn-global-lock",
                         outline=True,
                         color="light",
                         size="sm",
+                        title="Обычный режим",
                     ),
                 ],
                 className="d-flex align-items-center gap-1 flex-wrap",
+                title="Пароль администратора — для правки общего справочника (вкладка «Справочники»)",
             ),
             html.Div(
                 id="dash-dn-edit-mode-badge",
@@ -117,7 +122,7 @@ def create_navbar():
             html.Div(
                 id="dash-dn-global-unlock-msg",
                 className="small text-end text-warning",
-                style={"maxWidth": "240px", "lineHeight": "1.2"},
+                style={"maxWidth": "200px", "lineHeight": "1.2"},
             ),
         ],
         className=(

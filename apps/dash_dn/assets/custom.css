@@ -1,0 +1,20 @@
+/* Каталог в тёмном навбаре: читаемый react-select (разные версии Dash) */
+.dash-dn-catalog-dd .Select-control,
+.dash-dn-catalog-dd .Select-menu-outer {
+  background-color: #fff !important;
+  color: #212529 !important;
+}
+.dash-dn-catalog-dd .Select-value-label,
+.dash-dn-catalog-dd .Select-placeholder {
+  color: #212529 !important;
+}
+.dash-dn-catalog-dd .Select-input > input {
+  color: #212529 !important;
+}
+.dash-dn-catalog-dd [class*="-Control"] {
+  background-color: #fff !important;
+}
+.dash-dn-catalog-dd [class*="-singleValue"],
+.dash-dn-catalog-dd [class*="-placeholder"] {
+  color: #212529 !important;
+}

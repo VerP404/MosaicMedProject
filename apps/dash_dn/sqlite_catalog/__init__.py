@@ -1,4 +1,5 @@
 from apps.dash_dn.sqlite_catalog.catalog_ops import (
+    copy_catalog_to_user,
     copy_global_to_user,
     export_catalog,
     import_catalog,
@@ -10,6 +11,7 @@ from apps.dash_dn.sqlite_catalog.db import ensure_database, get_engine
 from apps.dash_dn.sqlite_catalog.paths import get_db_path
 
 __all__ = [
+    "copy_catalog_to_user",
     "copy_global_to_user",
     "export_catalog",
     "get_db_path",

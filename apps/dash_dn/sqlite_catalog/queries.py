@@ -8,7 +8,7 @@ SPECIALTIES_OPTIONS_SQL = text(
     SELECT DISTINCT s.name AS value, s.name AS label
     FROM dn_specialty s
     JOIN dn_service_requirement sr
-      ON sr.specialty_id = s.id AND sr.catalog = :catalog AND sr.is_required = 1
+      ON sr.specialty_id = s.id AND sr.catalog = :catalog
     WHERE s.catalog = :catalog AND s.is_active = 1
     ORDER BY s.name
     """
@@ -39,7 +39,7 @@ SPECIALTIES_FOR_DIAGNOSIS_SQL = text(
       ON gm.diagnosis_id = d.id AND gm.catalog = :catalog AND gm.is_active = 1
     JOIN dn_service_requirement sr
       ON sr.group_id = gm.group_id AND sr.catalog = :catalog
-     AND sr.specialty_id = s.id AND sr.is_required = 1
+     AND sr.specialty_id = s.id
     WHERE d.code = :diagnosis_code AND s.is_active = 1 AND d.is_active = 1
     ORDER BY s.name
     """
@@ -60,7 +60,7 @@ DIAGNOSES_FOR_SPECIALTY_SQL = text(
       ON gm.diagnosis_id = d.id AND gm.catalog = :catalog AND gm.is_active = 1
     JOIN dn_service_requirement sr
       ON sr.group_id = gm.group_id AND sr.catalog = :catalog
-     AND sr.specialty_id = s.id AND sr.is_required = 1
+     AND sr.specialty_id = s.id
     WHERE s.name = :specialty_name AND s.is_active = 1 AND d.is_active = 1
     ORDER BY d.code
     """
@@ -85,7 +85,8 @@ SERVICES_FOR_DIAGNOSES_FLAT_SQL = text(
         srv.name AS name,
         ap.price AS price,
         d.code AS diagnosis_code,
-        grp.title AS group_title
+        grp.title AS group_title,
+        sr.is_required AS is_required
     FROM dn_service_requirement sr
     JOIN dn_service srv ON srv.id = sr.service_id AND srv.catalog = :catalog
     LEFT JOIN actual_prices ap ON ap.service_id = srv.id AND ap.rn = 1
@@ -96,7 +97,6 @@ SERVICES_FOR_DIAGNOSES_FLAT_SQL = text(
     JOIN dn_specialty s ON s.id = sr.specialty_id AND s.catalog = :catalog
     WHERE s.name = :specialty_name
       AND d.code IN :diagnosis_codes
-      AND sr.is_required = 1
       AND srv.is_active = 1
       AND sr.catalog = :catalog
     ORDER BY srv.name, srv.code, d.code
