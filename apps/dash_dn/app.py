@@ -13,6 +13,22 @@ _LOCAL_ASSETS = _CURRENT / "assets"
 # находятся в `apps/analytical_app/assets/`. Поэтому для офлайн-режима всегда используем
 # assets аналитического приложения.
 _ASSETS = _ANALYTICAL_ASSETS
+_DASH_DN_CUSTOM_CSS = _ASSETS / "dash_dn_custom.css"
+
+
+def _sync_dash_dn_custom_css() -> None:
+    """Копирует custom.css в assets_folder — Dash подхватит файл автоматически (без html.Style)."""
+    src = _LOCAL_ASSETS / "custom.css"
+    if not src.is_file():
+        return
+    try:
+        if not _DASH_DN_CUSTOM_CSS.exists() or src.stat().st_mtime > _DASH_DN_CUSTOM_CSS.stat().st_mtime:
+            _DASH_DN_CUSTOM_CSS.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    except OSError:
+        pass
+
+
+_sync_dash_dn_custom_css()
 
 dash_dn_app = dash.Dash(
     __name__,
