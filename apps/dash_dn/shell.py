@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
@@ -11,10 +13,19 @@ from apps.dash_dn.iszl_page import layout_body as iszl_layout
 
 
 def build_layout():
+    # Оставляем кастомные стили dash_dn локально (файл `apps/dash_dn/assets/custom.css`),
+    # чтобы они не потерялись при переключении `assets_folder`.
+    custom_css_path = Path(__file__).resolve().parent / "assets" / "custom.css"
+    try:
+        custom_css = custom_css_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        custom_css = ""
+
     return html.Div(
         [
             dcc.Store(id="dash-dn-active-catalog", data=default_active_catalog()),
             dcc.Store(id="dash-dn-global-unlocked", data=False),
+            html.Style(custom_css),
             create_navbar(),
             html.Main(
                 dbc.Container(

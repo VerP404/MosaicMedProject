@@ -9,15 +9,18 @@ os.environ.setdefault("DASH_DISABLE_VERSION_CHECK", "true")
 _CURRENT = Path(__file__).resolve().parent
 _ANALYTICAL_ASSETS = _CURRENT.parent / "analytical_app" / "assets"
 _LOCAL_ASSETS = _CURRENT / "assets"
-_ASSETS = _LOCAL_ASSETS if _LOCAL_ASSETS.is_dir() else _ANALYTICAL_ASSETS
-_BOOTSTRAP_ICONS = "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+# В `apps/dash_dn/assets/` лежит только `custom.css`, а `bootstrap*.css` и шрифты bootstrap-icons
+# находятся в `apps/analytical_app/assets/`. Поэтому для офлайн-режима всегда используем
+# assets аналитического приложения.
+_ASSETS = _ANALYTICAL_ASSETS
 
 dash_dn_app = dash.Dash(
     __name__,
     suppress_callback_exceptions=True,
+    # Подключаем Bootstrap и bootstrap-icons локально, чтобы не зависеть от интернета.
     external_stylesheets=[
-        dbc.themes.BOOTSTRAP,
-        _BOOTSTRAP_ICONS,
+        "/assets/css/bootstrap.min.css",
+        "/assets/css/bootstrap-icons.css",
     ],
     assets_folder=str(_ASSETS.resolve()),
     serve_locally=True,
