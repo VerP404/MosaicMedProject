@@ -194,7 +194,7 @@ COALESCE(SUM(1) FILTER(WHERE mon = 1 AND sending_status = 'Документ ус
     """
 
 
-def sql_query_adults_appointments_not_passed(selected_year: int, visit_start_date: str, visit_end_date: str, exclude_departments: list[str] | None = None) -> str:
+def sql_query_adults_appointments_not_passed(selected_year: int, visit_start_date: str, visit_end_date: str, include_departments: list[str] | None = None) -> str:
     """
     Пациенты 18+ по состоянию на выбранный год, которые записаны на прием (журнал обращений)
     в интервале дат, но НЕ имеют в load_data_oms_data целей 'ДВ4' или 'ОПВ' в указанном отчетном году.
@@ -202,13 +202,14 @@ def sql_query_adults_appointments_not_passed(selected_year: int, visit_start_dat
     :param selected_year: Год отчета (int)
     :param visit_start_date: Дата начала (YYYY-MM-DD)
     :param visit_end_date: Дата окончания (YYYY-MM-DD)
+    :param include_departments: Если задано — только записи из этих подразделений
     """
-    # Исключение подразделений
-    exclude_clause = ""
-    if exclude_departments:
-        safe_vals = [str(v).replace("'", "''") for v in exclude_departments if isinstance(v, str) and v.strip()]
+    # Фильтр по выбранным подразделениям
+    include_clause = ""
+    if include_departments:
+        safe_vals = [str(v).replace("'", "''") for v in include_departments if isinstance(v, str) and v.strip()]
         if safe_vals:
-            exclude_clause = " AND ap.department NOT IN (" + ", ".join([f"'{v}'" for v in safe_vals]) + ")"
+            include_clause = " AND ap.department IN (" + ", ".join([f"'{v}'" for v in safe_vals]) + ")"
 
     return f"""
 WITH appointments AS (
@@ -296,7 +297,7 @@ WHERE a.age_years >= 18
           AND o.goal IN ('ДВ4', 'ОПВ')
           AND o.report_year = {selected_year}
     )
-{"" if not exclude_clause else exclude_clause}
+{"" if not include_clause else include_clause}
 ORDER BY ap.appointment_ts DESC, a.lpuuch, a.fio
     """
 

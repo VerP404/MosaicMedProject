@@ -26,12 +26,12 @@ adults_dv12 = html.Div([
                 dbc.Col(date_picker(type_page), width=3),
                 dbc.Col(
                     html.Div([
-                        html.Label("Исключить подразделения"),
+                        html.Label("Только подразделения"),
                         dcc.Dropdown(
-                            id=f'dropdown-exclude-dept-{type_page}', 
+                            id=f'dropdown-include-dept-{type_page}', 
                             options=[], 
                             multi=True, 
-                            placeholder="Выберите подразделения",
+                            placeholder="Все подразделения (если не выбрано)",
                             style={'minHeight': '60px'},
                             optionHeight=50
                         )
@@ -52,7 +52,7 @@ adults_dv12 = html.Div([
 
 
 @app.callback(
-    Output(f'dropdown-exclude-dept-{type_page}', 'options'),
+    Output(f'dropdown-include-dept-{type_page}', 'options'),
     [Input(f'dropdown-year-{type_page}', 'value')]
 )
 def load_departments(year_value):
@@ -83,9 +83,9 @@ def load_departments(year_value):
     [State(f'dropdown-year-{type_page}', 'value'),
      State(f'date-picker-range-{type_page}', 'start_date'),
      State(f'date-picker-range-{type_page}', 'end_date'),
-     State(f'dropdown-exclude-dept-{type_page}', 'value')]
+     State(f'dropdown-include-dept-{type_page}', 'value')]
 )
-def update_table(n_clicks, year_value, start_date, end_date, exclude_depts):
+def update_table(n_clicks, year_value, start_date, end_date, include_depts):
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
@@ -96,8 +96,8 @@ def update_table(n_clicks, year_value, start_date, end_date, exclude_depts):
     start_date_sql = start_date.split('T')[0]
     end_date_sql = end_date.split('T')[0]
 
-    exclude_depts = exclude_depts or []
-    query = sql_query_adults_appointments_not_passed(int(year_value), start_date_sql, end_date_sql, exclude_depts)
+    include_depts = include_depts or []
+    query = sql_query_adults_appointments_not_passed(int(year_value), start_date_sql, end_date_sql, include_depts)
     try:
         columns, data = TableUpdater.query_to_df(engine, query)
     except Exception as e:
