@@ -70,7 +70,8 @@ schedule_storage:
     webserver_cmd = ["dagit", "--host", args.host, "--port", args.port]
 
     # Если Linux, оборачиваем команды в xvfb-run для эмуляции дисплея
-    if platform.system() == "Linux":
+    use_xvfb = os.getenv("DAGSTER_USE_XVFB", "1").strip() not in {"0", "false", "no"}
+    if platform.system() == "Linux" and use_xvfb:
         daemon_cmd = ["xvfb-run", "-a"] + daemon_cmd
         webserver_cmd = ["xvfb-run", "-a"] + webserver_cmd
     print("Запускаем daemon:", " ".join(daemon_cmd))

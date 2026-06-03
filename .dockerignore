@@ -1,0 +1,45 @@
+.venv
+venv
+env
+.git
+.idea
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+.env
+.env.*
+!.env.docker.example
+
+*.log
+celery_debug.log
+db.sqlite3
+
+# Бэкапы и тяжёлые данные (монтируются volumes или backup/)
+backup/
+*.sql
+*.rar
+*.zip
+
+# ETL / dagster на хосте — не в образ, только volumes
+mosaic_conductor/etl/data/
+mosaic_conductor/dagster_home/
+uploads/
+staticfiles/
+
+# Скрипты с входящими архивами
+scripts/**/in/
+scripts/_zip_tmp/
+scripts/**/out/
+scripts/**/отработано/
+scripts/**/исходный/
+
+apps/dash_dn/data/
+
+# Документация и мусор репозитория
+docs/_build
+*.xlsx
+*.csv

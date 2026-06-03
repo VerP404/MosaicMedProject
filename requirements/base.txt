@@ -58,3 +58,5 @@ python-telegram-bot==22.0
 python-dotenv==1.1.0
 setuptools==80.7.1
 chardet==5.2.0
+celery>=5.3,<6
+redis>=5,<6

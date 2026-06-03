@@ -24,12 +24,15 @@ def get_organization_name():
     SELECT name FROM organization_medicalorganization
     LIMIT 1;
     """
-    with engine.connect() as connection:
-        result = connection.execute(text(query))
-        organization_name = result.fetchone()  # Получаем первую строку
-        if organization_name:
-            return organization_name[0]  # Возвращаем значение поля name
-        return 'МозаикаМед'
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(text(query))
+            organization_name = result.fetchone()  # Получаем первую строку
+            if organization_name:
+                return organization_name[0]  # Возвращаем значение поля name
+    except Exception:
+        pass
+    return 'МозаикаМед'
 
 
 def get_site_header():

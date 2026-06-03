@@ -236,7 +236,21 @@ sudo chmod +x /home/drpay/code/MosaicMedProject
 
 ```
 
-## Запуск приложения
+## Запуск в Docker (рекомендуется)
+
+Полная инструкция: [docs/docker.md](docs/docker.md).
+
+```bash
+cp .env.docker.example .env
+# Настройте POSTGRES_PASSWORD, SECRET_KEY; положите дамп в backup/
+docker compose up -d db
+# Восстановите БД: docker compose exec -T db psql -U postgres -d mosaicmed -f /backup/ваш_дамп.sql
+docker compose up -d --build mosaicmed
+```
+
+Обновление: `./scripts/deploy-docker.sh`.
+
+## Запуск приложения (bare-metal, nohup)
 
 # Запуск как фоновой задачи `nohup`
 

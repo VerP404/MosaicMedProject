@@ -4,18 +4,13 @@ from .base import *
 DEBUG = False
 LOGGING['root']['level'] = 'DEBUG'
 
-# ВАЖНО: Для обслуживания статических файлов в продакшене
-# В реальном продакшене используйте nginx/Apache, но для разработки можно использовать Django
-SERVE_STATIC = True  # Добавляем флаг для обслуживания статических файлов
+# ВАЖНО: Для обслуживания статических файлов в продакшене (Docker / без nginx)
+SERVE_STATIC = True
 
-# Настройки для статических файлов в продакшене
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
-# Для обслуживания статических файлов в продакшене
-# В реальном продакшене используйте nginx или Apache для статических файлов
-# Но для разработки можно использовать Django
-from django.conf.urls.static import static
-from django.conf import settings
+# WhiteNoise сразу после SecurityMiddleware
+MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 DATABASES = {
     'default': {
