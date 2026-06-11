@@ -41,12 +41,16 @@ def _as_list(value) -> list[str]:
     return [v] if v else []
 
 
-_GROUP_COLORS = {
-    'Объём': 'primary',
-    'Результат': 'success',
-    'Проблема': 'danger',
-    'Пересечения': 'secondary',
-}
+def _kpi_card(title: str, value, hint: str, border: str, *, large: bool = False) -> dbc.Card:
+    value_tag = html.H2(str(value), className="mb-0 text-center") if large else html.H5(str(value), className="mb-0 text-center")
+    return dbc.Card(
+        dbc.CardBody([
+            html.Div(title, className="text-muted small text-center"),
+            value_tag,
+            html.Div(hint, className="text-muted text-center mt-1", style={'fontSize': '0.7rem'}),
+        ], className="py-2 px-2 d-flex flex-column justify-content-center"),
+        className=f"border-{border} border-2 h-100",
+    )
 
 
 def _build_analytics_kpi(analytics_data: list[dict]):
@@ -54,51 +58,66 @@ def _build_analytics_kpi(analytics_data: list[dict]):
         return html.Div("Нет данных для аналитики")
 
     metrics = {row.get('Показатель', ''): row.get('Значение', '') for row in analytics_data}
-    with_result = metrics.get('Есть результат (любой канал)', 0)
-    without_result = metrics.get('Без результата', 0)
-    total_visits = metrics.get('Записей на приём', 0)
+    m = lambda key, default=0: metrics.get(key, default)
 
-    summary = dbc.Alert([
-        html.Strong("Итог: "),
-        f"из {total_visits} записей — ",
-        html.Strong(str(with_result), className="text-success"),
-        " с результатом, ",
-        html.Strong(str(without_result), className="text-danger"),
-        " без результата (ни диспансеризация, ни 541 в дату приёма, ни услуга).",
-    ], color="light", className="mb-3")
+    volume_row = dbc.Row([
+        dbc.Col(_kpi_card(
+            'Записей на приём', m('Записей на приём'),
+            'строк журнала за период', 'primary',
+        ), md=6, xs=12, className="mb-2"),
+        dbc.Col(_kpi_card(
+            'Уникальных пациентов', m('Уникальных пациентов'),
+            'уникальных ЕНП', 'primary',
+        ), md=6, xs=12, className="mb-2"),
+    ], className="g-2 mb-2")
 
-    sections = []
-    current_group = None
-    row_cols = []
+    channels_stack = html.Div([
+        html.Div(_kpi_card('→ Услуга', m('  → Услуга (детализация)'), 'детализация', 'success'), className="mb-2"),
+        html.Div(_kpi_card('→ Диспансеризация', m('  → Диспансеризация (цель ОМС)'), 'цель ОМС', 'success'), className="mb-2"),
+        html.Div(_kpi_card('→ 541', m('  → 541 в дату приёма'), 'дата приёма', 'success')),
+    ], className="h-100 d-flex flex-column")
 
-    for row in analytics_data:
-        group = row.get('Группа', '')
-        if group != current_group:
-            if row_cols:
-                sections.append(dbc.Row(row_cols, className="mb-2"))
-                row_cols = []
-            current_group = group
-            sections.append(html.H6(group, className="mt-2 mb-1 text-muted"))
+    result_problem_row = dbc.Row([
+        dbc.Col([
+            html.Div("Результат", className="text-muted small fw-semibold mb-1"),
+            dbc.Row([
+                dbc.Col(_kpi_card(
+                    'Есть результат', m('Есть результат (любой канал)'),
+                    'любой канал', 'success', large=True,
+                ), md=4, xs=12, className="mb-2 mb-md-0"),
+                dbc.Col(channels_stack, md=5, xs=12, className="mb-2 mb-md-0"),
+            ], className="g-2 align-items-stretch h-100"),
+        ], md=9, xs=12),
+        dbc.Col([
+            html.Div("Проблема", className="text-muted small fw-semibold mb-1"),
+            _kpi_card(
+                'Без результата', m('Без результата'),
+                'ни услуги, ни диспансеризации, ни 541', 'danger', large=True,
+            ),
+        ], md=3, xs=12, className="mb-2 d-flex flex-column"),
+    ], className="g-2 mb-2 align-items-stretch")
 
-        color = _GROUP_COLORS.get(group, 'light')
-        row_cols.append(
-            dbc.Col(
-                dbc.Card(
-                    dbc.CardBody([
-                        html.Div(row.get('Показатель', ''), className="text-muted small"),
-                        html.H5(str(row.get('Значение', '')), className="mb-1"),
-                        html.Div(row.get('Пояснение', ''), className="text-muted", style={'fontSize': '0.75rem'}),
-                    ]),
-                    className=f"border-{color}",
-                ),
-                md=4, xs=12, className="mb-2",
-            )
-        )
+    intersections_row = dbc.Row([
+        dbc.Col(html.Div("Пересечения", className="text-muted small fw-semibold mb-1"), width=12),
+        dbc.Col(_kpi_card(
+            'Услуга + диспансеризация', m('Услуга + диспансеризация'),
+            'оба канала', 'secondary',
+        ), md=3, xs=6, className="mb-2"),
+        dbc.Col(_kpi_card(
+            'Услуга + 541', m('Услуга + 541'),
+            'оба канала', 'secondary',
+        ), md=3, xs=6, className="mb-2"),
+        dbc.Col(_kpi_card(
+            'Диспансеризация + 541', m('Диспансеризация + 541'),
+            'оба канала', 'secondary',
+        ), md=3, xs=6, className="mb-2"),
+        dbc.Col(_kpi_card(
+            'Все три канала', m('Все три канала'),
+            'услуга, диспансеризация, 541', 'secondary',
+        ), md=3, xs=6, className="mb-2"),
+    ], className="g-2")
 
-    if row_cols:
-        sections.append(dbc.Row(row_cols, className="mb-2"))
-
-    return html.Div([summary, *sections])
+    return html.Div([volume_row, result_problem_row, intersections_row])
 
 
 _filters_card = dbc.Card(
