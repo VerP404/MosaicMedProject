@@ -12,6 +12,10 @@ from apps.analytical_app.pages.head.dispensary.adults.query import (
     sql_query_procedure_appointments_list,
     sql_query_procedure_appointments_analytics,
     sql_query_procedure_appointments_goal_breakdown,
+    sql_query_procedure_source_journal,
+    sql_query_procedure_source_oms,
+    sql_query_procedure_source_detailing,
+    SOURCE_PREVIEW_LIMIT,
 )
 
 
@@ -179,6 +183,21 @@ adults_dv16 = html.Div([
             html.Hr(),
             card_table(f'goal-breakdown-table-{type_page}', "По целям (ОМС и 541)", page_size=12),
         ]),
+        dbc.Tab(label="Исходные данные", tab_id="sources", children=[
+            dbc.Alert(
+                f"Для проверки: выборка до {SOURCE_PREVIEW_LIMIT} строк по каждому источнику "
+                "(только пациенты из выбранных записей журнала). Полный дамп таблиц не выводится — "
+                "скачивание через Export в каждой таблице.",
+                color="info",
+                className="mt-2 mb-2",
+            ),
+            html.Div(id=f'source-stat-{type_page}', className='filters-label'),
+            card_table(f'source-journal-{type_page}', "Журнал обращений (load_data_journal_appeals)", page_size=15),
+            html.Hr(),
+            card_table(f'source-oms-{type_page}', "Талоны ОМС (load_data_oms_data)", page_size=15),
+            html.Hr(),
+            card_table(f'source-detail-{type_page}', "Детализация (load_data_detailed_medical_examination)", page_size=15),
+        ]),
     ], id=f'tabs-{type_page}', active_tab="list"),
     html.Details([
         html.Summary("Отладка (показать/скрыть)"),
@@ -257,7 +276,14 @@ def load_filter_options(_year_value):
         Output(f'analytics-table-{type_page}', 'data'),
         Output(f'goal-breakdown-table-{type_page}', 'columns'),
         Output(f'goal-breakdown-table-{type_page}', 'data'),
+        Output(f'source-journal-{type_page}', 'columns'),
+        Output(f'source-journal-{type_page}', 'data'),
+        Output(f'source-oms-{type_page}', 'columns'),
+        Output(f'source-oms-{type_page}', 'data'),
+        Output(f'source-detail-{type_page}', 'columns'),
+        Output(f'source-detail-{type_page}', 'data'),
         Output(f'stat-block-{type_page}', 'children'),
+        Output(f'source-stat-{type_page}', 'children'),
         Output(f'analytics-kpi-{type_page}', 'children'),
         Output(f'debug-info-{type_page}', 'children'),
         Output(f'loading-output-{type_page}', 'children'),
@@ -278,18 +304,21 @@ def update_procedure_report(n_clicks, year_value, start_date, end_date,
         raise exceptions.PreventUpdate
 
     loading = html.Div([dcc.Loading(type="default")])
-    empty = [], [], [], [], [], [], '', '', '', loading
+    _empty_tables = ([],) * 12
+
+    def _empty_return(stat_msg: str = '', dbg_msg: str = ''):
+        return (*_empty_tables, stat_msg, '', '', dbg_msg, loading)
 
     procedures = _as_list(procedures)
     service_keys = _as_list(service_keys)
     include_depts = _as_list(include_depts)
 
     if not year_value or not start_date or not end_date:
-        return (*empty[:-3], 'Укажите год и период дат', '', loading)
+        return _empty_return('Укажите год и период дат')
     if not procedures:
-        return (*empty[:-3], 'Выберите хотя бы одну процедуру', '', loading)
+        return _empty_return('Выберите хотя бы одну процедуру')
     if not service_keys:
-        return (*empty[:-3], 'Выберите хотя бы одну услугу из детализации', '', loading)
+        return _empty_return('Выберите хотя бы одну услугу из детализации')
 
     start_date_sql = start_date.split('T')[0]
     end_date_sql = end_date.split('T')[0]
@@ -306,14 +335,26 @@ def update_procedure_report(n_clicks, year_value, start_date, end_date,
         int(year_value), start_date_sql, end_date_sql,
         procedures, include_depts,
     )
+    journal_src_query = sql_query_procedure_source_journal(
+        start_date_sql, end_date_sql, procedures, include_depts,
+    )
+    oms_src_query = sql_query_procedure_source_oms(
+        int(year_value), start_date_sql, end_date_sql, procedures, include_depts,
+    )
+    detail_src_query = sql_query_procedure_source_detailing(
+        start_date_sql, end_date_sql, procedures, service_keys, include_depts,
+    )
 
     try:
         list_columns, list_data = TableUpdater.query_to_df(engine, list_query)
         analytics_columns, analytics_data = TableUpdater.query_to_df(engine, analytics_query)
         breakdown_columns, breakdown_data = TableUpdater.query_to_df(engine, breakdown_query)
+        journal_src_cols, journal_src_data = TableUpdater.query_to_df(engine, journal_src_query)
+        oms_src_cols, oms_src_data = TableUpdater.query_to_df(engine, oms_src_query)
+        detail_src_cols, detail_src_data = TableUpdater.query_to_df(engine, detail_src_query)
     except Exception as e:
         err = f"Ошибка выполнения запроса: {e}\n\n{traceback.format_exc()}"
-        return [], [], [], [], [], [], 'Ошибка загрузки', '', err, loading
+        return _empty_return('Ошибка загрузки', err)
 
     total_rows = len(list_data)
     unique_enp = len({row.get('ЕНП') for row in list_data}) if list_data else 0
@@ -324,6 +365,12 @@ def update_procedure_report(n_clicks, year_value, start_date, end_date,
     )
 
     kpi_row = _build_analytics_kpi(analytics_data)
+
+    source_stat = (
+        f"Исходные данные: журнал {len(journal_src_data)} | "
+        f"ОМС {len(oms_src_data)} | детализация {len(detail_src_data)} строк "
+        f"(лимит {SOURCE_PREVIEW_LIMIT} на таблицу)"
+    )
 
     dbg = (
         f"Год: {year_value}; Период: {start_date_sql} .. {end_date_sql}\n"
@@ -336,5 +383,8 @@ def update_procedure_report(n_clicks, year_value, start_date, end_date,
         list_columns, list_data,
         analytics_columns, analytics_data,
         breakdown_columns, breakdown_data,
-        stat_text, kpi_row, dbg, loading,
+        journal_src_cols, journal_src_data,
+        oms_src_cols, oms_src_data,
+        detail_src_cols, detail_src_data,
+        stat_text, source_stat, kpi_row, dbg, loading,
     )

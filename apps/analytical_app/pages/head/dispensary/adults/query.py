@@ -442,6 +442,7 @@ ORDER BY
 
 DISPENSARY_GOALS = ('ДВ4', 'ДВ2', 'ОПВ', 'УД1', 'УД2', 'ДР1', 'ДР2')
 GOAL_541 = '541'
+SOURCE_PREVIEW_LIMIT = 500
 
 _DISPENSARY_GOAL_ANY_EXPR = (
     'gp."ДВ4" IS NOT NULL OR gp."ДВ2" IS NOT NULL OR gp."ОПВ" IS NOT NULL '
@@ -818,4 +819,125 @@ GROUP BY goal
 UNION ALL
 SELECT '{GOAL_541}', COUNT(*), '541 в дату приёма' FROM oms_541_matched
 ORDER BY "Тип", "Цель"
+"""
+
+
+def _scheduled_in_period_cte(
+    visit_start_date: str,
+    visit_end_date: str,
+    proc_clause: str,
+    dept_clause: str,
+) -> str:
+    return f"""
+scheduled AS (
+    SELECT
+        regexp_replace(s.enp, '\\D', '', 'g') AS enp_norm,
+        s.enp,
+        TRIM(s.patient_last_name || ' ' || s.patient_first_name || ' ' || s.patient_middle_name) AS patient_fio,
+        s.procedure,
+        s.acceptance_date,
+        s.record_date,
+        s.department,
+        s.no_show,
+        {_APPOINTMENT_TS_EXPR} AS appointment_ts
+    FROM load_data_journal_appeals s
+    WHERE COALESCE(NULLIF(s.enp, '-'), '') <> ''
+      {proc_clause}
+      {dept_clause}
+),
+scheduled_in_period AS (
+    SELECT *
+    FROM scheduled
+    WHERE appointment_ts::date BETWEEN DATE '{visit_start_date}' AND DATE '{visit_end_date}'
+)"""
+
+
+def sql_query_procedure_source_journal(
+    visit_start_date: str,
+    visit_end_date: str,
+    procedures: list[str],
+    include_departments: list[str] | None = None,
+) -> str:
+    proc_clause = _procedure_filter_clause(procedures, "s")
+    dept_clause = _department_filter_clause(include_departments, "s")
+    cte = _scheduled_in_period_cte(visit_start_date, visit_end_date, proc_clause, dept_clause)
+    return f"""
+WITH {cte}
+SELECT
+    patient_fio AS "ФИО",
+    enp_norm AS "ЕНП",
+    procedure AS "Процедура",
+    to_char(appointment_ts::date, 'YYYY-MM-DD') AS "Дата приема",
+    acceptance_date AS "Дата приема (сырая)",
+    department AS "Подразделение",
+    no_show AS "Не явился"
+FROM scheduled_in_period
+ORDER BY appointment_ts DESC, patient_fio
+LIMIT {SOURCE_PREVIEW_LIMIT}
+"""
+
+
+def sql_query_procedure_source_oms(
+    selected_year: int,
+    visit_start_date: str,
+    visit_end_date: str,
+    procedures: list[str],
+    include_departments: list[str] | None = None,
+) -> str:
+    proc_clause = _procedure_filter_clause(procedures, "s")
+    dept_clause = _department_filter_clause(include_departments, "s")
+    cte = _scheduled_in_period_cte(visit_start_date, visit_end_date, proc_clause, dept_clause)
+    disp_goals_sql = ", ".join([f"'{g}'" for g in DISPENSARY_GOALS])
+    return f"""
+WITH {cte},
+scheduled_enp AS (
+    SELECT DISTINCT enp_norm FROM scheduled_in_period
+)
+SELECT
+    regexp_replace(o.enp, '\\D', '', 'g') AS "ЕНП",
+    o.goal AS "Цель",
+    o.treatment_end AS "Окончание лечения",
+    o.treatment_start AS "Начало лечения",
+    o.talon AS "Талон",
+    o.status AS "Статус",
+    o.patient AS "Пациент"
+FROM load_data_oms_data o
+INNER JOIN scheduled_enp se ON regexp_replace(o.enp, '\\D', '', 'g') = se.enp_norm
+WHERE o.report_year = {int(selected_year)}
+  AND (o.goal IN ({disp_goals_sql}) OR o.goal = '{GOAL_541}')
+ORDER BY o.enp, o.goal, o.treatment_end
+LIMIT {SOURCE_PREVIEW_LIMIT}
+"""
+
+
+def sql_query_procedure_source_detailing(
+    visit_start_date: str,
+    visit_end_date: str,
+    procedures: list[str],
+    service_keys: list[str],
+    include_departments: list[str] | None = None,
+) -> str:
+    proc_clause = _procedure_filter_clause(procedures, "s")
+    svc_clause = _service_filter_clause(service_keys)
+    dept_clause = _department_filter_clause(include_departments, "s")
+    cte = _scheduled_in_period_cte(visit_start_date, visit_end_date, proc_clause, dept_clause)
+    return f"""
+WITH {cte},
+scheduled_enp AS (
+    SELECT DISTINCT enp_norm FROM scheduled_in_period
+)
+SELECT
+    regexp_replace(d.enp, '\\D', '', 'g') AS "ЕНП",
+    d.service_name AS "Услуга",
+    d.service_nomenclature AS "Номенклатура",
+    d.service_date AS "Дата услуги",
+    d.service_status AS "Статус",
+    d.talon_number AS "Талон"
+FROM load_data_detailed_medical_examination d
+INNER JOIN scheduled_enp se ON regexp_replace(d.enp, '\\D', '', 'g') = se.enp_norm
+WHERE COALESCE(NULLIF(d.enp, '-'), '') <> ''
+  AND d.service_status = 'Да'
+  {svc_clause}
+ORDER BY d.enp, d.service_date
+LIMIT {SOURCE_PREVIEW_LIMIT}
 """
