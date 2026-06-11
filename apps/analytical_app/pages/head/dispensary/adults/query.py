@@ -441,6 +441,13 @@ ORDER BY
 
 
 DISPENSARY_GOALS = ('ДВ4', 'ДВ2', 'ОПВ', 'УД1', 'УД2', 'ДР1', 'ДР2')
+GOAL_541 = '541'
+
+_DISPENSARY_GOAL_ANY_EXPR = (
+    'gp."ДВ4" IS NOT NULL OR gp."ДВ2" IS NOT NULL OR gp."ОПВ" IS NOT NULL '
+    'OR gp."УД1" IS NOT NULL OR gp."УД2" IS NOT NULL '
+    'OR gp."ДР1" IS NOT NULL OR gp."ДР2" IS NOT NULL'
+)
 
 _APPOINTMENT_TS_EXPR = """
         COALESCE(
@@ -503,6 +510,26 @@ def _department_filter_clause(include_departments: list[str] | None, alias: str 
     return f" AND {alias}.department IN ({joined})"
 
 
+def _procedure_filter_clause(procedures: list[str] | None, alias: str = "s") -> str:
+    if not procedures:
+        return ""
+    safe_vals = [_sql_escape(v) for v in procedures if isinstance(v, str) and v.strip()]
+    if not safe_vals:
+        return ""
+    joined = ", ".join([f"'{v}'" for v in safe_vals])
+    return f" AND {alias}.procedure IN ({joined})"
+
+
+def _service_filter_clause(services: list[str] | None) -> str:
+    if not services:
+        return ""
+    safe_vals = [_sql_escape(v) for v in services if isinstance(v, str) and v.strip()]
+    if not safe_vals:
+        return ""
+    joined = ", ".join([f"'{v}'" for v in safe_vals])
+    return f" AND (service_name IN ({joined}) OR service_nomenclature IN ({joined}))"
+
+
 def _goal_pivot_columns() -> str:
     parts = []
     for goal in DISPENSARY_GOALS:
@@ -517,12 +544,12 @@ def sql_query_procedure_appointments_list(
     selected_year: int,
     visit_start_date: str,
     visit_end_date: str,
-    procedure: str,
-    service_key: str,
+    procedures: list[str],
+    service_keys: list[str],
     include_departments: list[str] | None = None,
 ) -> str:
-    safe_procedure = _sql_escape(procedure)
-    safe_service = _sql_escape(service_key)
+    proc_clause = _procedure_filter_clause(procedures, "s")
+    svc_clause = _service_filter_clause(service_keys)
     dept_clause = _department_filter_clause(include_departments, "s")
     goal_pivot = _goal_pivot_columns()
 
@@ -542,7 +569,7 @@ WITH scheduled AS (
         {_APPOINTMENT_TIME_EXPR} AS appointment_time_txt
     FROM load_data_journal_appeals s
     WHERE COALESCE(NULLIF(s.enp, '-'), '') <> ''
-      AND s.procedure = '{safe_procedure}'
+      {proc_clause}
       {dept_clause}
 ),
 scheduled_filtered AS (
@@ -557,7 +584,7 @@ service_fact AS (
     FROM load_data_detailed_medical_examination
     WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
       AND service_status = 'Да'
-      AND (service_name = '{safe_service}' OR service_nomenclature = '{safe_service}')
+      {svc_clause}
     GROUP BY 1
 ),
 oms_goals AS (
@@ -577,6 +604,17 @@ goal_pivot AS (
         {_goal_pivot_columns()}
     FROM oms_goals og
     GROUP BY og.enp_norm
+),
+goal_541_on_date AS (
+    SELECT
+        regexp_replace(o.enp, '\\D', '', 'g') AS enp_norm,
+        {_TREATMENT_END_PARSED_EXPR} AS goal_date
+    FROM load_data_oms_data o
+    WHERE COALESCE(NULLIF(o.enp, '-'), '') <> ''
+      AND o.goal = '{GOAL_541}'
+      AND o.report_year = {int(selected_year)}
+      AND {_TREATMENT_END_PARSED_EXPR} IS NOT NULL
+    GROUP BY 1, 2
 )
 SELECT
     sf.patient_fio AS "ФИО",
@@ -591,6 +629,19 @@ SELECT
     sf.schedule_type AS "Тип расписания",
     sf.record_source AS "Источник",
     to_char(svc.service_date, 'DD.MM.YYYY') AS "Прошёл услугу",
+    to_char(g541.goal_date, 'DD.MM.YYYY') AS "541",
+    CASE
+        WHEN TRIM(BOTH ', ' FROM CONCAT_WS(', ',
+            CASE WHEN svc.service_date IS NOT NULL THEN 'Услуга' END,
+            CASE WHEN {_DISPENSARY_GOAL_ANY_EXPR} THEN 'Диспансеризация' END,
+            CASE WHEN g541.goal_date IS NOT NULL THEN '541' END
+        )) = '' THEN 'Без результата'
+        ELSE TRIM(BOTH ', ' FROM CONCAT_WS(', ',
+            CASE WHEN svc.service_date IS NOT NULL THEN 'Услуга' END,
+            CASE WHEN {_DISPENSARY_GOAL_ANY_EXPR} THEN 'Диспансеризация' END,
+            CASE WHEN g541.goal_date IS NOT NULL THEN '541' END
+        ))
+    END AS "Результат",
     gp."ДВ4",
     gp."ДВ2",
     gp."ОПВ",
@@ -601,6 +652,9 @@ SELECT
 FROM scheduled_filtered sf
 LEFT JOIN service_fact svc ON sf.enp_norm = svc.enp_norm
 LEFT JOIN goal_pivot gp ON sf.enp_norm = gp.enp_norm
+LEFT JOIN goal_541_on_date g541
+    ON sf.enp_norm = g541.enp_norm
+   AND sf.appointment_ts::date = g541.goal_date
 ORDER BY sf.appointment_ts DESC, sf.patient_fio
 """
 
@@ -609,13 +663,15 @@ def sql_query_procedure_appointments_analytics(
     selected_year: int,
     visit_start_date: str,
     visit_end_date: str,
-    procedure: str,
-    service_key: str,
+    procedures: list[str],
+    service_keys: list[str],
     include_departments: list[str] | None = None,
 ) -> str:
-    safe_procedure = _sql_escape(procedure)
-    safe_service = _sql_escape(service_key)
+    proc_clause = _procedure_filter_clause(procedures, "s")
+    svc_clause = _service_filter_clause(service_keys)
     dept_clause = _department_filter_clause(include_departments, "s")
+
+    disp_goals_sql = ", ".join([f"'{g}'" for g in DISPENSARY_GOALS])
 
     return f"""
 WITH scheduled AS (
@@ -623,63 +679,97 @@ WITH scheduled AS (
         regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
         {_APPOINTMENT_TS_EXPR} AS appointment_ts
     FROM load_data_journal_appeals s
-    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
-      AND procedure = '{safe_procedure}'
+    WHERE COALESCE(NULLIF(s.enp, '-'), '') <> ''
+      {proc_clause}
       {dept_clause}
 ),
 scheduled_filtered AS (
-    SELECT enp_norm
+    SELECT enp_norm, appointment_ts::date AS appt_date
     FROM scheduled
     WHERE appointment_ts::date BETWEEN DATE '{visit_start_date}' AND DATE '{visit_end_date}'
 ),
-scheduled_unique AS (
-    SELECT DISTINCT enp_norm FROM scheduled_filtered
+scheduled_visits AS (
+    SELECT DISTINCT enp_norm, appt_date FROM scheduled_filtered
 ),
 service_fact AS (
     SELECT DISTINCT regexp_replace(enp, '\\D', '', 'g') AS enp_norm
     FROM load_data_detailed_medical_examination
     WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
       AND service_status = 'Да'
-      AND (service_name = '{safe_service}' OR service_nomenclature = '{safe_service}')
+      {svc_clause}
 ),
-oms_any_goal AS (
+oms_disp AS (
     SELECT DISTINCT regexp_replace(enp, '\\D', '', 'g') AS enp_norm
     FROM load_data_oms_data
     WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
-      AND goal IN ({", ".join([f"'{g}'" for g in DISPENSARY_GOALS])})
+      AND goal IN ({disp_goals_sql})
       AND report_year = {int(selected_year)}
 ),
-oms_dv4_opv AS (
-    SELECT DISTINCT regexp_replace(enp, '\\D', '', 'g') AS enp_norm
-    FROM load_data_oms_data
-    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
-      AND goal IN ('ДВ4', 'ОПВ')
-      AND report_year = {int(selected_year)}
+oms_541 AS (
+    SELECT
+        regexp_replace(o.enp, '\\D', '', 'g') AS enp_norm,
+        {_TREATMENT_END_PARSED_EXPR} AS goal_date
+    FROM load_data_oms_data o
+    WHERE COALESCE(NULLIF(o.enp, '-'), '') <> ''
+      AND o.goal = '{GOAL_541}'
+      AND o.report_year = {int(selected_year)}
+      AND {_TREATMENT_END_PARSED_EXPR} IS NOT NULL
+    GROUP BY 1, 2
+),
+visit_flags AS (
+    SELECT
+        sv.enp_norm,
+        sv.appt_date,
+        (svc.enp_norm IS NOT NULL) AS has_service,
+        (disp.enp_norm IS NOT NULL) AS has_disp,
+        (g541.enp_norm IS NOT NULL) AS has_541
+    FROM scheduled_visits sv
+    LEFT JOIN service_fact svc ON sv.enp_norm = svc.enp_norm
+    LEFT JOIN oms_disp disp ON sv.enp_norm = disp.enp_norm
+    LEFT JOIN oms_541 g541
+        ON sv.enp_norm = g541.enp_norm
+       AND sv.appt_date = g541.goal_date
 ),
 base AS (
     SELECT
         (SELECT COUNT(*) FROM scheduled_filtered) AS scheduled_rows,
-        (SELECT COUNT(*) FROM scheduled_unique) AS scheduled_unique_enp,
-        (SELECT COUNT(*) FROM scheduled_unique su INNER JOIN service_fact svc ON su.enp_norm = svc.enp_norm) AS passed_service,
-        (SELECT COUNT(*) FROM scheduled_unique su INNER JOIN oms_any_goal og ON su.enp_norm = og.enp_norm) AS has_any_goal,
-        (SELECT COUNT(*) FROM scheduled_unique su
-            INNER JOIN service_fact svc ON su.enp_norm = svc.enp_norm
-            INNER JOIN oms_any_goal og ON su.enp_norm = og.enp_norm) AS overlap_service_and_goal,
-        (SELECT COUNT(*) FROM scheduled_unique su INNER JOIN oms_dv4_opv dv ON su.enp_norm = dv.enp_norm) AS passed_dv4_opv,
-        (SELECT COUNT(*) FROM scheduled_unique su LEFT JOIN oms_dv4_opv dv ON su.enp_norm = dv.enp_norm WHERE dv.enp_norm IS NULL) AS scheduled_not_dv4_opv
+        (SELECT COUNT(DISTINCT enp_norm) FROM scheduled_filtered) AS scheduled_unique_enp,
+        (SELECT COUNT(*) FROM visit_flags WHERE has_service) AS via_service,
+        (SELECT COUNT(*) FROM visit_flags WHERE has_disp) AS via_disp,
+        (SELECT COUNT(*) FROM visit_flags WHERE has_541) AS via_541,
+        (SELECT COUNT(*) FROM visit_flags WHERE has_service OR has_disp OR has_541) AS with_any_result,
+        (SELECT COUNT(*) FROM visit_flags WHERE NOT (has_service OR has_disp OR has_541)) AS without_result,
+        (SELECT COUNT(*) FROM visit_flags WHERE has_service AND has_disp) AS service_and_disp,
+        (SELECT COUNT(*) FROM visit_flags WHERE has_service AND has_541) AS service_and_541,
+        (SELECT COUNT(*) FROM visit_flags WHERE has_disp AND has_541) AS disp_and_541,
+        (SELECT COUNT(*) FROM visit_flags WHERE has_service AND has_disp AND has_541) AS all_three
 )
-SELECT
-    'Сводка' AS "Показатель",
-    scheduled_rows AS "Значение"
-FROM base
-UNION ALL SELECT 'Уникальных ЕНП', scheduled_unique_enp FROM base
-UNION ALL SELECT 'Прошли выбранную услугу', passed_service FROM base
-UNION ALL SELECT 'Не прошли услугу', scheduled_unique_enp - passed_service FROM base
-UNION ALL SELECT 'Есть хотя бы одна цель (ОМС)', has_any_goal FROM base
-UNION ALL SELECT 'Нет ни одной цели', scheduled_unique_enp - has_any_goal FROM base
-UNION ALL SELECT 'Прошли ДВ4 или ОПВ', passed_dv4_opv FROM base
-UNION ALL SELECT 'Записаны, не прошли ДВ4/ОПВ', scheduled_not_dv4_opv FROM base
-UNION ALL SELECT 'Пересечение: услуга + цель', overlap_service_and_goal FROM base
+SELECT sort_order, "Группа", "Показатель", "Значение", "Пояснение"
+FROM (
+    SELECT 10 AS sort_order, 'Объём' AS "Группа", 'Записей на приём' AS "Показатель",
+           scheduled_rows AS "Значение", 'Строк журнала обращений за период' AS "Пояснение" FROM base
+    UNION ALL SELECT 20, 'Объём', 'Уникальных пациентов', scheduled_unique_enp,
+           'Уникальных ЕНП среди записей' FROM base
+    UNION ALL SELECT 100, 'Результат', 'Есть результат (любой канал)', with_any_result,
+           'Услуга, диспансеризация или 541 в дату приёма' FROM base
+    UNION ALL SELECT 110, 'Результат', '  → Услуга (детализация)', via_service,
+           'Прошёл хотя бы одну выбранную услугу' FROM base
+    UNION ALL SELECT 120, 'Результат', '  → Диспансеризация (цель ОМС)', via_disp,
+           'Есть цель ДВ/ОПВ/УД/ДР за год' FROM base
+    UNION ALL SELECT 130, 'Результат', '  → 541 в дату приёма', via_541,
+           'Окончание лечения по 541 совпало с датой записи' FROM base
+    UNION ALL SELECT 200, 'Проблема', 'Без результата', without_result,
+           'Ни услуги, ни диспансеризации, ни 541 в дату приёма' FROM base
+    UNION ALL SELECT 300, 'Пересечения', 'Услуга + диспансеризация', service_and_disp,
+           'Оба канала у одной записи' FROM base
+    UNION ALL SELECT 310, 'Пересечения', 'Услуга + 541', service_and_541,
+           'Оба канала у одной записи' FROM base
+    UNION ALL SELECT 320, 'Пересечения', 'Диспансеризация + 541', disp_and_541,
+           'Оба канала у одной записи' FROM base
+    UNION ALL SELECT 330, 'Пересечения', 'Все три канала', all_three,
+           'Услуга, диспансеризация и 541 одновременно' FROM base
+) t
+ORDER BY sort_order
 """
 
 
@@ -687,38 +777,45 @@ def sql_query_procedure_appointments_goal_breakdown(
     selected_year: int,
     visit_start_date: str,
     visit_end_date: str,
-    procedure: str,
+    procedures: list[str],
     include_departments: list[str] | None = None,
 ) -> str:
-    safe_procedure = _sql_escape(procedure)
+    proc_clause = _procedure_filter_clause(procedures, "s")
     dept_clause = _department_filter_clause(include_departments, "s")
 
     return f"""
-WITH scheduled AS (
-    SELECT
+WITH scheduled_visits AS (
+    SELECT DISTINCT
         regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
-        {_APPOINTMENT_TS_EXPR} AS appointment_ts
+        ({_APPOINTMENT_TS_EXPR})::date AS appt_date
     FROM load_data_journal_appeals s
-    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
-      AND procedure = '{safe_procedure}'
+    WHERE COALESCE(NULLIF(s.enp, '-'), '') <> ''
+      {proc_clause}
       {dept_clause}
+      AND ({_APPOINTMENT_TS_EXPR})::date BETWEEN DATE '{visit_start_date}' AND DATE '{visit_end_date}'
 ),
-scheduled_unique AS (
-    SELECT DISTINCT enp_norm
-    FROM scheduled
-    WHERE appointment_ts::date BETWEEN DATE '{visit_start_date}' AND DATE '{visit_end_date}'
-),
-oms_goals AS (
+oms_disp_goals AS (
     SELECT DISTINCT
         regexp_replace(o.enp, '\\D', '', 'g') AS enp_norm,
         o.goal
     FROM load_data_oms_data o
-    INNER JOIN scheduled_unique sf ON regexp_replace(o.enp, '\\D', '', 'g') = sf.enp_norm
+    INNER JOIN scheduled_visits sv ON regexp_replace(o.enp, '\\D', '', 'g') = sv.enp_norm
     WHERE o.goal IN ({", ".join([f"'{g}'" for g in DISPENSARY_GOALS])})
       AND o.report_year = {int(selected_year)}
+),
+oms_541_matched AS (
+    SELECT DISTINCT sv.enp_norm, sv.appt_date
+    FROM scheduled_visits sv
+    INNER JOIN load_data_oms_data o
+        ON regexp_replace(o.enp, '\\D', '', 'g') = sv.enp_norm
+    WHERE o.goal = '{GOAL_541}'
+      AND o.report_year = {int(selected_year)}
+      AND {_TREATMENT_END_PARSED_EXPR} = sv.appt_date
 )
-SELECT goal AS "Цель", COUNT(DISTINCT enp_norm) AS "Количество"
-FROM oms_goals
+SELECT goal AS "Цель", COUNT(DISTINCT enp_norm) AS "Количество", 'Диспансеризация' AS "Тип"
+FROM oms_disp_goals
 GROUP BY goal
-ORDER BY goal
+UNION ALL
+SELECT '{GOAL_541}', COUNT(*), '541 в дату приёма' FROM oms_541_matched
+ORDER BY "Тип", "Цель"
 """
