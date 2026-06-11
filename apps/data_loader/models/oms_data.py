@@ -30,6 +30,7 @@ class OMSData(models.Model):
     gender = models.CharField(max_length=50, default='-')  # "Пол"
     policy = models.CharField(max_length=255, default='-')  # "Полис"
     smo_code = models.CharField(max_length=255, default='-')  # "Код СМО"
+    smo_tfoms = models.CharField(max_length=255, default='-')  # "СМО от ТФОМС"
     insurance = models.CharField(max_length=255, default='-')  # "Страховая"
     enp = models.CharField(max_length=255, default='-')  # "ЕНП"
     treatment_start = models.CharField(max_length=255, default='-')  # "Начало лечения"

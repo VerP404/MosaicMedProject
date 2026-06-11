@@ -5,7 +5,8 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                doctor_ids=None,
                initial_input_date_start=None, initial_input_date_end=None,
                treatment_start=None, treatment_end=None,
-               cel_list=None, status_list=None):
+               cel_list=None, status_list=None,
+               include_status4_override=False):
     building_filter = ""
     department_filter = ""
     profile_filter = ""
@@ -22,6 +23,10 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
         status = "AND status IN (" + ",".join(f"'{cel}'" for cel in cel_list) + ")"
     if status_list:
         status = "AND status IN (" + ",".join(f"'{cel}'" for cel in status_list) + ")"
+
+    status4_override_clause = ""
+    if include_status4_override:
+        status4_override_clause = " OR status = '4'"
 
     if building_ids:
         building_filter = f"AND building_id IN ({','.join(map(str, building_ids))})"
@@ -143,6 +148,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                         END                                                                  AS enp,
                     report_data.smo_code,
                     CASE
+                        WHEN COALESCE(NULLIF(TRIM(report_data.smo_tfoms), '-'), '') <> '' THEN false
                         WHEN report_data.smo_code LIKE '360%' THEN false
                         ELSE true
                         END                                                        AS inogorodniy,
@@ -203,7 +209,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
             oms as (select *
                     from oms_data
                      WHERE report_year = '{year}' 
-                           AND report_month_number IN ({months})
+                           AND (report_month_number IN ({months}){status4_override_clause})
                                {inogorodniy_filter}
                                {sanction_filter}
                                {amount_null_filter}
@@ -223,11 +229,11 @@ def columns_by_status_oms():
     return """
                    COUNT(*)                                       AS Всего,
                SUM(CASE WHEN status = '3' THEN 1 ELSE 0 END)  AS "Оплачен(3 )",
-               SUM(CASE WHEN status = '1' or status = '2' or status = '3' or status = '4' or status = '6' or status = '8' THEN 1 ELSE 0 END)  AS "В работе(1,2,3,4,6,8)",
+               SUM(CASE WHEN status = '1' or status = '2' or status = '3' or status = '4' or status = '6' or status = '8' or status = '19' THEN 1 ELSE 0 END)  AS "В работе(1,2,3,4,6,8,19)",
                SUM(CASE WHEN status = '2' THEN 1 ELSE 0 END)  AS "В ТФОМС(2)",
                SUM(CASE WHEN status = '0' or status = '13' or status = '17' THEN 1 ELSE 0 END)  AS "Отменен(0,13,17)",
-               SUM(CASE WHEN status = '5' or status = '7' or status = '12' THEN 1 ELSE 0 END)  AS "Отказан(5,7,12)",
-               SUM(CASE WHEN status = '6' or status = '8' THEN 1 ELSE 0 END)  AS "Исправлен(6,8)",
+               SUM(CASE WHEN status = '5' or status = '7' or status = '12' or status = '18' THEN 1 ELSE 0 END)  AS "Отказан(5,7,12,18)",
+               SUM(CASE WHEN status = '6' or status = '8' or status = '19' THEN 1 ELSE 0 END)  AS "Исправлен(6,8,19)",
                SUM(CASE WHEN status = '0' THEN 1 ELSE 0 END)  AS "0",
                SUM(CASE WHEN status = '1' THEN 1 ELSE 0 END)  AS "1",
                SUM(CASE WHEN status = '2' THEN 1 ELSE 0 END)  AS "2",
@@ -239,6 +245,8 @@ def columns_by_status_oms():
                SUM(CASE WHEN status = '8' THEN 1 ELSE 0 END)  AS "8",
                SUM(CASE WHEN status = '12' THEN 1 ELSE 0 END) AS "12",
                SUM(CASE WHEN status = '13' THEN 1 ELSE 0 END) AS "13",
-               SUM(CASE WHEN status = '17' THEN 1 ELSE 0 END) AS "17"
+               SUM(CASE WHEN status = '17' THEN 1 ELSE 0 END) AS "17",
+               SUM(CASE WHEN status = '18' THEN 1 ELSE 0 END) AS "18",
+               SUM(CASE WHEN status = '19' THEN 1 ELSE 0 END) AS "19"
     """
 

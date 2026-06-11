@@ -51,6 +51,7 @@ class Talon(TimeStampedModel):
     gender = models.CharField(max_length=50, default='-')
     policy = models.CharField(max_length=255, default='-')
     smo_code = models.CharField(max_length=255, default='-')
+    smo_tfoms = models.CharField(max_length=255, default='-', verbose_name="СМО от ТФОМС")
     enp = models.CharField(max_length=255, default='-')
     treatment_start = models.CharField(max_length=255, default='-')
     treatment_end = models.CharField(max_length=255, default='-')
@@ -122,6 +123,7 @@ class ComplexTalon(TimeStampedModel):
     gender = models.CharField(max_length=50, default='-')
     policy = models.CharField(max_length=255, default='-')
     smo_code = models.CharField(max_length=255, default='-')
+    smo_tfoms = models.CharField(max_length=255, default='-', verbose_name="СМО от ТФОМС")
     enp = models.CharField(max_length=255, default='-')
     treatment_start = models.CharField(max_length=255, default='-')
     treatment_end = models.CharField(max_length=255, default='-')
@@ -592,6 +594,7 @@ class JournalAppeals(models.Model):
     creator = models.CharField("Создавший", max_length=255, default='-')
     no_show = models.CharField("Не явился", max_length=50, default='-')
     epmz = models.CharField("ЭПМЗ", max_length=255, default='-')
+    procedure = models.CharField("Процедура", max_length=255, default='-')
 
     def __str__(self):
         return f"{self.patient_last_name} {self.patient_first_name} - {self.enp}"
@@ -600,7 +603,7 @@ class JournalAppeals(models.Model):
         db_table = "load_data_journal_appeals"
         verbose_name = "Обращение"
         verbose_name_plural = "Обращения"
-        unique_together = (("enp", "employee_last_name", "acceptance_date"),)
+        unique_together = (("enp", "acceptance_date", "procedure", "employee_last_name"),)
 
 
 class DispanseryWorkISZL(TimeStampedModel):

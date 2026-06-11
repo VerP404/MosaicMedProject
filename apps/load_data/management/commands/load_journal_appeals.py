@@ -42,6 +42,7 @@ RUS_MAP_SINGLE = {
     "Создавший": "creator",
     "Не явился": "no_show",
     "ЭПМЗ": "epmz",
+    "Процедура": "procedure",
 }
 
 
@@ -140,7 +141,7 @@ class Command(BaseCommand):
                 "birth_date", "gender", "phone", "enp", "attachment", "series", "number",
                 "employee_last_name", "employee_first_name", "employee_middle_name",
                 "position", "acceptance_date", "record_date", "schedule_type", "record_source",
-                "department", "creator", "no_show", "epmz"
+                "department", "creator", "no_show", "epmz", "procedure"
             ]
 
             def row_to_values(row: List[str]) -> List[str]:
@@ -161,19 +162,20 @@ class Command(BaseCommand):
             rows: List[List[str]] = [row_to_values(r) for r in rows_raw]
             log(f"CSV прочитан, строк: {len(rows_raw)} | {time.time() - t0:.2f}s")
 
-            # Дедупликация по ключу конфликта (enp, employee_last_name, acceptance_date)
-            # Оставляем последнюю запись для каждого уникального ключа
+            # Дедупликация по ключу конфликта (enp, acceptance_date, procedure, employee_last_name)
             enp_idx = columns.index("enp")
-            employee_last_name_idx = columns.index("employee_last_name")
             acceptance_date_idx = columns.index("acceptance_date")
-            
+            procedure_idx = columns.index("procedure")
+            employee_last_name_idx = columns.index("employee_last_name")
+
             seen_keys = {}
             deduplicated_rows = []
             for row in rows:
                 key = (
                     row[enp_idx] or '-',
+                    row[acceptance_date_idx] or '-',
+                    row[procedure_idx] or '-',
                     row[employee_last_name_idx] or '-',
-                    row[acceptance_date_idx] or '-'
                 )
                 seen_keys[key] = row
             
@@ -216,7 +218,8 @@ class Command(BaseCommand):
                         department varchar(255),
                         creator varchar(255),
                         no_show varchar(50),
-                        epmz varchar(255)
+                        epmz varchar(255),
+                        procedure varchar(255)
                     ) ON COMMIT DROP;
                     """
                 )
@@ -231,7 +234,7 @@ class Command(BaseCommand):
                         birth_date, gender, phone, enp, attachment, series, number,
                         employee_last_name, employee_first_name, employee_middle_name,
                         position, acceptance_date, record_date, schedule_type, record_source,
-                        department, creator, no_show, epmz
+                        department, creator, no_show, epmz, procedure
                     ) VALUES %s
                     """,
                     rows,
@@ -248,16 +251,16 @@ class Command(BaseCommand):
                         birth_date, gender, phone, enp, attachment, series, number,
                         employee_last_name, employee_first_name, employee_middle_name,
                         position, acceptance_date, record_date, schedule_type, record_source,
-                        department, creator, no_show, epmz
+                        department, creator, no_show, epmz, procedure
                     )
                     SELECT 
                         patient_last_name, patient_first_name, patient_middle_name,
                         birth_date, gender, phone, enp, attachment, series, number,
                         employee_last_name, employee_first_name, employee_middle_name,
                         position, acceptance_date, record_date, schedule_type, record_source,
-                        department, creator, no_show, epmz
+                        department, creator, no_show, epmz, procedure
                     FROM tmp_journal_appeals
-                    ON CONFLICT (enp, employee_last_name, acceptance_date) DO UPDATE SET
+                    ON CONFLICT (enp, acceptance_date, procedure, employee_last_name) DO UPDATE SET
                         patient_last_name = EXCLUDED.patient_last_name,
                         patient_first_name = EXCLUDED.patient_first_name,
                         patient_middle_name = EXCLUDED.patient_middle_name,
@@ -276,7 +279,8 @@ class Command(BaseCommand):
                         department = EXCLUDED.department,
                         creator = EXCLUDED.creator,
                         no_show = EXCLUDED.no_show,
-                        epmz = EXCLUDED.epmz
+                        epmz = EXCLUDED.epmz,
+                        procedure = EXCLUDED.procedure
                     ;
                     """
                 )

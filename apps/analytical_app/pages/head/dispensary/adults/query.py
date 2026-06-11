@@ -438,3 +438,287 @@ ORDER BY
     CASE WHEN "Тип" = 'Итого' THEN 999 ELSE 1 END,
     "Тип"
     """
+
+
+DISPENSARY_GOALS = ('ДВ4', 'ДВ2', 'ОПВ', 'УД1', 'УД2', 'ДР1', 'ДР2')
+
+_APPOINTMENT_TS_EXPR = """
+        COALESCE(
+          CASE WHEN acceptance_date LIKE '____-__-__%'
+               THEN to_date(SUBSTRING(acceptance_date FROM 1 FOR 10), 'YYYY-MM-DD')::timestamp END,
+          CASE WHEN acceptance_date LIKE '__.__.____%'
+               THEN to_timestamp(SUBSTRING(acceptance_date FROM 1 FOR 16), 'DD.MM.YYYY HH24:MI') END,
+          CASE WHEN record_date LIKE '____-__-__%'
+               THEN to_date(SUBSTRING(record_date FROM 1 FOR 10), 'YYYY-MM-DD')::timestamp END,
+          CASE WHEN record_date LIKE '__.__.____%'
+               THEN to_date(SUBSTRING(record_date FROM 1 FOR 10), 'DD.MM.YYYY')::timestamp END
+        )
+"""
+
+_APPOINTMENT_TIME_EXPR = """
+        COALESCE(
+          CASE WHEN acceptance_date LIKE '____-__-__T__:%' THEN SUBSTRING(acceptance_date FROM 12 FOR 5) END,
+          CASE WHEN acceptance_date LIKE '____-__-__ __:__%' THEN SUBSTRING(acceptance_date FROM 12 FOR 5) END,
+          CASE WHEN acceptance_date LIKE '__.__.____ __:__%' THEN SUBSTRING(acceptance_date FROM 12 FOR 5) END,
+          CASE WHEN record_date    LIKE '____-__-__T__:%' THEN SUBSTRING(record_date FROM 12 FOR 5) END,
+          CASE WHEN record_date    LIKE '____-__-__ __:__%' THEN SUBSTRING(record_date FROM 12 FOR 5) END,
+          CASE WHEN record_date    LIKE '__.__.____ __:__%' THEN SUBSTRING(record_date FROM 12 FOR 5) END
+        )
+"""
+
+_TREATMENT_END_PARSED_EXPR = """
+        COALESCE(
+          CASE WHEN treatment_end::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+               THEN to_date(treatment_end::text, 'YYYY-MM-DD') END,
+          CASE WHEN treatment_end::text ~ '^[0-9]{2}\\.[0-9]{2}\\.[0-9]{4}$'
+               THEN to_date(treatment_end::text, 'DD.MM.YYYY') END,
+          CASE WHEN treatment_end::text ~ '^[0-9]{8}$'
+               THEN to_date(treatment_end::text, 'YYYYMMDD') END
+        )
+"""
+
+_SERVICE_DATE_PARSED_EXPR = """
+        COALESCE(
+          CASE WHEN service_date ~ '^[0-9]{2}-[0-9]{2}-[0-9]{4}'
+               THEN to_date(service_date, 'DD-MM-YYYY') END,
+          CASE WHEN service_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+               THEN to_date(service_date, 'YYYY-MM-DD') END,
+          CASE WHEN service_date ~ '^[0-9]{2}\\.[0-9]{2}\\.[0-9]{4}$'
+               THEN to_date(service_date, 'DD.MM.YYYY') END
+        )
+"""
+
+
+def _sql_escape(value: str) -> str:
+    return str(value).replace("'", "''")
+
+
+def _department_filter_clause(include_departments: list[str] | None, alias: str = "s") -> str:
+    if not include_departments:
+        return ""
+    safe_vals = [_sql_escape(v) for v in include_departments if isinstance(v, str) and v.strip()]
+    if not safe_vals:
+        return ""
+    joined = ", ".join([f"'{v}'" for v in safe_vals])
+    return f" AND {alias}.department IN ({joined})"
+
+
+def _goal_pivot_columns() -> str:
+    parts = []
+    for goal in DISPENSARY_GOALS:
+        parts.append(
+            f"MAX(CASE WHEN og.goal = '{goal}' "
+            f"THEN to_char(og.goal_date, 'DD.MM.YYYY') END) AS \"{goal}\""
+        )
+    return ",\n    ".join(parts)
+
+
+def sql_query_procedure_appointments_list(
+    selected_year: int,
+    visit_start_date: str,
+    visit_end_date: str,
+    procedure: str,
+    service_key: str,
+    include_departments: list[str] | None = None,
+) -> str:
+    safe_procedure = _sql_escape(procedure)
+    safe_service = _sql_escape(service_key)
+    dept_clause = _department_filter_clause(include_departments, "s")
+    goal_pivot = _goal_pivot_columns()
+
+    return f"""
+WITH scheduled AS (
+    SELECT
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        TRIM(patient_last_name || ' ' || patient_first_name || ' ' || patient_middle_name) AS patient_fio,
+        birth_date,
+        phone,
+        procedure,
+        department,
+        no_show,
+        schedule_type,
+        record_source,
+        {_APPOINTMENT_TS_EXPR} AS appointment_ts,
+        {_APPOINTMENT_TIME_EXPR} AS appointment_time_txt
+    FROM load_data_journal_appeals s
+    WHERE COALESCE(NULLIF(s.enp, '-'), '') <> ''
+      AND s.procedure = '{safe_procedure}'
+      {dept_clause}
+),
+scheduled_filtered AS (
+    SELECT *
+    FROM scheduled
+    WHERE appointment_ts::date BETWEEN DATE '{visit_start_date}' AND DATE '{visit_end_date}'
+),
+service_fact AS (
+    SELECT
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        MAX({_SERVICE_DATE_PARSED_EXPR}) AS service_date
+    FROM load_data_detailed_medical_examination
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND service_status = 'Да'
+      AND (service_name = '{safe_service}' OR service_nomenclature = '{safe_service}')
+    GROUP BY 1
+),
+oms_goals AS (
+    SELECT
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        goal,
+        MAX({_TREATMENT_END_PARSED_EXPR}) AS goal_date
+    FROM load_data_oms_data
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND goal IN ({", ".join([f"'{g}'" for g in DISPENSARY_GOALS])})
+      AND report_year = {int(selected_year)}
+    GROUP BY 1, 2
+),
+goal_pivot AS (
+    SELECT
+        og.enp_norm,
+        {_goal_pivot_columns()}
+    FROM oms_goals og
+    GROUP BY og.enp_norm
+)
+SELECT
+    sf.patient_fio AS "ФИО",
+    sf.birth_date AS "ДР",
+    sf.enp_norm AS "ЕНП",
+    sf.phone AS "Телефон",
+    sf.procedure AS "Процедура",
+    to_char(sf.appointment_ts::date, 'YYYY-MM-DD') AS "Дата приема",
+    COALESCE(sf.appointment_time_txt, '') AS "Время приема",
+    sf.department AS "Подразделение",
+    sf.no_show AS "Не явился",
+    sf.schedule_type AS "Тип расписания",
+    sf.record_source AS "Источник",
+    to_char(svc.service_date, 'DD.MM.YYYY') AS "Прошёл услугу",
+    gp."ДВ4",
+    gp."ДВ2",
+    gp."ОПВ",
+    gp."УД1",
+    gp."УД2",
+    gp."ДР1",
+    gp."ДР2"
+FROM scheduled_filtered sf
+LEFT JOIN service_fact svc ON sf.enp_norm = svc.enp_norm
+LEFT JOIN goal_pivot gp ON sf.enp_norm = gp.enp_norm
+ORDER BY sf.appointment_ts DESC, sf.patient_fio
+"""
+
+
+def sql_query_procedure_appointments_analytics(
+    selected_year: int,
+    visit_start_date: str,
+    visit_end_date: str,
+    procedure: str,
+    service_key: str,
+    include_departments: list[str] | None = None,
+) -> str:
+    safe_procedure = _sql_escape(procedure)
+    safe_service = _sql_escape(service_key)
+    dept_clause = _department_filter_clause(include_departments, "s")
+
+    return f"""
+WITH scheduled AS (
+    SELECT
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        {_APPOINTMENT_TS_EXPR} AS appointment_ts
+    FROM load_data_journal_appeals s
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND procedure = '{safe_procedure}'
+      {dept_clause}
+),
+scheduled_filtered AS (
+    SELECT enp_norm
+    FROM scheduled
+    WHERE appointment_ts::date BETWEEN DATE '{visit_start_date}' AND DATE '{visit_end_date}'
+),
+scheduled_unique AS (
+    SELECT DISTINCT enp_norm FROM scheduled_filtered
+),
+service_fact AS (
+    SELECT DISTINCT regexp_replace(enp, '\\D', '', 'g') AS enp_norm
+    FROM load_data_detailed_medical_examination
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND service_status = 'Да'
+      AND (service_name = '{safe_service}' OR service_nomenclature = '{safe_service}')
+),
+oms_any_goal AS (
+    SELECT DISTINCT regexp_replace(enp, '\\D', '', 'g') AS enp_norm
+    FROM load_data_oms_data
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND goal IN ({", ".join([f"'{g}'" for g in DISPENSARY_GOALS])})
+      AND report_year = {int(selected_year)}
+),
+oms_dv4_opv AS (
+    SELECT DISTINCT regexp_replace(enp, '\\D', '', 'g') AS enp_norm
+    FROM load_data_oms_data
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND goal IN ('ДВ4', 'ОПВ')
+      AND report_year = {int(selected_year)}
+),
+base AS (
+    SELECT
+        (SELECT COUNT(*) FROM scheduled_filtered) AS scheduled_rows,
+        (SELECT COUNT(*) FROM scheduled_unique) AS scheduled_unique_enp,
+        (SELECT COUNT(*) FROM scheduled_unique su INNER JOIN service_fact svc ON su.enp_norm = svc.enp_norm) AS passed_service,
+        (SELECT COUNT(*) FROM scheduled_unique su INNER JOIN oms_any_goal og ON su.enp_norm = og.enp_norm) AS has_any_goal,
+        (SELECT COUNT(*) FROM scheduled_unique su
+            INNER JOIN service_fact svc ON su.enp_norm = svc.enp_norm
+            INNER JOIN oms_any_goal og ON su.enp_norm = og.enp_norm) AS overlap_service_and_goal,
+        (SELECT COUNT(*) FROM scheduled_unique su INNER JOIN oms_dv4_opv dv ON su.enp_norm = dv.enp_norm) AS passed_dv4_opv,
+        (SELECT COUNT(*) FROM scheduled_unique su LEFT JOIN oms_dv4_opv dv ON su.enp_norm = dv.enp_norm WHERE dv.enp_norm IS NULL) AS scheduled_not_dv4_opv
+)
+SELECT
+    'Сводка' AS "Показатель",
+    scheduled_rows AS "Значение"
+FROM base
+UNION ALL SELECT 'Уникальных ЕНП', scheduled_unique_enp FROM base
+UNION ALL SELECT 'Прошли выбранную услугу', passed_service FROM base
+UNION ALL SELECT 'Не прошли услугу', scheduled_unique_enp - passed_service FROM base
+UNION ALL SELECT 'Есть хотя бы одна цель (ОМС)', has_any_goal FROM base
+UNION ALL SELECT 'Нет ни одной цели', scheduled_unique_enp - has_any_goal FROM base
+UNION ALL SELECT 'Прошли ДВ4 или ОПВ', passed_dv4_opv FROM base
+UNION ALL SELECT 'Записаны, не прошли ДВ4/ОПВ', scheduled_not_dv4_opv FROM base
+UNION ALL SELECT 'Пересечение: услуга + цель', overlap_service_and_goal FROM base
+"""
+
+
+def sql_query_procedure_appointments_goal_breakdown(
+    selected_year: int,
+    visit_start_date: str,
+    visit_end_date: str,
+    procedure: str,
+    include_departments: list[str] | None = None,
+) -> str:
+    safe_procedure = _sql_escape(procedure)
+    dept_clause = _department_filter_clause(include_departments, "s")
+
+    return f"""
+WITH scheduled AS (
+    SELECT
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        {_APPOINTMENT_TS_EXPR} AS appointment_ts
+    FROM load_data_journal_appeals s
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND procedure = '{safe_procedure}'
+      {dept_clause}
+),
+scheduled_unique AS (
+    SELECT DISTINCT enp_norm
+    FROM scheduled
+    WHERE appointment_ts::date BETWEEN DATE '{visit_start_date}' AND DATE '{visit_end_date}'
+),
+oms_goals AS (
+    SELECT DISTINCT
+        regexp_replace(o.enp, '\\D', '', 'g') AS enp_norm,
+        o.goal
+    FROM load_data_oms_data o
+    INNER JOIN scheduled_unique sf ON regexp_replace(o.enp, '\\D', '', 'g') = sf.enp_norm
+    WHERE o.goal IN ({", ".join([f"'{g}'" for g in DISPENSARY_GOALS])})
+      AND o.report_year = {int(selected_year)}
+)
+SELECT goal AS "Цель", COUNT(DISTINCT enp_norm) AS "Количество"
+FROM oms_goals
+GROUP BY goal
+ORDER BY goal
+"""

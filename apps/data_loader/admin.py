@@ -368,6 +368,7 @@ OMS_DATA_CSV_TO_MODEL_MAPPING = {
     "Пол": "gender",
     "Полис": "policy",
     "Код СМО": "smo_code",
+    "СМО от ТФОМС": "smo_tfoms",
     "Страховая": "insurance",
     "ЕНП": "enp",
     "Начало лечения": "treatment_start",

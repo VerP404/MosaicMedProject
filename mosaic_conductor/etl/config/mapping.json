@@ -14,6 +14,7 @@
         "Дата рождения": "birth_date",
         "Пол": "gender",
         "Код СМО": "smo_code",
+        "СМО от ТФОМС": "smo_tfoms",
         "ЕНП": "enp",
         "Начало лечения": "treatment_start",
         "Окончание лечения": "treatment_end",
@@ -176,6 +177,7 @@
         "Пол": "gender",
         "Полис": "policy",
         "Код СМО": "smo_code",
+        "СМО от ТФОМС": "smo_tfoms",
         "Страховая": "insurance",
         "ЕНП": "enp",
         "Начало лечения": "treatment_start",
@@ -508,7 +510,8 @@
         "Подразделение": "department",
         "Создавший": "creator",
         "Не явился": "no_show",
-        "ЭПМЗ": "epmz"
+        "ЭПМЗ": "epmz",
+        "Процедура": "procedure"
       },
       "column_check": [
         "enp",

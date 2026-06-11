@@ -14,6 +14,7 @@ from apps.analytical_app.pages.head.dispensary.adults.tab12 import adults_dv12
 from apps.analytical_app.pages.head.dispensary.adults.tab13 import adults_dv13
 from apps.analytical_app.pages.head.dispensary.adults.tab14 import adults_dv14
 from apps.analytical_app.pages.head.dispensary.adults.tab15 import adults_dv15
+from apps.analytical_app.pages.head.dispensary.adults.tab16 import adults_dv16
 from apps.analytical_app.pages.head.dispensary.children.main import head_children_dd_main
 from apps.analytical_app.pages.head.dispensary.children.tab1 import children_dn1
 from apps.analytical_app.pages.head.dispensary.children.tab2 import children_dn2
@@ -153,6 +154,14 @@ routes_head = {
             {"label": "Проверка карт", "active": True},
         ]),
         adults_dv15
+    ]),
+    "/head/adults/dv16": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансеризация взрослых", "href": "/head/adults"},
+            {"label": "Записаны на процедуру", "active": True},
+        ]),
+        adults_dv16
     ]),
     "/head/children": html.Div([
         dbc.Breadcrumb(items=[

@@ -338,6 +338,7 @@ def sql_query_svpod_details(selected_year, selected_month, group_ids, filter_con
                         END                                                                  AS enp,
                     report_data.smo_code,
                     CASE
+                        WHEN COALESCE(NULLIF(TRIM(report_data.smo_tfoms), '-'), '') <> '' THEN false
                         WHEN report_data.smo_code LIKE '360%' THEN false
                         ELSE true
                         END                                                        AS inogorodniy,
@@ -1048,6 +1049,7 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
                         END                                                                  AS enp,
                     report_data.smo_code,
                     CASE
+                        WHEN COALESCE(NULLIF(TRIM(report_data.smo_tfoms), '-'), '') <> '' THEN false
                         WHEN report_data.smo_code LIKE '360%' THEN false
                         ELSE true
                         END                                                        AS inogorodniy,

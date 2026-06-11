@@ -38,7 +38,11 @@ def update_oms_data_op(context, load_result):
         talons.gender,
         CASE WHEN talons.enp = '-' THEN talons.policy ELSE talons.enp END AS enp,
         smo_code,
-        CASE WHEN smo_code LIKE '360%' THEN FALSE ELSE TRUE END            AS inogorodniy,
+        CASE
+          WHEN COALESCE(NULLIF(TRIM(talons.smo_tfoms), '-'), '') <> '' THEN FALSE
+          WHEN smo_code LIKE '360%' THEN FALSE
+          ELSE TRUE
+        END                                                                AS inogorodniy,
         CASE WHEN visits IN ('0','-')
              THEN (to_date(talons.treatment_end,'DD-MM-YYYY')
                    - to_date(talons.treatment_start,'DD-MM-YYYY')+1)::int
