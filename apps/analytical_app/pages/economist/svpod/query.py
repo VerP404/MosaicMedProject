@@ -897,7 +897,11 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
     # Находим условие для выбранного типа индикатора
     indicator_filter = ""
     if indicator_type:
-        for condition_type, where_clause, operator in dynamic_conditions:
+        for item in dynamic_conditions:
+            if isinstance(item, (list, tuple)) and len(item) >= 5:
+                condition_type, where_clause, operator, group_id, group_external_id = item[:5]
+            else:
+                condition_type, where_clause, operator = item
             if condition_type == indicator_type:
                 indicator_filter = f"AND ({where_clause})"
                 break
