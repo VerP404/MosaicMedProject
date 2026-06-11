@@ -157,6 +157,9 @@ class Command(BaseCommand):
                         values[field] = (row[idx_list[0]] or '-').strip()
                 # нормализация ENP
                 values["enp"] = normalize_enp(values["enp"])
+                # Квазар кладёт название услуги/процедуры в «Должность», колонки «Процедура» в CSV нет
+                if values.get("procedure", "-") in ("", "-") and values.get("position", "-") not in ("", "-"):
+                    values["procedure"] = values["position"]
                 return [values[c] for c in columns]
 
             rows: List[List[str]] = [row_to_values(r) for r in rows_raw]
@@ -210,14 +213,14 @@ class Command(BaseCommand):
                         employee_last_name varchar(255),
                         employee_first_name varchar(255),
                         employee_middle_name varchar(255),
-                        position varchar(255),
+                        position varchar(512),
                         acceptance_date varchar(50),
                         record_date varchar(50),
                         schedule_type varchar(255),
                         record_source varchar(255),
                         department varchar(255),
                         creator varchar(255),
-                        no_show varchar(50),
+                        no_show varchar(128),
                         epmz varchar(255),
                         procedure varchar(255)
                     ) ON COMMIT DROP;
