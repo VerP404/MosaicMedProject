@@ -2,7 +2,7 @@ import inspect
 import pandas as pd
 from sqlalchemy import text
 
-from apps.analytical_app.pages.SQL_query.query import base_query
+from apps.analytical_app.pages.SQL_query.query import base_query, columns_by_status_oms, columns_by_status_oms_finance
 from apps.analytical_app.query_executor import engine
 
 
@@ -102,7 +102,6 @@ def sql_query_rep(selected_year, group_id,
     # Формируем базовый набор условий
     where_conditions = [
         "inogorodniy = false",
-        "sanctions IN ('-', '0')",  # Включаем как '-' так и '0'
         "amount_numeric != '0'"
     ]
     if filter_conditions:
@@ -211,6 +210,45 @@ ORDER BY month
     return query
 
 
+def sql_query_inogorod_monthly(selected_year, months_placeholder='1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12',
+                               filter_conditions=None, mode='volumes'):
+    """
+    Помесячный отчёт по иногородним талонам.
+    mode: 'volumes' — количество, 'finance' — суммы.
+    """
+    base = base_query(
+        selected_year, months_placeholder,
+        '3', '3', '3',
+        None, None, None, None,
+        None, None, None, None,
+    )
+
+    where_conditions = [
+        "inogorodniy = true",
+        "amount_numeric != '0'",
+    ]
+    if filter_conditions:
+        where_conditions.append(filter_conditions)
+
+    where_clause = " WHERE " + " AND ".join(where_conditions)
+
+    if mode == 'finance':
+        agg_columns = columns_by_status_oms_finance()
+    else:
+        agg_columns = columns_by_status_oms()
+
+    query = f"""
+{base}
+SELECT report_month_number AS month,
+       {agg_columns}
+FROM oms
+{where_clause}
+GROUP BY month
+ORDER BY month
+    """
+    return query
+
+
 def sql_query_svpod_details(selected_year, selected_month, group_ids, filter_conditions, status_filter=None):
     """
     SQL-запрос для детализации svpod по талонам
@@ -247,7 +285,6 @@ def sql_query_svpod_details(selected_year, selected_month, group_ids, filter_con
     where_conditions.extend([
         "inogorodniy = false",
         "amount_numeric != '0'",
-        "sanctions IN ('-', '0')"
     ])
     
     where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"

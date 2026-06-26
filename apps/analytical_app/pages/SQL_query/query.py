@@ -250,3 +250,29 @@ def columns_by_status_oms():
                SUM(CASE WHEN status = '19' THEN 1 ELSE 0 END) AS "19"
     """
 
+
+def columns_by_status_oms_finance():
+    return """
+               ROUND(COALESCE(SUM(amount_numeric), 0)::numeric, 2)                          AS Всего,
+               ROUND(COALESCE(SUM(CASE WHEN status = '3' THEN amount_numeric END), 0)::numeric, 2)  AS "Оплачен(3 )",
+               ROUND(COALESCE(SUM(CASE WHEN status IN ('1','2','3','4','6','8','19') THEN amount_numeric END), 0)::numeric, 2)  AS "В работе(1,2,3,4,6,8,19)",
+               ROUND(COALESCE(SUM(CASE WHEN status = '2' THEN amount_numeric END), 0)::numeric, 2)  AS "В ТФОМС(2)",
+               ROUND(COALESCE(SUM(CASE WHEN status IN ('0','13','17') THEN amount_numeric END), 0)::numeric, 2)  AS "Отменен(0,13,17)",
+               ROUND(COALESCE(SUM(CASE WHEN status IN ('5','7','12','18') THEN amount_numeric END), 0)::numeric, 2)  AS "Отказан(5,7,12,18)",
+               ROUND(COALESCE(SUM(CASE WHEN status IN ('6','8','19') THEN amount_numeric END), 0)::numeric, 2)  AS "Исправлен(6,8,19)",
+               ROUND(COALESCE(SUM(CASE WHEN status = '0' THEN amount_numeric END), 0)::numeric, 2)  AS "0",
+               ROUND(COALESCE(SUM(CASE WHEN status = '1' THEN amount_numeric END), 0)::numeric, 2)  AS "1",
+               ROUND(COALESCE(SUM(CASE WHEN status = '2' THEN amount_numeric END), 0)::numeric, 2)  AS "2",
+               ROUND(COALESCE(SUM(CASE WHEN status = '3' THEN amount_numeric END), 0)::numeric, 2)  AS "3",
+               ROUND(COALESCE(SUM(CASE WHEN status = '4' THEN amount_numeric END), 0)::numeric, 2)  AS "4",
+               ROUND(COALESCE(SUM(CASE WHEN status = '5' THEN amount_numeric END), 0)::numeric, 2)  AS "5",
+               ROUND(COALESCE(SUM(CASE WHEN status = '6' THEN amount_numeric END), 0)::numeric, 2)  AS "6",
+               ROUND(COALESCE(SUM(CASE WHEN status = '7' THEN amount_numeric END), 0)::numeric, 2)  AS "7",
+               ROUND(COALESCE(SUM(CASE WHEN status = '8' THEN amount_numeric END), 0)::numeric, 2)  AS "8",
+               ROUND(COALESCE(SUM(CASE WHEN status = '12' THEN amount_numeric END), 0)::numeric, 2) AS "12",
+               ROUND(COALESCE(SUM(CASE WHEN status = '13' THEN amount_numeric END), 0)::numeric, 2) AS "13",
+               ROUND(COALESCE(SUM(CASE WHEN status = '17' THEN amount_numeric END), 0)::numeric, 2) AS "17",
+               ROUND(COALESCE(SUM(CASE WHEN status = '18' THEN amount_numeric END), 0)::numeric, 2) AS "18",
+               ROUND(COALESCE(SUM(CASE WHEN status = '19' THEN amount_numeric END), 0)::numeric, 2) AS "19"
+    """
+

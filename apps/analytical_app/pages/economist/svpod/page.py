@@ -14,14 +14,81 @@ from apps.analytical_app.components.filters import filter_years, update_buttons,
     get_current_reporting_month, get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
     get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
-    filter_status, status_groups
+    filter_status, status_groups, months_sql_labels
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups, sql_query_indicators, sql_query_indicators_details, clear_cache, get_groups_for_indicators_report, get_plan_by_months_for_group, sql_query_plans
+from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups, sql_query_indicators, sql_query_indicators_details, clear_cache, get_groups_for_indicators_report, get_plan_by_months_for_group, sql_query_plans, sql_query_inogorod_monthly
 import pandas as pd
 from apps.analytical_app.query_executor import engine
 
 type_page = "econ-sv-pod"
 type_page_indicators = "econ-sv-pod-indicators"
+type_page_inogorod = "econ-sv-pod-inogorod"
+
+INOGOROD_VALUE_COL_IDS = [
+    "Всего",
+    "Оплачен(3 )",
+    "В работе(1,2,3,4,6,8,19)",
+    "В ТФОМС(2)",
+    "Отменен(0,13,17)",
+    "Отказан(5,7,12,18)",
+    "Исправлен(6,8,19)",
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "12", "13", "17", "18", "19",
+]
+INOGOROD_GROUP_COL_IDS = INOGOROD_VALUE_COL_IDS[:7]
+INOGOROD_STATUS_COL_IDS = INOGOROD_VALUE_COL_IDS[7:]
+INOGOROD_GROUP_LABELS = {
+    "Всего": "Всего",
+    "Оплачен(3 )": "Оплачен(3)",
+    "В работе(1,2,3,4,6,8,19)": "В работе",
+    "В ТФОМС(2)": "В ТФОМС(2)",
+    "Отменен(0,13,17)": "Отменён",
+    "Отказан(5,7,12,18)": "Отказан",
+    "Исправлен(6,8,19)": "Исправлен",
+}
+
+
+def build_inogorod_columns():
+    columns = [{"name": ["", "Месяц"], "id": "month", "type": "text"}]
+    for col_id in INOGOROD_GROUP_COL_IDS:
+        columns.append({
+            "name": ["Группы", INOGOROD_GROUP_LABELS.get(col_id, col_id)],
+            "id": col_id,
+            "type": "numeric",
+        })
+    for col_id in INOGOROD_STATUS_COL_IDS:
+        columns.append({"name": ["Статусы", col_id], "id": col_id, "type": "numeric"})
+    return columns
+
+
+def build_inogorod_table_data(raw_rows, selected_year, month_from, month_to, is_finance=False):
+    months_in_range = list(range(month_from, month_to + 1))
+    by_month = {row["month"]: row for row in raw_rows}
+
+    rows = []
+    for month_num in sorted(months_in_range, reverse=True):
+        source = by_month.get(month_num, {})
+        row = {"month": f"{months_sql_labels[month_num]} {selected_year}"}
+        for col_id in INOGOROD_VALUE_COL_IDS:
+            value = source.get(col_id, 0) or 0
+            row[col_id] = round(float(value), 2) if is_finance else int(value)
+        rows.append(row)
+
+    total_row = {"month": "Общий итог"}
+    for col_id in INOGOROD_VALUE_COL_IDS:
+        total = sum(by_month.get(m, {}).get(col_id, 0) or 0 for m in months_in_range)
+        total_row[col_id] = round(float(total), 2) if is_finance else int(total)
+    rows.append(total_row)
+    return rows
+
+
+def inogorod_table_styles(row_count):
+    if row_count == 0:
+        return []
+    return [{
+        "if": {"row_index": row_count - 1},
+        "fontWeight": "bold",
+        "backgroundColor": "#f8f9fa",
+    }]
 
 
 def get_level_options(parent_id=None):
@@ -75,7 +142,7 @@ current_report_tab = html.Div(
                                 dbc.Col(update_buttons(type_page), width=2),
                                 dbc.Col(filter_years(type_page), width=1),
                                 dbc.Col(dbc.Alert(
-                                    "Отобраны талоны: без санкций, местные (по полису ОМС), сумма талона не равна 0",
+                                    "Отобраны талоны: местные (по полису ОМС), сумма талона не равна 0",
                                     color="primary"), width=4),
                                 dbc.Col(
                                     dbc.Alert(
@@ -493,6 +560,122 @@ indicators_tab = html.Div(
 )
 
 
+# Контент для вкладки «Иногородние»
+inogorod_tab = html.Div(
+    [
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    dbc.CardBody(
+                        [
+                            dbc.CardHeader(
+                                html.H5("Фильтры", className="mb-0 fw-bold"),
+                                className="bg-primary text-white",
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(update_buttons(type_page_inogorod), width=2),
+                                    dbc.Col(filter_years(type_page_inogorod), width=1),
+                                    dbc.Col(
+                                        dbc.Alert(
+                                            [
+                                                html.Strong("Иногородний пациент: "),
+                                                "код СМО от ТФОМС не заполнен и код СМО не начинается с 360. ",
+                                                "Сумма талона ≠ 0. ",
+                                                "В таблице — все месяцы с января по текущий отчётный.",
+                                            ],
+                                            color="info",
+                                            className="mb-0 py-2",
+                                        ),
+                                        width=9,
+                                    ),
+                                ],
+                                className="mt-3 mb-2",
+                                align="center",
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        [
+                                            html.Label(
+                                                "Индикатор (опционально):",
+                                                className="fw-bold mb-1",
+                                            ),
+                                            html.Div(
+                                                id="dropdown-container-inogorod",
+                                                children=dbc.Row(
+                                                    [
+                                                        dbc.Col(
+                                                            dcc.Dropdown(
+                                                                id={"type": "inogorod-dynamic-dropdown", "index": 0},
+                                                                options=get_level_options(),
+                                                                placeholder="Все иногородние",
+                                                                value=None,
+                                                                clearable=True,
+                                                            ),
+                                                            width=4,
+                                                        ),
+                                                    ],
+                                                    className="g-2",
+                                                ),
+                                            ),
+                                        ],
+                                        width=12,
+                                    ),
+                                ],
+                                className="mb-2",
+                            ),
+                        ]
+                    ),
+                    style={
+                        "width": "100%",
+                        "padding": "0rem",
+                        "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+                        "border-radius": "10px",
+                    },
+                ),
+                width=12,
+            ),
+            style={"margin": "0 auto", "padding": "0rem"},
+        ),
+        dbc.Row(
+            dbc.Col(
+                html.Div(
+                    id=f"loading-status-{type_page_inogorod}",
+                    className="text-muted small py-2",
+                ),
+                width=12,
+            ),
+        ),
+        dcc.Loading(
+            id=f"loading-output-{type_page_inogorod}",
+            type="default",
+            children=[
+                card_table(
+                    f"result-volumes-{type_page_inogorod}",
+                    "Количество по месяцам",
+                    page_size=15,
+                    merge_duplicate_headers=True,
+                    style_cell_conditional=[
+                        {"if": {"column_id": "month"}, "minWidth": "140px", "width": "140px"},
+                    ],
+                ),
+                card_table(
+                    f"result-finance-{type_page_inogorod}",
+                    "Сумма по месяцам",
+                    page_size=15,
+                    merge_duplicate_headers=True,
+                    style_cell_conditional=[
+                        {"if": {"column_id": "month"}, "minWidth": "140px", "width": "140px"},
+                    ],
+                ),
+            ],
+        ),
+    ],
+    style={"padding": "0rem"},
+)
+
+
 type_page_plans = "econ-sv-pod-plans"
 
 # Контент для вкладки "Планы"
@@ -568,6 +751,11 @@ economist_sv_pod = html.Div(
                     label="Выбранные индикаторы",
                     tab_id=f"tab-indicators-{type_page}",
                     children=indicators_tab
+                ),
+                dbc.Tab(
+                    label="Иногородние",
+                    tab_id=f"tab-inogorod-{type_page}",
+                    children=inogorod_tab
                 ),
                 dbc.Tab(
                     label="Планы",
@@ -1996,3 +2184,150 @@ def update_plans_table(n_clicks, selected_year):
             color_idx += 1
     
     return columns, data, style_data_conditional
+
+
+# ========== Callbacks для вкладки «Иногородние» ==========
+
+@app.callback(
+    Output('dropdown-container-inogorod', 'children'),
+    Input({'type': 'inogorod-dynamic-dropdown', 'index': ALL}, 'value'),
+)
+def display_inogorod_dynamic_dropdowns(values):
+    dropdowns = []
+    level = 0
+    options = get_level_options()
+    value = values[0] if values else None
+
+    dropdowns.append(
+        dbc.Col(
+            dcc.Dropdown(
+                id={'type': 'inogorod-dynamic-dropdown', 'index': level},
+                options=options,
+                placeholder="Все иногородние",
+                value=value,
+                clearable=True,
+            ),
+            width=4,
+        )
+    )
+
+    while True:
+        if value is None:
+            break
+        options = get_level_options(value)
+        if not options:
+            break
+        level += 1
+        value = values[level] if len(values) > level else None
+        dropdowns.append(
+            dbc.Col(
+                dcc.Dropdown(
+                    id={'type': 'inogorod-dynamic-dropdown', 'index': level},
+                    options=options,
+                    placeholder=f"Уровень {level + 1}",
+                    value=value,
+                    clearable=True,
+                ),
+                width=4,
+            )
+        )
+
+    return dbc.Row(dropdowns, className="g-2")
+
+
+@app.callback(
+    [
+        Output(f'result-volumes-{type_page_inogorod}', 'columns'),
+        Output(f'result-volumes-{type_page_inogorod}', 'data'),
+        Output(f'result-volumes-{type_page_inogorod}', 'style_data_conditional'),
+        Output(f'result-finance-{type_page_inogorod}', 'columns'),
+        Output(f'result-finance-{type_page_inogorod}', 'data'),
+        Output(f'result-finance-{type_page_inogorod}', 'style_data_conditional'),
+        Output(f'loading-status-{type_page_inogorod}', 'children'),
+    ],
+    Input(f'update-button-{type_page_inogorod}', 'n_clicks'),
+    State(f'dropdown-year-{type_page_inogorod}', 'value'),
+    State({'type': 'inogorod-dynamic-dropdown', 'index': ALL}, 'value'),
+)
+def update_inogorod_tables(n_clicks, selected_year, selected_levels):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    if not selected_year:
+        raise PreventUpdate
+
+    if isinstance(selected_year, str):
+        selected_year = int(selected_year)
+
+    today = datetime.today()
+    reporting_month = today.month - 1 if today.day <= 5 else today.month
+    month_from, month_to = 1, reporting_month
+    months_placeholder = ', '.join(str(m) for m in range(1, 13))
+    period_label = (
+        f"{months_sql_labels[1]} – {months_sql_labels[reporting_month]} {selected_year}"
+        if reporting_month > 1
+        else f"{months_sql_labels[reporting_month]} {selected_year}"
+    )
+
+    filter_conditions = None
+    indicator_label = "Все иногородние"
+    selected_levels = [lvl for lvl in (selected_levels or []) if lvl is not None]
+    if selected_levels:
+        selected_level = selected_levels[-1]
+        filter_conditions = get_filter_conditions([selected_level], selected_year)
+        group_df = pd.read_sql(
+            f"SELECT name FROM plan_groupindicators WHERE id = {int(selected_level)}",
+            engine,
+        )
+        if not group_df.empty:
+            indicator_label = group_df.iloc[0]['name']
+
+    columns = build_inogorod_columns()
+    start_time = time.time()
+
+    _, volumes_raw = TableUpdater.query_to_df(
+        engine,
+        sql_query_inogorod_monthly(
+            selected_year,
+            months_placeholder,
+            filter_conditions=filter_conditions,
+            mode='volumes',
+        ),
+    )
+    _, finance_raw = TableUpdater.query_to_df(
+        engine,
+        sql_query_inogorod_monthly(
+            selected_year,
+            months_placeholder,
+            filter_conditions=filter_conditions,
+            mode='finance',
+        ),
+    )
+
+    execution_time = time.time() - start_time
+    volumes_data = build_inogorod_table_data(
+        volumes_raw, selected_year, month_from, month_to, is_finance=False,
+    )
+    finance_data = build_inogorod_table_data(
+        finance_raw, selected_year, month_from, month_to, is_finance=True,
+    )
+
+    volumes_styles = inogorod_table_styles(len(volumes_data))
+    finance_styles = inogorod_table_styles(len(finance_data))
+
+    if execution_time < 1:
+        time_text = f"{execution_time * 1000:.0f} мс"
+    else:
+        time_text = f"{execution_time:.1f} с"
+
+    status_text = f"Период: {period_label} · Индикатор: {indicator_label} · Запрос: {time_text}"
+
+    return (
+        columns,
+        volumes_data,
+        volumes_styles,
+        columns,
+        finance_data,
+        finance_styles,
+        status_text,
+    )
