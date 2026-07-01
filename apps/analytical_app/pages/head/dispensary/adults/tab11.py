@@ -254,6 +254,11 @@ def build_tables(n_clicks, months_range, year, building_ids,
                 WHEN emd.sending_status = '-' THEN 'Подписан но не отправлен'
                 ELSE emd.sending_status
             END AS "Статус ЭМД",
+            CASE
+                WHEN emd.formation_date IS NULL OR emd.formation_date IN ('', '-')
+                    THEN NULL
+                ELSE emd.formation_date
+            END AS "Дата формирования ЭМД",
             oms.talon AS "Талон",
             oms.source_id AS "ID источника",
             oms.report_month AS "Месяц",
