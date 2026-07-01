@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 
 from dash import html, dcc, Output, Input, State, exceptions
 import dash_bootstrap_components as dbc
@@ -10,9 +10,10 @@ from apps.analytical_app.components.filters import (
     filter_years,
     filter_months,
     filter_status,
-    filter_building,
     status_groups,
     get_current_reporting_month,
+    get_available_buildings,
+    current_year,
 )
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.query_executor import engine
@@ -22,6 +23,16 @@ from sqlalchemy import text
 # Уникальный идентификатор страницы: используйте в id элементов
 type_page = "tab11-da"
 
+_formation_date_id = f"date-picker-range-formation-{type_page}"
+
+
+def _default_formation_dates(year: int | None = None) -> tuple[date, date]:
+    year = int(year or current_year)
+    return date(year, 1, 1), datetime.now().date()
+
+
+_formation_start_default, _formation_end_default = _default_formation_dates()
+
 
 adults_dv11 = html.Div(
     [
@@ -29,61 +40,101 @@ adults_dv11 = html.Div(
         dbc.Row(
             dbc.Col(
                 dbc.Card(
-                    dbc.CardBody(
-                        [
-                            dbc.CardHeader("Фильтры"),
-                            dbc.Row(
-                                [
-                                    dbc.Col(update_buttons(type_page), width=2),
-                                    dbc.Col(filter_years(type_page), width=2),
-                                    dbc.Col(filter_months(type_page), width=8),
-                                ],
-                                align="center",
-                            ),
-                            dbc.Row(
-                                [
-                                    dbc.Col(filter_building(type_page), width=6),
-                                    dbc.Col(
-                                        html.Div([
-                                            html.Label("Наличие ЭМД", style={"font-weight": "bold"}),
-                                            dbc.RadioItems(
-                                                id=f"emd-presence-{type_page}",
-                                                options=[
-                                                    {"label": "Все", "value": "all"},
-                                                    {"label": "Есть ЭМД", "value": "with"},
-                                                    {"label": "Нет ЭМД", "value": "without"},
-                                                ],
-                                                value="all",
-                                                inline=True,
-                                                className="mt-1"
-                                            )
-                                        ]),
-                                        width=6,
-                                    ),
-                                ]
-                            ),
-                            dbc.Card(
+                    [
+                        dbc.CardHeader("Фильтры"),
+                        dbc.CardBody(
+                            [
                                 dbc.Row(
                                     [
-                                        filter_status(type_page),
-                                    ]
+                                        dbc.Col(update_buttons(type_page), width=2),
+                                        dbc.Col(filter_years(type_page), width=2),
+                                        dbc.Col(filter_months(type_page), width=8),
+                                    ],
+                                    align="center",
+                                    className="mb-3",
                                 ),
-                            ),
-                            dbc.Row(
-                                [
-                                    dbc.Col(
-                                        html.Div(id=f"selected-period-{type_page}", className="filters-label"),
-                                        width=6,
-                                    ),
-                                    dbc.Col(
-                                        html.Div(id=f"current-month-name-{type_page}", className="filters-label"),
-                                        width=6,
-                                    ),
-                                ]
-                            ),
-                        ]
-                    ),
-
+                                dbc.Row(
+                                    [
+                                        dbc.Col(
+                                            [
+                                                html.Label("Корпус", className="fw-bold mb-1"),
+                                                dcc.Dropdown(
+                                                    id=f"dropdown-building-{type_page}",
+                                                    placeholder="Выберите корпус...",
+                                                    clearable=True,
+                                                    multi=True,
+                                                    options=get_available_buildings(),
+                                                ),
+                                                html.Div(
+                                                    filter_status(type_page),
+                                                    className="mt-3",
+                                                ),
+                                            ],
+                                            md=6,
+                                            className="mb-3 mb-md-0",
+                                        ),
+                                        dbc.Col(
+                                            [
+                                                html.Label("Наличие ЭМД", className="fw-bold"),
+                                                dbc.RadioItems(
+                                                    id=f"emd-presence-{type_page}",
+                                                    options=[
+                                                        {"label": "Все", "value": "all"},
+                                                        {"label": "Есть ЭМД", "value": "with"},
+                                                        {"label": "Нет ЭМД", "value": "without"},
+                                                    ],
+                                                    value="all",
+                                                    inline=True,
+                                                    className="mt-1",
+                                                ),
+                                                html.Label(
+                                                    "Дата формирования ЭМД",
+                                                    className="fw-bold mt-3",
+                                                ),
+                                                dcc.DatePickerRange(
+                                                    id=_formation_date_id,
+                                                    start_date_placeholder_text="Начало",
+                                                    end_date_placeholder_text="Конец",
+                                                    start_date=_formation_start_default,
+                                                    end_date=_formation_end_default,
+                                                    display_format="DD.MM.YYYY",
+                                                    calendar_orientation="horizontal",
+                                                    first_day_of_week=1,
+                                                    style={"width": "100%"},
+                                                ),
+                                            ],
+                                            md=6,
+                                        ),
+                                    ],
+                                    className="g-3 align-items-start",
+                                ),
+                                dbc.Row(
+                                    [
+                                        dbc.Col(
+                                            html.Div(
+                                                id=f"selected-period-{type_page}",
+                                                className="filters-label",
+                                            ),
+                                            width=6,
+                                        ),
+                                        dbc.Col(
+                                            html.Div(
+                                                id=f"current-month-name-{type_page}",
+                                                className="filters-label",
+                                            ),
+                                            width=6,
+                                        ),
+                                    ],
+                                    className="mt-2",
+                                ),
+                            ]
+                        ),
+                    ],
+                    style={
+                        "width": "100%",
+                        "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+                        "border-radius": "10px",
+                    },
                 ),
                 width=12,
             ),
@@ -146,14 +197,55 @@ def update_current_month(_):
 
 
 @app.callback(
+    [Output(_formation_date_id, 'start_date'),
+     Output(_formation_date_id, 'end_date')],
+    Input(f'dropdown-year-{type_page}', 'value'),
+)
+def sync_formation_dates(year):
+    if not year:
+        raise exceptions.PreventUpdate
+    start_date, end_date = _default_formation_dates(year)
+    return start_date, end_date
+
+
+@app.callback(
     Output(f'selected-period-{type_page}', 'children'),
     [Input(f'range-slider-month-{type_page}', 'value'),
-     Input(f'dropdown-year-{type_page}', 'value')]
+     Input(f'dropdown-year-{type_page}', 'value'),
+     Input(_formation_date_id, 'start_date'),
+     Input(_formation_date_id, 'end_date')]
 )
-def show_period(months, year):
+def show_period(months, year, formation_start, formation_end):
     if not months or not year:
         return ""
-    return f"Год: {year}, месяцы: {months}"
+    parts = [f"Год: {year}, месяцы: {months}"]
+    if formation_start and formation_end:
+        parts.append(f"Дата формирования ЭМД: {formation_start} — {formation_end}")
+    return " | ".join(parts)
+
+
+def _build_formation_date_sql(start_date: str, end_date: str, emd_presence: str) -> str:
+    if not start_date or not end_date or emd_presence == "without":
+        return ""
+
+    start_date = start_date.split("T")[0]
+    end_date = end_date.split("T")[0]
+    date_condition = f"""
+            emd.formation_date IS NOT NULL AND emd.formation_date NOT IN ('', '-')
+            AND emd.formation_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}'
+            AND to_date(substring(emd.formation_date from 1 for 10), 'DD.MM.YYYY')
+                BETWEEN to_date('{start_date}', 'YYYY-MM-DD') AND to_date('{end_date}', 'YYYY-MM-DD')
+    """
+
+    if emd_presence == "with":
+        return f"\n            AND ({date_condition})\n"
+
+    return f"""
+            AND (
+                emd.sending_status IS NULL OR emd.sending_status = ''
+                OR ({date_condition})
+            )
+    """
 
 
 # ——— Основной колбэк: строим таблицы ———
@@ -182,10 +274,13 @@ def show_period(months, year):
         State(f'status-selection-mode-{type_page}', 'value'),
         State(f'status-group-radio-{type_page}', 'value'),
         State(f'status-individual-dropdown-{type_page}', 'value'),
+        State(_formation_date_id, 'start_date'),
+        State(_formation_date_id, 'end_date'),
     ]
 )
 def build_tables(n_clicks, months_range, year, building_ids,
-                 emd_presence, status_mode, status_group, status_individual):
+                 emd_presence, status_mode, status_group, status_individual,
+                 formation_start, formation_end):
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
@@ -231,6 +326,8 @@ def build_tables(n_clicks, months_range, year, building_ids,
     elif emd_presence == "without":
         emd_filter_sql = " AND emd.sending_status IS NULL"
 
+    formation_date_sql = _build_formation_date_sql(formation_start, formation_end, emd_presence)
+
     # Базовые условия (общие для всех)
     where_common = f"""
         WHERE
@@ -239,6 +336,7 @@ def build_tables(n_clicks, months_range, year, building_ids,
             AND oms.goal IN ('ДВ4','ДВ2','ОПВ','УД1','УД2')
             AND oms.status IN ({statuses_list})
             {buildings_filter_sql}
+            {formation_date_sql}
     """
 
     # Для вкладки "Список" учитываем выбранный фильтр наличия ЭМД

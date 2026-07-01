@@ -5,19 +5,24 @@ import pandas as pd
 from sqlalchemy import text
 import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
-from apps.analytical_app.pages.head.dn_job.query import sql_head_dn_job_nested
-from apps.analytical_app.components.filters import filter_years, filter_status, status_groups
+from apps.analytical_app.pages.head.dn_job.query import (
+    sql_dn_job_disp,
+    sql_dn_job_tal,
+    sql_dn_job_orgs,
+    sql_dn_job_coverage,
+)
+from apps.analytical_app.pages.head.dn_job.services import (
+    build_store_payload,
+    get_status_list,
+    patient_passes_filters,
+    filter_flat_rows,
+    build_report_table,
+    build_report_detail,
+)
+from apps.analytical_app.components.filters import filter_years, filter_status
 from apps.analytical_app.query_executor import engine
 
 type_page = "head-dn-job"
-
-# --- Список организаций для фильтра ---
-with engine.connect() as conn:
-    rows = conn.execute(text(
-        "SELECT DISTINCT org_prof_m FROM load_data_dn_work_iszl "
-        "WHERE org_prof_m IS NOT NULL AND org_prof_m <> '' ORDER BY org_prof_m"
-    )).fetchall()
-org_options = [{"label": r[0], "value": r[0]} for r in rows]
 
 # --- layout ---
 head_dn_job = html.Div([
@@ -49,7 +54,7 @@ head_dn_job = html.Div([
             dbc.Col(
                 dcc.Dropdown(
                     id=f"dropdown-org-{type_page}",
-                    options=org_options,
+                    options=[],
                     multi=True,
                     placeholder="Организации"
                 ),
@@ -76,14 +81,11 @@ head_dn_job = html.Div([
                 ),
                 width=6
             ),
-            dbc.Col(
-                dcc.Loading(id=f"loading-{type_page}", type="default"),
-                width="auto"
-            ),
         ],
         align="center",
-        className="mb-3"
+        className="mb-2"
     ),
+    html.Div(id=f"load-status-{type_page}", className="mb-3 text-muted"),
     dbc.Offcanvas(
         dbc.Card(
             dbc.CardBody(
@@ -187,10 +189,18 @@ head_dn_job = html.Div([
                             label="Данные",
                             tab_id="tab-data",
                             children=[
-
+                                dcc.Loading(
+                                    id=f"loading-data-{type_page}",
+                                    type="default",
+                                    color="#0d6efd",
+                                    children=[
                                 # Фильтры внутри «Данных»
                                 dbc.Row(
                                     [
+                                        dbc.Col(
+                                            html.Label("Дубликат:", className="mb-0"),
+                                            width="auto",
+                                        ),
                                         dbc.Col(
                                             dcc.Dropdown(
                                                 id=f"dropdown-duplicate-{type_page}",
@@ -200,9 +210,14 @@ head_dn_job = html.Div([
                                                     {"label": "Без дубликатов", "value": "no_dup"},
                                                 ],
                                                 value="all",
-                                                clearable=False
+                                                clearable=False,
+                                                style={"minWidth": "180px"},
                                             ),
-                                            width=2
+                                            width="auto",
+                                        ),
+                                        dbc.Col(
+                                            html.Label("Талон:", className="mb-0 ms-3"),
+                                            width="auto",
                                         ),
                                         dbc.Col(
                                             dcc.Dropdown(
@@ -213,9 +228,14 @@ head_dn_job = html.Div([
                                                     {"label": "Нет талона", "value": "no"},
                                                 ],
                                                 value="all",
-                                                clearable=False
+                                                clearable=False,
+                                                style={"minWidth": "160px"},
                                             ),
-                                            width=2
+                                            width="auto",
+                                        ),
+                                        dbc.Col(
+                                            html.Label("Запись:", className="mb-0 ms-3"),
+                                            width="auto",
                                         ),
                                         dbc.Col(
                                             dcc.Dropdown(
@@ -226,13 +246,14 @@ head_dn_job = html.Div([
                                                     {"label": "Нет записи", "value": "no"},
                                                 ],
                                                 value="all",
-                                                clearable=False
+                                                clearable=False,
+                                                style={"minWidth": "160px"},
                                             ),
-                                            width=2
+                                            width="auto",
                                         ),
                                     ],
                                     align="center",
-                                    className="mb-3"
+                                    className="mb-3 g-2",
                                 ),
 
                                 # Собственно таблицы «Данные»
@@ -254,7 +275,8 @@ head_dn_job = html.Div([
                                                             row_selectable="single",
                                                             selected_rows=[],
                                                             active_cell=None,
-                                                            page_action="none",
+                                                            page_action="native",
+                                                            page_size=50,
                                                             style_table={"height": "500px", "overflowY": "auto"},
                                                             style_cell={"textAlign": "left", "padding": "4px"},
                                                             sort_action="native",
@@ -269,8 +291,17 @@ head_dn_job = html.Div([
 
                                         # Диспансерные записи и талоны
                                         dbc.Col(
-                                            [
-                                                dbc.Card(
+                                            dcc.Loading(
+                                                id=f"loading-detail-{type_page}",
+                                                type="default",
+                                                color="#0d6efd",
+                                                children=[
+                                            html.Div(
+                                                id=f"patient-detail-label-{type_page}",
+                                                className="mb-2 text-muted",
+                                                children="Выберите пациента из списка слева",
+                                            ),
+                                            dbc.Card(
                                                     [
                                                         dbc.CardHeader(
                                                             dbc.Row([
@@ -341,11 +372,14 @@ head_dn_job = html.Div([
                                                         )
                                                     ]
                                                 ),
-                                            ],
+                                                ],
+                                            ),
                                             width=7
                                         ),
                                     ],
                                     className="g-3"
+                                ),
+                                    ],
                                 ),
                             ]
                         ),
@@ -564,48 +598,38 @@ def toggle_row(active_cell, selected_rows):
     Input(f"dropdown-year-{type_page}", "value"),
 )
 def _update_org_options(year):
-    # если год не выбран — чистим
     if not year:
         return [], []
 
-    sql = f"""
-    SELECT DISTINCT org_prof_m
-    FROM load_data_dn_work_iszl
-    WHERE org_prof_m IS NOT NULL
-      AND org_prof_m <> ''
-      AND EXTRACT(YEAR FROM TO_TIMESTAMP(date, 'DD.MM.YYYY HH24:MI:SS')) = {year}
-    ORDER BY org_prof_m
-    """
-    df = pd.read_sql(sql, engine)
-
+    df = pd.read_sql(sql_dn_job_orgs(year), engine)
     opts = [{"label": org, "value": org} for org in df["org_prof_m"]]
-    return opts, []  # кроме опций очищаем текущее значение
+    return opts, []
 
 
-# 1) Загрузка всех данных по году (без фильтра по организации)
 @app.callback(
     Output(f"store-{type_page}", "data"),
-    Output(f"loading-{type_page}", "children"),
+    Output(f"load-status-{type_page}", "children"),
     Output(f"last-updated-dn-{type_page}", "children"),
     Output(f"last-updated-talons-{type_page}", "children"),
     Output(f"last-updated-main-{type_page}", "children"),
+    Output(f"tbl-patients-{type_page}", "selected_rows", allow_duplicate=True),
+    Output(f"tbl-disp-{type_page}", "data", allow_duplicate=True),
+    Output(f"tbl-tal-{type_page}", "data", allow_duplicate=True),
+    Output(f"patient-detail-label-{type_page}", "children", allow_duplicate=True),
     Input(f"btn-get-{type_page}", "n_clicks"),
     State(f"dropdown-year-{type_page}", "value"),
-    State(f"status-selection-mode-{type_page}", "value"),
-    State(f"status-group-radio-{type_page}", "value"),
-    State(f"status-individual-dropdown-{type_page}", "value"),
+    prevent_initial_call=True,
 )
-def load_all(n_clicks, year, mode, sel_group, sel_ind):
-    if not n_clicks:
+def load_all(n_clicks, year):
+    if not n_clicks or not year:
         raise exceptions.PreventUpdate
 
-    sql = sql_head_dn_job_nested(year)
-    df = pd.read_sql(sql, con=engine)
-
-    if "ds2" in df:
-        df["ds2"] = df["ds2"].apply(
-            lambda v: ", ".join(v) if isinstance(v, (list, tuple)) else (str(v) if v else "")
-        )
+    disp_df = pd.read_sql(sql_dn_job_disp(year), con=engine)
+    tal_df = pd.read_sql(sql_dn_job_tal(year), con=engine)
+    store_data = build_store_payload(
+        disp_df.to_dict("records"),
+        tal_df.to_dict("records"),
+    )
 
     with engine.connect() as conn:
         row_dn = conn.execute(text(
@@ -621,19 +645,28 @@ def load_all(n_clicks, year, mode, sel_group, sel_ind):
     last_dn = fmt(row_dn)
     last_tal = fmt(row_tal)
     main_str = f"ИСЗЛ: {last_dn} | Талоны: {last_tal}"
+    n_patients = len(store_data.get("patients", {}))
+    load_msg = html.Span(
+        f"Данные за {year} г. загружены: {n_patients} пациентов",
+        className="text-success",
+    )
 
     return (
-        df.to_dict("records"),
-        None,
+        store_data,
+        load_msg,
         last_dn,
         last_tal,
-        main_str
+        main_str,
+        [],
+        [],
+        [],
+        "Выберите пациента из списка слева",
     )
 
 
-# 2) Формирование списка пациентов, **фильтруя** по выбранным организациям
 @app.callback(
     Output(f"tbl-patients-{type_page}", "data"),
+    Output(f"tbl-patients-{type_page}", "selected_rows", allow_duplicate=True),
     Input(f"store-{type_page}", "data"),
     Input(f"dropdown-org-{type_page}", "value"),
     Input(f"dropdown-duplicate-{type_page}", "value"),
@@ -643,143 +676,93 @@ def load_all(n_clicks, year, mode, sel_group, sel_ind):
     Input(f"status-group-radio-{type_page}", "value"),
     Input(f"status-individual-dropdown-{type_page}", "value"),
     Input(f"status-filter-mode-{type_page}", "value"),
+    prevent_initial_call=True,
 )
-def fill_patients(all_rows, selected_orgs, dup_filter, has_tal_filter, has_disp_filter, status_mode, sel_group,
-                  sel_ind, status_filter_mode):
-    if not all_rows:
-        return []
-    # 1) фильтруем по организациям
-    rows = all_rows
-    if selected_orgs:
-        rows = [r for r in rows if r['org_prof_m'] in selected_orgs]
+def fill_patients(store_data, selected_orgs, dup_filter, has_tal_filter, has_disp_filter,
+                  status_mode, sel_group, sel_ind, status_filter_mode):
+    if not store_data or not store_data.get("patients"):
+        return [], []
 
-    if status_filter_mode == "by_status" and status_mode in ("group", "individual"):
-        # получаем список статусов
-        if status_mode == "group":
-            status_list = status_groups[sel_group]
-        else:
-            status_list = sel_ind or []
-        # собираем enp пациентов, у которых есть хотя бы один talon с нужным статусом
-        enps = {r["enp"] for r in rows if r.get("status") in status_list}
-        rows = [r for r in rows if r["enp"] in enps]
-    seen = set()
+    status_list = get_status_list(status_filter_mode, status_mode, sel_group, sel_ind)
     out = []
-    for r in rows:
-        enp = r['enp']
-        if enp in seen:
+    for patient in store_data["patients"].values():
+        if not patient_passes_filters(
+            patient,
+            selected_orgs=selected_orgs,
+            status_list=status_list,
+            dup_filter=dup_filter,
+            has_tal_filter=has_tal_filter,
+            has_disp_filter=has_disp_filter,
+        ):
             continue
-        # собираем все строки пациента
-        patient_rows = [x for x in rows if x['enp'] == enp]
-        # формируем списки disp и tal
-        disp = [dict(d, **{'has_tal': False}) for d in patient_rows if d.get('external_id')]
-        seen_t = set()
-        tal = []
-        for d in patient_rows:
-            if d.get('talon') and d['talon'] not in seen_t:
-                seen_t.add(d['talon'])
-                tal.append(dict(d, **{'has_disp': False}))
-        # отмечаем совпадения (месяц/год/диагноз)
-        for t in tal:
-            for d in disp:
-                if d['duplicate']:
-                    continue
-                same = (t['month_end'] == d['month_d'] and t['year_end'] == d['year_d'])
-                match = (d['ds_norm'] == t['ds1']) or (d['ds_norm'] in (t.get('ds2') or []))
-                if same and match:
-                    t['has_disp'] = True
-                    break
-        for d in disp:
-            if d['duplicate']:
-                continue
-            for t in tal:
-                same = (t['month_end'] == d['month_d'] and t['year_end'] == d['year_d'])
-                match = (d['ds_norm'] == t['ds1']) or (d['ds_norm'] in (t.get('ds2') or []))
-                if same and match:
-                    d['has_tal'] = True
-                    break
-        # раскраска флагов
-        for d in disp:
-            d['has_tal'] = '🔵' if d.get('place_service') == '-' else ('🟢' if d.get('has_tal') else '🔴')
-            d['duplicate'] = '🔴' if d.get('duplicate') else '🟢'
-        for t in tal:
-            t['has_disp'] = '🔵' if t.get('place_service') == '-' else ('🟢' if t.get('has_disp') else '🔴')
-            t['duplicate'] = '🔴' if t.get('duplicate') else '🟢'
-        # проверяем, остались ли записи после фильтров
-        # фильтр дубликатов
-        if dup_filter == 'dup_only' and not (
-                any(d['duplicate'] == '🔴' for d in disp) or any(t['duplicate'] == '🔴' for t in tal)):
-            continue
-        if dup_filter == 'no_dup' and (
-                any(d['duplicate'] == '🔴' for d in disp) or any(t['duplicate'] == '🔴' for t in tal)):
-            continue
-        # фильтр наличия талона
-        if has_tal_filter == 'has' and not any(d['has_tal'] == '🟢' for d in disp):
-            continue
-        if has_tal_filter == 'no' and not any(d['has_tal'] == '🔴' for d in disp):
-            continue
-        # фильтр наличия записи
-        if has_disp_filter == 'has' and not any(t['has_disp'] == '🟢' for t in tal):
-            continue
-        if has_disp_filter == 'no' and not any(t['has_disp'] == '🔴' for t in tal):
-            continue
-        # добавляем пациента
         out.append({
-            'enp': enp,
-            'patient': r['patient'],
-            'birth_date': r['birth_date'],
+            "enp": patient["enp"],
+            "patient": patient["patient"],
+            "birth_date": patient["birth_date"],
         })
-        seen.add(enp)
-    out.sort(key=lambda x: x['patient'])
-    return out
+
+    out.sort(key=lambda x: x["patient"] or "")
+    return out, []
 
 
-# 3) Объединённый колбэк: сброс при нажатии «Получить данные» и отрисовка деталей при выборе пациента
+app.clientside_callback(
+    """
+    function(n_clicks) {
+        if (!n_clicks) {
+            return window.dash_clientside.no_update;
+        }
+        return "Загрузка данных…";
+    }
+    """,
+    Output(f"load-status-{type_page}", "children", allow_duplicate=True),
+    Input(f"btn-get-{type_page}", "n_clicks"),
+    prevent_initial_call=True,
+)
+
+
+app.clientside_callback(
+    """
+    function(selected_rows) {
+        if (selected_rows && selected_rows.length) {
+            return [[], [], "Загрузка карточки пациента…"];
+        }
+        return [[], [], "Выберите пациента из списка слева"];
+    }
+    """,
+    Output(f"tbl-disp-{type_page}", "data", allow_duplicate=True),
+    Output(f"tbl-tal-{type_page}", "data", allow_duplicate=True),
+    Output(f"patient-detail-label-{type_page}", "children", allow_duplicate=True),
+    Input(f"tbl-patients-{type_page}", "selected_rows"),
+    prevent_initial_call=True,
+)
+
+
 @app.callback(
     Output(f"tbl-disp-{type_page}", "data"),
     Output(f"tbl-tal-{type_page}", "data"),
+    Output(f"patient-detail-label-{type_page}", "children"),
     Input(f"tbl-patients-{type_page}", "selected_rows"),
     State(f"tbl-patients-{type_page}", "data"),
     State(f"store-{type_page}", "data"),
 )
-def update_details(selected_rows, patients, all_rows):
-    if not selected_rows or not patients or not all_rows:
-        return [], []
-    idx = selected_rows[0]
-    selected_enp = patients[idx]['enp']
-    # все диспансерные записи пациента
-    disp = [dict(d, **{'has_tal': False}) for d in all_rows if d.get('external_id') and d['enp'] == selected_enp]
-    # все талоны пациента
-    seen_t = set()
-    tal = []
-    for d in all_rows:
-        if d.get('talon') and d['enp'] == selected_enp and d['talon'] not in seen_t:
-            seen_t.add(d['talon'])
-            tal.append(dict(d, **{'has_disp': False}))
-    # отмечаем совпадения и раскрашиваем флаги аналогично выше
-    for t in tal:
-        for d in disp:
-            if d['duplicate']: continue
-            same = (t['month_end'] == d['month_d'] and t['year_end'] == d['year_d'])
-            match = (d['ds_norm'] == t['ds1']) or (d['ds_norm'] in (t.get('ds2') or []))
-            if same and match:
-                t['has_disp'] = True
-                break
-    for d in disp:
-        if d['duplicate']: continue
-        for t in tal:
-            same = (t['month_end'] == d['month_d'] and t['year_end'] == d['year_d'])
-            match = (d['ds_norm'] == t['ds1']) or (d['ds_norm'] in (t.get('ds2') or []))
-            if same and match:
-                d['has_tal'] = True
-                break
-    for d in disp:
-        d['has_tal'] = '🟢' if d.get('has_tal') else '🔴'
-        d['duplicate'] = '🔴' if d.get('duplicate') else '🟢'
-        if d.get('place_service') == '-': d['has_tal'] = '🔵'
-    for t in tal:
-        t['has_disp'] = '🟢' if t.get('has_disp') else '🔴'
-        if t.get('place_service') == '-': t['has_disp'] = '🔵'
-    return disp, tal
+def update_details(selected_rows, patients, store_data):
+    if not selected_rows or not patients or not store_data:
+        return [], [], "Выберите пациента из списка слева"
+
+    patient_row = patients[selected_rows[0]]
+    selected_enp = patient_row["enp"]
+    patient = store_data.get("patients", {}).get(selected_enp)
+    if not patient:
+        return [], [], "Пациент не найден в загруженных данных"
+
+    name = patient_row.get("patient") or "—"
+    label = html.Div([
+        html.Strong("Выбран: ", className="text-primary"),
+        name,
+        html.Span(f" · ЕНП {selected_enp}", className="text-muted ms-1"),
+    ])
+
+    return patient.get("disp", []), patient.get("tal", []), label
 
 
 @app.callback(
@@ -795,73 +778,22 @@ def update_details(selected_rows, patients, all_rows):
     Input(f"dropdown-place-service-report-{type_page}", "value"),
     Input(f"dropdown-dup-report-{type_page}", "value"),
 )
-def update_report(all_rows, year, orgs,
+def update_report(store_data, year, orgs,
                   status_filter_mode, status_mode, sel_group, sel_ind,
                   place_service, dup_report):
-    if not all_rows:
+    if not store_data or not store_data.get("flat"):
         return [], []
 
-    df = pd.DataFrame(all_rows)
-
-    # 1) год, организации
-    if year:
-        df = df[df["year_d"] == year]
-    if orgs:
-        df = df[df["org_prof_m"].isin(orgs)]
-
-    # 2) фильтрация по статусу ТАЛОНОВ
-    if status_filter_mode == "by_status" and status_mode in ("group", "individual"):
-        if status_mode == "group":
-            status_list = status_groups[sel_group]
-        else:
-            status_list = sel_ind or []
-        # ВАЖНО: фильтруем сами талоны, а не patients по enp
-        df = df[df["status"].isin(status_list)]
-
-    # 3) фильтр по месту обслуживания
-    if place_service != "all":
-        df = df[df["place_service"] == place_service]
-    # 4)  фильтр дубликатов
-    if dup_report == "yes":
-        df = df[df["duplicate"] == True]
-    elif dup_report == "no":
-        df = df[df["duplicate"] == False]
-    # 5) делаем pivot сразу по отфильтрованным строкам
-    grp = (
-        df.groupby(["org_prof_m", "month_d"])["enp"]
-        .nunique()
-        .reset_index(name="count")
+    status_list = get_status_list(status_filter_mode, status_mode, sel_group, sel_ind)
+    filtered = filter_flat_rows(
+        store_data["flat"],
+        year=year,
+        orgs=orgs,
+        status_list=status_list,
+        place_service=place_service,
+        dup_report=dup_report,
     )
-    pivot = grp.pivot(index="org_prof_m", columns="month_d", values="count") \
-        .fillna(0).astype(int)
-
-    # 5) переименовываем месяцы и добавляем недостающие
-    month_map = {
-        1: "янв", 2: "февр", 3: "мар", 4: "апр",
-        5: "май", 6: "июн", 7: "июл", 8: "авг",
-        9: "сент", 10: "окт", 11: "ноя", 12: "дек"
-    }
-    pivot = pivot.rename(columns=month_map)
-    for m in month_map.values():
-        if m not in pivot.columns:
-            pivot[m] = 0
-
-    # 6) считаем «Всего» и готовим итоговый DF
-    df_out = pivot.reset_index().rename(columns={"org_prof_m": "Организация"})
-    months = [month_map[i] for i in range(1, 13)]
-    df_out["Всего"] = df_out[months].sum(axis=1)
-    cols = ["Организация", "Всего"] + months
-    df_out = df_out[cols]
-
-    # 7) строка Итого
-    totals = df_out[months + ["Всего"]].sum()
-    total_row = {"Организация": "Итого", **totals.to_dict()}
-    df_out = pd.concat([df_out, pd.DataFrame([total_row])], ignore_index=True)
-
-    # 8) отдаём в таблицу
-    columns = [{"name": c, "id": c} for c in df_out.columns]
-    data = df_out.to_dict("records")
-    return columns, data
+    return build_report_table(filtered)
 
 
 @app.callback(
@@ -885,9 +817,8 @@ def detail_on_click(active_cell,
                     year, orgs,
                     status_filter_mode, status_mode, sel_group, sel_ind,
                     place_service, dup_report,
-                    all_rows):
+                    store_data):
     trig = callback_context.triggered[0]["prop_id"].split(".")[0]
-    # 1) Любой фильтр (кроме клика по таблице) — чистим и сбрасываем выделение
     filter_ids = {
         f"dropdown-year-{type_page}",
         f"dropdown-org-{type_page}",
@@ -901,86 +832,21 @@ def detail_on_click(active_cell,
     if trig in filter_ids:
         return [], [], None
 
-    # 2) Если еще нет данных или не кликнули по ячейке — ничего не показываем
-    if not all_rows or not active_cell:
+    if not store_data or not store_data.get("flat") or not active_cell:
         return [], [], None
 
-    # === далее ваша старая логика детализации ===
-    df = pd.DataFrame(all_rows)
-    # общий фильтр по году/орг
-    if year:
-        df = df[df["year_d"] == year]
-    if orgs:
-        df = df[df["org_prof_m"].isin(orgs)]
-    # фильтр по статусу
-    if status_filter_mode == "by_status" and status_mode in ("group", "individual"):
-        if status_mode == "group":
-            statuses = status_groups[sel_group]
-        else:
-            statuses = sel_ind or []
-        df = df[df["status"].isin(statuses)]
-    # фильтр по месту
-    if place_service and place_service != "all":
-        df = df[df["place_service"] == place_service]
-    if dup_report == "yes":
-        df = df[df["duplicate"] == True]
-    elif dup_report == "no":
-        df = df[df["duplicate"] == False]
-    # пересчитаем pivot чтобы знать, где «Итого»
-    grp = (
-        df.groupby(["org_prof_m", "month_d"])["enp"]
-        .nunique()
-        .reset_index(name="count")
+    status_list = get_status_list(status_filter_mode, status_mode, sel_group, sel_ind)
+    filtered = filter_flat_rows(
+        store_data["flat"],
+        year=year,
+        orgs=orgs,
+        status_list=status_list,
+        place_service=place_service,
+        dup_report=dup_report,
     )
-    pivot = grp.pivot(index="org_prof_m", columns="month_d", values="count") \
-        .fillna(0).astype(int)
-    month_map = {1: "янв", 2: "февр", 3: "мар", 4: "апр", 5: "май", 6: "июн",
-                 7: "июл", 8: "авг", 9: "сент", 10: "окт", 11: "ноя", 12: "дек"}
-    pivot = pivot.rename(columns=month_map)
-    org_list = list(pivot.index)
-    total_idx = len(org_list)
-
-    row_i = active_cell["row"]
-    col_id = active_cell["column_id"]
-
-    # строим detail
-    if row_i == total_idx:  # клик по «Итого»
-        detail = df.copy()
-    else:
-        org = org_list[row_i]
-        detail = df[df["org_prof_m"] == org]
-
-    if col_id not in ("Организация", "Всего"):
-        inv = {v: k for k, v in month_map.items()}
-        m = inv.get(col_id)
-        if m:
-            detail = detail[detail["month_d"] == m]
-
-    # формируем колонки + данные
-    if detail.empty:
+    columns, data = build_report_detail(filtered, active_cell)
+    if not data:
         return [], [], None
-
-    # маппинг заголовков
-    COL_MAP = {
-        "enp": "ЕНП", "patient": "Пациент", "birth_date": "ДР",
-        "talon": "ОМС: Талон", "report_period": "ОМС: Период",
-        "place_service": "ОМС: Место", "status": "ОМС: Статус",
-        "treatment_end": "ОМС: Дата", "doctor": "ОМС: Врач",
-        "doctor_profile": "ОМС: Профиль", "ds1": "ОМС: ds1",
-        "ds2": "ОМС: ds2", "external_id": "ИСЗЛ: Номер",
-        "mo_prikreplenia": "ИСЗЛ: Прикрепление",
-        "org_prof_m": "ИСЗЛ: Организация", "ds_norm": "ИСЗЛ: Диагноз",
-        "disp_date": "ИСЗЛ: Дата", "month_d": "ИСЗЛ: Месяц",
-        "year_d": "ИСЗЛ: Год", "duplicate": "Проверка дубликата"
-    }
-    # уберем month_end/year_end если они есть
-    detail = detail.drop(columns=["month_end", "year_end"], errors="ignore")
-
-    cols_final = [c for c in detail.columns if c in COL_MAP]
-    columns = [{"name": COL_MAP[c], "id": c} for c in cols_final]
-    data = detail[cols_final].to_dict("records")
-
-    # возвращаем detail + НЕ сбрасываем active_cell (ставим его же)
     return columns, data, active_cell
 
 
@@ -1029,56 +895,14 @@ def update_coverage_all(year):
     if not year:
         return "", "", "", ""
 
-    sql_cov = f"""
-    WITH base AS (
-      SELECT
-        enp,
-        {year} - EXTRACT(YEAR FROM to_date(birth_date, 'DD-MM-YYYY')) AS age,
-        gender
-      FROM load_data_talons
-      WHERE goal = '3'
-        AND EXTRACT(YEAR FROM to_date(treatment_end, 'DD-MM-YYYY')) = {year}
-    )
-    SELECT COUNT(DISTINCT enp) AS patient_count
-    FROM base
-    WHERE (gender = 'М' AND age < 65)
-       OR (gender = 'Ж' AND age < 60)
-    """
-    df_cov = pd.read_sql(sql_cov, con=engine)
-    cov_count = int(df_cov["patient_count"].iloc[0]) if not df_cov.empty else 0
+    df = pd.read_sql(sql_dn_job_coverage(year), con=engine)
+    if df.empty:
+        return "0 чел.", "0 чел.", "0 чел.", "0 чел."
 
-    sql_iszl = f"""
-    SELECT COUNT(DISTINCT enp) AS patient_count
-    FROM load_data_dn_work_iszl
-    WHERE EXTRACT(YEAR FROM TO_TIMESTAMP(date, 'DD.MM.YYYY HH24:MI:SS')) = {year}
-    """
-    df_iszl = pd.read_sql(sql_iszl, con=engine)
-    iszl_count = int(df_iszl["patient_count"].iloc[0]) if not df_iszl.empty else 0
-
-    sql_work = f"""
-    SELECT COUNT(DISTINCT enp) AS patient_count
-    FROM load_data_talons
-    WHERE goal = '3'
-      AND EXTRACT(YEAR FROM TO_DATE(treatment_end, 'DD-MM-YYYY')) = {year}
-      AND place_service = '17'
-    """
-    df_work = pd.read_sql(sql_work, con=engine)
-    work_count = int(df_work["patient_count"].iloc[0]) if not df_work.empty else 0
-
-    sql_work_paid = f"""
-    SELECT COUNT(DISTINCT enp) AS patient_count
-    FROM load_data_talons
-    WHERE goal = '3'
-      AND EXTRACT(YEAR FROM TO_DATE(treatment_end, 'DD-MM-YYYY')) = {year}
-      AND place_service = '17'
-      AND status = '3'
-    """
-    df_work_paid = pd.read_sql(sql_work_paid, con=engine)
-    work_paid_count = int(df_work_paid["patient_count"].iloc[0]) if not df_work_paid.empty else 0
-
+    row = df.iloc[0]
     return (
-        f"{cov_count} чел.",
-        f"{iszl_count} чел.",
-        f"{work_count} чел.",
-        f"{work_paid_count} чел."
+        f"{int(row['cov_count'])} чел.",
+        f"{int(row['iszl_count'])} чел.",
+        f"{int(row['work_count'])} чел.",
+        f"{int(row['work_paid_count'])} чел.",
     )
