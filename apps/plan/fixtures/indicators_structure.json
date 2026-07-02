@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-03-23 12:51:16.150798",
+  "export_date": "2026-07-02 15:58:37.936628",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -534,7 +534,7 @@
         {
           "field_name": "amount_numeric",
           "filter_type": "in",
-          "values": "740.97, 1481.94, 2222.91",
+          "values": "740.97, 1481.94, 2222.91, 716.71, 1433.42, 2150.13",
           "year": 2026
         }
       ]
@@ -828,7 +828,7 @@
         {
           "field_name": "amount_numeric",
           "filter_type": "in",
-          "values": "2591.73, 4063.44, 5183.46, 6655.17, 10323.6",
+          "values": "2591.73, 4063.44, 5183.46, 6655.17, 7775.19, 10323.6",
           "year": 2026
         }
       ]
@@ -1166,8 +1166,8 @@
         },
         {
           "field_name": "amount_numeric",
-          "filter_type": "exact",
-          "values": "740.97",
+          "filter_type": "in",
+          "values": "740.97, 716.71",
           "year": 2026
         }
       ]
@@ -1211,8 +1211,8 @@
         },
         {
           "field_name": "amount_numeric",
-          "filter_type": "exact",
-          "values": "1481.94",
+          "filter_type": "in",
+          "values": "1481.94, 1433.42",
           "year": 2026
         }
       ]
