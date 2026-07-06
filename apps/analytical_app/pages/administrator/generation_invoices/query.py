@@ -38,6 +38,7 @@ SELECT TO_CHAR(TO_DATE(initial_input_date, 'DD-MM-YYYY'), 'DD-MM-YYYY')         
                      THEN 1
            END)                                                                               AS "C",
        COUNT(CASE WHEN goal in ('5', '7', '9', '10', '32') THEN 1 END)                        AS "5,7,9,10,32 P",
+       COUNT(CASE WHEN goal in ('55', '551', '552', '553') THEN 1 END)                        AS "55,551,552,553 T",
        COUNT(CASE WHEN goal in ('В дневном стационаре', 'На дому', 'Стационарно') THEN 1 END) AS "SD",
        COUNT(case when goal = 'ДВ4' then 1 end)                                                 as "ДВ4 V",
        COUNT(case when goal = 'ДВ2' then 1 end)                                                 as "ДВ2 T",
@@ -69,6 +70,7 @@ HAVING (
                   THEN 1
         END) +
     COUNT(CASE WHEN goal in ('5', '7', '9', '10', '32') THEN 1 END) +
+    COUNT(CASE WHEN goal in ('55', '551', '552', '553') THEN 1 END) +
     COUNT(CASE WHEN goal in ('В дневном стационаре', 'На дому', 'Стационарно') THEN 1 END) +
     COUNT(case when goal = 'ДВ4' then 1 end) +
     COUNT(case when goal = 'ДВ2' then 1 end) +
@@ -135,6 +137,8 @@ def sql_query_details(selected_year, months_placeholder, inogorod, sanction, amo
                 AND main_diagnosis_code LIKE 'C%'"""
         elif column_id == "5,7,9,10,32 P":
             goal_filter = "AND goal IN ('5', '7', '9', '10', '32')"
+        elif column_id == "55,551,552,553 T":
+            goal_filter = "AND goal IN ('55', '551', '552', '553')"
         elif column_id == "SD":
             goal_filter = "AND goal IN ('В дневном стационаре', 'На дому', 'Стационарно')"
         elif column_id == "ДВ4 V":

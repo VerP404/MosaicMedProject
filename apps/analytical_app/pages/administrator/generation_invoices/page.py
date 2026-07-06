@@ -951,7 +951,7 @@ def update_table(n_clicks, value_doctor, value_profile, selected_year, inogorodn
                 'backgroundColor': '#d4edda',  # светло-зеленый цвет
                 'color': '#155724'  # темно-зеленый цвет текста
             })
-    
+
     return columns1, data1, style_data_conditional, loading_output
 
 
@@ -1058,7 +1058,7 @@ def update_details_button_state(active_cell):
     # Проверяем, что выбрана допустимая колонка для детализации
     column_id = active_cell.get('column_id')
     allowed_columns = ['1', '3', '305,307 D', '113,114,14 Z', '64 G', '541,561 E', '22 N', 
-                      '30,301 O', 'C', '5,7,9,10,32 P', 'SD', 'ДВ4 V', 'ДВ2 T', 'ОПВ P',
+                      '30,301 O', 'C', '5,7,9,10,32 P', '55,551,552,553 T', 'SD', 'ДВ4 V', 'ДВ2 T', 'ОПВ P',
                       'УД1 U', 'УД2 Y', 'ДР1 R', 'ДР2 Q', 'ПН1 N', 'ДС2 S']
     
     return column_id not in allowed_columns
@@ -1118,7 +1118,7 @@ def show_details(n_clicks, viewport_data, active_cell, selected_year, inogorodni
         
         # Проверяем, что выбрана допустимая колонка для детализации
         allowed_columns = ['1', '3', '305,307 D', '113,114,14 Z', '64 G', '541,561 E', '22 N', 
-                          '30,301 O', 'C', '5,7,9,10,32 P', 'SD', 'ДВ4 V', 'ДВ2 T', 'ОПВ P',
+                          '30,301 O', 'C', '5,7,9,10,32 P', '55,551,552,553 T', 'SD', 'ДВ4 V', 'ДВ2 T', 'ОПВ P',
                           'УД1 U', 'УД2 Y', 'ДР1 R', 'ДР2 Q', 'ПН1 N', 'ДС2 S']
         if column_id not in allowed_columns:
             return f'Детализация доступна только для колонок: {", ".join(allowed_columns)}', [], []

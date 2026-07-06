@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-02 15:58:37.936628",
+  "export_date": "2026-07-06 09:24:28.707568",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -2407,6 +2407,48 @@
           "field_name": "amount_numeric",
           "filter_type": "exact",
           "values": "1481.94",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "5c4d137c-241c-46ab-a0d8-0495d7502924",
+      "name": "ЭхоКГ + КТ",
+      "level": 4,
+      "is_distributable": false,
+      "parent_external_id": "a48e0117-a2b8-4365-919a-7cd85dfbe776",
+      "filters": [
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "3332.7",
+          "year": 2026
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'УД2'",
+          "year": 2026
+        }
+      ]
+    },
+    {
+      "external_id": "b113c32a-24dc-4458-9779-4f9070f3f0d4",
+      "name": "КТ",
+      "level": 4,
+      "is_distributable": false,
+      "parent_external_id": "a48e0117-a2b8-4365-919a-7cd85dfbe776",
+      "filters": [
+        {
+          "field_name": "amount_numeric",
+          "filter_type": "exact",
+          "values": "2591.73",
+          "year": 2026
+        },
+        {
+          "field_name": "goal",
+          "filter_type": "exact",
+          "values": "'УД2'",
           "year": 2026
         }
       ]
