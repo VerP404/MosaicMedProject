@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-06 12:32:43.030699",
+  "export_date": "2026-07-06 13:47:52.876328",
   "groups": [
     {
       "external_id": "d0a5de08-3f0e-4cde-99df-78cd4f8d0db2",
@@ -621,7 +621,7 @@
         {
           "field_name": "amount_numeric",
           "filter_type": "in",
-          "values": "1061.84, 2549.4",
+          "values": "1061.84, 1296.78, 2549.4",
           "year": 2026
         }
       ]
