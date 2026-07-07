@@ -19,10 +19,10 @@ def sql_query_gis_oms_research(selected_months, selected_year, status_list=None)
         SUM(ROUND(amount::NUMERIC, 2)) AS "Сумма",
         COUNT(*) FILTER (WHERE goal = '541') AS "к-во: исследования",
         SUM(ROUND((CASE WHEN goal = '541' THEN amount::NUMERIC ELSE 0 END), 2)) AS "сумма: исследования",
-        COUNT(*) FILTER (WHERE goal = '541' AND amount IN ('589.82', '1179.64', '1769.46', '2359.28', '1387.58', '2081.37', '2775.16', '693.79', '740.97', '1481.94', '2222.91', '716.71', '1433.42', '2150.13')) AS "к-во: УЗИ",
-        SUM(ROUND((CASE WHEN goal = '541' AND amount IN ('589.82', '1179.64', '1769.46', '2359.28', '1387.58', '2081.37', '2775.16', '693.79', '740.97', '1481.94', '2222.91', '716.71', '1433.42', '2150.13') THEN amount::NUMERIC ELSE 0 END), 2)) AS "сумма: УЗИ",
-        COUNT(*) FILTER (WHERE goal = '541' AND amount IN ('1059.57', '1404.98', '2077.79', '2387.07', '2972.81', '895.02', '994.23', '1061.84', '1296.78', '2549.4')) AS "к-во: эндоскопия",
-        SUM(ROUND((CASE WHEN goal = '541' AND amount IN ('1059.57', '1404.98', '2077.79', '2387.07', '2972.81', '895.02', '994.23', '1061.84', '1296.78', '2549.4') THEN amount::NUMERIC ELSE 0 END), 2)) AS "сумма: эндоскопия",
+        COUNT(*) FILTER (WHERE goal = '541' AND amount IN ('589.82', '1179.64', '1769.46', '2359.28', '1387.58', '2081.37', '2775.16', '693.79', '740.97', '1481.94', '2222.91', '716.71', '1433.42', '2150.13', '1810.91')) AS "к-во: УЗИ",
+        SUM(ROUND((CASE WHEN goal = '541' AND amount IN ('589.82', '1179.64', '1769.46', '2359.28', '1387.58', '2081.37', '2775.16', '693.79', '740.97', '1481.94', '2222.91', '716.71', '1433.42', '2150.13', '1810.91') THEN amount::NUMERIC ELSE 0 END), 2)) AS "сумма: УЗИ",
+        COUNT(*) FILTER (WHERE goal = '541' AND amount IN ('1059.57', '1404.98', '2077.79', '2387.07', '2972.81', '895.02', '994.23', '1061.84', '1296.78', '2549.4', '3611.24')) AS "к-во: эндоскопия",
+        SUM(ROUND((CASE WHEN goal = '541' AND amount IN ('1059.57', '1404.98', '2077.79', '2387.07', '2972.81', '895.02', '994.23', '1061.84', '1296.78', '2549.4', '3611.24') THEN amount::NUMERIC ELSE 0 END), 2)) AS "сумма: эндоскопия",
         COUNT(*) FILTER (WHERE goal = '561') AS "к-во: COVID",
         SUM(ROUND((CASE WHEN goal = '561' THEN amount::NUMERIC ELSE 0 END), 2)) AS "сумма: COVID"
     FROM (
