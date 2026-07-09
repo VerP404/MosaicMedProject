@@ -23,6 +23,8 @@ def sql_query_gis_oms_research(selected_months, selected_year, status_list=None)
         SUM(ROUND((CASE WHEN goal = '541' AND amount IN ('589.82', '1179.64', '1769.46', '2359.28', '1387.58', '2081.37', '2775.16', '693.79', '740.97', '1481.94', '2222.91', '716.71', '1433.42', '2150.13', '1810.91') THEN amount::NUMERIC ELSE 0 END), 2)) AS "сумма: УЗИ",
         COUNT(*) FILTER (WHERE goal = '541' AND amount IN ('1059.57', '1404.98', '2077.79', '2387.07', '2972.81', '895.02', '994.23', '1061.84', '1296.78', '2549.4', '3611.24')) AS "к-во: эндоскопия",
         SUM(ROUND((CASE WHEN goal = '541' AND amount IN ('1059.57', '1404.98', '2077.79', '2387.07', '2972.81', '895.02', '994.23', '1061.84', '1296.78', '2549.4', '3611.24') THEN amount::NUMERIC ELSE 0 END), 2)) AS "сумма: эндоскопия",
+        COUNT(*) FILTER (WHERE goal = '541' AND amount IN ('2591.73', '4063.44', '5183.46', '6655.17', '7775.19', '10323.6', '10366.92')) AS "к-во: КТ",
+        SUM(ROUND((CASE WHEN goal = '541' AND amount IN ('2591.73', '4063.44', '5183.46', '6655.17', '7775.19', '10323.6', '10366.92') THEN amount::NUMERIC ELSE 0 END), 2)) AS "сумма: КТ",
         COUNT(*) FILTER (WHERE goal = '561') AS "к-во: COVID",
         SUM(ROUND((CASE WHEN goal = '561' THEN amount::NUMERIC ELSE 0 END), 2)) AS "сумма: COVID"
     FROM (
@@ -59,26 +61,32 @@ def sql_query_gis_oms_ambulatory(selected_months, selected_year, status_list=Non
         status_filter = "AND status = '3'"
     
     query = f"""
-    SELECT doctor_profile,
-           SUM(CASE WHEN goal IN ('1', '3', '5', '7', '9', '10', '113', '114', '22', '32', '64', '541', '561',
-                                  'ДВ4', 'ОПВ', 'УД1', 'ДР1', 'ПН1', 'ДР1') THEN 1 ELSE 0 END) AS "Посещений всего",
-           0 as "Паллиатив",
-           0 as "Патронаж",
-           0 as "Без патронажа",
-           COUNT(*) AS "Посещений с иными целями",
-           SUM(CASE WHEN goal IN ('22') THEN 1 ELSE 0 END) AS "Неотложная помощь",
-           0 AS "Гемодиализ",
-           0 AS "Иные цели",
-           SUM(CASE WHEN goal IN ('30', '301', '305', '307') THEN 1 ELSE 0 END) AS "Обращения",
-           SUM(amount::numeric) AS "Сумма оплаты"
+    SELECT 
+        COALESCE(doctor_profile, 'Итого') AS doctor_profile,
+        SUM(CASE WHEN goal IN ('1', '5', '7', '9', '10', '13', '113', '114', '22', '32', '64', '640',
+                                '55', '551', '552', '553',
+                                'ДВ4', 'ОПВ', 'УД1', 'ДР1', 'ПН1') THEN 1 ELSE 0 END) AS "Посещений всего",
+        0 as "Паллиатив",
+        0 as "Патронаж",
+        0 as "Без патронажа",
+        COUNT(*) AS "Посещений с иными целями",
+        SUM(CASE WHEN goal IN ('22') THEN 1 ELSE 0 END) AS "Неотложная помощь",
+        0 AS "Гемодиализ",
+        0 AS "Иные цели",
+        SUM(CASE WHEN goal IN ('30', '301', '305', '307', '3', 'ДВ2') THEN 1 ELSE 0 END) AS "Обращения",
+        SUM(CASE WHEN goal IN ('1', '5', '7', '9', '10', '552', '30') THEN amount::numeric ELSE 0 END) AS "Подушевик",
+        SUM(amount::numeric) AS "Сумма оплаты"
     FROM load_data_talons
     WHERE report_period IN ({months_placeholder})
       {status_filter}
-      AND goal IN ('1', '3', '5', '7', '9', '10', '113', '114', '22', '32', '64', '541', '561',
-                   'ДВ4', 'ОПВ', 'УД1', 'ДР1', 'ПН1', 'ДР1',
-                   '30', '301', '305', '307')
-    GROUP BY doctor_profile
-    ORDER BY "Посещений всего" DESC
+      AND goal IN ('1', '3', '5', '7', '9', '10', '13', '113', '114', '22', '32', '64', '640',
+                   '55', '551', '552', '553',
+                   'ДВ4', 'ОПВ', 'УД1', 'ДР1', 'ПН1',
+                   '30', '301', '305', '307', 'ДВ2')
+    GROUP BY GROUPING SETS ((doctor_profile), ())
+    ORDER BY 
+        CASE WHEN doctor_profile IS NULL THEN 1 ELSE 0 END,
+        "Посещений всего" DESC
     """
     return query.strip()
 
