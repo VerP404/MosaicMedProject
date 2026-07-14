@@ -1,4 +1,3 @@
-from datetime import datetime
 from dash import html, dcc, Output, Input, State, exceptions
 import traceback
 import dash_bootstrap_components as dbc
@@ -6,12 +5,21 @@ import dash_bootstrap_components as dbc
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.elements import card_table
-from apps.analytical_app.components.filters import filter_years, date_picker, update_buttons
-from sqlalchemy import text
+from apps.analytical_app.components.filters import filter_years, update_buttons
 from apps.analytical_app.query_executor import engine, execute_query
+from apps.analytical_app.pages.head.dispensary.adults.query import (
+    sql_query_attached_disp_list,
+    sql_query_attached_disp_analytics,
+)
 
 
 type_page = "tab13-da"
+
+_PASS_STATUS_LABELS = {
+    "all": "Все",
+    "passed": "Прошедшие",
+    "not_passed": "Не прошедшие",
+}
 
 
 def filter_lpuuch(type_page):
@@ -23,27 +31,20 @@ def filter_lpuuch(type_page):
     """
     try:
         lpuuch_list = [row[0] for row in execute_query(query) if row[0]]
-        
-        # Функция для извлечения последних 3 цифр после подчеркивания для сортировки
+
         def get_sort_key(lpu):
             if '_' in lpu:
                 parts = lpu.split('_')
                 if len(parts) == 2 and parts[1].isdigit() and len(parts[1]) >= 3:
-                    return parts[1][-3:]  # Последние 3 цифры после подчеркивания
-                else:
-                    return lpu[-3:] if len(lpu) >= 3 else lpu
-            else:
+                    return parts[1][-3:]
                 return lpu[-3:] if len(lpu) >= 3 else lpu
-        
-        # Сортируем участки по последним 3 цифрам после подчеркивания
+            return lpu[-3:] if len(lpu) >= 3 else lpu
+
         sorted_lpuuch = sorted(lpuuch_list, key=lambda x: (get_sort_key(x), x))
-        
-        # Создаем опции для дропдауна
         options = [{'label': lpu, 'value': lpu} for lpu in sorted_lpuuch]
-        
     except Exception:
         options = []
-    
+
     return html.Div([
         html.Label("Участки"),
         dcc.Dropdown(
@@ -65,6 +66,21 @@ adults_dv13 = html.Div([
             dbc.Row([
                 dbc.Col(update_buttons(type_page), width=2),
                 dbc.Col(filter_years(type_page), width=2),
+                dbc.Col(
+                    html.Div([
+                        html.Label("Статус"),
+                        dcc.Dropdown(
+                            id=f'dropdown-pass-status-{type_page}',
+                            options=[
+                                {'label': 'Все', 'value': 'all'},
+                                {'label': 'Прошедшие', 'value': 'passed'},
+                                {'label': 'Не прошедшие', 'value': 'not_passed'},
+                            ],
+                            value='not_passed',
+                            placeholder="Статус диспансеризации",
+                        )
+                    ]), width=2
+                ),
                 dbc.Col(
                     html.Div([
                         html.Label("Пол"),
@@ -91,7 +107,7 @@ adults_dv13 = html.Div([
                             max=120,
                             value=18
                         )
-                    ]), width=2
+                    ]), width=1
                 ),
                 dbc.Col(
                     html.Div([
@@ -104,7 +120,7 @@ adults_dv13 = html.Div([
                             max=120,
                             value=120
                         )
-                    ]), width=2
+                    ]), width=1
                 ),
                 dbc.Col(
                     html.Div([
@@ -129,8 +145,19 @@ adults_dv13 = html.Div([
         style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)", "border-radius": "10px"}
     ),
     dcc.Loading(id=f'loading-output-{type_page}', type='default'),
-    html.Div(id=f'stat-block-{type_page}', className='filters-label'),
-    card_table(f'result-table-{type_page}', "Прикрепленные не прошедшие диспансеризацию", page_size=20),
+    dbc.Tabs([
+        dbc.Tab(label="Список", tab_id="list", children=[
+            html.Div(id=f'stat-block-{type_page}', className='filters-label', style={'marginTop': '12px'}),
+            card_table(f'result-table-{type_page}', "Прикреплённые пациенты", page_size=20),
+        ]),
+        dbc.Tab(label="Аналитика", tab_id="analytics", children=[
+            card_table(
+                f'analytics-table-{type_page}',
+                "Разбивка по возрастам (прикреплено / прошли / не прошли)",
+                page_size=30,
+            ),
+        ]),
+    ], id=f'tabs-{type_page}', active_tab="list"),
     html.Details([
         html.Summary("Отладка (показать/скрыть)"),
         html.Pre(id=f'debug-info-{type_page}', style={"whiteSpace": "pre-wrap"})
@@ -138,200 +165,106 @@ adults_dv13 = html.Div([
 ])
 
 
-@app.callback(
-    [
-        Output(f'result-table-{type_page}', 'columns'),
-        Output(f'result-table-{type_page}', 'data'),
-        Output(f'stat-block-{type_page}', 'children'),
-        Output(f'debug-info-{type_page}', 'children'),
-        Output(f'loading-output-{type_page}', 'children')
-    ],
-    [Input(f'update-button-{type_page}', 'n_clicks')],
-    [State(f'dropdown-year-{type_page}', 'value'),
-     State(f'dropdown-gender-{type_page}', 'value'),
-     State(f'input-age-from-{type_page}', 'value'),
-     State(f'input-age-to-{type_page}', 'value'),
-     State(f'dropdown-disp-type-{type_page}', 'value'),
-     State(f'dropdown-lpuuch-{type_page}', 'value')]
-)
-def update_table(n_clicks, year_value, gender_value, age_from, age_to, disp_type, lpuuch_values):
-    if n_clicks is None:
-        raise exceptions.PreventUpdate
-
-    if not year_value:
-        return [], [], '', '', html.Div([dcc.Loading(type="default")])
-
-    # Валидация возраста
+def _normalize_age_bounds(age_from, age_to):
     if age_from is None:
         age_from = 18
     if age_to is None:
         age_to = 120
     if age_from > age_to:
         age_from, age_to = age_to, age_from
+    return int(age_from), int(age_to)
 
-    # Формируем условия фильтрации
-    gender_condition = ""
-    if gender_value and gender_value != 'all':
-        gender_condition = f"AND a.gender = '{gender_value}'"
 
-    age_condition = f"AND a.age_years >= {age_from} AND a.age_years <= {age_to}"
-
-    disp_condition = ""
-    if disp_type and disp_type != 'all':
-        disp_condition = f"AND o.goal = '{disp_type}'"
-
-    lpuuch_condition = ""
-    if lpuuch_values and len(lpuuch_values) > 0:
-        # Экранируем одинарные кавычки в значениях участков
-        safe_lpuuch = [f"'{lpu.replace(chr(39), chr(39)+chr(39))}'" for lpu in lpuuch_values if lpu]
-        if safe_lpuuch:
-            lpuuch_condition = f"AND a.lpuuch IN ({', '.join(safe_lpuuch)})"
-
-    query = f"""
-WITH attached_patients AS (
-    SELECT 
-        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
-        fio,
-        dr,
-        CASE 
-            WHEN LOWER("fio") LIKE '%ович%' THEN 'М'
-            WHEN LOWER("fio") LIKE '%евич%' THEN 'М'
-            WHEN LOWER("fio") LIKE '%ич%' THEN 'М'
-            WHEN LOWER("fio") LIKE '%овна%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%евна%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%ична%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%инична%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%овна%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%евна%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%ична%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%инична%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%ья%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%иа%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%йя%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%инич%' THEN 'М'
-            WHEN LOWER("fio") LIKE '%ус%' THEN 'М'
-            WHEN LOWER("fio") LIKE '%ия%' THEN 'Ж'
-            WHEN LOWER("fio") LIKE '%джонзода%' THEN 'М'
-            WHEN LOWER("fio") LIKE '%мохаммед%' THEN 'М'
-            WHEN RIGHT(LOWER("fio"), 1) IN ('а', 'я', 'и', 'е', 'о', 'у', 'э', 'ю') THEN 'Ж'
-            ELSE 'М'
-        END AS gender,
-        lpuuch,
-        COALESCE(
-            CASE WHEN dr ~ '^[0-9]{{2}}[.][0-9]{{2}}[.][0-9]{{4}}' THEN to_date(dr, 'DD.MM.YYYY') END,
-            CASE WHEN dr ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' THEN to_date(dr, 'YYYY-MM-DD') END
-        ) AS dr_date
-    FROM data_loader_iszlpeople
-    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
-      AND COALESCE(NULLIF(fio, '-'), '') <> ''
-),
-adults AS (
-    SELECT 
-        enp_norm,
-        fio,
-        dr,
-        gender,
-        lpuuch,
-        dr_date,
-        DATE_PART('year', AGE(make_date({int(year_value)}, 12, 31), dr_date))::INT AS age_years
-    FROM attached_patients
-    WHERE dr_date IS NOT NULL
-),
-patients_without_disp AS (
-    SELECT 
-        a.enp_norm,
-        a.fio,
-        a.dr,
-        a.gender,
-        a.lpuuch,
-        a.age_years,
-        CASE 
-            WHEN a.age_years IN (19,20,22,23,25,26,28,29,31,32,34,35,37,38) THEN 'ОПВ' 
-            ELSE 'ДВ4' 
-        END AS required_disp_type
-    FROM adults a
-    WHERE a.age_years >= 18
-      {gender_condition}
-      {age_condition}
-      {lpuuch_condition}
-      AND NOT EXISTS (
-            SELECT 1 
-            FROM load_data_oms_data o
-            WHERE regexp_replace(o.enp, '\\D', '', 'g') = a.enp_norm
-              AND o.goal IN ('ДВ4', 'ОПВ')
-              AND o.report_year = {int(year_value)}
-              {disp_condition}
-        )
-),
-patient_phones AS (
-    SELECT DISTINCT ON (regexp_replace(enp, '\\D', '', 'g'))
-        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
-        phone
-    FROM load_data_journal_appeals
-    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
-      AND COALESCE(NULLIF(phone, '-'), '') <> ''
-    ORDER BY regexp_replace(enp, '\\D', '', 'g'), 
-             COALESCE(
-                 CASE WHEN acceptance_date ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' 
-                      THEN to_date(SUBSTRING(acceptance_date FROM 1 FOR 10), 'YYYY-MM-DD') END,
-                 CASE WHEN acceptance_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}[ ]+[0-9]{{2}}:[0-9]{{2}}' 
-                      THEN to_timestamp(acceptance_date, 'DD.MM.YYYY HH24:MI')::date END,
-                 CASE WHEN acceptance_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}$' 
-                      THEN to_date(acceptance_date, 'DD.MM.YYYY') END,
-                 CASE WHEN record_date ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' 
-                      THEN to_date(SUBSTRING(record_date FROM 1 FOR 10), 'YYYY-MM-DD') END,
-                 CASE WHEN record_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}$' 
-                      THEN to_date(record_date, 'DD.MM.YYYY') END
-             ) DESC NULLS LAST,
-             id DESC
+@app.callback(
+    [
+        Output(f'result-table-{type_page}', 'columns'),
+        Output(f'result-table-{type_page}', 'data'),
+        Output(f'analytics-table-{type_page}', 'columns'),
+        Output(f'analytics-table-{type_page}', 'data'),
+        Output(f'stat-block-{type_page}', 'children'),
+        Output(f'debug-info-{type_page}', 'children'),
+        Output(f'loading-output-{type_page}', 'children')
+    ],
+    [Input(f'update-button-{type_page}', 'n_clicks')],
+    [
+        State(f'dropdown-year-{type_page}', 'value'),
+        State(f'dropdown-pass-status-{type_page}', 'value'),
+        State(f'dropdown-gender-{type_page}', 'value'),
+        State(f'input-age-from-{type_page}', 'value'),
+        State(f'input-age-to-{type_page}', 'value'),
+        State(f'dropdown-disp-type-{type_page}', 'value'),
+        State(f'dropdown-lpuuch-{type_page}', 'value'),
+    ]
 )
-SELECT 
-    p.fio AS "ФИО",
-    p.dr AS "ДР",
-    p.enp_norm AS "ЕНП",
-    p.gender AS "Пол",
-    p.lpuuch AS "Участок",
-    p.age_years AS "Возраст",
-    p.required_disp_type AS "Требуемый тип",
-    COALESCE(ph.phone, '') AS "Телефон"
-FROM patients_without_disp p
-LEFT JOIN patient_phones ph ON p.enp_norm = ph.enp_norm
-ORDER BY p.lpuuch, p.fio
-"""
+def update_table(n_clicks, year_value, pass_status, gender_value, age_from, age_to,
+                 disp_type, lpuuch_values):
+    if n_clicks is None:
+        raise exceptions.PreventUpdate
+
+    loading = html.Div([dcc.Loading(type="default")])
+    empty = ([], [], [], [], '', '', loading)
+
+    if not year_value:
+        return empty
+
+    age_from, age_to = _normalize_age_bounds(age_from, age_to)
+    pass_status = pass_status or 'not_passed'
+    lpuuch_values = lpuuch_values or []
+
+    list_query = sql_query_attached_disp_list(
+        int(year_value),
+        pass_status,
+        gender_value,
+        age_from,
+        age_to,
+        disp_type,
+        lpuuch_values,
+    )
+    analytics_query = sql_query_attached_disp_analytics(
+        int(year_value),
+        gender_value,
+        age_from,
+        age_to,
+        disp_type,
+        lpuuch_values,
+    )
 
     try:
-        columns, data = TableUpdater.query_to_df(engine, query)
+        columns, data = TableUpdater.query_to_df(engine, list_query)
+        analytics_columns, analytics_data = TableUpdater.query_to_df(engine, analytics_query)
     except Exception as e:
-        err = f"Ошибка выполнения запроса: {e}\n\nSQL:\n{query}\n\n{traceback.format_exc()}"
-        return [], [], 'Ошибка загрузки', err, html.Div([dcc.Loading(type="default")])
+        err = (
+            f"Ошибка выполнения запроса: {e}\n\n"
+            f"SQL (список):\n{list_query}\n\n"
+            f"SQL (аналитика):\n{analytics_query}\n\n"
+            f"{traceback.format_exc()}"
+        )
+        return [], [], [], [], 'Ошибка загрузки', err, loading
 
-    # Статистика
     total_rows = len(data)
     unique_enp = len({row.get('ЕНП') for row in data}) if data else 0
-    
-    # Подсчет по полу
     male_count = sum(1 for row in data if row.get('Пол') == 'М') if data else 0
     female_count = sum(1 for row in data if row.get('Пол') == 'Ж') if data else 0
-    
-    # Подсчет по типу диспансеризации
+    passed_count = sum(1 for row in data if row.get('Статус') == 'Прошёл') if data else 0
+    not_passed_count = sum(1 for row in data if row.get('Статус') == 'Не прошёл') if data else 0
     dv4_count = sum(1 for row in data if row.get('Требуемый тип') == 'ДВ4') if data else 0
     opv_count = sum(1 for row in data if row.get('Требуемый тип') == 'ОПВ') if data else 0
 
-    stat_text = f"Всего: {total_rows} | Уникальных: {unique_enp} | М: {male_count} | Ж: {female_count} | ДВ4: {dv4_count} | ОПВ: {opv_count}"
+    stat_text = (
+        f"Статус: {_PASS_STATUS_LABELS.get(pass_status, pass_status)} | "
+        f"Всего: {total_rows} | Уникальных: {unique_enp} | "
+        f"Прошли: {passed_count} | Не прошли: {not_passed_count} | "
+        f"М: {male_count} | Ж: {female_count} | ДВ4: {dv4_count} | ОПВ: {opv_count}"
+    )
 
-    # Отладочная информация
     debug_info = f"""
 Год: {year_value}
+Статус: {_PASS_STATUS_LABELS.get(pass_status, pass_status)}
 Пол: {gender_value if gender_value != 'all' else 'Все'}
 Возраст: {age_from}-{age_to}
 Тип диспансеризации: {disp_type if disp_type != 'all' else 'Все'}
-Участки: {', '.join(lpuuch_values) if lpuuch_values and len(lpuuch_values) > 0 else 'Все'}
-
-SQL условия:
-- Пол: {gender_condition or 'Не указано'}
-- Возраст: {age_condition}
-- Тип диспансеризации: {disp_condition or 'Не указано'}
-- Участки: {lpuuch_condition or 'Не указано'}
+Участки: {', '.join(lpuuch_values) if lpuuch_values else 'Все'}
+Строк аналитики: {len(analytics_data)}
 """
 
-    return columns, data, stat_text, debug_info, html.Div([dcc.Loading(type="default")])
+    return columns, data, analytics_columns, analytics_data, stat_text, debug_info, loading

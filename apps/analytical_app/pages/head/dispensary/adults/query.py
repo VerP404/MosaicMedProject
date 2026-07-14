@@ -941,3 +941,246 @@ WHERE COALESCE(NULLIF(d.enp, '-'), '') <> ''
 ORDER BY d.enp, d.service_date
 LIMIT {SOURCE_PREVIEW_LIMIT}
 """
+
+
+def _attached_disp_filter_clauses(
+    gender_value,
+    age_from,
+    age_to,
+    disp_type,
+    lpuuch_values,
+):
+    gender_condition = ""
+    if gender_value and gender_value != "all":
+        gender_condition = f"AND a.gender = '{gender_value}'"
+
+    age_condition = f"AND a.age_years >= {int(age_from)} AND a.age_years <= {int(age_to)}"
+
+    disp_condition = ""
+    if disp_type and disp_type != "all":
+        disp_condition = f"AND o.goal = '{disp_type}'"
+
+    lpuuch_condition = ""
+    if lpuuch_values:
+        safe_lpuuch = [
+            f"'{lpu.replace(chr(39), chr(39) + chr(39))}'"
+            for lpu in lpuuch_values
+            if lpu
+        ]
+        if safe_lpuuch:
+            lpuuch_condition = f"AND a.lpuuch IN ({', '.join(safe_lpuuch)})"
+
+    return gender_condition, age_condition, disp_condition, lpuuch_condition
+
+
+def _sql_attached_with_status_cte(
+    year: int,
+    gender_condition: str,
+    age_condition: str,
+    lpuuch_condition: str,
+    disp_condition: str,
+) -> str:
+    return f"""
+attached_patients AS (
+    SELECT
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        fio,
+        dr,
+        CASE
+            WHEN LOWER("fio") LIKE '%ович%' THEN 'М'
+            WHEN LOWER("fio") LIKE '%евич%' THEN 'М'
+            WHEN LOWER("fio") LIKE '%ич%' THEN 'М'
+            WHEN LOWER("fio") LIKE '%овна%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%евна%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%ична%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%инична%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%ья%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%иа%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%йя%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%инич%' THEN 'М'
+            WHEN LOWER("fio") LIKE '%ус%' THEN 'М'
+            WHEN LOWER("fio") LIKE '%ия%' THEN 'Ж'
+            WHEN LOWER("fio") LIKE '%джонзода%' THEN 'М'
+            WHEN LOWER("fio") LIKE '%мохаммед%' THEN 'М'
+            WHEN RIGHT(LOWER("fio"), 1) IN ('а', 'я', 'и', 'е', 'о', 'у', 'э', 'ю') THEN 'Ж'
+            ELSE 'М'
+        END AS gender,
+        lpuuch,
+        COALESCE(
+            CASE WHEN dr ~ '^[0-9]{{2}}[.][0-9]{{2}}[.][0-9]{{4}}' THEN to_date(dr, 'DD.MM.YYYY') END,
+            CASE WHEN dr ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' THEN to_date(dr, 'YYYY-MM-DD') END
+        ) AS dr_date
+    FROM data_loader_iszlpeople
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND COALESCE(NULLIF(fio, '-'), '') <> ''
+),
+adults AS (
+    SELECT
+        enp_norm,
+        fio,
+        dr,
+        gender,
+        lpuuch,
+        dr_date,
+        DATE_PART('year', AGE(make_date({year}, 12, 31), dr_date))::INT AS age_years
+    FROM attached_patients
+    WHERE dr_date IS NOT NULL
+),
+attached_with_status AS (
+    SELECT
+        a.enp_norm,
+        a.fio,
+        a.dr,
+        a.gender,
+        a.lpuuch,
+        a.age_years,
+        CASE
+            WHEN a.age_years IN (19,20,22,23,25,26,28,29,31,32,34,35,37,38) THEN 'ОПВ'
+            ELSE 'ДВ4'
+        END AS required_disp_type,
+        EXISTS (
+            SELECT 1
+            FROM load_data_oms_data o
+            WHERE regexp_replace(o.enp, '\\D', '', 'g') = a.enp_norm
+              AND o.goal IN ('ДВ4', 'ОПВ')
+              AND o.report_year = {year}
+              {disp_condition}
+        ) AS passed_disp
+    FROM adults a
+    WHERE a.age_years >= 18
+      {gender_condition}
+      {age_condition}
+      {lpuuch_condition}
+)"""
+
+
+def sql_query_attached_disp_list(
+    year: int,
+    pass_status: str,
+    gender_value=None,
+    age_from: int = 18,
+    age_to: int = 120,
+    disp_type=None,
+    lpuuch_values=None,
+) -> str:
+    gender_condition, age_condition, disp_condition, lpuuch_condition = _attached_disp_filter_clauses(
+        gender_value, age_from, age_to, disp_type, lpuuch_values or []
+    )
+
+    pass_filter = ""
+    if pass_status == "passed":
+        pass_filter = "AND p.passed_disp = TRUE"
+    elif pass_status == "not_passed":
+        pass_filter = "AND p.passed_disp = FALSE"
+
+    base_cte = _sql_attached_with_status_cte(
+        year, gender_condition, age_condition, lpuuch_condition, disp_condition
+    )
+
+    return f"""
+WITH {base_cte},
+patient_phones AS (
+    SELECT DISTINCT ON (regexp_replace(enp, '\\D', '', 'g'))
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        phone
+    FROM load_data_journal_appeals
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND COALESCE(NULLIF(phone, '-'), '') <> ''
+    ORDER BY regexp_replace(enp, '\\D', '', 'g'),
+             COALESCE(
+                 CASE WHEN acceptance_date ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
+                      THEN to_date(SUBSTRING(acceptance_date FROM 1 FOR 10), 'YYYY-MM-DD') END,
+                 CASE WHEN acceptance_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}[ ]+[0-9]{{2}}:[0-9]{{2}}'
+                      THEN to_timestamp(acceptance_date, 'DD.MM.YYYY HH24:MI')::date END,
+                 CASE WHEN acceptance_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}$'
+                      THEN to_date(acceptance_date, 'DD.MM.YYYY') END,
+                 CASE WHEN record_date ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
+                      THEN to_date(SUBSTRING(record_date FROM 1 FOR 10), 'YYYY-MM-DD') END,
+                 CASE WHEN record_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}$'
+                      THEN to_date(record_date, 'DD.MM.YYYY') END
+             ) DESC NULLS LAST,
+             id DESC
+)
+SELECT
+    p.fio AS "ФИО",
+    p.dr AS "ДР",
+    p.enp_norm AS "ЕНП",
+    p.gender AS "Пол",
+    p.lpuuch AS "Участок",
+    p.age_years AS "Возраст",
+    p.required_disp_type AS "Требуемый тип",
+    CASE WHEN p.passed_disp THEN 'Прошёл' ELSE 'Не прошёл' END AS "Статус",
+    COALESCE(ph.phone, '') AS "Телефон"
+FROM attached_with_status p
+LEFT JOIN patient_phones ph ON p.enp_norm = ph.enp_norm
+WHERE 1=1
+  {pass_filter}
+ORDER BY p.lpuuch, p.fio
+"""
+
+
+def sql_query_attached_disp_analytics(
+    year: int,
+    gender_value=None,
+    age_from: int = 18,
+    age_to: int = 120,
+    disp_type=None,
+    lpuuch_values=None,
+) -> str:
+    gender_condition, age_condition, disp_condition, lpuuch_condition = _attached_disp_filter_clauses(
+        gender_value, age_from, age_to, disp_type, lpuuch_values or []
+    )
+
+    base_cte = _sql_attached_with_status_cte(
+        year, gender_condition, age_condition, lpuuch_condition, disp_condition
+    )
+
+    return f"""
+WITH {base_cte},
+by_age AS (
+    SELECT
+        age_years,
+        COUNT(*) AS attached_total,
+        COUNT(*) FILTER (WHERE gender = 'М') AS attached_m,
+        COUNT(*) FILTER (WHERE gender = 'Ж') AS attached_f,
+        COUNT(*) FILTER (WHERE passed_disp) AS passed_total,
+        COUNT(*) FILTER (WHERE passed_disp AND gender = 'М') AS passed_m,
+        COUNT(*) FILTER (WHERE passed_disp AND gender = 'Ж') AS passed_f,
+        COUNT(*) FILTER (WHERE NOT passed_disp) AS not_passed_total,
+        COUNT(*) FILTER (WHERE NOT passed_disp AND gender = 'М') AS not_passed_m,
+        COUNT(*) FILTER (WHERE NOT passed_disp AND gender = 'Ж') AS not_passed_f
+    FROM attached_with_status
+    GROUP BY age_years
+),
+totals AS (
+    SELECT
+        NULL::INT AS age_years,
+        SUM(attached_total) AS attached_total,
+        SUM(attached_m) AS attached_m,
+        SUM(attached_f) AS attached_f,
+        SUM(passed_total) AS passed_total,
+        SUM(passed_m) AS passed_m,
+        SUM(passed_f) AS passed_f,
+        SUM(not_passed_total) AS not_passed_total,
+        SUM(not_passed_m) AS not_passed_m,
+        SUM(not_passed_f) AS not_passed_f
+    FROM by_age
+)
+SELECT
+    COALESCE(age_years::text, 'Итого') AS "Возраст",
+    attached_total AS "Прикреплено",
+    attached_m AS "Прикр. М",
+    attached_f AS "Прикр. Ж",
+    passed_total AS "Прошли",
+    passed_m AS "Прошли М",
+    passed_f AS "Прошли Ж",
+    not_passed_total AS "Не прошли",
+    not_passed_m AS "Не прошли М",
+    not_passed_f AS "Не прошли Ж"
+FROM (
+    SELECT * FROM by_age
+    UNION ALL
+    SELECT * FROM totals
+) t
+ORDER BY CASE WHEN age_years IS NULL THEN 999999 ELSE age_years END
+"""
