@@ -18,6 +18,7 @@ from apps.analytical_app.pages.economist.financial_indicators.page import layout
 from apps.analytical_app.pages.economist.goal_groups_report.page import economist_goal_groups_report_def
 from apps.analytical_app.pages.economist.gis_oms.page import economist_gis_oms_def
 from apps.analytical_app.pages.economist.stationary_gis_oms.page import economist_stationary_gis_oms_def
+from apps.analytical_app.pages.economist.building_indicators.page import economist_building_indicators_def
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
@@ -134,6 +135,13 @@ routes = {
             {"label": "Детализация детских профосмотров", "active": True},
         ]),
         economist_child_prof_exams_detail_layout
+    ]),
+    "/economist/building_indicators": lambda: html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Экономист", "href": "/economist"},
+            {"label": "Индикаторы по корпусам", "active": True},
+        ]),
+        economist_building_indicators_def()
     ]),
 
     "/statistic": statistic_main,

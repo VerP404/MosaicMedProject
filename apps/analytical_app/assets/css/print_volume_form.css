@@ -1,0 +1,168 @@
+/* Печатный бланк «Выполнение объёмных показателей» */
+
+.print-volume-form {
+  --pvf-columns: 3;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 9pt;
+  color: #000;
+  background: #fff;
+  padding: 0.5rem;
+}
+
+.pvf-header {
+  text-align: center;
+  margin-bottom: 0.6rem;
+  border-bottom: 1px solid #000;
+  padding-bottom: 0.35rem;
+}
+
+.pvf-org {
+  font-size: 10pt;
+  font-weight: bold;
+}
+
+.pvf-title {
+  font-size: 12pt;
+  font-weight: bold;
+  margin: 0.15rem 0;
+  text-transform: uppercase;
+}
+
+.pvf-meta {
+  font-size: 8pt;
+}
+
+.pvf-empty {
+  padding: 1rem;
+  color: #666;
+  font-style: italic;
+}
+
+.pvf-section {
+  margin-bottom: 0.75rem;
+  break-inside: avoid-page;
+}
+
+.pvf-section-title {
+  font-size: 10pt;
+  font-weight: bold;
+  margin: 0.4rem 0 0.35rem;
+  text-align: center;
+  border-bottom: 1px solid #333;
+  padding-bottom: 0.15rem;
+}
+
+.pvf-grid {
+  column-count: var(--pvf-columns);
+  column-gap: 0.6rem;
+}
+
+.pvf-mini {
+  break-inside: avoid;
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 0.45rem;
+  vertical-align: top;
+}
+
+.pvf-mini-title {
+  font-weight: bold;
+  font-size: 8.5pt;
+  text-align: center;
+  margin-bottom: 0.1rem;
+  line-height: 1.15;
+}
+
+.pvf-mini table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.pvf-mini th,
+.pvf-mini td {
+  border: 0.5pt solid #000;
+  padding: 1px 3px;
+  text-align: right;
+  font-size: 8pt;
+  line-height: 1.15;
+}
+
+.pvf-mini th {
+  font-weight: bold;
+  text-align: center;
+  background: #f3f3f3;
+}
+
+.pvf-mini td.pvf-name,
+.pvf-mini th:first-child {
+  text-align: left;
+  width: 38%;
+}
+
+.pvf-mini tr.pvf-total td {
+  font-weight: bold;
+}
+
+/* Экран: рамка превью */
+#print-volume-form-preview {
+  border: 1px solid #ccc;
+  background: #fff;
+  overflow: auto;
+  max-height: 75vh;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  /* Книжная: пользователь может сменить ориентацию в диалоге печати */
+  body.pvf-print-portrait {
+    /* placeholder for future named @page */
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #print-volume-form-preview,
+  #print-volume-form-preview *,
+  #print-volume-form-sheet,
+  #print-volume-form-sheet * {
+    visibility: visible !important;
+  }
+
+  #print-volume-form-preview {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-height: none !important;
+    border: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .d-print-none,
+  nav,
+  .navbar,
+  .nav-tabs,
+  footer,
+  ._dash-undo-redo,
+  .dash-debug-menu,
+  .dash-debug-menu__outer {
+    display: none !important;
+  }
+
+  .print-volume-form {
+    padding: 0;
+  }
+
+  .pvf-preview-inner > * {
+    margin: 0 !important;
+  }
+}
