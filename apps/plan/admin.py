@@ -41,7 +41,7 @@ from .models import (
     GroupIndicators, FilterCondition, MonthlyPlan, UnifiedFilter, UnifiedFilterCondition,
     AnnualPlan, BuildingPlan, MonthlyBuildingPlan, MonthlyDepartmentPlan, DepartmentPlan,
     GroupBuildingDepartment, ChiefDashboard, MonthlyDoctorPlan, AnnualDoctorPlan, GoalGroupConfig,
-    OrganizationIndicatorConfig
+    OrganizationIndicatorConfig, BuildingIndicatorReportPreset, BuildingVolumePrintTemplate
 )
 from .utils import copy_filters_to_new_year, copy_filters_from_year_to_year, copy_plans_to_year
 from ..organization.models import Department, Building
@@ -473,7 +473,13 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     readonly_fields = ('external_id',)
     actions = [enable_cumulative_report_action, disable_cumulative_report_action, 
                enable_indicators_report_action, disable_indicators_report_action]
-    actions_list = ["export_plans", "import_plans", "copy_plans_action"]
+    actions_list = [
+        "export_plans",
+        "import_plans",
+        "export_building_plans",
+        "import_building_plans",
+        "copy_plans_action",
+    ]
     ordering = ['year', 'sort_order', 'group__level', 'group__name']
 
     def has_quantity_plan(self, obj):
@@ -740,11 +746,189 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
         }
         return render(request, 'admin/plan/copy_plans.html', context)
 
+    @action(
+        description="Экспорт планов корпусов в Excel",
+        url_path="export-building-plans",
+        permissions=["export_plans"],
+    )
+    def export_building_plans(self, request):
+        if request.method == 'POST':
+            form = YearSelectForm(request.POST)
+            if form.is_valid():
+                return self._export_building_plans_to_excel(form.cleaned_data['year'])
+        else:
+            form = YearSelectForm(initial={'year': datetime.now().year})
+        context = {
+            'form': form,
+            'title': 'Экспорт планов корпусов',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/plan/export_plans.html', context)
+
+    def _export_building_plans_to_excel(self, year):
+        building_plans = (
+            BuildingPlan.objects.filter(annual_plan__year=year)
+            .select_related('annual_plan__group', 'building')
+            .prefetch_related('monthly_building_plans')
+            .order_by('annual_plan__group__name', 'building__name')
+        )
+        rows = []
+        for bp in building_plans:
+            group = bp.annual_plan.group
+            hierarchy = group.get_hierarchy_display()
+            monthly = {m.month: m for m in bp.monthly_building_plans.all()}
+            qty_row = {
+                'Показатель': f'{hierarchy} - Объемы',
+                'external_id': group.external_id or '',
+                'building_id': bp.building_id,
+                'Корпус': bp.building.name,
+                'Итого': sum(m.quantity for m in monthly.values()),
+            }
+            amt_row = {
+                'Показатель': f'{hierarchy} - Финансы',
+                'external_id': group.external_id or '',
+                'building_id': bp.building_id,
+                'Корпус': bp.building.name,
+                'Итого': sum(float(m.amount) for m in monthly.values()),
+            }
+            for month in range(1, 13):
+                mp = monthly.get(month)
+                qty_row[str(month)] = mp.quantity if mp else 0
+                amt_row[str(month)] = float(mp.amount) if mp else 0.0
+            rows.append(qty_row)
+            rows.append(amt_row)
+
+        df = pd.DataFrame(rows)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Планы корпусов', index=False)
+        output.seek(0)
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="building_plans_{year}.xlsx"'
+        return response
+
+    @action(
+        description="Импорт планов корпусов из Excel",
+        url_path="import-building-plans",
+        permissions=["import_plans"],
+    )
+    def import_building_plans(self, request):
+        if request.method == 'POST':
+            form = ImportPlansForm(request.POST, request.FILES)
+            if form.is_valid():
+                try:
+                    result = self._import_building_plans_from_excel(
+                        form.cleaned_data['file'],
+                        form.cleaned_data['year'],
+                    )
+                    messages.success(
+                        request,
+                        f'Импорт корпусов: обновлено {result["updated"]} месячных планов, '
+                        f'пропущено {result["skipped"]} строк.',
+                    )
+                    return redirect('admin:plan_annualplan_changelist')
+                except Exception as e:
+                    messages.error(request, f'Ошибка при импорте планов корпусов: {e}')
+        else:
+            form = ImportPlansForm(initial={'year': datetime.now().year})
+        context = {
+            'form': form,
+            'title': 'Импорт планов корпусов',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/plan/import_plans.html', context)
+
+    def _import_building_plans_from_excel(self, file, year):
+        df = pd.read_excel(file)
+        updated = 0
+        skipped = 0
+        # ключ: (external_id, building_id) -> quantity_row / amount_row
+        groups_data = {}
+
+        for _, row in df.iterrows():
+            indicator = str(row.get('Показатель', '')).strip()
+            external_id = str(row.get('external_id', '')).strip()
+            building_id = row.get('building_id')
+            if not indicator or not external_id or external_id == 'nan' or pd.isna(building_id):
+                skipped += 1
+                continue
+            try:
+                building_id = int(float(building_id))
+            except (TypeError, ValueError):
+                skipped += 1
+                continue
+            key = (external_id, building_id)
+            groups_data.setdefault(key, {'quantity_row': None, 'amount_row': None})
+            if indicator.endswith(' - Объемы'):
+                groups_data[key]['quantity_row'] = row
+            elif indicator.endswith(' - Финансы'):
+                groups_data[key]['amount_row'] = row
+            else:
+                skipped += 1
+
+        for (external_id, building_id), data in groups_data.items():
+            quantity_row = data['quantity_row']
+            amount_row = data['amount_row']
+            if quantity_row is None or amount_row is None:
+                skipped += 1
+                continue
+            try:
+                group = GroupIndicators.objects.get(external_id=external_id)
+            except GroupIndicators.DoesNotExist:
+                skipped += 1
+                continue
+            annual_plan, _ = AnnualPlan.objects.get_or_create(group=group, year=year)
+            try:
+                building = Building.objects.get(pk=building_id)
+            except Building.DoesNotExist:
+                skipped += 1
+                continue
+            building_plan, _ = BuildingPlan.objects.get_or_create(
+                annual_plan=annual_plan,
+                building=building,
+            )
+            for month in range(1, 13):
+                monthly_plan, _ = MonthlyBuildingPlan.objects.get_or_create(
+                    building_plan=building_plan,
+                    month=month,
+                    defaults={'quantity': 0, 'amount': 0.00},
+                )
+                col = str(month)
+                if col in quantity_row and pd.notna(quantity_row[col]):
+                    try:
+                        monthly_plan.quantity = int(float(quantity_row[col]))
+                    except (ValueError, TypeError):
+                        monthly_plan.quantity = 0
+                if col in amount_row and pd.notna(amount_row[col]):
+                    try:
+                        monthly_plan.amount = float(amount_row[col])
+                    except (ValueError, TypeError):
+                        monthly_plan.amount = 0.00
+                # validation vs org month — cap if exceeds
+                org_month = annual_plan.monthly_plans.filter(month=month).first()
+                if org_month:
+                    if monthly_plan.quantity > org_month.quantity:
+                        monthly_plan.quantity = org_month.quantity
+                    if monthly_plan.amount > org_month.amount:
+                        monthly_plan.amount = org_month.amount
+                try:
+                    monthly_plan.save()
+                    updated += 1
+                except ValidationError:
+                    skipped += 1
+
+        return {'updated': updated, 'skipped': skipped}
+
     def has_export_plans_permission(self, request):
-        return request.user.has_perm('plan.export_plans')
+        return request.user.has_perm('plan.export_plans') or request.user.is_staff
     
     def has_import_plans_permission(self, request):
-        return request.user.has_perm('plan.import_plans')
+        return request.user.has_perm('plan.import_plans') or request.user.is_staff
 
     def has_change_annualplan_permission(self, request):
         return request.user.has_perm('plan.change_annualplan')
@@ -1014,3 +1198,21 @@ class GoalGroupConfigAdmin(ModelAdmin, ImportExportModelAdmin):
         # Переключаемся на TextField (вместо JSONField)
         models.TextField: {'widget': JSONEditorWidget},
     }
+
+
+@admin.register(BuildingIndicatorReportPreset)
+class BuildingIndicatorReportPresetAdmin(ModelAdmin):
+    list_display = ('name', 'is_active', 'created_at', 'updated_at')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'notes')
+    readonly_fields = ('created_at', 'updated_at')
+    fields = ('name', 'is_active', 'config', 'notes', 'created_at', 'updated_at')
+
+
+@admin.register(BuildingVolumePrintTemplate)
+class BuildingVolumePrintTemplateAdmin(ModelAdmin):
+    list_display = ('name', 'is_active', 'created_at', 'updated_at')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'notes')
+    readonly_fields = ('created_at', 'updated_at')
+    fields = ('name', 'is_active', 'config', 'notes', 'created_at', 'updated_at')

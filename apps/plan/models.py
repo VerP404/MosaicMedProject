@@ -793,3 +793,54 @@ class OrganizationIndicatorConfig(models.Model):
         org_name = self.organization_code or "Все организации"
         status = "Включен" if self.is_enabled else "Выключен"
         return f"{self.group.name} - {org_name} ({status})"
+
+class BuildingIndicatorReportPreset(models.Model):
+    """Saved report constructor preset (indicators x buildings)."""
+    name = models.CharField(max_length=200, unique=True, verbose_name="Name")
+    config = JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Config",
+        help_text=(
+            "JSON: indicator_ids, building_ids, layout, metric, payment_type, "
+            "unique_flag, require_building_plan, columns"
+        ),
+    )
+    notes = models.TextField(blank=True, default="", verbose_name="Notes")
+    is_active = models.BooleanField(default=True, verbose_name="Active")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Created")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Updated")
+
+    class Meta:
+        verbose_name = "Building report preset"
+        verbose_name_plural = "Building report presets"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class BuildingVolumePrintTemplate(models.Model):
+    """Print form template for volume indicators by building."""
+    name = models.CharField(max_length=200, unique=True, verbose_name="Name")
+    config = JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Config",
+        help_text=(
+            "JSON: columns, page_orientation, "
+            "sections with title and items (indicator_id, short_title, show_of_year)"
+        ),
+    )
+    notes = models.TextField(blank=True, default="", verbose_name="Notes")
+    is_active = models.BooleanField(default=True, verbose_name="Active")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Created")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Updated")
+
+    class Meta:
+        verbose_name = "Building volume print template"
+        verbose_name_plural = "Building volume print templates"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
