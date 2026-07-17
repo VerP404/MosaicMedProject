@@ -1,0 +1,54 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:organization_medicalorganization_changelist' %}">Медицинская организация</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="content" style="padding:20px;">
+    <h1>{{ title }}</h1>
+
+    <div class="module" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:20px;">
+        <form method="post" action="" enctype="multipart/form-data" class="form">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <ul class="errorlist">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+            {% endif %}
+
+            <fieldset class="module aligned">
+                {% for field in form %}
+                <div class="form-row" style="margin-bottom:16px;">
+                    <div class="field-box">
+                        <label for="{{ field.id_for_label }}" {% if field.field.required %}class="required"{% endif %}>
+                            {{ field.label }}
+                        </label>
+                        {{ field }}
+                        {% if field.help_text %}<p class="help" style="color:#6b7280;font-size:12px;">{{ field.help_text }}</p>{% endif %}
+                        {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </fieldset>
+
+            <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;font-size:14px;line-height:1.6;">
+                <p style="margin:0 0 8px;"><strong>Что получите:</strong> JSON в формате <code>medical_structure.json</code> MosaicPortal.</p>
+                <p style="margin:0 0 8px;">В файле: регион → МО → корпуса → отделения → синонимы (Web-ОМС / Квазар / МИСКАУЗ) → участки (Station → District).</p>
+                <p style="margin:0;"><strong>Дальше в Portal:</strong> положите файл в <code>apps/organization/data/medical_structure.json</code> (или <code>docker compose cp</code>) и выполните <code>python manage.py import_structure</code>.</p>
+            </div>
+
+            <div class="submit-row" style="display:flex;gap:12px;align-items:center;margin-top:24px;padding-top:20px;border-top:1px solid #e5e7eb;">
+                <input type="submit" value="Скачать JSON для Portal" class="default" style="background:#3b82f6;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;" />
+                <a href="{% url 'admin:organization_medicalorganization_changelist' %}" class="button" style="padding:10px 20px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:6px;text-decoration:none;">Назад</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
