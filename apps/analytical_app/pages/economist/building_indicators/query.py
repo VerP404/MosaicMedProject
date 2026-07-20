@@ -981,7 +981,7 @@ PLAN_KIND_OPTIONS = [
 ]
 
 
-def list_plan_catalog(year: int, plan_kind: str = "internal") -> list[dict]:
+def list_plan_catalog(year: int, plan_kind: str | None = None) -> list[dict]:
     from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
         list_plan_catalog as _impl,
     )
@@ -997,6 +997,14 @@ def load_indicator_plan_form(year: int, group_id: int, plan_kind: str = "interna
     return _impl(year, group_id, plan_kind)
 
 
+def load_dual_indicator_plan_form(year: int, group_id: int) -> dict:
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        load_dual_indicator_plan_form as _impl,
+    )
+
+    return _impl(year, group_id)
+
+
 def add_building_to_plan(
     year: int, group_id: int, building_id: int, plan_kind: str = "internal"
 ) -> dict:
@@ -1007,9 +1015,37 @@ def add_building_to_plan(
     return _impl(year, group_id, building_id, plan_kind)
 
 
+def add_building_to_dual_plan(
+    year: int, group_id: int, building_id: int, plan_kind: str
+) -> dict:
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        add_building_to_dual_plan as _impl,
+    )
+
+    return _impl(year, group_id, building_id, plan_kind)
+
+
+def remove_building_from_dual_plan(
+    year: int, group_id: int, building_id: int, plan_kind: str
+) -> dict:
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        remove_building_from_dual_plan as _impl,
+    )
+
+    return _impl(year, group_id, building_id, plan_kind)
+
+
 def save_indicator_plan_form(**kwargs) -> dict:
     from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
         save_indicator_plan_form as _impl,
+    )
+
+    return _impl(**kwargs)
+
+
+def save_dual_indicator_plan_form(**kwargs) -> dict:
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        save_dual_indicator_plan_form as _impl,
     )
 
     return _impl(**kwargs)

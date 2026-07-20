@@ -1,4 +1,4 @@
-"""ORM API для ввода планов индикатора по корпусам (объёмы+финансы, plan_kind)."""
+"""ORM API для ввода планов индикатора по корпусам (объёмы+финансы, ТФОМС + внутренний)."""
 from __future__ import annotations
 
 from apps.organization.models import Building
@@ -26,14 +26,28 @@ def _empty_month_map(*, finance: bool = False) -> dict:
 
 def _ensure_annual_plan(group_id: int, year: int, plan_kind: str) -> AnnualPlan:
     kind = _normalize_plan_kind(plan_kind)
+    year = int(year)
+    group_id = int(group_id)
+    defaults = {
+        "show_in_cumulative_report": False,
+        "show_in_indicators_report": False,
+    }
+    # Новый ТФОМС/внутренний наследует флаги отображения от «соседа», если есть
+    sibling = (
+        AnnualPlan.objects.filter(group_id=group_id, year=year)
+        .exclude(plan_kind=kind)
+        .first()
+    )
+    if sibling:
+        defaults["show_in_cumulative_report"] = sibling.show_in_cumulative_report
+        defaults["show_in_indicators_report"] = sibling.show_in_indicators_report
+        defaults["sort_order"] = sibling.sort_order
+
     ap, _ = AnnualPlan.objects.get_or_create(
         group_id=group_id,
-        year=int(year),
+        year=year,
         plan_kind=kind,
-        defaults={
-            "show_in_cumulative_report": False,
-            "show_in_indicators_report": False,
-        },
+        defaults=defaults,
     )
     return ap
 
@@ -45,42 +59,84 @@ def _group_path(group_id: int) -> str:
     return group.get_hierarchy_display().replace(" - ", " \\ ")
 
 
-def list_plan_catalog(year: int, plan_kind: str = "internal") -> list[dict]:
+def _plan_totals(ap: AnnualPlan | None) -> dict:
+    qty = _empty_month_map(finance=False)
+    amt = _empty_month_map(finance=True)
+    if ap is None:
+        return {
+            "annual_plan_id": None,
+            "has_buildings": False,
+            "quantity": qty,
+            "amount": amt,
+            "qty_total": 0,
+            "amt_total": 0.0,
+        }
+    for mp in ap.monthly_plans.all():
+        qty[str(mp.month)] = int(mp.quantity or 0)
+        amt[str(mp.month)] = float(mp.amount or 0)
+    return {
+        "annual_plan_id": ap.id,
+        "has_buildings": ap.building_plans.exists(),
+        "quantity": qty,
+        "amount": amt,
+        "qty_total": sum(qty.values()),
+        "amt_total": round(sum(amt.values()), 2),
+    }
+
+
+def list_plan_catalog(year: int, plan_kind: str | None = None) -> list[dict]:
     """
-    Каталог для ввода планов: только AnnualPlan с show_in_indicators_report=True.
+    Каталог для ввода планов: группы с show_in_indicators_report=True (любая версия).
+    В каждой строке — итоги ТФОМС и внутреннего плана.
+    plan_kind оставлен для совместимости вызовов и игнорируется.
     """
-    kind = _normalize_plan_kind(plan_kind)
+    del plan_kind  # dual catalog
     year = int(year)
+    flagged_group_ids = list(
+        AnnualPlan.objects.filter(year=year, show_in_indicators_report=True)
+        .values_list("group_id", flat=True)
+        .distinct()
+    )
+    if not flagged_group_ids:
+        return []
+
     plans = (
-        AnnualPlan.objects.filter(
-            year=year,
-            plan_kind=kind,
-            show_in_indicators_report=True,
-        )
+        AnnualPlan.objects.filter(year=year, group_id__in=flagged_group_ids)
         .select_related("group")
         .prefetch_related("monthly_plans", "building_plans")
-        .order_by("sort_order", "group__name")
     )
-    catalog: list[dict] = []
+    by_group: dict[int, dict[str, AnnualPlan]] = {}
+    sort_key: dict[int, tuple] = {}
     for ap in plans:
-        qty = _empty_month_map(finance=False)
-        amt = _empty_month_map(finance=True)
-        for mp in ap.monthly_plans.all():
-            qty[str(mp.month)] = int(mp.quantity or 0)
-            amt[str(mp.month)] = float(mp.amount or 0)
+        by_group.setdefault(ap.group_id, {})[ap.plan_kind] = ap
+        so = ap.sort_order if ap.sort_order is not None else 10**9
+        prev = sort_key.get(ap.group_id)
+        if prev is None or (so, ap.group.name or "") < prev:
+            sort_key[ap.group_id] = (so, ap.group.name or "")
+
+    catalog: list[dict] = []
+    for gid in flagged_group_ids:
+        kinds = by_group.get(gid) or {}
+        tfoms = _plan_totals(kinds.get(AnnualPlan.PlanKind.TFOMS))
+        internal = _plan_totals(kinds.get(AnnualPlan.PlanKind.INTERNAL))
         catalog.append(
             {
-                "group_id": ap.group_id,
-                "group_path": _group_path(ap.group_id),
-                "annual_plan_id": ap.id,
-                "has_buildings": ap.building_plans.exists(),
-                "quantity": qty,
-                "amount": amt,
-                "qty_total": sum(qty.values()),
-                "amt_total": round(sum(amt.values()), 2),
+                "group_id": gid,
+                "group_path": _group_path(gid),
+                "tfoms_qty_total": tfoms["qty_total"],
+                "tfoms_amt_total": tfoms["amt_total"],
+                "tfoms_has_buildings": tfoms["has_buildings"],
+                "internal_qty_total": internal["qty_total"],
+                "internal_amt_total": internal["amt_total"],
+                "internal_has_buildings": internal["has_buildings"],
+                # совместимость со старым UI
+                "qty_total": internal["qty_total"],
+                "amt_total": internal["amt_total"],
+                "has_buildings": internal["has_buildings"] or tfoms["has_buildings"],
             }
         )
-    catalog.sort(key=lambda x: x["group_path"])
+
+    catalog.sort(key=lambda x: (sort_key.get(x["group_id"], (10**9, "")), x["group_path"]))
     return catalog
 
 
@@ -142,6 +198,25 @@ def load_indicator_plan_form(
     }
 
 
+def load_dual_indicator_plan_form(year: int, group_id: int) -> dict:
+    """Загрузка обеих версий плана для формы ввода."""
+    year = int(year)
+    group_id = int(group_id)
+    tfoms = load_indicator_plan_form(year, group_id, AnnualPlan.PlanKind.TFOMS)
+    internal = load_indicator_plan_form(year, group_id, AnnualPlan.PlanKind.INTERNAL)
+    available = [
+        {"label": b.name, "value": b.id} for b in Building.objects.order_by("name")
+    ]
+    return {
+        "group_id": group_id,
+        "group_path": _group_path(group_id),
+        "year": year,
+        "tfoms": tfoms,
+        "internal": internal,
+        "available_buildings": available,
+    }
+
+
 def add_building_to_plan(
     year: int,
     group_id: int,
@@ -158,6 +233,39 @@ def add_building_to_plan(
                 defaults={"quantity": 0, "amount": 0},
             )
     return load_indicator_plan_form(int(year), int(group_id), plan_kind)
+
+
+def add_building_to_dual_plan(
+    year: int,
+    group_id: int,
+    building_id: int,
+    plan_kind: str,
+) -> dict:
+    """Добавить корпус в одну версию плана и вернуть dual-payload."""
+    add_building_to_plan(int(year), int(group_id), int(building_id), plan_kind)
+    return load_dual_indicator_plan_form(int(year), int(group_id))
+
+
+def remove_building_from_plan(
+    year: int,
+    group_id: int,
+    building_id: int,
+    plan_kind: str = "internal",
+) -> dict:
+    ap = _ensure_annual_plan(int(group_id), int(year), plan_kind)
+    BuildingPlan.objects.filter(annual_plan=ap, building_id=int(building_id)).delete()
+    return load_indicator_plan_form(int(year), int(group_id), plan_kind)
+
+
+def remove_building_from_dual_plan(
+    year: int,
+    group_id: int,
+    building_id: int,
+    plan_kind: str,
+) -> dict:
+    """Удалить корпус из одной версии плана и вернуть dual-payload."""
+    remove_building_from_plan(int(year), int(group_id), int(building_id), plan_kind)
+    return load_dual_indicator_plan_form(int(year), int(group_id))
 
 
 def _parse_qty(value) -> int:
@@ -267,5 +375,68 @@ def save_indicator_plan_form(
         "updated_org": updated_org,
         "updated_buildings": updated_bld,
         "raised_org_months": raised,
+        "errors": [],
+    }
+
+
+def save_dual_indicator_plan_form(
+    *,
+    year: int,
+    group_id: int,
+    tfoms: dict,
+    internal: dict,
+    raise_org_from_buildings: bool = False,
+) -> dict:
+    """Сохранить обе версии; при ошибке валидации ни одна не пишется (сначала обе проверки)."""
+    year = int(year)
+    group_id = int(group_id)
+
+    # Сначала dry-run валидации обеих версий без raise, если raise выключен —
+    # вызываем save последовательно; при ошибке первой вторая не пишется.
+    # При raise — обе сохраняются с подъёмом.
+    r_tfoms = save_indicator_plan_form(
+        year=year,
+        group_id=group_id,
+        plan_kind=AnnualPlan.PlanKind.TFOMS,
+        org_quantity=(tfoms or {}).get("org_quantity") or {},
+        org_amount=(tfoms or {}).get("org_amount") or {},
+        buildings=(tfoms or {}).get("buildings") or [],
+        raise_org_from_buildings=raise_org_from_buildings,
+    )
+    if not r_tfoms.get("ok"):
+        return {
+            "ok": False,
+            "updated_org": 0,
+            "updated_buildings": 0,
+            "raised_org_months": 0,
+            "errors": [f"ТФОМС: {e}" for e in (r_tfoms.get("errors") or [])],
+        }
+
+    r_int = save_indicator_plan_form(
+        year=year,
+        group_id=group_id,
+        plan_kind=AnnualPlan.PlanKind.INTERNAL,
+        org_quantity=(internal or {}).get("org_quantity") or {},
+        org_amount=(internal or {}).get("org_amount") or {},
+        buildings=(internal or {}).get("buildings") or [],
+        raise_org_from_buildings=raise_org_from_buildings,
+    )
+    if not r_int.get("ok"):
+        return {
+            "ok": False,
+            "updated_org": r_tfoms.get("updated_org", 0),
+            "updated_buildings": r_tfoms.get("updated_buildings", 0),
+            "raised_org_months": r_tfoms.get("raised_org_months", 0),
+            "errors": [f"Внутренний: {e}" for e in (r_int.get("errors") or [])],
+            "partial_tfoms_saved": True,
+        }
+
+    return {
+        "ok": True,
+        "updated_org": (r_tfoms.get("updated_org", 0) or 0) + (r_int.get("updated_org", 0) or 0),
+        "updated_buildings": (r_tfoms.get("updated_buildings", 0) or 0)
+        + (r_int.get("updated_buildings", 0) or 0),
+        "raised_org_months": (r_tfoms.get("raised_org_months", 0) or 0)
+        + (r_int.get("raised_org_months", 0) or 0),
         "errors": [],
     }

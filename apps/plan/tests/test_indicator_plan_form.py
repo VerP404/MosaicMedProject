@@ -154,6 +154,18 @@ class IndicatorPlanFormServiceTests(TestCase):
         bp = BuildingPlan.objects.get(annual_plan=ap, building=self.b1)
         self.assertEqual(MonthlyBuildingPlan.objects.filter(building_plan=bp).count(), 12)
 
+    def test_remove_building_from_dual(self):
+        from apps.analytical_app.pages.economist.building_indicators.query import (
+            add_building_to_dual_plan,
+            remove_building_from_dual_plan,
+        )
+
+        add_building_to_dual_plan(self.year, self.group.id, self.b1.id, "internal")
+        dual = remove_building_from_dual_plan(self.year, self.group.id, self.b1.id, "internal")
+        self.assertEqual(len(dual["internal"]["buildings"]), 0)
+        ap = AnnualPlan.objects.get(group=self.group, year=self.year, plan_kind="internal")
+        self.assertFalse(BuildingPlan.objects.filter(annual_plan=ap, building=self.b1).exists())
+
     def test_load_form_after_save(self):
         from apps.analytical_app.pages.economist.building_indicators.query import (
             load_indicator_plan_form,
@@ -171,3 +183,39 @@ class IndicatorPlanFormServiceTests(TestCase):
         self.assertEqual(form["org_quantity"]["1"], 100)
         self.assertEqual(form["buildings"][0]["quantity"]["1"], 5)
         self.assertEqual(form["buildings"][0]["amount"]["1"], 50.5)
+
+    def test_dual_catalog_and_save(self):
+        from apps.analytical_app.pages.economist.building_indicators.query import (
+            list_plan_catalog,
+            load_dual_indicator_plan_form,
+            save_dual_indicator_plan_form,
+        )
+
+        AnnualPlan.objects.create(
+            group=self.group,
+            year=self.year,
+            plan_kind=AnnualPlan.PlanKind.INTERNAL,
+            show_in_indicators_report=True,
+        )
+        catalog = list_plan_catalog(self.year)
+        self.assertEqual(len(catalog), 1)
+        self.assertEqual(catalog[0]["group_id"], self.group.id)
+        self.assertIn("tfoms_qty_total", catalog[0])
+        self.assertIn("internal_qty_total", catalog[0])
+
+        months_q = {str(m): 10 for m in range(1, 13)}
+        months_a = {str(m): 100.0 for m in range(1, 13)}
+        result = save_dual_indicator_plan_form(
+            year=self.year,
+            group_id=self.group.id,
+            tfoms={"org_quantity": {str(m): 7 for m in range(1, 13)}, "org_amount": months_a, "buildings": []},
+            internal={"org_quantity": months_q, "org_amount": months_a, "buildings": []},
+        )
+        self.assertTrue(result["ok"])
+        dual = load_dual_indicator_plan_form(self.year, self.group.id)
+        self.assertEqual(dual["tfoms"]["org_quantity"]["1"], 7)
+        self.assertEqual(dual["internal"]["org_quantity"]["1"], 10)
+        self.assertEqual(
+            AnnualPlan.objects.filter(group=self.group, year=self.year).count(),
+            2,
+        )

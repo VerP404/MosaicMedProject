@@ -1,4 +1,4 @@
-"""Вкладка «Ввод планов»: каталог индикаторов + форма корпусов (объёмы+финансы, ТФОМС/внутренний)."""
+"""Вкладка «Ввод планов»: каталог (ТФОМС + внутренний) и две формы редактирования."""
 from __future__ import annotations
 
 import json
@@ -10,16 +10,21 @@ from dash.exceptions import PreventUpdate
 from apps.analytical_app.app import app
 from apps.analytical_app.components.filters import filter_years
 from apps.analytical_app.pages.economist.building_indicators.query import (
-    PLAN_KIND_OPTIONS,
-    add_building_to_plan,
+    add_building_to_dual_plan,
     list_plan_catalog,
-    load_indicator_plan_form,
-    save_indicator_plan_form,
+    load_dual_indicator_plan_form,
+    remove_building_from_dual_plan,
+    save_dual_indicator_plan_form,
 )
 
 type_page_plans = "econ-building-indicators-plans"
 PLAN_EDIT_EXISTING = "bie-edit-existing"
 PLAN_FORM_TABLE = "bie-form-table"
+CATALOG_PAGE_SIZE = 15
+ADD_KIND_OPTIONS = [
+    {"label": "ТФОМС", "value": "tfoms"},
+    {"label": "Внутренний", "value": "internal"},
+]
 
 
 def _form_month_columns():
@@ -71,7 +76,7 @@ def _form_rows_from_payload(payload: dict) -> list[dict]:
     return rows
 
 
-def _payload_from_form_rows(rows: list[dict]) -> tuple[dict, dict, list[dict]]:
+def _payload_from_form_rows(rows: list[dict]) -> dict:
     org_quantity = {str(m): 0 for m in range(1, 13)}
     org_amount = {str(m): 0.0 for m in range(1, 13)}
     by_building: dict[int, dict] = {}
@@ -119,20 +124,29 @@ def _payload_from_form_rows(rows: list[dict]) -> tuple[dict, dict, list[dict]]:
         if row.get("row_label"):
             entry["building_name"] = row["row_label"]
 
-    return org_quantity, org_amount, list(by_building.values())
+    return {
+        "org_quantity": org_quantity,
+        "org_amount": org_amount,
+        "buildings": list(by_building.values()),
+    }
 
 
-type_page_plans = "econ-building-indicators-plans"
-PLAN_EDIT_EXISTING = "bie-edit-existing"
-PLAN_FORM_TABLE = "bie-form-table"
-CATALOG_PAGE_SIZE = 15
+def _tables_by_kind(table_ids, tables_data) -> dict[str, list]:
+    out: dict[str, list] = {}
+    for tid, data in zip(table_ids or [], tables_data or []):
+        if not isinstance(tid, dict):
+            continue
+        kind = tid.get("index")
+        if kind in ("tfoms", "internal"):
+            out[str(kind)] = data or []
+    return out
 
 
 def _render_catalog(catalog: list[dict], *, page: int = 1, page_size: int = CATALOG_PAGE_SIZE) -> html.Div:
     if not catalog:
         return html.P(
             "Нет показателей с флагом «Отображать в отчете индикаторов» "
-            "для выбранного года и версии плана. Отметьте их в админке AnnualPlan.",
+            "для выбранного года. Отметьте их в админке AnnualPlan.",
             className="text-muted mb-0",
         )
 
@@ -153,14 +167,22 @@ def _render_catalog(catalog: list[dict], *, page: int = 1, page_size: int = CATA
             size="sm",
             className="me-2",
         )
-        mark = "есть корпуса" if item.get("has_buildings") else "нет корпусов"
+        tfoms_mark = "есть" if item.get("tfoms_has_buildings") else "нет"
+        int_mark = "есть" if item.get("internal_has_buildings") else "нет"
         rows.append(
             html.Tr(
                 [
                     html.Td(btn),
                     html.Td(item["group_path"]),
-                    html.Td(f"{item['qty_total']} / {item['amt_total']}", className="text-nowrap"),
-                    html.Td(mark, className="text-muted small"),
+                    html.Td(
+                        f"{item.get('tfoms_qty_total', 0)} / {item.get('tfoms_amt_total', 0)}",
+                        className="text-nowrap",
+                    ),
+                    html.Td(
+                        f"{item.get('internal_qty_total', 0)} / {item.get('internal_amt_total', 0)}",
+                        className="text-nowrap",
+                    ),
+                    html.Td(f"ТФОМС: {tfoms_mark}; внутр.: {int_mark}", className="text-muted small"),
                 ]
             )
         )
@@ -174,7 +196,8 @@ def _render_catalog(catalog: list[dict], *, page: int = 1, page_size: int = CATA
                             [
                                 html.Th(""),
                                 html.Th("Показатель"),
-                                html.Th("Итого объём / финансы"),
+                                html.Th("ТФОМС объём / финансы"),
+                                html.Th("Внутр. объём / финансы"),
                                 html.Th("Корпуса"),
                             ]
                         )
@@ -195,9 +218,9 @@ def _render_catalog(catalog: list[dict], *, page: int = 1, page_size: int = CATA
     )
 
 
-def _render_form_table(payload: dict) -> dash_table.DataTable:
+def _render_form_table(payload: dict, *, plan_kind: str) -> dash_table.DataTable:
     return dash_table.DataTable(
-        id={"type": PLAN_FORM_TABLE, "index": 0},
+        id={"type": PLAN_FORM_TABLE, "index": plan_kind},
         columns=_form_month_columns(),
         data=_form_rows_from_payload(payload),
         editable=True,
@@ -221,16 +244,21 @@ def _render_form_table(payload: dict) -> dash_table.DataTable:
     )
 
 
-def _render_form(payload: dict) -> html.Div:
+def _render_dual_form(payload: dict) -> html.Div:
     return html.Div(
         [
             html.H5(payload.get("group_path") or "Индикатор", className="mb-2"),
             html.P(
-                "Строки «План МО» и корпуса: для каждого — объёмы и финансы по месяцам. "
-                "Σ корпусов не должна превышать план МО (или включите подъём плана МО).",
-                className="text-muted small mb-2",
+                "Две версии плана: сначала ТФОМС, затем внутренний. "
+                "Σ корпусов не должна превышать план МО в каждой версии "
+                "(или включите подъём плана МО).",
+                className="text-muted small mb-3",
             ),
-            _render_form_table(payload),
+            html.H6("План ТФОМС", className="mb-2"),
+            _render_form_table(payload.get("tfoms") or {}, plan_kind="tfoms"),
+            html.Hr(className="my-3"),
+            html.H6("Внутренний план", className="mb-2"),
+            _render_form_table(payload.get("internal") or {}, plan_kind="internal"),
         ]
     )
 
@@ -247,8 +275,8 @@ def plans_entry_tab() -> html.Div:
                     [
                         html.H5("Каталог планов", className="mb-2"),
                         html.P(
-                            "Только показатели с флагом «Отображать в отчете индикаторов» в AnnualPlan. "
-                            "Выберите год и версию плана, нажмите «Получить», затем «Редактировать».",
+                            "Только показатели с флагом «Отображать в отчете индикаторов». "
+                            "В таблице сразу ТФОМС и внутренний план. Выберите год, нажмите «Получить».",
                             className="text-muted mb-3",
                         ),
                         dbc.Row(
@@ -259,18 +287,6 @@ def plans_entry_tab() -> html.Div:
                                         filter_years(type_page_plans),
                                     ],
                                     width=2,
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Версия плана", className="fw-bold"),
-                                        dcc.Dropdown(
-                                            id=f"dropdown-plan-kind-{type_page_plans}",
-                                            options=PLAN_KIND_OPTIONS,
-                                            value="internal",
-                                            clearable=False,
-                                        ),
-                                    ],
-                                    width=3,
                                 ),
                                 dbc.Col(
                                     dbc.Button(
@@ -296,7 +312,7 @@ def plans_entry_tab() -> html.Div:
                                     html.Div(
                                         id=f"div-existing-catalog-{type_page_plans}",
                                         children=html.P(
-                                            "Выберите год и версию плана, затем нажмите «Получить».",
+                                            "Выберите год, затем нажмите «Получить».",
                                             className="text-muted mb-0",
                                         ),
                                     ),
@@ -327,16 +343,35 @@ def plans_entry_tab() -> html.Div:
                                     dcc.Dropdown(
                                         id=f"dropdown-add-building-{type_page_plans}",
                                         options=[],
-                                        placeholder="Добавить корпус…",
+                                        placeholder="Корпус…",
                                         clearable=True,
                                     ),
-                                    width=4,
+                                    width=3,
+                                ),
+                                dbc.Col(
+                                    dcc.Dropdown(
+                                        id=f"dropdown-add-building-kind-{type_page_plans}",
+                                        options=ADD_KIND_OPTIONS,
+                                        value="tfoms",
+                                        clearable=False,
+                                        placeholder="Версия…",
+                                    ),
+                                    width=2,
                                 ),
                                 dbc.Col(
                                     dbc.Button(
                                         "Добавить корпус",
                                         id=f"btn-add-building-{type_page_plans}",
                                         color="secondary",
+                                        size="sm",
+                                    ),
+                                    width="auto",
+                                ),
+                                dbc.Col(
+                                    dbc.Button(
+                                        "Удалить корпус",
+                                        id=f"btn-remove-building-{type_page_plans}",
+                                        color="outline-danger",
                                         size="sm",
                                     ),
                                     width="auto",
@@ -371,6 +406,11 @@ def plans_entry_tab() -> html.Div:
                             ],
                             className="g-2 align-items-center mb-2",
                         ),
+                        html.P(
+                            "Корпус добавляется/удаляется в выбранную версию плана "
+                            "(выпадающий список «ТФОМС» / «Внутренний»).",
+                            className="text-muted small mb-2",
+                        ),
                         dcc.Loading(
                             id=f"loading-plans-{type_page_plans}",
                             type="default",
@@ -398,29 +438,24 @@ def plans_entry_tab() -> html.Div:
     Input(f"btn-get-catalog-{type_page_plans}", "n_clicks"),
     Input(f"btn-save-plans-{type_page_plans}", "n_clicks"),
     Input(f"btn-add-building-{type_page_plans}", "n_clicks"),
+    Input(f"btn-remove-building-{type_page_plans}", "n_clicks"),
     State(f"dropdown-year-{type_page_plans}", "value"),
-    State(f"dropdown-plan-kind-{type_page_plans}", "value"),
     State(f"store-plan-catalog-{type_page_plans}", "data"),
     prevent_initial_call=True,
 )
-def refresh_plan_catalog(_get, _save, _add, year, plan_kind, catalog_loaded):
+def refresh_plan_catalog(_get, _save, _add, _remove, year, catalog_loaded):
     if not callback_context.triggered:
         raise PreventUpdate
     trigger = callback_context.triggered[0]["prop_id"]
     is_get = f"btn-get-catalog-{type_page_plans}" in trigger
-    # После сохранения/добавления корпуса — только если каталог уже загружали
     if not is_get and catalog_loaded is None:
         raise PreventUpdate
     if not year:
         if is_get:
             return None, "Укажите год", 1, 1
         raise PreventUpdate
-    kind = plan_kind or "internal"
-    catalog = list_plan_catalog(int(year), kind)
-    kind_label = "ТФОМС" if kind == "tfoms" else "внутренний"
-    status = (
-        f"{len(catalog)} показателей (в отчёте индикаторов) · {kind_label} · {year}"
-    )
+    catalog = list_plan_catalog(int(year))
+    status = f"{len(catalog)} показателей (в отчёте индикаторов) · ТФОМС + внутренний · {year}"
     max_page = max(1, (len(catalog) + CATALOG_PAGE_SIZE - 1) // CATALOG_PAGE_SIZE)
     return catalog, status, 1, max_page
 
@@ -431,11 +466,9 @@ def refresh_plan_catalog(_get, _save, _add, year, plan_kind, catalog_loaded):
     Output(f"pagination-catalog-{type_page_plans}", "active_page", allow_duplicate=True),
     Output(f"pagination-catalog-{type_page_plans}", "max_value", allow_duplicate=True),
     Input(f"dropdown-year-{type_page_plans}", "value"),
-    Input(f"dropdown-plan-kind-{type_page_plans}", "value"),
     prevent_initial_call=True,
 )
-def reset_plan_catalog_on_filters(_year, _plan_kind):
-    """Смена года/версии сбрасывает список — нужна повторная «Получить»."""
+def reset_plan_catalog_on_year(_year):
     return None, "", 1, 1
 
 
@@ -447,7 +480,7 @@ def reset_plan_catalog_on_filters(_year, _plan_kind):
 def render_plan_catalog_page(catalog, page):
     if catalog is None:
         return html.P(
-            "Выберите год и версию плана, затем нажмите «Получить».",
+            "Выберите год, затем нажмите «Получить».",
             className="text-muted mb-0",
         )
     return _render_catalog(catalog, page=page or 1)
@@ -465,11 +498,13 @@ def render_plan_catalog_page(catalog, page):
     Input({"type": PLAN_EDIT_EXISTING, "index": ALL}, "n_clicks"),
     Input(f"btn-close-form-{type_page_plans}", "n_clicks"),
     Input(f"btn-add-building-{type_page_plans}", "n_clicks"),
+    Input(f"btn-remove-building-{type_page_plans}", "n_clicks"),
     Input(f"btn-save-plans-{type_page_plans}", "n_clicks"),
     State(f"dropdown-year-{type_page_plans}", "value"),
-    State(f"dropdown-plan-kind-{type_page_plans}", "value"),
     State(f"dropdown-add-building-{type_page_plans}", "value"),
+    State(f"dropdown-add-building-kind-{type_page_plans}", "value"),
     State({"type": PLAN_FORM_TABLE, "index": ALL}, "data"),
+    State({"type": PLAN_FORM_TABLE, "index": ALL}, "id"),
     State(f"store-plan-meta-{type_page_plans}", "data"),
     State(f"switch-raise-org-{type_page_plans}", "value"),
     prevent_initial_call=True,
@@ -478,11 +513,13 @@ def plan_form_actions(
     edit_clicks,
     close_clicks,
     add_clicks,
+    remove_clicks,
     save_clicks,
     year,
-    plan_kind,
     add_building_id,
+    add_building_kind,
     tables_data,
+    table_ids,
     meta,
     raise_org,
 ):
@@ -492,7 +529,6 @@ def plan_form_actions(
     if trigger == ".":
         raise PreventUpdate
 
-    kind = plan_kind or "internal"
     empty = (
         html.P("Выберите показатель в каталоге выше.", className="text-muted mb-0"),
         None,
@@ -515,7 +551,7 @@ def plan_form_actions(
         if not year:
             return no_update, no_update, no_update, no_update, no_update, "Укажите год", "warning", True
         try:
-            payload = load_indicator_plan_form(int(year), group_id, kind)
+            payload = load_dual_indicator_plan_form(int(year), group_id)
         except Exception as exc:
             return (
                 no_update,
@@ -530,16 +566,15 @@ def plan_form_actions(
         meta_out = {
             "year": int(year),
             "group_id": group_id,
-            "plan_kind": kind,
             "group_path": payload.get("group_path"),
         }
         return (
-            _render_form(payload),
+            _render_dual_form(payload),
             payload,
             meta_out,
             payload.get("available_buildings") or [],
             None,
-            "Форма загружена",
+            "Форма загружена (ТФОМС + внутренний)",
             "success",
             True,
         )
@@ -558,12 +593,13 @@ def plan_form_actions(
             )
         if not add_building_id:
             return no_update, no_update, no_update, no_update, no_update, "Выберите корпус", "warning", True
+        kind = add_building_kind or "tfoms"
         try:
-            payload = add_building_to_plan(
+            payload = add_building_to_dual_plan(
                 int(year),
                 int(meta["group_id"]),
                 int(add_building_id),
-                meta.get("plan_kind") or kind,
+                kind,
             )
         except Exception as exc:
             return (
@@ -576,13 +612,68 @@ def plan_form_actions(
                 "danger",
                 True,
             )
+        kind_label = "ТФОМС" if kind == "tfoms" else "внутренний"
         return (
-            _render_form(payload),
+            _render_dual_form(payload),
             payload,
             meta,
             payload.get("available_buildings") or [],
             None,
-            "Корпус добавлен",
+            f"Корпус добавлен в план {kind_label}",
+            "success",
+            True,
+        )
+
+    if f"btn-remove-building-{type_page_plans}" in trigger:
+        if not meta or not year:
+            return (
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                "Сначала откройте форму индикатора",
+                "warning",
+                True,
+            )
+        if not add_building_id:
+            return (
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                "Выберите корпус для удаления",
+                "warning",
+                True,
+            )
+        kind = add_building_kind or "tfoms"
+        try:
+            payload = remove_building_from_dual_plan(
+                int(year),
+                int(meta["group_id"]),
+                int(add_building_id),
+                kind,
+            )
+        except Exception as exc:
+            return (
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                f"Ошибка удаления корпуса: {exc}",
+                "danger",
+                True,
+            )
+        kind_label = "ТФОМС" if kind == "tfoms" else "внутренний"
+        return (
+            _render_dual_form(payload),
+            payload,
+            meta,
+            payload.get("available_buildings") or [],
+            None,
+            f"Корпус удалён из плана {kind_label}",
             "success",
             True,
         )
@@ -590,18 +681,26 @@ def plan_form_actions(
     if f"btn-save-plans-{type_page_plans}" in trigger:
         if not meta or not year:
             return no_update, no_update, no_update, no_update, no_update, "Нет открытой формы", "warning", True
-        rows = (tables_data or [None])[0] if tables_data else None
-        if not rows:
-            return no_update, no_update, no_update, no_update, no_update, "Нет данных таблицы", "warning", True
-        org_q, org_a, buildings = _payload_from_form_rows(rows)
+        by_kind = _tables_by_kind(table_ids, tables_data)
+        if "tfoms" not in by_kind or "internal" not in by_kind:
+            return (
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                "Нет данных таблиц ТФОМС/внутренний",
+                "warning",
+                True,
+            )
+        tfoms_payload = _payload_from_form_rows(by_kind["tfoms"])
+        internal_payload = _payload_from_form_rows(by_kind["internal"])
         try:
-            result = save_indicator_plan_form(
+            result = save_dual_indicator_plan_form(
                 year=int(year),
                 group_id=int(meta["group_id"]),
-                plan_kind=meta.get("plan_kind") or kind,
-                org_quantity=org_q,
-                org_amount=org_a,
-                buildings=buildings,
+                tfoms=tfoms_payload,
+                internal=internal_payload,
                 raise_org_from_buildings=bool(raise_org),
             )
         except Exception as exc:
@@ -619,20 +718,18 @@ def plan_form_actions(
             errs = "; ".join(result.get("errors") or ["ошибка валидации"])
             return no_update, no_update, no_update, no_update, no_update, errs, "danger", True
         try:
-            payload = load_indicator_plan_form(
-                int(year), int(meta["group_id"]), meta.get("plan_kind") or kind
-            )
+            payload = load_dual_indicator_plan_form(int(year), int(meta["group_id"]))
         except Exception:
             payload = None
         msg = (
-            f"Сохранено: месяцев МО {result.get('updated_org', 0)}, "
+            f"Сохранено обе версии: месяцев МО {result.get('updated_org', 0)}, "
             f"ячеек корпусов {result.get('updated_buildings', 0)}"
         )
         if result.get("raised_org_months"):
             msg += f"; план МО поднят в {result['raised_org_months']} мес."
         if payload:
             return (
-                _render_form(payload),
+                _render_dual_form(payload),
                 payload,
                 meta,
                 payload.get("available_buildings") or [],
