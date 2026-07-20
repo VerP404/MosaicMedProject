@@ -11,6 +11,7 @@ from apps.analytical_app.app import app
 from apps.analytical_app.components.filters import filter_years
 from apps.analytical_app.pages.economist.building_indicators.query import (
     add_building_to_dual_plan,
+    apply_annual_distribution,
     list_plan_catalog,
     load_dual_indicator_plan_form,
     remove_building_from_dual_plan,
@@ -140,6 +141,24 @@ def _tables_by_kind(table_ids, tables_data) -> dict[str, list]:
         if kind in ("tfoms", "internal"):
             out[str(kind)] = data or []
     return out
+
+
+def _merge_tables_into_dual(payload: dict | None, table_ids, tables_data) -> dict:
+    """Собрать dual-payload из текущего store + правок в таблицах."""
+    base = dict(payload or {})
+    by_kind = _tables_by_kind(table_ids, tables_data)
+    for kind in ("tfoms", "internal"):
+        if kind not in by_kind:
+            continue
+        parsed = _payload_from_form_rows(by_kind[kind])
+        kind_data = dict(base.get(kind) or {})
+        kind_data["org_quantity"] = parsed["org_quantity"]
+        kind_data["org_amount"] = parsed["org_amount"]
+        kind_data["buildings"] = parsed["buildings"]
+        kind_data["org_qty_total"] = sum(parsed["org_quantity"].values())
+        kind_data["org_amt_total"] = round(sum(parsed["org_amount"].values()), 2)
+        base[kind] = kind_data
+    return base
 
 
 def _render_catalog(catalog: list[dict], *, page: int = 1, page_size: int = CATALOG_PAGE_SIZE) -> html.Div:
@@ -411,6 +430,53 @@ def plans_entry_tab() -> html.Div:
                             "(выпадающий список «ТФОМС» / «Внутренний»).",
                             className="text-muted small mb-2",
                         ),
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    [
+                                        html.Label("Годовой объём", className="small mb-0"),
+                                        dbc.Input(
+                                            id=f"input-annual-qty-{type_page_plans}",
+                                            type="number",
+                                            min=0,
+                                            step=1,
+                                            placeholder="объём",
+                                        ),
+                                    ],
+                                    width=2,
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Годовые финансы", className="small mb-0"),
+                                        dbc.Input(
+                                            id=f"input-annual-amt-{type_page_plans}",
+                                            type="number",
+                                            min=0,
+                                            step=0.01,
+                                            placeholder="финансы",
+                                        ),
+                                    ],
+                                    width=2,
+                                ),
+                                dbc.Col(
+                                    dbc.Button(
+                                        "Распределить по месяцам",
+                                        id=f"btn-distribute-{type_page_plans}",
+                                        color="info",
+                                        size="sm",
+                                        className="mt-4",
+                                    ),
+                                    width="auto",
+                                ),
+                            ],
+                            className="g-2 align-items-start mb-2",
+                        ),
+                        html.P(
+                            "Распределение в выбранную версию: в «План МО», "
+                            "или в выбранный корпус (если указан). "
+                            "Январь = год − среднее×11, остальные месяцы = среднее.",
+                            className="text-muted small mb-2",
+                        ),
                         dcc.Loading(
                             id=f"loading-plans-{type_page_plans}",
                             type="default",
@@ -499,12 +565,16 @@ def render_plan_catalog_page(catalog, page):
     Input(f"btn-close-form-{type_page_plans}", "n_clicks"),
     Input(f"btn-add-building-{type_page_plans}", "n_clicks"),
     Input(f"btn-remove-building-{type_page_plans}", "n_clicks"),
+    Input(f"btn-distribute-{type_page_plans}", "n_clicks"),
     Input(f"btn-save-plans-{type_page_plans}", "n_clicks"),
     State(f"dropdown-year-{type_page_plans}", "value"),
     State(f"dropdown-add-building-{type_page_plans}", "value"),
     State(f"dropdown-add-building-kind-{type_page_plans}", "value"),
+    State(f"input-annual-qty-{type_page_plans}", "value"),
+    State(f"input-annual-amt-{type_page_plans}", "value"),
     State({"type": PLAN_FORM_TABLE, "index": ALL}, "data"),
     State({"type": PLAN_FORM_TABLE, "index": ALL}, "id"),
+    State(f"store-plan-form-{type_page_plans}", "data"),
     State(f"store-plan-meta-{type_page_plans}", "data"),
     State(f"switch-raise-org-{type_page_plans}", "value"),
     prevent_initial_call=True,
@@ -514,12 +584,16 @@ def plan_form_actions(
     close_clicks,
     add_clicks,
     remove_clicks,
+    distribute_clicks,
     save_clicks,
     year,
     add_building_id,
     add_building_kind,
+    annual_qty,
+    annual_amt,
     tables_data,
     table_ids,
+    form_store,
     meta,
     raise_org,
 ):
@@ -674,6 +748,88 @@ def plan_form_actions(
             payload.get("available_buildings") or [],
             None,
             f"Корпус удалён из плана {kind_label}",
+            "success",
+            True,
+        )
+
+    if f"btn-distribute-{type_page_plans}" in trigger:
+        if not meta:
+            return (
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                "Сначала откройте форму индикатора",
+                "warning",
+                True,
+            )
+        qty_empty = annual_qty is None or annual_qty == ""
+        amt_empty = annual_amt is None or annual_amt == ""
+        if qty_empty and amt_empty:
+            return (
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                "Укажите годовой объём и/или годовые финансы",
+                "warning",
+                True,
+            )
+        kind = add_building_kind or "tfoms"
+        if kind not in ("tfoms", "internal"):
+            kind = "tfoms"
+        dual = _merge_tables_into_dual(form_store, table_ids, tables_data)
+        kind_payload = dual.get(kind) or {}
+        target_building = int(add_building_id) if add_building_id else None
+        # Если корпус выбран, но его ещё нет в версии — распределяем в План МО нельзя молча:
+        # сообщим ошибку из apply
+        try:
+            updated_kind = apply_annual_distribution(
+                kind_payload,
+                annual_quantity=None if qty_empty else annual_qty,
+                annual_amount=None if amt_empty else annual_amt,
+                building_id=target_building,
+            )
+        except Exception as exc:
+            return (
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                f"Не удалось распределить: {exc}",
+                "danger",
+                True,
+            )
+        dual[kind] = updated_kind
+        dual["available_buildings"] = (form_store or {}).get("available_buildings") or dual.get(
+            "available_buildings"
+        ) or []
+        dual["group_id"] = meta.get("group_id") or dual.get("group_id")
+        dual["group_path"] = meta.get("group_path") or dual.get("group_path")
+        dual["year"] = meta.get("year") or dual.get("year")
+        kind_label = "ТФОМС" if kind == "tfoms" else "внутренний"
+        target_label = (
+            f"корпус {target_building}" if target_building else "План МО"
+        )
+        parts = []
+        if not qty_empty:
+            parts.append("объёмы")
+        if not amt_empty:
+            parts.append("финансы")
+        msg = (
+            f"Распределено ({', '.join(parts)}) → {kind_label}, {target_label}. "
+            "Не забудьте сохранить."
+        )
+        return (
+            _render_dual_form(dual),
+            dual,
+            meta,
+            dual.get("available_buildings") or [],
+            add_building_id,
+            msg,
             "success",
             True,
         )

@@ -219,3 +219,60 @@ class IndicatorPlanFormServiceTests(TestCase):
             AnnualPlan.objects.filter(group=self.group, year=self.year).count(),
             2,
         )
+
+
+class AnnualDistributeTests(TestCase):
+    def test_quantity_sum_equals_annual(self):
+        from apps.analytical_app.pages.economist.building_indicators.query import (
+            distribute_quantity_annual,
+        )
+
+        for total in (0, 1, 11, 12, 100, 27233, 2274):
+            months = distribute_quantity_annual(total)
+            self.assertEqual(sum(months.values()), total)
+            self.assertEqual(len(months), 12)
+            avg = total // 12
+            for m in range(2, 13):
+                self.assertEqual(months[str(m)], avg)
+            self.assertEqual(months["1"], total - avg * 11)
+
+    def test_amount_sum_equals_annual(self):
+        from apps.analytical_app.pages.economist.building_indicators.query import (
+            distribute_amount_annual,
+        )
+
+        for total in (0, 0.01, 10, 100, 1000.5, 12345.67):
+            months = distribute_amount_annual(total)
+            s = round(sum(months.values()), 2)
+            self.assertEqual(s, round(float(total), 2))
+            avg = months["2"]
+            for m in range(2, 13):
+                self.assertEqual(months[str(m)], avg)
+
+    def test_apply_to_org_and_building(self):
+        from apps.analytical_app.pages.economist.building_indicators.query import (
+            apply_annual_distribution,
+        )
+
+        payload = {
+            "org_quantity": {str(m): 0 for m in range(1, 13)},
+            "org_amount": {str(m): 0.0 for m in range(1, 13)},
+            "buildings": [
+                {
+                    "building_id": 5,
+                    "building_name": "К1",
+                    "quantity": {str(m): 0 for m in range(1, 13)},
+                    "amount": {str(m): 0.0 for m in range(1, 13)},
+                }
+            ],
+        }
+        out = apply_annual_distribution(
+            payload, annual_quantity=100, annual_amount=1200.0, building_id=None
+        )
+        self.assertEqual(sum(out["org_quantity"].values()), 100)
+        self.assertEqual(round(sum(out["org_amount"].values()), 2), 1200.0)
+
+        out_b = apply_annual_distribution(
+            payload, annual_quantity=50, annual_amount=None, building_id=5
+        )
+        self.assertEqual(sum(out_b["buildings"][0]["quantity"].values()), 50)

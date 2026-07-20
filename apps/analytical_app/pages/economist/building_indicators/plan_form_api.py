@@ -1,6 +1,9 @@
 """ORM API для ввода планов индикатора по корпусам (объёмы+финансы, ТФОМС + внутренний)."""
 from __future__ import annotations
 
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Any
+
 from apps.organization.models import Building
 from apps.plan.models import (
     AnnualPlan,
@@ -22,6 +25,85 @@ def _empty_month_map(*, finance: bool = False) -> dict:
     if finance:
         return {str(m): 0.0 for m in range(1, 13)}
     return {str(m): 0 for m in range(1, 13)}
+
+
+def distribute_quantity_annual(annual: Any) -> dict[str, int]:
+    """
+    Годовой объём → 12 месяцев (целые).
+    Среднее = total // 12; месяцы 2–12 = среднее; январь = total − среднее×11.
+    """
+    try:
+        total = int(float(annual or 0))
+    except (TypeError, ValueError):
+        total = 0
+    if total < 0:
+        total = 0
+    avg = total // 12
+    jan = total - avg * 11
+    return {str(m): (jan if m == 1 else avg) for m in range(1, 13)}
+
+
+def distribute_amount_annual(annual: Any) -> dict[str, float]:
+    """
+    Годовые финансы → 12 месяцев (2 знака).
+    Среднее = round(total/12, 2); месяцы 2–12 = среднее; январь = total − среднее×11.
+    """
+    try:
+        total = Decimal(str(annual if annual is not None else 0))
+    except Exception:
+        total = Decimal("0")
+    total = total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if total < 0:
+        total = Decimal("0.00")
+    avg = (total / Decimal(12)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    jan = (total - avg * 11).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return {str(m): float(jan if m == 1 else avg) for m in range(1, 13)}
+
+
+def apply_annual_distribution(
+    kind_payload: dict,
+    *,
+    annual_quantity: Any = None,
+    annual_amount: Any = None,
+    building_id: int | None = None,
+) -> dict:
+    """
+    Проставить распределённые месяцы в payload одной версии плана.
+    building_id=None → План МО; иначе — указанный корпус (должен уже быть в buildings).
+    None в annual_* означает «не менять эту метрику».
+    """
+    out = dict(kind_payload or {})
+    buildings = [dict(b) for b in (out.get("buildings") or [])]
+
+    qty_map = None if annual_quantity is None else distribute_quantity_annual(annual_quantity)
+    amt_map = None if annual_amount is None else distribute_amount_annual(annual_amount)
+
+    if building_id is None:
+        if qty_map is not None:
+            out["org_quantity"] = qty_map
+            out["org_qty_total"] = sum(qty_map.values())
+        if amt_map is not None:
+            out["org_amount"] = amt_map
+            out["org_amt_total"] = round(sum(amt_map.values()), 2)
+    else:
+        bid = int(building_id)
+        found = False
+        for b in buildings:
+            if int(b["building_id"]) != bid:
+                continue
+            found = True
+            if qty_map is not None:
+                b["quantity"] = qty_map
+                b["qty_total"] = sum(qty_map.values())
+            if amt_map is not None:
+                b["amount"] = amt_map
+                b["amt_total"] = round(sum(amt_map.values()), 2)
+            break
+        if not found:
+            raise ValueError(f"Корпус {bid} отсутствует в выбранной версии плана")
+        out["buildings"] = buildings
+
+    return out
 
 
 def _ensure_annual_plan(group_id: int, year: int, plan_kind: str) -> AnnualPlan:

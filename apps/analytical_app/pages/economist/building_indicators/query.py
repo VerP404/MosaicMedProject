@@ -1049,3 +1049,27 @@ def save_dual_indicator_plan_form(**kwargs) -> dict:
     )
 
     return _impl(**kwargs)
+
+
+def distribute_quantity_annual(annual):
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        distribute_quantity_annual as _impl,
+    )
+
+    return _impl(annual)
+
+
+def distribute_amount_annual(annual):
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        distribute_amount_annual as _impl,
+    )
+
+    return _impl(annual)
+
+
+def apply_annual_distribution(kind_payload, **kwargs):
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        apply_annual_distribution as _impl,
+    )
+
+    return _impl(kind_payload, **kwargs)
