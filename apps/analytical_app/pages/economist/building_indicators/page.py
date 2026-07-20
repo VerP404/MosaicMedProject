@@ -6,9 +6,8 @@ from datetime import datetime
 
 import dash_bootstrap_components as dbc
 import pandas as pd
-from dash import ALL, Input, Output, State, callback_context, dash_table, dcc, html, no_update
+from dash import Input, Output, State, callback_context, dash_table, dcc, html, no_update
 from dash.exceptions import PreventUpdate
-import json
 
 from apps.analytical_app.app import app
 from apps.analytical_app.components.filters import (
@@ -20,19 +19,16 @@ from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.economist.building_indicators.query import (
     DEFAULT_PRINT_CONFIG,
     LAYOUT_OPTIONS,
-    baseline_from_blocks,
+    PLAN_KIND_OPTIONS,
     delete_preset,
     delete_print_template,
     get_preset,
     get_print_template,
-    list_existing_building_plans_catalog,
     list_indicator_options,
     list_presets,
     list_print_templates,
-    load_building_plan_editor_data,
     normalize_print_config,
     run_building_report,
-    save_building_plan_diffs,
     save_preset,
     save_print_template,
 )
@@ -41,148 +37,17 @@ from apps.plan.services.print_form_engine import (
     build_print_form_data,
     render_print_form_html,
 )
+from apps.analytical_app.pages.economist.building_indicators.plans_entry import (
+    plans_entry_tab,
+)
 
 type_page = "econ-building-indicators"
-type_page_plans = "econ-building-indicators-plans"
 type_page_print = "econ-building-indicators-print"
-PLAN_EDIT_TABLE = "bie-plan-edit"
-PLAN_EDIT_EXISTING = "bie-edit-existing"
 PRINT_ITEMS_TABLE = "bie-print-items"
 
 
 def _current_year() -> int:
     return datetime.now().year
-
-
-def _plan_month_columns():
-    cols = [
-        {"name": "Строка", "id": "building_name", "editable": False},
-        {"name": "building_id", "id": "building_id", "editable": False},
-    ]
-    for m in range(1, 13):
-        cols.append({"name": str(m), "id": str(m), "editable": True, "type": "numeric"})
-    cols.append({"name": "Итого", "id": "total", "editable": False, "type": "numeric"})
-    return cols
-
-
-def _is_building_row(row: dict) -> bool:
-    bid = row.get("building_id")
-    if bid is None or bid == "":
-        return False
-    if isinstance(bid, str) and bid in {"org", "sum", "rem"}:
-        return False
-    try:
-        int(bid)
-        return True
-    except (TypeError, ValueError):
-        return False
-
-
-def _table_rows_for_block(block: dict, metric: str = "volumes") -> list[dict]:
-    """Строки таблицы: План МО → корпуса → Σ → Остаток."""
-    org = block.get("org_plan") or {}
-    building_rows = [dict(r) for r in (block.get("rows") or [])]
-    is_finance = metric == "finance"
-
-    def _num(v):
-        try:
-            return float(v or 0) if is_finance else int(float(v or 0))
-        except (TypeError, ValueError):
-            return 0.0 if is_finance else 0
-
-    org_row = {
-        "building_id": "org",
-        "building_name": "План МО",
-    }
-    sum_row = {
-        "building_id": "sum",
-        "building_name": "Σ корпуса",
-    }
-    rem_row = {
-        "building_id": "rem",
-        "building_name": "Остаток",
-    }
-    for m in range(1, 13):
-        key = str(m)
-        o = _num(org.get(key, 0))
-        s = sum(_num(r.get(key)) for r in building_rows)
-        org_row[key] = o
-        sum_row[key] = round(s, 2) if is_finance else int(s)
-        rem = o - s
-        rem_row[key] = round(rem, 2) if is_finance else int(rem)
-
-    for row in (org_row, sum_row, rem_row, *building_rows):
-        vals = [_num(row.get(str(m))) for m in range(1, 13)]
-        row["total"] = round(sum(vals), 2) if is_finance else int(sum(vals))
-
-    return [org_row, *building_rows, sum_row, rem_row]
-
-
-def _build_plan_editor(blocks: list[dict], *, metric: str = "volumes"):
-    if not blocks:
-        return dbc.Alert("Нет данных для выбранных фильтров.", color="warning")
-
-    sections = []
-    for block in blocks:
-        gid = int(block["group_id"])
-        path = block["group_path"]
-        org_total = block.get("org_total", 0)
-        rows = _table_rows_for_block(block, metric=metric)
-        tip = (
-            "План МО = 0 — сначала заполните план организации или включите "
-            "«Поднять план МО из суммы корпусов»."
-            if not org_total
-            else "Редактируйте только строки корпусов. Σ и Остаток — справочно (на момент загрузки)."
-        )
-        sections.append(
-            html.Div(
-                [
-                    html.H6(f"{path}", className="mb-1"),
-                    html.P(tip, className="text-muted small mb-2"),
-                    dash_table.DataTable(
-                        id={"type": PLAN_EDIT_TABLE, "index": gid},
-                        columns=_plan_month_columns(),
-                        data=rows,
-                        editable=True,
-                        page_size=25,
-                        style_table={"overflowX": "auto"},
-                        style_cell={"minWidth": "50px", "textAlign": "center", "padding": "4px"},
-                        style_cell_conditional=[
-                            {"if": {"column_id": "building_name"}, "textAlign": "left", "minWidth": "140px"},
-                        ],
-                        style_header={"fontWeight": "bold"},
-                        style_data_conditional=[
-                            {
-                                "if": {"filter_query": '{building_name} = "План МО"'},
-                                "backgroundColor": "#e7f1ff",
-                                "fontWeight": "bold",
-                            },
-                            {
-                                "if": {"filter_query": '{building_name} = "Σ корпуса"'},
-                                "backgroundColor": "#f8f9fa",
-                                "fontWeight": "bold",
-                            },
-                            {
-                                "if": {"filter_query": '{building_name} = "Остаток"'},
-                                "backgroundColor": "#fff3cd",
-                                "fontWeight": "bold",
-                            },
-                            {
-                                "if": {
-                                    "filter_query": '{building_name} = "Остаток" && {total} < 0',
-                                },
-                                "color": "#842029",
-                            },
-                        ],
-                        hidden_columns=["building_id"],
-                        css=[{"selector": ".show-hide", "rule": "display: none"}],
-                    ),
-                ],
-                className="mb-4",
-            )
-        )
-    return html.Div(sections, id=f"editor-plans-{type_page_plans}")
-
 
 
 def _report_tab(presets, indicators, buildings, month_options, month_num):
@@ -308,6 +173,13 @@ def _report_tab(presets, indicators, buildings, month_options, month_num):
                                                 value="volumes",
                                                 clearable=False,
                                             ),
+                                            html.Label("Версия плана", className="fw-bold mt-2"),
+                                            dcc.Dropdown(
+                                                id=f"dropdown-plan-kind-{type_page}",
+                                                options=PLAN_KIND_OPTIONS,
+                                                value="internal",
+                                                clearable=False,
+                                            ),
                                             dbc.Switch(
                                                 id=f"switch-period-closed-{type_page}",
                                                 label="Период закрыт (факт = только оплаченные)",
@@ -419,193 +291,6 @@ def _report_tab(presets, indicators, buildings, month_options, month_num):
                 id=f"loading-{type_page}",
                 type="default",
                 children=card_table(f"result-table-{type_page}", "Отчёт по корпусам", page_size=40),
-            ),
-        ]
-    )
-
-
-def _render_existing_plans_catalog(catalog: list[dict]):
-    if not catalog:
-        return dbc.Alert(
-            "Пока нет планов по корпусам на этот год. Выберите корпуса и индикатор ниже, "
-            "загрузите таблицу и сохраните — после этого индикатор появится здесь.",
-            color="secondary",
-            className="mb-0",
-        )
-    rows = []
-    for item in catalog:
-        gid = item["group_id"]
-        rows.append(
-            html.Tr(
-                [
-                    html.Td(item["group_path"]),
-                    html.Td(item["buildings_label"]),
-                    html.Td(item["plan_qty"], className="text-end"),
-                    html.Td(item["org_qty"], className="text-end"),
-                    html.Td(
-                        dbc.Button(
-                            "Редактировать",
-                            id={"type": PLAN_EDIT_EXISTING, "index": gid},
-                            color="primary",
-                            size="sm",
-                            outline=True,
-                        ),
-                        className="text-end",
-                    ),
-                ]
-            )
-        )
-    return dbc.Table(
-        [
-            html.Thead(
-                html.Tr(
-                    [
-                        html.Th("Индикатор"),
-                        html.Th("Корпуса"),
-                        html.Th("План корпусов", className="text-end"),
-                        html.Th("План МО", className="text-end"),
-                        html.Th(""),
-                    ]
-                )
-            ),
-            html.Tbody(rows),
-        ],
-        bordered=True,
-        hover=True,
-        size="sm",
-        className="mb-0",
-    )
-
-
-def _plans_entry_tab(indicators, buildings):
-    all_building_ids = [b["value"] for b in buildings]
-    return html.Div(
-        [
-            dcc.Store(id=f"store-plan-baseline-{type_page_plans}"),
-            dcc.Store(id=f"store-plan-meta-{type_page_plans}"),
-            dcc.Store(id=f"store-plan-paths-{type_page_plans}"),
-            dcc.Store(id=f"store-plan-catalog-{type_page_plans}"),
-            dbc.Alert(id=f"alert-{type_page_plans}", is_open=False, duration=8000, className="mb-2"),
-            dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H5("Уже введённые планы", className="mb-2"),
-                        html.P(
-                            "Отчёт только показывает цифры. Чтобы изменить план — нажмите "
-                            "«Редактировать». Таблица откроется сразу: сверху план МО по месяцам, "
-                            "ниже — корпуса.",
-                            className="text-muted mb-2",
-                        ),
-                        html.Div(id=f"div-existing-catalog-{type_page_plans}"),
-                    ]
-                ),
-                className="mb-3 shadow-sm",
-            ),
-            dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H5("Новый план / другой набор", className="mb-2"),
-                        html.P(
-                            "Список индикаторов — выпадающий список ниже (все с годовым планом). "
-                            "Корпуса по умолчанию уже выбраны все. Выберите индикатор → "
-                            "«Загрузить для редактирования» → правьте ячейки → «Сохранить».",
-                            className="text-muted mb-3",
-                        ),
-                        dbc.Row(
-                            [
-                                dbc.Col(
-                                    [
-                                        html.Label("Год", className="fw-bold"),
-                                        filter_years(type_page_plans),
-                                    ],
-                                    width=2,
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Метрика", className="fw-bold"),
-                                        dcc.Dropdown(
-                                            id=f"dropdown-metric-{type_page_plans}",
-                                            options=[
-                                                {"label": "Объёмы", "value": "volumes"},
-                                                {"label": "Финансы", "value": "finance"},
-                                            ],
-                                            value="volumes",
-                                            clearable=False,
-                                        ),
-                                    ],
-                                    width=2,
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Корпуса", className="fw-bold"),
-                                        dcc.Dropdown(
-                                            id=f"dropdown-buildings-{type_page_plans}",
-                                            options=buildings,
-                                            value=all_building_ids,
-                                            multi=True,
-                                            placeholder="Все корпуса",
-                                        ),
-                                    ],
-                                    width=4,
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Индикаторы (список здесь)", className="fw-bold"),
-                                        dcc.Dropdown(
-                                            id=f"dropdown-indicators-{type_page_plans}",
-                                            options=indicators,
-                                            multi=True,
-                                            placeholder="Пусто = все с годовым планом",
-                                        ),
-                                    ],
-                                    width=4,
-                                ),
-                            ],
-                            className="mb-3 g-2",
-                        ),
-                        dbc.Row(
-                            [
-                                dbc.Col(
-                                    dbc.Button(
-                                        "Загрузить для редактирования",
-                                        id=f"btn-load-plans-{type_page_plans}",
-                                        color="primary",
-                                    ),
-                                    width="auto",
-                                ),
-                                dbc.Col(
-                                    dbc.Button(
-                                        "Сохранить изменения",
-                                        id=f"btn-save-plans-{type_page_plans}",
-                                        color="success",
-                                        disabled=True,
-                                    ),
-                                    width="auto",
-                                ),
-                                dbc.Col(
-                                    dbc.Switch(
-                                        id=f"switch-raise-org-{type_page_plans}",
-                                        label="Поднять план МО из суммы корпусов",
-                                        value=False,
-                                        className="mt-2",
-                                    ),
-                                    width="auto",
-                                ),
-                                dbc.Col(
-                                    html.Div(id=f"status-{type_page_plans}", className="text-muted mt-2"),
-                                    width=True,
-                                ),
-                            ],
-                            className="g-2 align-items-center",
-                        ),
-                    ]
-                ),
-                className="mb-3 shadow-sm",
-            ),
-            dcc.Loading(
-                id=f"loading-plans-{type_page_plans}",
-                type="default",
-                children=html.Div(id=f"div-plan-editor-{type_page_plans}"),
             ),
         ]
     )
@@ -901,6 +586,18 @@ def _print_form_tab(indicators, month_options, month_num):
                                 ),
                                 dbc.Col(
                                     [
+                                        html.Label("Версия плана", className="fw-bold"),
+                                        dcc.Dropdown(
+                                            id=f"dropdown-plan-kind-{type_page_print}",
+                                            options=PLAN_KIND_OPTIONS,
+                                            value="internal",
+                                            clearable=False,
+                                        ),
+                                    ],
+                                    width=2,
+                                ),
+                                dbc.Col(
+                                    [
                                         dbc.Switch(
                                             id=f"switch-period-closed-{type_page_print}",
                                             label="Период закрыт",
@@ -975,7 +672,6 @@ def economist_building_indicators_def():
     month_num, _month_name = get_current_reporting_month()
     presets = list_presets()
     indicators = list_indicator_options(year)
-    indicators_editor = list_indicator_options(year, for_editor=True)
     indicators_print = list_indicator_options(
         year, for_editor=True, only_with_building_plan=True
     )
@@ -1014,7 +710,7 @@ def economist_building_indicators_def():
                     dbc.Tab(
                         label="Ввод планов",
                         tab_id=f"tab-plans-{type_page}",
-                        children=_plans_entry_tab(indicators_editor, buildings),
+                        children=plans_entry_tab(),
                     ),
                     dbc.Tab(
                         label="Печатная форма",
@@ -1086,21 +782,12 @@ def toggle_period_closed_payment(period_closed, pending_payment, current_payment
 @app.callback(
     Output(f"dropdown-indicators-{type_page}", "options"),
     Input(f"dropdown-year-{type_page}", "value"),
+    Input(f"dropdown-plan-kind-{type_page}", "value"),
 )
-def refresh_indicators(year):
+def refresh_indicators(year, plan_kind):
     if not year:
         raise PreventUpdate
-    return list_indicator_options(int(year))
-
-
-@app.callback(
-    Output(f"dropdown-indicators-{type_page_plans}", "options"),
-    Input(f"dropdown-year-{type_page_plans}", "value"),
-)
-def refresh_indicators_plans(year):
-    if not year:
-        raise PreventUpdate
-    return list_indicator_options(int(year), for_editor=True)
+    return list_indicator_options(int(year), plan_kind=plan_kind or "internal")
 
 
 @app.callback(
@@ -1268,6 +955,7 @@ def manage_presets(
     State(f"dropdown-buildings-{type_page}", "value"),
     State(f"radio-layout-{type_page}", "value"),
     State(f"dropdown-metric-{type_page}", "value"),
+    State(f"dropdown-plan-kind-{type_page}", "value"),
     State(f"dropdown-payment-{type_page}", "value"),
     State(f"switch-unique-{type_page}", "value"),
     State(f"switch-require-plan-{type_page}", "value"),
@@ -1282,6 +970,7 @@ def generate_report(
     buildings,
     layout,
     metric,
+    plan_kind,
     payment,
     unique_flag,
     require_plan,
@@ -1304,6 +993,7 @@ def generate_report(
             unique_flag=bool(unique_flag),
             require_building_plan=bool(require_plan),
             period_closed=bool(period_closed),
+            plan_kind=plan_kind or "internal",
         )
     except Exception as exc:
         return [], [], None, True, f"Ошибка: {exc}"
@@ -1355,233 +1045,22 @@ def download_excel(n_clicks, stored, year, month):
     return dcc.send_bytes(buffer.getvalue(), filename)
 
 
-# ========== Ввод планов ==========
-
-def _load_editor_payload(year, buildings, indicators, metric, all_building_ids=None):
-    """Общая загрузка редактора. buildings пустой → все корпуса."""
-    if not year:
-        return None, "Укажите год", "warning"
-    building_ids = list(buildings) if buildings else list(all_building_ids or [])
-    if not building_ids:
-        return None, "Нет корпусов для загрузки", "warning"
-    try:
-        blocks = load_building_plan_editor_data(
-            year=int(year),
-            building_ids=building_ids,
-            indicator_ids=list(indicators) if indicators else None,
-            metric=metric or "volumes",
-        )
-    except Exception as exc:
-        return None, f"Ошибка загрузки: {exc}", "danger"
-    if not blocks:
-        return None, "Нет индикаторов/планов для выбранных фильтров.", "warning"
-    return {
-        "blocks": blocks,
-        "building_ids": building_ids,
-        "indicator_ids": list(indicators) if indicators else None,
-        "metric": metric or "volumes",
-        "year": int(year),
-    }, "Данные загружены", "success"
-
-
-@app.callback(
-    Output(f"div-existing-catalog-{type_page_plans}", "children"),
-    Output(f"store-plan-catalog-{type_page_plans}", "data"),
-    Input(f"dropdown-year-{type_page_plans}", "value"),
-    Input(f"btn-save-plans-{type_page_plans}", "n_clicks"),
-)
-def refresh_existing_plans_catalog(year, _save_clicks):
-    if not year:
-        raise PreventUpdate
-    catalog = list_existing_building_plans_catalog(int(year))
-    store = {
-        str(item["group_id"]): {
-            "building_ids": item["building_ids"],
-            "group_path": item["group_path"],
-        }
-        for item in catalog
-    }
-    return _render_existing_plans_catalog(catalog), store
-
-
-@app.callback(
-    Output(f"div-plan-editor-{type_page_plans}", "children"),
-    Output(f"store-plan-baseline-{type_page_plans}", "data"),
-    Output(f"store-plan-meta-{type_page_plans}", "data"),
-    Output(f"store-plan-paths-{type_page_plans}", "data"),
-    Output(f"btn-save-plans-{type_page_plans}", "disabled"),
-    Output(f"status-{type_page_plans}", "children"),
-    Output(f"alert-{type_page_plans}", "children"),
-    Output(f"alert-{type_page_plans}", "color"),
-    Output(f"alert-{type_page_plans}", "is_open"),
-    Output(f"dropdown-buildings-{type_page_plans}", "value"),
-    Output(f"dropdown-indicators-{type_page_plans}", "value"),
-    Input(f"btn-load-plans-{type_page_plans}", "n_clicks"),
-    Input({"type": PLAN_EDIT_EXISTING, "index": ALL}, "n_clicks"),
-    State(f"dropdown-year-{type_page_plans}", "value"),
-    State(f"dropdown-buildings-{type_page_plans}", "value"),
-    State(f"dropdown-indicators-{type_page_plans}", "value"),
-    State(f"dropdown-metric-{type_page_plans}", "value"),
-    State(f"store-plan-catalog-{type_page_plans}", "data"),
-    State(f"dropdown-buildings-{type_page_plans}", "options"),
-    prevent_initial_call=True,
-)
-def load_plan_editor(
-    n_load,
-    n_edit_list,
-    year,
-    buildings,
-    indicators,
-    metric,
-    catalog_store,
-    building_options,
-):
-    if not callback_context.triggered:
-        raise PreventUpdate
-    trigger = callback_context.triggered[0]["prop_id"]
-    if trigger == "." or (n_load is None and not any(n_edit_list or [])):
-        raise PreventUpdate
-    # клик по «Редактировать» без n_clicks (инициализация) — игнор
-    if PLAN_EDIT_EXISTING in trigger:
-        if not any(n_edit_list or []):
-            raise PreventUpdate
-        try:
-            tid = json.loads(trigger.split(".")[0])
-            group_id = int(tid["index"])
-        except Exception:
-            raise PreventUpdate
-        info = (catalog_store or {}).get(str(group_id)) or {}
-        buildings = info.get("building_ids") or [
-            opt["value"] for opt in (building_options or [])
-        ]
-        indicators = [group_id]
-    elif "btn-load-plans" not in trigger:
-        raise PreventUpdate
-
-    all_ids = [opt["value"] for opt in (building_options or [])]
-    payload, msg, color = _load_editor_payload(year, buildings, indicators, metric, all_ids)
-    if payload is None:
-        return (
-            no_update,
-            no_update,
-            no_update,
-            no_update,
-            True,
-            "",
-            msg,
-            color,
-            True,
-            no_update,
-            no_update,
-        )
-
-    blocks = payload["blocks"]
-    baseline = baseline_from_blocks(blocks)
-    paths = {str(b["group_id"]): b["group_path"] for b in blocks}
-    meta = {"year": payload["year"], "metric": payload["metric"]}
-    editor = _build_plan_editor(blocks, metric=payload["metric"])
-    status = (
-        f"Редактирование: {len(blocks)} индикатор(ов). "
-        "В таблице первая строка — план МО по месяцам; правьте только корпуса, затем «Сохранить»."
-    )
-    return (
-        editor,
-        baseline,
-        meta,
-        paths,
-        False,
-        status,
-        msg,
-        color,
-        True,
-        payload["building_ids"],
-        payload["indicator_ids"],
-    )
-
-@app.callback(
-    Output(f"alert-{type_page_plans}", "children", allow_duplicate=True),
-    Output(f"alert-{type_page_plans}", "color", allow_duplicate=True),
-    Output(f"alert-{type_page_plans}", "is_open", allow_duplicate=True),
-    Output(f"status-{type_page_plans}", "children", allow_duplicate=True),
-    Output(f"store-plan-baseline-{type_page_plans}", "data", allow_duplicate=True),
-    Input(f"btn-save-plans-{type_page_plans}", "n_clicks"),
-    State({"type": PLAN_EDIT_TABLE, "index": ALL}, "data"),
-    State({"type": PLAN_EDIT_TABLE, "index": ALL}, "id"),
-    State(f"store-plan-baseline-{type_page_plans}", "data"),
-    State(f"store-plan-meta-{type_page_plans}", "data"),
-    State(f"store-plan-paths-{type_page_plans}", "data"),
-    State(f"switch-raise-org-{type_page_plans}", "value"),
-    prevent_initial_call=True,
-)
-def save_plan_editor(n_clicks, tables_data, tables_ids, baseline, meta, paths, raise_org):
-    if not n_clicks:
-        raise PreventUpdate
-    if not meta or not baseline:
-        return "Сначала загрузите данные", "warning", True, no_update, no_update
-    if not tables_data or not tables_ids:
-        return "Нет открытых таблиц для сохранения", "warning", True, no_update, no_update
-
-    paths = paths or {}
-    current_blocks = []
-    for data, tid in zip(tables_data, tables_ids):
-        gid = int(tid["index"])
-        rows = []
-        for row in data or []:
-            if not _is_building_row(row):
-                continue
-            r = dict(row)
-            try:
-                if meta.get("metric") == "finance":
-                    r["total"] = round(sum(float(r.get(str(m)) or 0) for m in range(1, 13)), 2)
-                else:
-                    r["total"] = sum(int(float(r.get(str(m)) or 0)) for m in range(1, 13))
-            except (TypeError, ValueError):
-                r["total"] = r.get("total", 0)
-            rows.append(r)
-        current_blocks.append(
-            {
-                "group_id": gid,
-                "group_path": paths.get(str(gid), str(gid)),
-                "rows": rows,
-            }
-        )
-
-    try:
-        result = save_building_plan_diffs(
-            year=int(meta["year"]),
-            metric=meta.get("metric") or "volumes",
-            baseline=baseline,
-            current_blocks=current_blocks,
-            raise_org_from_buildings=bool(raise_org),
-        )
-    except Exception as exc:
-        return f"Ошибка сохранения: {exc}", "danger", True, no_update, no_update
-
-    new_baseline = baseline_from_blocks(current_blocks)
-    msg = (
-        f"Сохранено ячеек: {result['updated']}. "
-        f"Новых планов корпусов: {result['created_building_plans']}. "
-        f"Поднято месяцев МО: {result.get('raised_org_months', 0)}. "
-        f"Пропущено: {result['skipped']}."
-    )
-    if result.get("errors"):
-        msg += " Ошибки: " + "; ".join(result["errors"][:5])
-        color = "warning" if result["updated"] else "danger"
-    else:
-        color = "success"
-    return msg, color, True, msg, new_baseline
-
-
 # ========== Печатная форма ==========
 
 @app.callback(
     Output(f"dropdown-print-add-indicator-{type_page_print}", "options"),
     Input(f"dropdown-year-{type_page_print}", "value"),
+    Input(f"dropdown-plan-kind-{type_page_print}", "value"),
 )
-def refresh_print_indicators(year):
+def refresh_print_indicators(year, plan_kind):
     if not year:
         raise PreventUpdate
-    return list_indicator_options(int(year), for_editor=True, only_with_building_plan=True)
+    return list_indicator_options(
+        int(year),
+        for_editor=True,
+        only_with_building_plan=True,
+        plan_kind=plan_kind or "internal",
+    )
 
 
 @app.callback(
@@ -1776,6 +1255,7 @@ def manage_print_templates(
     State(f"dropdown-year-{type_page_print}", "value"),
     State(f"dropdown-reporting-month-{type_page_print}", "value"),
     State(f"dropdown-metric-{type_page_print}", "value"),
+    State(f"dropdown-plan-kind-{type_page_print}", "value"),
     State(f"dropdown-payment-{type_page_print}", "value"),
     State(f"switch-period-closed-{type_page_print}", "value"),
     State(f"table-print-items-{type_page_print}", "data"),
@@ -1788,6 +1268,7 @@ def generate_print_form(
     year,
     reporting_month,
     metric,
+    plan_kind,
     payment,
     period_closed,
     items,
@@ -1817,6 +1298,7 @@ def generate_print_form(
             payment_type=payment or "presented",
             period_closed=bool(period_closed),
             metric=metric or "volumes",
+            plan_kind=plan_kind or "internal",
         )
         html_str = render_print_form_html(data)
     except Exception as exc:

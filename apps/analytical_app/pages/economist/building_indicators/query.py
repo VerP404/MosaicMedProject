@@ -18,17 +18,26 @@ from apps.plan.services.building_report_engine import (
 )
 
 
+def _normalize_plan_kind(plan_kind: str | None) -> str:
+    raw = (plan_kind or "internal").strip().lower()
+    if raw in ("tfoms", "тфомс"):
+        return "tfoms"
+    return "internal"
+
+
 def list_indicator_options(
     year: int,
     *,
     for_editor: bool = False,
     only_with_building_plan: bool = False,
+    plan_kind: str = "internal",
 ) -> list[dict]:
     """
     Индикаторы с AnnualPlan на год (полная иерархия).
     for_editor=True — в подписи план МО (сумма помесячных объёмов).
     only_with_building_plan=True — только те, у кого есть BuildingPlan.
     """
+    kind = _normalize_plan_kind(plan_kind)
     query = text(
         """
         WITH RECURSIVE group_paths AS (
@@ -39,7 +48,8 @@ def list_indicator_options(
                 g.name::text AS full_path,
                 0 AS level
             FROM plan_groupindicators g
-            INNER JOIN plan_annualplan ap ON ap.group_id = g.id AND ap.year = :year
+            INNER JOIN plan_annualplan ap
+                ON ap.group_id = g.id AND ap.year = :year AND ap.plan_kind = :plan_kind
             WHERE 1=1
 
             UNION ALL
@@ -69,13 +79,14 @@ def list_indicator_options(
                 WHERE bp.annual_plan_id = ap.id
             ) AS has_building_plan
         FROM paths p
-        INNER JOIN plan_annualplan ap ON ap.group_id = p.id AND ap.year = :year
+        INNER JOIN plan_annualplan ap
+            ON ap.group_id = p.id AND ap.year = :year AND ap.plan_kind = :plan_kind
         LEFT JOIN plan_monthlyplan mp ON mp.annual_plan_id = ap.id
         GROUP BY p.id, p.name, ap.id
         ORDER BY p.name
         """
     )
-    df = pd.read_sql(query, engine, params={"year": int(year)})
+    df = pd.read_sql(query, engine, params={"year": int(year), "plan_kind": kind})
     if df.empty:
         return []
     if only_with_building_plan:
@@ -410,6 +421,7 @@ def run_building_report(
     unique_flag: bool,
     require_building_plan: bool = True,
     period_closed: bool = False,
+    plan_kind: str = "internal",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     if layout not in VALID_LAYOUTS:
         layout = LAYOUT_INDICATOR_BUILDING
@@ -423,6 +435,7 @@ def run_building_report(
         period_closed=period_closed,
         unique_flag=unique_flag,
         require_building_plan=require_building_plan,
+        plan_kind=_normalize_plan_kind(plan_kind),
     )
     return build_report(engine, params, layout=layout)
 
@@ -696,7 +709,7 @@ def save_building_plan_diffs(
                 text(
                     """
                     SELECT id FROM plan_annualplan
-                    WHERE group_id = :gid AND year = :year
+                    WHERE group_id = :gid AND year = :year AND plan_kind = 'internal'
                     """
                 ),
                 {"gid": group_id, "year": year},
@@ -706,8 +719,8 @@ def save_building_plan_diffs(
                     text(
                         """
                         INSERT INTO plan_annualplan
-                            (group_id, year, show_in_cumulative_report, show_in_indicators_report)
-                        VALUES (:gid, :year, false, false)
+                            (group_id, year, plan_kind, show_in_cumulative_report, show_in_indicators_report)
+                        VALUES (:gid, :year, 'internal', false, false)
                         RETURNING id
                         """
                     ),
@@ -960,3 +973,43 @@ def baseline_from_blocks(blocks: list[dict]) -> dict:
             bid = str(row["building_id"])
             out[gid][bid] = {str(m): row.get(str(m), 0) for m in range(1, 13)}
     return out
+
+
+PLAN_KIND_OPTIONS = [
+    {"label": "Внутренний", "value": "internal"},
+    {"label": "ТФОМС", "value": "tfoms"},
+]
+
+
+def list_plan_catalog(year: int, plan_kind: str = "internal") -> list[dict]:
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        list_plan_catalog as _impl,
+    )
+
+    return _impl(year, plan_kind)
+
+
+def load_indicator_plan_form(year: int, group_id: int, plan_kind: str = "internal") -> dict:
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        load_indicator_plan_form as _impl,
+    )
+
+    return _impl(year, group_id, plan_kind)
+
+
+def add_building_to_plan(
+    year: int, group_id: int, building_id: int, plan_kind: str = "internal"
+) -> dict:
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        add_building_to_plan as _impl,
+    )
+
+    return _impl(year, group_id, building_id, plan_kind)
+
+
+def save_indicator_plan_form(**kwargs) -> dict:
+    from apps.analytical_app.pages.economist.building_indicators.plan_form_api import (
+        save_indicator_plan_form as _impl,
+    )
+
+    return _impl(**kwargs)

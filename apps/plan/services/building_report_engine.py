@@ -33,6 +33,7 @@ class BuildReportParams:
     period_closed: bool = False
     unique_flag: bool = False
     require_building_plan: bool = True
+    plan_kind: str = "internal"
     columns: Sequence[str] = field(
         default_factory=lambda: ["plan", "fact", "pct", "balance"]
     )
@@ -74,20 +75,25 @@ def _default_reporting_month() -> int:
     return today.month - 1 if today.day <= 5 else today.month
 
 
-def resolve_indicator_ids(engine, year: int, indicator_ids: Sequence[int] | None) -> list[int]:
+def resolve_indicator_ids(
+    engine, year: int, indicator_ids: Sequence[int] | None, plan_kind: str = "internal"
+) -> list[int]:
     if indicator_ids:
         return [int(x) for x in indicator_ids]
+    kind = (plan_kind or "internal").strip().lower()
+    if kind not in ("internal", "tfoms"):
+        kind = "internal"
     query = text(
         """
         SELECT DISTINCT ap.group_id AS id
         FROM plan_annualplan ap
         INNER JOIN plan_buildingplan bp ON bp.annual_plan_id = ap.id
-        WHERE ap.year = :year
+        WHERE ap.year = :year AND ap.plan_kind = :plan_kind
         ORDER BY ap.group_id
         """
     )
     with engine.connect() as conn:
-        rows = conn.execute(query, {"year": year}).fetchall()
+        rows = conn.execute(query, {"year": year, "plan_kind": kind}).fetchall()
     return [int(r[0]) for r in rows]
 
 
@@ -123,6 +129,7 @@ def fetch_building_plans(
     group_ids: Sequence[int],
     building_ids: Sequence[int] | None,
     metric: str,
+    plan_kind: str = "internal",
 ) -> pd.DataFrame:
     """План по месяцам: group_id, building_id, building_name, month, plan."""
     if not group_ids:
@@ -131,7 +138,10 @@ def fetch_building_plans(
     plan_field = "quantity" if metric == "volumes" else "amount"
     group_sql = ",".join(str(int(i)) for i in group_ids)
     building_filter = ""
-    params: dict[str, Any] = {"year": year, "m": reporting_month}
+    kind = (plan_kind or "internal").strip().lower()
+    if kind not in ("internal", "tfoms"):
+        kind = "internal"
+    params: dict[str, Any] = {"year": year, "m": reporting_month, "plan_kind": kind}
     if building_ids:
         building_filter = "AND bp.building_id IN (" + ",".join(str(int(i)) for i in building_ids) + ")"
 
@@ -148,6 +158,7 @@ def fetch_building_plans(
         INNER JOIN plan_annualplan ap ON ap.id = bp.annual_plan_id
         INNER JOIN organization_building b ON b.id = bp.building_id
         WHERE ap.year = :year
+          AND ap.plan_kind = :plan_kind
           AND ap.group_id IN ({group_sql})
           AND mbp.month BETWEEN 1 AND :m
           {building_filter}
@@ -242,13 +253,19 @@ def build_long_report(engine, params: BuildReportParams) -> pd.DataFrame:
     reporting_month = max(1, min(12, reporting_month))
     metric = "finance" if params.metric == "finance" else "volumes"
 
-    group_ids = resolve_indicator_ids(engine, year, params.indicator_ids)
+    group_ids = resolve_indicator_ids(engine, year, params.indicator_ids, params.plan_kind)
     if not group_ids:
         return pd.DataFrame()
 
     paths = fetch_group_paths(engine, group_ids)
     plans_df = fetch_building_plans(
-        engine, year, reporting_month, group_ids, params.building_ids, metric
+        engine,
+        year,
+        reporting_month,
+        group_ids,
+        params.building_ids,
+        metric,
+        plan_kind=params.plan_kind,
     )
     if plans_df.empty:
         return pd.DataFrame()

@@ -464,12 +464,12 @@ class DepartmentAutocomplete(autocomplete.Select2QuerySetView):
 class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
     import_form_class = ImportForm
     export_form_class = ExportForm
-    list_display = ('group', 'year', 'sort_order', 'show_in_cumulative_report', 'show_in_indicators_report', 'external_id', 'has_quantity_plan', 'has_amount_plan')
-    list_filter = ('year', 'show_in_cumulative_report', 'show_in_indicators_report')
+    list_display = ('group', 'year', 'plan_kind', 'sort_order', 'show_in_cumulative_report', 'show_in_indicators_report', 'external_id', 'has_quantity_plan', 'has_amount_plan')
+    list_filter = ('year', 'plan_kind', 'show_in_cumulative_report', 'show_in_indicators_report')
     search_fields = ('group__name', 'year', 'external_id')
     list_editable = ('sort_order', 'show_in_cumulative_report', 'show_in_indicators_report')
     inlines = [MonthlyPlanInline]
-    fields = ('group', 'year', 'sort_order', 'show_in_cumulative_report', 'show_in_indicators_report', 'external_id')
+    fields = ('group', 'year', 'plan_kind', 'sort_order', 'show_in_cumulative_report', 'show_in_indicators_report', 'external_id')
     readonly_fields = ('external_id',)
     actions = [enable_cumulative_report_action, disable_cumulative_report_action, 
                enable_indicators_report_action, disable_indicators_report_action]
@@ -565,6 +565,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
             # Строка с объемами (quantity) - всегда первой
             quantity_row = {
                 'Показатель': f'{hierarchy} - Объемы',
+                'Вид плана': annual_plan.plan_kind or AnnualPlan.PlanKind.INTERNAL,
                 'external_id': group.external_id or '',
                 'Итого': sum(mp.quantity for mp in monthly_plans),
             }
@@ -575,6 +576,7 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
             # Строка с финансами (amount) - всегда второй
             amount_row = {
                 'Показатель': f'{hierarchy} - Финансы',
+                'Вид плана': annual_plan.plan_kind or AnnualPlan.PlanKind.INTERNAL,
                 'external_id': group.external_id or '',
                 'Итого': sum(float(mp.amount) for mp in monthly_plans),
             }
@@ -675,10 +677,16 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
                 # Если не найдено, пропускаем
                 continue
             
-            # Получаем или создаем AnnualPlan
+            # Получаем или создаем AnnualPlan (по умолчанию внутренний)
+            plan_kind = AnnualPlan.PlanKind.INTERNAL
+            if "Вид плана" in quantity_row.index and pd.notna(quantity_row.get("Вид плана")):
+                raw_kind = str(quantity_row.get("Вид плана") or "").strip().lower()
+                if raw_kind in ("tfoms", "тфомс"):
+                    plan_kind = AnnualPlan.PlanKind.TFOMS
             annual_plan, created = AnnualPlan.objects.get_or_create(
                 group=group,
                 year=year,
+                plan_kind=plan_kind,
                 defaults={}
             )
             
@@ -882,7 +890,11 @@ class AnnualPlanAdmin(ModelAdmin, ImportExportModelAdmin):
             except GroupIndicators.DoesNotExist:
                 skipped += 1
                 continue
-            annual_plan, _ = AnnualPlan.objects.get_or_create(group=group, year=year)
+            annual_plan, _ = AnnualPlan.objects.get_or_create(
+                group=group,
+                year=year,
+                plan_kind=AnnualPlan.PlanKind.INTERNAL,
+            )
             try:
                 building = Building.objects.get(pk=building_id)
             except Building.DoesNotExist:

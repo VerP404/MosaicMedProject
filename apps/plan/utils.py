@@ -40,7 +40,9 @@ def copy_filters_from_year_to_year(groups_queryset, source_year, target_year):
                 fc.save()
                 copied_count += 1
         if source_filters.exists():
-            ap_src = AnnualPlan.objects.filter(group=group, year=source_year).first()
+            ap_src = AnnualPlan.objects.filter(
+                group=group, year=source_year, plan_kind=AnnualPlan.PlanKind.INTERNAL
+            ).first()
             defaults = {}
             if ap_src:
                 defaults = {
@@ -51,6 +53,7 @@ def copy_filters_from_year_to_year(groups_queryset, source_year, target_year):
             ap_dst, created = AnnualPlan.objects.get_or_create(
                 group=group,
                 year=target_year,
+                plan_kind=AnnualPlan.PlanKind.INTERNAL,
                 defaults=defaults or {},
             )
             if not created and ap_src:
@@ -83,6 +86,7 @@ def copy_plans_to_year(source_year, target_year):
         ap_dst, created = AnnualPlan.objects.get_or_create(
             group=ap_src.group,
             year=target_year,
+            plan_kind=ap_src.plan_kind or AnnualPlan.PlanKind.INTERNAL,
             defaults={
                 'show_in_cumulative_report': ap_src.show_in_cumulative_report,
                 'show_in_indicators_report': ap_src.show_in_indicators_report,

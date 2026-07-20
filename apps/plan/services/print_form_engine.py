@@ -65,11 +65,15 @@ def fetch_annual_building_plans(
     year: int,
     group_ids: Sequence[int],
     metric: str = "volumes",
+    plan_kind: str = "internal",
 ) -> dict[tuple[int, int], float]:
     """План на год по корпусу: (group_id, building_id) -> sum months 1..12."""
     if not group_ids:
         return {}
     plan_field = "quantity" if metric != "finance" else "amount"
+    kind = (plan_kind or "internal").strip().lower()
+    if kind not in ("internal", "tfoms"):
+        kind = "internal"
     group_sql = ",".join(str(int(i)) for i in group_ids)
     query = text(
         f"""
@@ -81,12 +85,13 @@ def fetch_annual_building_plans(
         INNER JOIN plan_buildingplan bp ON bp.id = mbp.building_plan_id
         INNER JOIN plan_annualplan ap ON ap.id = bp.annual_plan_id
         WHERE ap.year = :year
+          AND ap.plan_kind = :plan_kind
           AND ap.group_id IN ({group_sql})
           AND mbp.month BETWEEN 1 AND 12
         GROUP BY ap.group_id, bp.building_id
         """
     )
-    df = pd.read_sql(query, engine, params={"year": int(year)})
+    df = pd.read_sql(query, engine, params={"year": int(year), "plan_kind": kind})
     out: dict[tuple[int, int], float] = {}
     for _, row in df.iterrows():
         out[(int(row["group_id"]), int(row["building_id"]))] = float(row["year_plan"] or 0)
@@ -117,6 +122,7 @@ def build_print_form_data(
     period_closed: bool = False,
     metric: str = "volumes",
     unique_flag: bool = False,
+    plan_kind: str = "internal",
 ) -> dict[str, Any]:
     """
     Возвращает структуру для рендера бланка:
@@ -130,6 +136,9 @@ def build_print_form_data(
     year = int(year)
     reporting_month = max(1, min(12, int(reporting_month)))
     metric = "finance" if metric == "finance" else "volumes"
+    kind = (plan_kind or "internal").strip().lower()
+    if kind not in ("internal", "tfoms"):
+        kind = "internal"
 
     header = {
         "organization": get_organization_name(),
@@ -145,6 +154,7 @@ def build_print_form_data(
         "columns": int(config.get("columns") or 3),
         "page_orientation": config.get("page_orientation") or "landscape",
         "metric": metric,
+        "plan_kind": kind,
     }
 
     if not indicator_ids:
@@ -160,6 +170,7 @@ def build_print_form_data(
         period_closed=period_closed,
         unique_flag=unique_flag,
         require_building_plan=True,
+        plan_kind=kind,
     )
     long_df = build_long_report(engine, params)
     if long_df is None or long_df.empty:
@@ -176,7 +187,7 @@ def build_print_form_data(
         return {"header": header, "sections": [], "missing": missing}
 
     totals = long_df[long_df["is_total"] == True].copy()  # noqa: E712
-    year_plans = fetch_annual_building_plans(year, indicator_ids, metric)
+    year_plans = fetch_annual_building_plans(year, indicator_ids, metric, plan_kind=kind)
 
     # index: group_id -> list of building rows
     by_group: dict[int, list[dict]] = {}

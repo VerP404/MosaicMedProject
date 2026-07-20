@@ -63,7 +63,11 @@ class GroupIndicators(models.Model):
 
         if self.is_distributable:
             current_year = datetime.now().year
-            AnnualPlan.objects.get_or_create(group=self, year=current_year)
+            AnnualPlan.objects.get_or_create(
+                group=self,
+                year=current_year,
+                plan_kind=AnnualPlan.PlanKind.INTERNAL,
+            )
 
     def get_hierarchy_display(self):
         """
@@ -148,7 +152,11 @@ class FilterCondition(models.Model):
         super().save(*args, **kwargs)
 
         # После сохранения FilterCondition, убедимся, что AnnualPlan существует
-        annual_plan, created = AnnualPlan.objects.get_or_create(group=self.group, year=self.year)
+        annual_plan, created = AnnualPlan.objects.get_or_create(
+            group=self.group,
+            year=self.year,
+            plan_kind=AnnualPlan.PlanKind.INTERNAL,
+        )
         if created:
             pass  # Если AnnualPlan был создан, MonthlyPlan создадутся автоматически
 
@@ -191,9 +199,20 @@ class GroupBuildingDepartment(models.Model):
 
 
 class AnnualPlan(models.Model):
+    class PlanKind(models.TextChoices):
+        INTERNAL = "internal", "Внутренний"
+        TFOMS = "tfoms", "ТФОМС"
+
     group = models.ForeignKey(GroupIndicators, on_delete=models.CASCADE, related_name="annual_plans",
                               verbose_name="Группа")
     year = models.PositiveIntegerField(verbose_name="Год")
+    plan_kind = models.CharField(
+        max_length=16,
+        choices=PlanKind.choices,
+        default=PlanKind.INTERNAL,
+        verbose_name="Вид плана",
+        help_text="Внутренний план МО или план ТФОМС",
+    )
     show_in_cumulative_report = models.BooleanField(
         default=False,
         verbose_name="Отображать в отчете нарастающе",
@@ -222,12 +241,13 @@ class AnnualPlan(models.Model):
     )
     
     class Meta:
-        unique_together = ('group', 'year')
+        unique_together = ('group', 'year', 'plan_kind')
         verbose_name = "Объемы: План на год"
         verbose_name_plural = "Объемы: Планы на год"
 
     def __str__(self):
-        return f"{self.group.name} - {self.year}"
+        kind_label = self.get_plan_kind_display() if self.plan_kind else self.PlanKind.INTERNAL.label
+        return f"{self.group.name} - {self.year} ({kind_label})"
 
     def save(self, *args, **kwargs):
         # Автоматически генерируем external_id, если его нет
