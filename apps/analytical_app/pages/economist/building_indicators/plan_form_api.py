@@ -188,13 +188,8 @@ def list_plan_catalog(year: int, plan_kind: str | None = None) -> list[dict]:
         .prefetch_related("monthly_plans", "building_plans")
     )
     by_group: dict[int, dict[str, AnnualPlan]] = {}
-    sort_key: dict[int, tuple] = {}
     for ap in plans:
         by_group.setdefault(ap.group_id, {})[ap.plan_kind] = ap
-        so = ap.sort_order if ap.sort_order is not None else 10**9
-        prev = sort_key.get(ap.group_id)
-        if prev is None or (so, ap.group.name or "") < prev:
-            sort_key[ap.group_id] = (so, ap.group.name or "")
 
     catalog: list[dict] = []
     for gid in flagged_group_ids:
@@ -218,7 +213,7 @@ def list_plan_catalog(year: int, plan_kind: str | None = None) -> list[dict]:
             }
         )
 
-    catalog.sort(key=lambda x: (sort_key.get(x["group_id"], (10**9, "")), x["group_path"]))
+    catalog.sort(key=lambda x: (x.get("group_path") or "").casefold())
     return catalog
 
 

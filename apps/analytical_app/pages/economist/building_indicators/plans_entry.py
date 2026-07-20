@@ -561,6 +561,8 @@ def render_plan_catalog_page(catalog, page):
     Output(f"alert-{type_page_plans}", "children"),
     Output(f"alert-{type_page_plans}", "color"),
     Output(f"alert-{type_page_plans}", "is_open"),
+    Output(f"input-annual-qty-{type_page_plans}", "value"),
+    Output(f"input-annual-amt-{type_page_plans}", "value"),
     Input({"type": PLAN_EDIT_EXISTING, "index": ALL}, "n_clicks"),
     Input(f"btn-close-form-{type_page_plans}", "n_clicks"),
     Input(f"btn-add-building-{type_page_plans}", "n_clicks"),
@@ -603,6 +605,10 @@ def plan_form_actions(
     if trigger == ".":
         raise PreventUpdate
 
+    def _out(*eight, clear_annual: bool = False):
+        aq, aa = (None, None) if clear_annual else (no_update, no_update)
+        return (*eight, aq, aa)
+
     empty = (
         html.P("Выберите показатель в каталоге выше.", className="text-muted mb-0"),
         None,
@@ -612,7 +618,7 @@ def plan_form_actions(
     )
 
     if f"btn-close-form-{type_page_plans}" in trigger:
-        return (*empty, "Форма закрыта", "secondary", True)
+        return _out(*empty, "Форма закрыта", "secondary", True, clear_annual=True)
 
     if PLAN_EDIT_EXISTING in trigger:
         if not any(edit_clicks or []):
@@ -623,11 +629,11 @@ def plan_form_actions(
         except (json.JSONDecodeError, KeyError, TypeError, ValueError):
             raise PreventUpdate
         if not year:
-            return no_update, no_update, no_update, no_update, no_update, "Укажите год", "warning", True
+            return _out(no_update, no_update, no_update, no_update, no_update, "Укажите год", "warning", True)
         try:
             payload = load_dual_indicator_plan_form(int(year), group_id)
         except Exception as exc:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -642,7 +648,7 @@ def plan_form_actions(
             "group_id": group_id,
             "group_path": payload.get("group_path"),
         }
-        return (
+        return _out(
             _render_dual_form(payload),
             payload,
             meta_out,
@@ -651,11 +657,12 @@ def plan_form_actions(
             "Форма загружена (ТФОМС + внутренний)",
             "success",
             True,
+            clear_annual=True,
         )
 
     if f"btn-add-building-{type_page_plans}" in trigger:
         if not meta or not year:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -666,7 +673,7 @@ def plan_form_actions(
                 True,
             )
         if not add_building_id:
-            return no_update, no_update, no_update, no_update, no_update, "Выберите корпус", "warning", True
+            return _out(no_update, no_update, no_update, no_update, no_update, "Выберите корпус", "warning", True)
         kind = add_building_kind or "tfoms"
         try:
             payload = add_building_to_dual_plan(
@@ -676,7 +683,7 @@ def plan_form_actions(
                 kind,
             )
         except Exception as exc:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -687,7 +694,7 @@ def plan_form_actions(
                 True,
             )
         kind_label = "ТФОМС" if kind == "tfoms" else "внутренний"
-        return (
+        return _out(
             _render_dual_form(payload),
             payload,
             meta,
@@ -700,7 +707,7 @@ def plan_form_actions(
 
     if f"btn-remove-building-{type_page_plans}" in trigger:
         if not meta or not year:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -711,7 +718,7 @@ def plan_form_actions(
                 True,
             )
         if not add_building_id:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -730,7 +737,7 @@ def plan_form_actions(
                 kind,
             )
         except Exception as exc:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -741,7 +748,7 @@ def plan_form_actions(
                 True,
             )
         kind_label = "ТФОМС" if kind == "tfoms" else "внутренний"
-        return (
+        return _out(
             _render_dual_form(payload),
             payload,
             meta,
@@ -754,7 +761,7 @@ def plan_form_actions(
 
     if f"btn-distribute-{type_page_plans}" in trigger:
         if not meta:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -767,7 +774,7 @@ def plan_form_actions(
         qty_empty = annual_qty is None or annual_qty == ""
         amt_empty = annual_amt is None or annual_amt == ""
         if qty_empty and amt_empty:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -783,8 +790,6 @@ def plan_form_actions(
         dual = _merge_tables_into_dual(form_store, table_ids, tables_data)
         kind_payload = dual.get(kind) or {}
         target_building = int(add_building_id) if add_building_id else None
-        # Если корпус выбран, но его ещё нет в версии — распределяем в План МО нельзя молча:
-        # сообщим ошибку из apply
         try:
             updated_kind = apply_annual_distribution(
                 kind_payload,
@@ -793,7 +798,7 @@ def plan_form_actions(
                 building_id=target_building,
             )
         except Exception as exc:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -823,7 +828,8 @@ def plan_form_actions(
             f"Распределено ({', '.join(parts)}) → {kind_label}, {target_label}. "
             "Не забудьте сохранить."
         )
-        return (
+        # После распределения тоже очищаем поля — значения уже в таблице
+        return _out(
             _render_dual_form(dual),
             dual,
             meta,
@@ -832,14 +838,15 @@ def plan_form_actions(
             msg,
             "success",
             True,
+            clear_annual=True,
         )
 
     if f"btn-save-plans-{type_page_plans}" in trigger:
         if not meta or not year:
-            return no_update, no_update, no_update, no_update, no_update, "Нет открытой формы", "warning", True
+            return _out(no_update, no_update, no_update, no_update, no_update, "Нет открытой формы", "warning", True)
         by_kind = _tables_by_kind(table_ids, tables_data)
         if "tfoms" not in by_kind or "internal" not in by_kind:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -860,7 +867,7 @@ def plan_form_actions(
                 raise_org_from_buildings=bool(raise_org),
             )
         except Exception as exc:
-            return (
+            return _out(
                 no_update,
                 no_update,
                 no_update,
@@ -872,7 +879,7 @@ def plan_form_actions(
             )
         if not result.get("ok"):
             errs = "; ".join(result.get("errors") or ["ошибка валидации"])
-            return no_update, no_update, no_update, no_update, no_update, errs, "danger", True
+            return _out(no_update, no_update, no_update, no_update, no_update, errs, "danger", True)
         try:
             payload = load_dual_indicator_plan_form(int(year), int(meta["group_id"]))
         except Exception:
@@ -884,7 +891,7 @@ def plan_form_actions(
         if result.get("raised_org_months"):
             msg += f"; план МО поднят в {result['raised_org_months']} мес."
         if payload:
-            return (
+            return _out(
                 _render_dual_form(payload),
                 payload,
                 meta,
@@ -893,7 +900,10 @@ def plan_form_actions(
                 msg,
                 "success",
                 True,
+                clear_annual=True,
             )
-        return no_update, no_update, meta, no_update, no_update, msg, "success", True
+        return _out(
+            no_update, no_update, meta, no_update, no_update, msg, "success", True, clear_annual=True
+        )
 
     raise PreventUpdate

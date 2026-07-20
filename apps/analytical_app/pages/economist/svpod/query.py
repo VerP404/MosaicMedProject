@@ -6,6 +6,13 @@ from apps.analytical_app.pages.SQL_query.query import base_query, columns_by_sta
 from apps.analytical_app.query_executor import engine
 
 
+def _normalize_plan_kind(plan_kind: str | None) -> str:
+    raw = (plan_kind or "internal").strip().lower()
+    if raw in ("tfoms", "тфомс"):
+        return "tfoms"
+    return "internal"
+
+
 def _call_base_query(selected_year, months_placeholder, inogorod, sanction, amount_null,
                      building, department, profile, doctor,
                      input_start, input_end, treatment_start, treatment_end,
@@ -501,7 +508,8 @@ ORDER BY building_name, month
     return query
 
 
-def sql_query_svpod_details(selected_year, selected_month, group_ids, filter_conditions, status_filter=None):
+def sql_query_svpod_details(selected_year, selected_month, group_ids, filter_conditions, status_filter=None,
+                            building=None):
     """
     SQL-запрос для детализации svpod по талонам
     Возвращает детальную информацию по талонам для выбранной группы показателей
@@ -532,6 +540,13 @@ def sql_query_svpod_details(selected_year, selected_month, group_ids, filter_con
             # Обычная логика для простых статусов
             status_values = "', '".join(status_filter)
             where_conditions.append(f"status IN ('{status_values}')")
+
+    if building:
+        if not isinstance(building, (list, tuple)):
+            building = [building]
+        bids = [str(int(b)) for b in building if b is not None and str(b).isdigit()]
+        if bids:
+            where_conditions.append(f"building_id IN ({','.join(bids)})")
     
     # Базовые фильтры (как в основном запросе)
     where_conditions.extend([
@@ -727,15 +742,16 @@ def get_all_end_groups():
     return groups
 
 
-def get_groups_for_cumulative_report(selected_year):
+def get_groups_for_cumulative_report(selected_year, plan_kind: str = "internal"):
     """
     Получает группы показателей, которые нужно отображать в отчете нарастающе.
     Выбираются группы, у которых AnnualPlan.show_in_cumulative_report = True для указанного года.
-    Сортировка: сначала по sort_order (если указан), потом по иерархии групп.
+    Сортировка по названию (алфавит).
     Возвращает полную иерархию групп через обратный слэш (\\).
     """
     from sqlalchemy import text
-    
+
+    kind = _normalize_plan_kind(plan_kind)
     query = text("""
     WITH RECURSIVE group_paths AS (
         SELECT 
@@ -749,6 +765,7 @@ def get_groups_for_cumulative_report(selected_year):
         INNER JOIN plan_annualplan ap ON ap.group_id = g.id
         WHERE ap.year = :selected_year 
         AND ap.show_in_cumulative_report = true
+        AND ap.plan_kind = :plan_kind
         
         UNION ALL
         
@@ -769,24 +786,28 @@ def get_groups_for_cumulative_report(selected_year):
     FROM group_paths
     ORDER BY id, level DESC
     """)
-    groups = pd.read_sql(query, engine, params={"selected_year": selected_year})
-    
-    # Сортируем: сначала по sort_order, потом по name
-    if not groups.empty and 'sort_order' in groups.columns:
-        groups = groups.sort_values(by=['sort_order', 'name'], na_position='last')
-    
+    groups = pd.read_sql(
+        query, engine, params={"selected_year": selected_year, "plan_kind": kind}
+    )
+
+    if not groups.empty and "name" in groups.columns:
+        groups = groups.assign(_sort=groups["name"].astype(str).str.casefold()).sort_values(
+            by=["_sort"], na_position="last"
+        ).drop(columns=["_sort"])
+
     return groups
 
 
-def get_groups_for_indicators_report(selected_year):
+def get_groups_for_indicators_report(selected_year, plan_kind: str = "internal"):
     """
-    Получает группы для отчета индикаторов с учетом сортировки.
+    Получает группы для отчета индикаторов.
     Выбираются группы, у которых AnnualPlan.show_in_indicators_report = True для указанного года.
-    Сортировка: сначала по sort_order (если указан), потом по иерархии групп.
+    Сортировка по названию (алфавит).
     Возвращает полную иерархию групп через обратный слэш (\\).
     """
     from sqlalchemy import text
-    
+
+    kind = _normalize_plan_kind(plan_kind)
     query = text("""
     WITH RECURSIVE group_paths AS (
         SELECT 
@@ -801,6 +822,7 @@ def get_groups_for_indicators_report(selected_year):
         INNER JOIN plan_annualplan ap ON ap.group_id = g.id
         WHERE ap.year = :selected_year 
         AND ap.show_in_indicators_report = true
+        AND ap.plan_kind = :plan_kind
         
         UNION ALL
         
@@ -823,16 +845,19 @@ def get_groups_for_indicators_report(selected_year):
     FROM group_paths
     ORDER BY id, level DESC
     """)
-    groups = pd.read_sql(query, engine, params={"selected_year": selected_year})
-    
-    # Сортируем: сначала по sort_order, потом по name
-    if not groups.empty and 'sort_order' in groups.columns:
-        groups = groups.sort_values(by=['sort_order', 'name'], na_position='last')
-    
+    groups = pd.read_sql(
+        query, engine, params={"selected_year": selected_year, "plan_kind": kind}
+    )
+
+    if not groups.empty and "name" in groups.columns:
+        groups = groups.assign(_sort=groups["name"].astype(str).str.casefold()).sort_values(
+            by=["_sort"], na_position="last"
+        ).drop(columns=["_sort"])
+
     return groups
 
 
-def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_flag=False, reporting_month=None, payment_type='presented'):
+def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_flag=False, reporting_month=None, payment_type='presented', plan_kind='internal', building=None):
     """
     Формирует отчет нарастающе по всем группам показателей.
     Для каждой группы рассчитывает нарастающий итог за год.
@@ -849,7 +874,7 @@ def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_f
     from sqlalchemy import text
     
     # Получаем группы, помеченные для отображения в отчете нарастающе
-    groups = get_groups_for_cumulative_report(selected_year)
+    groups = get_groups_for_cumulative_report(selected_year, plan_kind=plan_kind)
     
     if groups.empty:
         return pd.DataFrame()
@@ -859,6 +884,13 @@ def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_f
     default_month = today.month - 1 if today.day <= 5 else today.month
     current_day = today.day
     current_month = reporting_month if reporting_month is not None else default_month
+
+    building_ids = None
+    if building:
+        if not isinstance(building, (list, tuple)):
+            building = [building]
+        building_ids = [int(b) for b in building if b is not None]
+        building_ids = building_ids or None
     
     results = []
 
@@ -876,7 +908,8 @@ def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_f
                           group_id=[group_id],
                           filter_conditions=filter_conditions,
                           mode=mode,
-                          unique_flag=unique_flag)
+                          unique_flag=unique_flag,
+                          building=building_ids)
         )
         
         # Преобразуем в словарь по месяцам
@@ -887,16 +920,34 @@ def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_f
         
         # Получаем плановые данные
         plan_field = "quantity" if mode == 'volumes' else "amount"
-        plan_query = text(f"""
-            SELECT mp.month, SUM(mp.{plan_field}) AS plan
-            FROM plan_monthlyplan AS mp
-            INNER JOIN plan_annualplan AS ap ON mp.annual_plan_id = ap.id
-            WHERE ap.group_id = :group_id AND ap.year = :year
-            GROUP BY mp.month
-            ORDER BY mp.month
-        """)
+        kind = _normalize_plan_kind(plan_kind)
+        if building_ids:
+            ids_sql = ",".join(str(b) for b in building_ids)
+            plan_query = text(f"""
+                SELECT mbp.month, COALESCE(SUM(mbp.{plan_field}), 0) AS plan
+                FROM plan_monthlybuildingplan AS mbp
+                INNER JOIN plan_buildingplan AS bp ON bp.id = mbp.building_plan_id
+                INNER JOIN plan_annualplan AS ap ON ap.id = bp.annual_plan_id
+                WHERE ap.group_id = :group_id AND ap.year = :year
+                  AND ap.plan_kind = :plan_kind
+                  AND bp.building_id IN ({ids_sql})
+                GROUP BY mbp.month
+                ORDER BY mbp.month
+            """)
+        else:
+            plan_query = text(f"""
+                SELECT mp.month, SUM(mp.{plan_field}) AS plan
+                FROM plan_monthlyplan AS mp
+                INNER JOIN plan_annualplan AS ap ON mp.annual_plan_id = ap.id
+                WHERE ap.group_id = :group_id AND ap.year = :year
+                  AND ap.plan_kind = :plan_kind
+                GROUP BY mp.month
+                ORDER BY mp.month
+            """)
         with engine.connect() as connection:
-            result = connection.execute(plan_query, {"group_id": group_id, "year": selected_year}).mappings()
+            result = connection.execute(
+                plan_query, {"group_id": group_id, "year": selected_year, "plan_kind": kind}
+            ).mappings()
             plan_data = {row["month"]: row["plan"] for row in result}
         
         # Рассчитываем общую сумму "исправлено" за все месяцы
@@ -987,14 +1038,14 @@ def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_f
 
 # ========== Функции для вкладки "Выбранные индикаторы" ==========
 
-def get_dynamic_conditions(year):
+def get_dynamic_conditions(year, plan_kind: str = "internal"):
     """
     Получает условия фильтрации из groupindicators через FilterCondition.
     Используется для обратной совместимости со старым кодом.
     Кэширование убрано, чтобы данные всегда были актуальными.
     """
     # Получаем группы для отчета индикаторов
-    groups = get_groups_for_indicators_report(year)
+    groups = get_groups_for_indicators_report(year, plan_kind=plan_kind)
     
     if groups.empty:
         return []
@@ -1015,14 +1066,15 @@ def get_dynamic_conditions(year):
     return conditions
 
 
-def get_plan_for_group(group_id, selected_year, months_list, mode='both'):
+def get_plan_for_group(group_id, selected_year, months_list, mode='both', plan_kind='internal'):
     """
     Получает план для группы за выбранные месяцы.
     mode: 'both' - возвращает (quantity, amount), 'quantity' - только количество, 'amount' - только сумму
     """
     if not months_list:
         return 0, 0.0
-    
+
+    kind = _normalize_plan_kind(plan_kind)
     months_str = ', '.join(map(str, months_list))
     query = text(f"""
         SELECT 
@@ -1032,23 +1084,27 @@ def get_plan_for_group(group_id, selected_year, months_list, mode='both'):
         INNER JOIN plan_annualplan AS ap ON mp.annual_plan_id = ap.id
         WHERE ap.group_id = :group_id 
         AND ap.year = :year
+        AND ap.plan_kind = :plan_kind
         AND mp.month IN ({months_str})
     """)
     with engine.connect() as connection:
-        result = connection.execute(query, {"group_id": group_id, "year": selected_year}).fetchone()
+        result = connection.execute(
+            query, {"group_id": group_id, "year": selected_year, "plan_kind": kind}
+        ).fetchone()
         if result:
             return result[0] or 0, float(result[1] or 0.0)
         return 0, 0.0
 
 
-def get_plan_by_months_for_group(group_id, selected_year, months_list):
+def get_plan_by_months_for_group(group_id, selected_year, months_list, plan_kind='internal'):
     """
     Получает план для группы по месяцам (помесячно).
     Возвращает словарь: {month: (quantity, amount)}
     """
     if not months_list:
         return {}
-    
+
+    kind = _normalize_plan_kind(plan_kind)
     months_str = ', '.join(map(str, months_list))
     query = text(f"""
         SELECT 
@@ -1059,12 +1115,15 @@ def get_plan_by_months_for_group(group_id, selected_year, months_list):
         INNER JOIN plan_annualplan AS ap ON mp.annual_plan_id = ap.id
         WHERE ap.group_id = :group_id 
         AND ap.year = :year
+        AND ap.plan_kind = :plan_kind
         AND mp.month IN ({months_str})
         GROUP BY mp.month
         ORDER BY mp.month
     """)
     with engine.connect() as connection:
-        result = connection.execute(query, {"group_id": group_id, "year": selected_year}).mappings()
+        result = connection.execute(
+            query, {"group_id": group_id, "year": selected_year, "plan_kind": kind}
+        ).mappings()
         plan_by_months = {}
         for row in result:
             plan_by_months[row["month"]] = (row["plan_quantity"] or 0, float(row["plan_amount"] or 0.0))
@@ -1079,13 +1138,14 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
                          treatment_start=None,
                          treatment_end=None,
                          status_list=None,
-                         include_status4_override=False):
+                         include_status4_override=False,
+                         plan_kind='internal'):
     base = _call_base_query(selected_year, months_placeholder, inogorod, sanction, amount_null,
                             building, department, profile, doctor,
                             input_start, input_end, treatment_start, treatment_end,
                             status_list, include_status4_override)
     # Получаем динамические условия из groupindicators
-    dynamic_conditions = get_dynamic_conditions(selected_year)
+    dynamic_conditions = get_dynamic_conditions(selected_year, plan_kind=plan_kind)
     
     # Парсим список месяцев из months_placeholder
     try:
@@ -1142,7 +1202,9 @@ def sql_query_indicators(selected_year, months_placeholder, inogorod, sanction, 
         plan_quantity = 0
         plan_amount = 0.0
         if group_id:
-            plan_quantity, plan_amount = get_plan_for_group(group_id, selected_year, months_list)
+            plan_quantity, plan_amount = get_plan_for_group(
+                group_id, selected_year, months_list, plan_kind=plan_kind
+            )
         
         # Используем правильную логику группировки статусов как в svpod
         union_query = f"""

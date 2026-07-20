@@ -92,13 +92,19 @@ def inogorod_table_styles(row_count):
 
 
 def get_level_options(parent_id=None):
-    """Возвращает список опций для выбора уровня."""
+    """Возвращает список опций для выбора уровня (по алфавиту)."""
     if parent_id is None:
-        query = "SELECT DISTINCT id, name FROM plan_groupindicators WHERE parent_id IS NULL"
+        query = "SELECT DISTINCT id, name FROM plan_groupindicators WHERE parent_id IS NULL ORDER BY name"
     else:
-        query = f"SELECT id, name FROM plan_groupindicators WHERE parent_id = {parent_id}"
+        query = f"SELECT id, name FROM plan_groupindicators WHERE parent_id = {int(parent_id)} ORDER BY name"
     levels = pd.read_sql(query, engine)
     return [{'label': level['name'], 'value': level['id']} for _, level in levels.iterrows()]
+
+
+PLAN_KIND_OPTIONS = [
+    {"label": "Внутренний", "value": "internal"},
+    {"label": "ТФОМС", "value": "tfoms"},
+]
 
 
 # Кэшированная функция для SQL-запроса индикаторов
@@ -107,7 +113,7 @@ def get_cached_indicators_query(selected_year, months_placeholder, inogorod, san
                                building_ids_tuple, department_ids_tuple, value_profile_tuple, selected_doctor_ids_tuple,
                                start_date_input_formatted, end_date_input_formatted,
                                start_date_treatment_formatted, end_date_treatment_formatted,
-                               selected_status_tuple, include_status4_override, cache_key):
+                               selected_status_tuple, include_status4_override, plan_kind, cache_key):
     """Кэшированный результат SQL-запроса для ускорения повторных запросов"""
     # Преобразуем кортежи обратно в списки для передачи в SQL-функции
     building_ids = list(building_ids_tuple) if building_ids_tuple else None
@@ -125,7 +131,8 @@ def get_cached_indicators_query(selected_year, months_placeholder, inogorod, san
         start_date_input_formatted, end_date_input_formatted,
         start_date_treatment_formatted, end_date_treatment_formatted,
         status_list=selected_status_tuple,
-        include_status4_override=include_status4_override
+        include_status4_override=include_status4_override,
+        plan_kind=plan_kind or "tfoms",
     )
 
 
@@ -183,7 +190,20 @@ current_report_tab = html.Div(
                                             style={"width": "100%"}
                                         ),
                                     ],
-                                    width=3
+                                    width=2
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Версия плана:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'dropdown-plan-kind-{type_page}',
+                                            options=PLAN_KIND_OPTIONS,
+                                            value='tfoms',
+                                            clearable=False,
+                                            style={"width": "100%"}
+                                        ),
+                                    ],
+                                    width=2
                                 ),
                                 dbc.Col(
                                     [
@@ -218,7 +238,21 @@ current_report_tab = html.Div(
                                         value=None
                                     ),
                                     width=2
-                                )
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Корпус:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'dropdown-building-{type_page}',
+                                            options=get_available_buildings(),
+                                            placeholder="Все корпуса",
+                                            clearable=True,
+                                            multi=True,
+                                            style={"width": "100%"},
+                                        ),
+                                    ],
+                                    width=3
+                                ),
                             ], style={'margin-bottom': '10px'})
                         ]
                     ),
@@ -229,6 +263,15 @@ current_report_tab = html.Div(
             ),
             style={"margin": "0 auto", "padding": "0rem"}
         ),
+        dbc.Row([
+            dbc.Col([
+                html.Div(
+                    "Факт по корпусу — через отделение врача. "
+                    "При выборе корпуса план берётся из распределения по корпусам.",
+                    className="text-muted small px-2",
+                ),
+            ], width=12)
+        ]),
         dbc.Row([
             dbc.Col([
                 html.Div(id=f'loading-status-{type_page}', style={'text-align': 'center', 'margin': '10px 0'}),
@@ -331,6 +374,33 @@ cumulative_report_tab = html.Div(
                                             value='volumes',
                                             clearable=False,
                                             style={"width": "100%"}
+                                        ),
+                                    ],
+                                    width=2
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Версия плана:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'dropdown-plan-kind-cumulative-{type_page}',
+                                            options=PLAN_KIND_OPTIONS,
+                                            value='tfoms',
+                                            clearable=False,
+                                            style={"width": "100%"}
+                                        ),
+                                    ],
+                                    width=2
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Корпус:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'dropdown-building-cumulative-{type_page}',
+                                            options=get_available_buildings(),
+                                            placeholder="Все корпуса",
+                                            clearable=True,
+                                            multi=True,
+                                            style={"width": "100%"},
                                         ),
                                     ],
                                     width=2
@@ -452,7 +522,19 @@ indicators_tab = html.Div(
                             ),
                             dbc.Row(
                                 [
-                                    dbc.Col(filter_status(type_page_indicators), width=6),
+                                    dbc.Col(filter_status(type_page_indicators), width=4),
+                                    dbc.Col(
+                                        [
+                                            html.Label("Версия плана:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                            dcc.Dropdown(
+                                                id=f'dropdown-plan-kind-{type_page_indicators}',
+                                                options=PLAN_KIND_OPTIONS,
+                                                value='tfoms',
+                                                clearable=False,
+                                            ),
+                                        ],
+                                        width=2
+                                    ),
                                     dbc.Col(
                                         dbc.Switch(
                                             id=f'show-plan-{type_page_indicators}',
@@ -845,21 +927,73 @@ def display_dynamic_dropdowns(values):
     return dropdowns
 
 
-def fetch_plan_data(selected_level, year, mode='volumes'):
-    """Получение плановых данных (помесячно) из БД."""
+def fetch_plan_data(selected_level, year, mode='volumes', plan_kind='internal', building_ids=None):
+    """Получение плановых данных (помесячно).
+    Без building_ids — план МО (MonthlyPlan).
+    С building_ids — сумма планов корпусов (MonthlyBuildingPlan).
+    """
     plan_field = "quantity" if mode == 'volumes' else "amount"
+    kind = (plan_kind or "tfoms").strip().lower()
+    if kind in ("тфомс",):
+        kind = "tfoms"
+    if kind not in ("internal", "tfoms"):
+        kind = "tfoms"
+
+    if building_ids:
+        if not isinstance(building_ids, (list, tuple)):
+            building_ids = [building_ids]
+        building_ids = [int(b) for b in building_ids if b is not None]
+        if building_ids:
+            ids_sql = ",".join(str(b) for b in building_ids)
+            query = text(f"""
+                SELECT mbp.month, COALESCE(SUM(mbp.{plan_field}), 0) AS plan
+                FROM plan_monthlybuildingplan AS mbp
+                INNER JOIN plan_buildingplan AS bp ON bp.id = mbp.building_plan_id
+                INNER JOIN plan_annualplan AS ap ON ap.id = bp.annual_plan_id
+                WHERE ap.group_id = :selected_level
+                  AND ap.year = :year
+                  AND ap.plan_kind = :plan_kind
+                  AND bp.building_id IN ({ids_sql})
+                GROUP BY mbp.month
+                ORDER BY mbp.month
+            """)
+            with engine.connect() as connection:
+                result = connection.execute(
+                    query, {"selected_level": selected_level, "year": year, "plan_kind": kind}
+                ).mappings()
+                return {row["month"]: row["plan"] for row in result}
+
     query = text(f"""
         SELECT mp.month, SUM(mp.{plan_field}) AS plan
         FROM plan_monthlyplan AS mp
         INNER JOIN plan_annualplan AS ap ON mp.annual_plan_id = ap.id
         WHERE ap.group_id = :selected_level AND ap.year = :year
+          AND ap.plan_kind = :plan_kind
         GROUP BY mp.month
         ORDER BY mp.month
     """)
     with engine.connect() as connection:
-        result = connection.execute(query, {"selected_level": selected_level, "year": year}).mappings()
-        plan_data = {row["month"]: row["plan"] for row in result}
-    return plan_data
+        result = connection.execute(
+            query, {"selected_level": selected_level, "year": year, "plan_kind": kind}
+        ).mappings()
+        return {row["month"]: row["plan"] for row in result}
+
+
+def _normalize_building_ids(building_ids):
+    """Приводит значение dropdown корпуса к list[int] или None."""
+    if not building_ids:
+        return None
+    if not isinstance(building_ids, (list, tuple)):
+        building_ids = [building_ids]
+    out = []
+    for b in building_ids:
+        if b is None or b == "":
+            continue
+        try:
+            out.append(int(b))
+        except (TypeError, ValueError):
+            continue
+    return out or None
 
 
 @app.callback(
@@ -874,14 +1008,18 @@ def fetch_plan_data(selected_level, year, mode='volumes'):
     State(f'unique-toggle-{type_page}', 'value'),
     State(f'dropdown-year-{type_page}', 'value'),
     State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
-    State(f'month-selector-{type_page}', 'value')
+    State(f'month-selector-{type_page}', 'value'),
+    State(f'dropdown-plan-kind-{type_page}', 'value'),
+    State(f'dropdown-building-{type_page}', 'value'),
 )
 def update_table_with_plan_and_balance(n_clicks,
                                        mode,
                                        unique_flag,
                                        selected_year,
                                        selected_levels,
-                                       selected_month):
+                                       selected_month,
+                                       plan_kind,
+                                       building_ids):
     if n_clicks is None:
         raise PreventUpdate
 
@@ -895,6 +1033,7 @@ def update_table_with_plan_and_balance(n_clicks,
     filter_conditions = get_filter_conditions([selected_level], selected_year)
 
     unique = unique_flag if unique_flag is not None else False
+    buildings = _normalize_building_ids(building_ids)
 
     # Загружаем фактические данные с измерением времени
     start_time = time.time()
@@ -904,7 +1043,8 @@ def update_table_with_plan_and_balance(n_clicks,
                       group_id=[selected_level],
                       filter_conditions=filter_conditions,
                       mode=mode,
-                      unique_flag=unique)
+                      unique_flag=unique,
+                      building=buildings)
     )
     execution_time = time.time() - start_time
     # Добавляем общую сумму "исправлено"
@@ -915,8 +1055,14 @@ def update_table_with_plan_and_balance(n_clicks,
         m = row["month"]
         fact_dict[m] = row
 
-    # Загружаем плановые данные
-    plan_data = fetch_plan_data(selected_level, selected_year, mode)
+    # Загружаем плановые данные (МО или сумма выбранных корпусов)
+    plan_data = fetch_plan_data(
+        selected_level,
+        selected_year,
+        mode,
+        plan_kind=plan_kind or "tfoms",
+        building_ids=buildings,
+    )
 
     today = datetime.today()
     default_month = today.month - 1 if today.day <= 5 else today.month
@@ -1085,7 +1231,13 @@ def update_table_with_plan_and_balance(n_clicks,
     record_count = len([r for r in fact_data if isinstance(r.get("month"), int)])
     status_text = f"Запрос выполнен за {time_text}. Найдено записей: {record_count}"
 
-    return columns, fact_data, loading_output, filter_conditions, status_text
+    applied = filter_conditions or ""
+    if buildings:
+        applied = (applied + "; " if applied else "") + f"корпус id={buildings}"
+    kind_label = "ТФОМС" if (plan_kind or "tfoms") == "tfoms" else "внутренний"
+    applied = (applied + "; " if applied else "") + f"план: {kind_label}"
+
+    return columns, fact_data, loading_output, applied, status_text
 
 
 # Callback для активации кнопки детализации при выборе строки
@@ -1119,11 +1271,12 @@ def update_details_button_state(active_cell):
         State(f'result-table1-{type_page}', 'active_cell'),
         State(f'dropdown-year-{type_page}', 'value'),
         State(f'month-selector-{type_page}', 'value'),
-        State({'type': 'dynamic-dropdown', 'index': ALL}, 'value')
+        State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
+        State(f'dropdown-building-{type_page}', 'value'),
     ]
 )
 def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selected_month, 
-                      selected_levels):
+                      selected_levels, building_ids):
     if not n_clicks or not active_cell or not table_data:
         return '', [], []
     
@@ -1153,6 +1306,7 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
         
         # Получаем условия фильтрации
         filter_conditions = get_filter_conditions(group_ids, selected_year)
+        buildings = _normalize_building_ids(building_ids)
         
         # Определяем месяц для фильтрации (изначально)
         filter_month = selected_month if selected_month is not None else None
@@ -1253,7 +1407,14 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
             status_filter = ['0', '13', '17']  # Отменено
         
         # Выполняем запрос детализации
-        sql_query = sql_query_svpod_details(selected_year, filter_month, group_ids, filter_conditions, status_filter)
+        sql_query = sql_query_svpod_details(
+            selected_year,
+            filter_month,
+            group_ids,
+            filter_conditions,
+            status_filter,
+            building=buildings,
+        )
         
         columns, data = TableUpdater.query_to_df(engine, sql_query)
         
@@ -1294,9 +1455,11 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
     State(f'mode-toggle-cumulative-{type_page}', 'value'),
     State(f'payment-type-toggle-cumulative-{type_page}', 'value'),
     State(f'reporting-month-cumulative-{type_page}', 'value'),
-    State(f'unique-toggle-cumulative-{type_page}', 'value')
+    State(f'unique-toggle-cumulative-{type_page}', 'value'),
+    State(f'dropdown-plan-kind-cumulative-{type_page}', 'value'),
+    State(f'dropdown-building-cumulative-{type_page}', 'value'),
 )
-def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payment_type, reporting_month, unique_flag):
+def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payment_type, reporting_month, unique_flag, plan_kind, building_ids):
     if n_clicks is None:
         raise PreventUpdate
     
@@ -1326,6 +1489,8 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
         mode = mode or 'volumes'
         report_type = report_type or 'cumulative'
         payment_type = payment_type or 'presented'
+        plan_kind = plan_kind or 'tfoms'
+        buildings = _normalize_building_ids(building_ids)
         
         # Определяем отчетный месяц
         today = datetime.today()
@@ -1342,7 +1507,9 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
                 mode=mode,
                 unique_flag=unique,
                 reporting_month=current_reporting_month,
-                payment_type=payment_type
+                payment_type=payment_type,
+                plan_kind=plan_kind,
+                building=buildings,
             )
             
             if df.empty:
@@ -1429,7 +1596,7 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
             # Режим "По месяцам" - нужно получить группы и показать данные по месяцам для каждой
             from apps.analytical_app.pages.economist.svpod.query import get_groups_for_cumulative_report
             
-            groups = get_groups_for_cumulative_report(selected_year)
+            groups = get_groups_for_cumulative_report(selected_year, plan_kind=plan_kind)
             
             if groups.empty:
                 execution_time = time.time() - start_time
@@ -1475,7 +1642,8 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
                                   group_id=[group_id],
                                   filter_conditions=filter_conditions,
                                   mode=mode,
-                                  unique_flag=unique)
+                                  unique_flag=unique,
+                                  building=buildings)
                 )
                 
                 fact_dict = {}
@@ -1483,7 +1651,9 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
                     m = row["month"]
                     fact_dict[m] = row
                 
-                plan_data = fetch_plan_data(group_id, selected_year, mode)
+                plan_data = fetch_plan_data(
+                    group_id, selected_year, mode, plan_kind=plan_kind, building_ids=buildings
+                )
                 total_ispravleno_all_months = sum(row.get("исправлено", 0) or 0 for row in fact_data_list)
                 
                 incoming_balance = 0
@@ -1797,13 +1967,14 @@ def update_selected_period_list_indicators(selected_months_range, selected_year,
      State(f'status-individual-dropdown-{type_page_indicators}', 'value'),
      State(f'show-plan-{type_page_indicators}', 'value'),
      State(f'include-status4-{type_page_indicators}', 'value'),
+     State(f'dropdown-plan-kind-{type_page_indicators}', 'value'),
      ]
 )
 def update_table_indicators(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
                  amount_null, building_ids, department_ids, start_date_input, end_date_input,
                  start_date_treatment, end_date_treatment, report_type,
                  status_mode, selected_status_group, selected_individual_statuses, show_plan,
-                 include_status4_override):
+                 include_status4_override, plan_kind):
     if n_clicks is None:
         raise exceptions.PreventUpdate
 
@@ -1875,7 +2046,9 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
             tuple(selected_doctor_ids) if selected_doctor_ids else None,
             start_date_input_formatted, end_date_input_formatted,
             start_date_treatment_formatted, end_date_treatment_formatted,
-            selected_status_tuple, include_status4, cache_key
+            selected_status_tuple, include_status4,
+            plan_kind or "tfoms",
+            cache_key,
         )
 
         status_text = "Выполнение запроса к базе данных..."
@@ -1883,11 +2056,17 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
 
         start_time = time.time()
         columns1, data1 = TableUpdater.query_to_df(engine, sql_query)
+        if data1:
+            data1 = sorted(
+                data1,
+                key=lambda r: str(r.get("type") or r.get("Группа показателей") or "").casefold(),
+            )
         
         # Добавляем расчет нарастающего плана для каждой группы (только если show_plan включен)
         if data1 and show_plan:
             # Получаем список месяцев
             months_list = list(range(selected_period[0], selected_period[1] + 1))
+            kind = plan_kind or "tfoms"
             
             # Для каждой строки рассчитываем нарастающий план
             for row in data1:
@@ -1900,7 +2079,9 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
                     # Нужны планы за все месяцы от 1 до последнего выбранного, чтобы правильно рассчитать входящие остатки
                     last_month = max(months_list) if months_list else 12
                     all_months_to_last = list(range(1, last_month + 1))
-                    plan_by_months = get_plan_by_months_for_group(group_id, selected_year, all_months_to_last)
+                    plan_by_months = get_plan_by_months_for_group(
+                        group_id, selected_year, all_months_to_last, plan_kind=kind
+                    )
                     
                     # Рассчитываем нарастающий план с учетом входящего остатка
                     # Логика как в "Подробно по индикатору": план = план 1/12 + входящий остаток
