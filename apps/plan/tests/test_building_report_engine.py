@@ -38,6 +38,25 @@ class BuildingReportEngineUnitTests(SimpleTestCase):
         # balance after m1 = 100-80=20; m2 plan=100+20=120, fact=65, balance=55
         self.assertEqual(balance, 55)
 
+    def test_accumulate_pair_month_mode(self):
+        plan = {1: 100, 2: 200, 3: 150}
+        fact_rows = [
+            {"month": 1, "оплачено": 80, "новые": 0, "в_тфомс": 0, "исправлено": 0},
+            {"month": 2, "оплачено": 50, "новые": 0, "в_тфомс": 0, "исправлено": 0},
+            {"month": 3, "оплачено": 40, "новые": 5, "в_тфомс": 0, "исправлено": 0},
+        ]
+        months, total_plan, total_fact, balance = accumulate_pair(
+            plan,
+            fact_rows,
+            reporting_month=3,
+            payment_type="presented",
+            period_mode="month",
+        )
+        self.assertEqual(len(months), 3)
+        self.assertEqual(total_plan, 150)
+        self.assertEqual(total_fact, 45)
+        self.assertEqual(balance, 105)
+
     def test_pivot_indicator_building(self):
         long_df = pd.DataFrame(
             [

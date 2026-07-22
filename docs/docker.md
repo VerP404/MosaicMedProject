@@ -14,38 +14,43 @@
 
 ```bash
 cd /path/to/MosaicMedProject
-cp .env.docker.example .env
-# Отредактируйте POSTGRES_PASSWORD и SECRET_KEY
+cp .env.docker.example .env.docker
+# Отредактируйте POSTGRES_PASSWORD и SECRET_KEY в .env.docker
 
 mkdir -p backup
 # Положите дамп: backup/mosaicmed_backup.sql
 
-docker compose up -d db
+docker compose --env-file .env.docker up -d db
 # Дождитесь healthy: docker compose ps
 
 # Восстановление БД (plain SQL)
-docker compose exec -T db psql -U postgres -d mosaicmed -f /backup/mosaicmed_backup.sql
+docker compose --env-file .env.docker exec -T db psql -U postgres -d mosaicmed -f /backup/mosaicmed_backup.sql
 
 # При необходимости дельта-миграции (если код новее дампа)
-docker compose run --rm mosaicmed python manage.py migrate --noinput
+docker compose --env-file .env.docker run --rm mosaicmed python manage.py migrate --noinput
 
-docker compose up -d --build mosaicmed
-docker compose logs -f mosaicmed
+docker compose --env-file .env.docker up -d --build mosaicmed
+docker compose --env-file .env.docker logs -f mosaicmed
 ```
 
 Обновление на сервере: [`scripts/deploy-docker.sh`](../scripts/deploy-docker.sh).
 
 ## Порты (хост)
 
-| Сервис | Переменная | По умолчанию |
-|--------|------------|--------------|
-| Django / admin | `DJANGO_PORT` | 8000 |
-| Аналитика Dash | `PORT_DASH` | 5000 |
-| Chief Dash | `PORT_DASH_CHIEF` | 5001 |
-| Masterd | `MASTERD_PORT` | 5020 |
-| Dagster UI | `DAGSTER_PORT` | 3000 |
-| Подбор услуг ДН | `PORT_DASH_DN` | 7777 |
-| PostgreSQL | `POSTGRES_PUBLISH_PORT` | 5432 |
+Внутри контейнера порты как в `update_MosaicMed.sh` (8000, 5000, 5001, 5020, 3000, 7777).
+На хост по умолчанию пробрасываются **5566+**, чтобы не конфликтовать с Portal и нативным стендом:
+
+| Сервис | Переменная | Хост (default) | В контейнере |
+|--------|------------|----------------|--------------|
+| Django / admin | `DJANGO_PORT` | 5566 | 8000 |
+| Аналитика Dash | `PORT_DASH_PUBLISH` | 5567 | 5000 |
+| Chief Dash | `PORT_DASH_CHIEF_PUBLISH` | 5568 | 5001 |
+| Masterd | `MASTERD_PORT_PUBLISH` | 5569 | 5020 |
+| Dagster UI | `DAGSTER_PORT_PUBLISH` | 5570 | 3000 |
+| Подбор услуг ДН | `PORT_DASH_DN_PUBLISH` | 5571 | 7777 |
+| PostgreSQL | `POSTGRES_PUBLISH_PORT` | 55433 | 5432 |
+
+Не занимать на хосте `5432`, `5430`, `55432` (часто заняты Portal / старым Postgres).
 
 ## Volumes
 
@@ -92,7 +97,9 @@ docker compose exec db pg_restore -U postgres -d mosaicmed --clean --if-exists /
 
 ## Переменные окружения
 
-Шаблон: [`.env.docker.example`](../.env.docker.example).
+Шаблон: [`.env.docker.example`](../.env.docker.example) → скопировать в **`.env.docker`** (не путать с нативным `.env` разработчика).
+
+Запуск всегда с `--env-file .env.docker`.
 
 Django prod читает `Name`, `USER`, `PASSWORD`, `HOST`, `PORT` — в Compose для `mosaicmed` задаётся `HOST=db`.
 

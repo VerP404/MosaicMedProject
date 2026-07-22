@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:16-alpine
     env_file:
-      - .env
+      - .env.docker
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-mosaicmed}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -11,7 +11,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backup:/backup:ro
     ports:
-      - "${POSTGRES_PUBLISH_PORT:-5432}:5432"
+      # Хост ≠ 5432/5430/55432 (заняты Portal / старым mosaicmed)
+      - "${POSTGRES_PUBLISH_PORT:-55433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mosaicmed}"]
       interval: 10s
@@ -24,9 +25,10 @@ services:
       context: .
       dockerfile: Dockerfile
     env_file:
-      - .env
+      - .env.docker
     environment:
       DJANGO_ENV: prod
+      # БД внутри docker-сети (не из .env разработчика)
       HOST: db
       Name: ${POSTGRES_DB:-mosaicmed}
       USER: ${POSTGRES_USER:-postgres}
@@ -38,6 +40,7 @@ services:
       DB_HOST: db
       DB_PORT: "5432"
       DAGSTER_HOME: /app/mosaic_conductor/dagster_home
+      # Внутри контейнера — как в update_MosaicMed.sh
       DAGSTER_PORT: "3000"
       MASTERD_PORT: "5020"
       PORT_DASH: "5000"
@@ -51,12 +54,13 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "${DJANGO_PORT:-8000}:8000"
-      - "${PORT_DASH:-5000}:5000"
-      - "${PORT_DASH_CHIEF:-5001}:5001"
-      - "${MASTERD_PORT:-5020}:5020"
-      - "${DAGSTER_PORT:-3000}:3000"
-      - "${PORT_DASH_DN:-7777}:7777"
+      # Хост: 5566+ (нативные 8000/5000/... могут быть заняты)
+      - "${DJANGO_PORT:-5566}:8000"
+      - "${PORT_DASH_PUBLISH:-5567}:5000"
+      - "${PORT_DASH_CHIEF_PUBLISH:-5568}:5001"
+      - "${MASTERD_PORT_PUBLISH:-5569}:5020"
+      - "${DAGSTER_PORT_PUBLISH:-5570}:3000"
+      - "${PORT_DASH_DN_PUBLISH:-5571}:7777"
     volumes:
       - mosaic_etl_data:/app/mosaic_conductor/etl/data
       - mosaic_dagster_home:/app/mosaic_conductor/dagster_home

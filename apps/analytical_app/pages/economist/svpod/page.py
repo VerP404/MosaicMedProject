@@ -265,15 +265,6 @@ current_report_tab = html.Div(
         ),
         dbc.Row([
             dbc.Col([
-                html.Div(
-                    "Факт по корпусу — через отделение врача. "
-                    "При выборе корпуса план берётся из распределения по корпусам.",
-                    className="text-muted small px-2",
-                ),
-            ], width=12)
-        ]),
-        dbc.Row([
-            dbc.Col([
                 html.Div(id=f'loading-status-{type_page}', style={'text-align': 'center', 'margin': '10px 0'}),
             ], width=12)
         ]),
@@ -780,6 +771,19 @@ plans_tab = html.Div(
                                     width=2
                                 ),
                                 dbc.Col(filter_years(type_page_plans), width=2),
+                                dbc.Col(
+                                    [
+                                        html.Label("Версия плана:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'dropdown-plan-kind-{type_page_plans}',
+                                            options=PLAN_KIND_OPTIONS,
+                                            value="tfoms",
+                                            clearable=False,
+                                            style={"width": "100%"},
+                                        ),
+                                    ],
+                                    width=2,
+                                ),
                             ]),
                         ]
                     ),
@@ -2311,17 +2315,18 @@ def show_indicators_details(n_clicks, table_data, active_cell,
         Input(f'update-button-{type_page_plans}', 'n_clicks')
     ],
     [
-        State(f'dropdown-year-{type_page_plans}', 'value')
+        State(f'dropdown-year-{type_page_plans}', 'value'),
+        State(f'dropdown-plan-kind-{type_page_plans}', 'value'),
     ]
 )
-def update_plans_table(n_clicks, selected_year):
+def update_plans_table(n_clicks, selected_year, plan_kind):
     if n_clicks is None:
         return [], [], []
     
     if isinstance(selected_year, str):
         selected_year = int(selected_year)
     
-    sql_query = sql_query_plans(selected_year)
+    sql_query = sql_query_plans(selected_year, plan_kind=plan_kind or "tfoms")
     columns, data = TableUpdater.query_to_df(engine, sql_query)
     
     # Создаем стили для выделения строк с одинаковым показателем

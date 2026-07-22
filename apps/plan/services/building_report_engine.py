@@ -19,6 +19,13 @@ VALID_LAYOUTS = (
     LAYOUT_INDICATOR_BUILDING_MONTHS,
 )
 
+PLAN_SCOPE_BUILDINGS = "buildings"
+PLAN_SCOPE_ORG_ONLY = "org_only"
+PERIOD_MODE_CUMULATIVE = "cumulative"
+PERIOD_MODE_MONTH = "month"
+ORG_BUILDING_ID = 0
+ORG_BUILDING_LABEL = "БУЗ"
+
 
 @dataclass
 class BuildReportParams:
@@ -34,6 +41,8 @@ class BuildReportParams:
     unique_flag: bool = False
     require_building_plan: bool = True
     plan_kind: str = "internal"
+    plan_scope: str = PLAN_SCOPE_BUILDINGS  # buildings | org_only
+    period_mode: str = PERIOD_MODE_CUMULATIVE  # cumulative | month
     columns: Sequence[str] = field(
         default_factory=lambda: ["plan", "fact", "pct", "balance"]
     )
@@ -75,23 +84,43 @@ def _default_reporting_month() -> int:
     return today.month - 1 if today.day <= 5 else today.month
 
 
+def _normalize_plan_kind(plan_kind: str | None) -> str:
+    kind = (plan_kind or "internal").strip().lower()
+    if kind in ("tfoms", "тфомс"):
+        return "tfoms"
+    return "internal"
+
+
 def resolve_indicator_ids(
-    engine, year: int, indicator_ids: Sequence[int] | None, plan_kind: str = "internal"
+    engine,
+    year: int,
+    indicator_ids: Sequence[int] | None,
+    plan_kind: str = "internal",
+    plan_scope: str = PLAN_SCOPE_BUILDINGS,
 ) -> list[int]:
     if indicator_ids:
         return [int(x) for x in indicator_ids]
-    kind = (plan_kind or "internal").strip().lower()
-    if kind not in ("internal", "tfoms"):
-        kind = "internal"
-    query = text(
-        """
-        SELECT DISTINCT ap.group_id AS id
-        FROM plan_annualplan ap
-        INNER JOIN plan_buildingplan bp ON bp.annual_plan_id = ap.id
-        WHERE ap.year = :year AND ap.plan_kind = :plan_kind
-        ORDER BY ap.group_id
-        """
-    )
+    kind = _normalize_plan_kind(plan_kind)
+    scope = (plan_scope or PLAN_SCOPE_BUILDINGS).strip().lower()
+    if scope == PLAN_SCOPE_ORG_ONLY:
+        query = text(
+            """
+            SELECT DISTINCT ap.group_id AS id
+            FROM plan_annualplan ap
+            WHERE ap.year = :year AND ap.plan_kind = :plan_kind
+            ORDER BY ap.group_id
+            """
+        )
+    else:
+        query = text(
+            """
+            SELECT DISTINCT ap.group_id AS id
+            FROM plan_annualplan ap
+            INNER JOIN plan_buildingplan bp ON bp.annual_plan_id = ap.id
+            WHERE ap.year = :year AND ap.plan_kind = :plan_kind
+            ORDER BY ap.group_id
+            """
+        )
     with engine.connect() as conn:
         rows = conn.execute(query, {"year": year, "plan_kind": kind}).fetchall()
     return [int(r[0]) for r in rows]
@@ -138,9 +167,7 @@ def fetch_building_plans(
     plan_field = "quantity" if metric == "volumes" else "amount"
     group_sql = ",".join(str(int(i)) for i in group_ids)
     building_filter = ""
-    kind = (plan_kind or "internal").strip().lower()
-    if kind not in ("internal", "tfoms"):
-        kind = "internal"
+    kind = _normalize_plan_kind(plan_kind)
     params: dict[str, Any] = {"year": year, "m": reporting_month, "plan_kind": kind}
     if building_ids:
         building_filter = "AND bp.building_id IN (" + ",".join(str(int(i)) for i in building_ids) + ")"
@@ -166,6 +193,45 @@ def fetch_building_plans(
         """
     )
     return pd.read_sql(query, engine, params=params)
+
+
+def fetch_org_plans(
+    engine,
+    year: int,
+    reporting_month: int,
+    group_ids: Sequence[int],
+    metric: str,
+    plan_kind: str = "internal",
+) -> pd.DataFrame:
+    """План МО по месяцам: group_id, building_id=0, building_name=БУЗ, month, plan."""
+    if not group_ids:
+        return pd.DataFrame(
+            columns=["group_id", "building_id", "building_name", "month", "plan"]
+        )
+
+    plan_field = "quantity" if metric == "volumes" else "amount"
+    group_sql = ",".join(str(int(i)) for i in group_ids)
+    kind = _normalize_plan_kind(plan_kind)
+    query = text(
+        f"""
+        SELECT
+            ap.group_id,
+            {ORG_BUILDING_ID} AS building_id,
+            '{ORG_BUILDING_LABEL}' AS building_name,
+            mp.month,
+            COALESCE(mp.{plan_field}, 0) AS plan
+        FROM plan_monthlyplan mp
+        INNER JOIN plan_annualplan ap ON ap.id = mp.annual_plan_id
+        WHERE ap.year = :year
+          AND ap.plan_kind = :plan_kind
+          AND ap.group_id IN ({group_sql})
+          AND mp.month BETWEEN 1 AND :m
+        ORDER BY ap.group_id, mp.month
+        """
+    )
+    return pd.read_sql(
+        query, engine, params={"year": year, "m": reporting_month, "plan_kind": kind}
+    )
 
 
 def fetch_fact_by_building(
@@ -196,16 +262,45 @@ def fetch_fact_by_building(
     return rows or []
 
 
+def fetch_fact_org(
+    engine,
+    year: int,
+    group_id: int,
+    metric: str,
+    unique_flag: bool,
+    filter_conditions: str | None,
+) -> list[dict]:
+    """Факт по МО (без разбивки по корпусам) для одного индикатора."""
+    from apps.analytical_app.callback import TableUpdater
+    from apps.analytical_app.pages.economist.svpod.query import sql_query_rep
+
+    mode = "finance" if metric == "finance" else "volumes"
+    months = ",".join(str(m) for m in range(1, 13))
+    sql = sql_query_rep(
+        year,
+        group_id,
+        months_placeholder=months,
+        filter_conditions=filter_conditions,
+        mode=mode,
+        unique_flag=unique_flag,
+    )
+    _cols, rows = TableUpdater.query_to_df(engine, sql)
+    return rows or []
+
+
 def accumulate_pair(
     plan_by_month: dict[int, float],
     fact_rows: list[dict],
     reporting_month: int,
     payment_type: str,
     period_closed: bool = False,
+    period_mode: str = PERIOD_MODE_CUMULATIVE,
 ) -> tuple[list[dict], float, float, float]:
     """
-    Возвращает (month_rows, cumulative_plan, cumulative_fact, balance).
+    Возвращает (month_rows, total_plan, total_fact, balance).
     month_rows: month, plan, fact, balance, pct
+    period_mode=cumulative — нарастающий итог Jan..reporting_month;
+    period_mode=month — итог только за reporting_month.
     """
     effective_payment = resolve_payment_type(payment_type, period_closed)
     fact_by_month: dict[int, dict] = {}
@@ -237,7 +332,59 @@ def accumulate_pair(
             }
         )
 
+    mode = (period_mode or PERIOD_MODE_CUMULATIVE).strip().lower()
+    if mode == PERIOD_MODE_MONTH:
+        m = reporting_month
+        month_data = fact_by_month.get(m, {})
+        month_plan_12 = float(plan_by_month.get(m, 0) or 0)
+        month_fact = _month_fact(month_data, m, reporting_month, effective_payment)
+        return month_rows, month_plan_12, month_fact, month_plan_12 - month_fact
+
     return month_rows, cumulative_plan, cumulative_fact, incoming_balance
+
+
+def _append_pair_rows(
+    long_rows: list[dict],
+    *,
+    group_id: int,
+    group_path: str,
+    building_id: int,
+    building_name: str,
+    month_rows: list[dict],
+    cum_plan: float,
+    cum_fact: float,
+    balance: float,
+) -> None:
+    pct = round(cum_fact / cum_plan * 100, 1) if cum_plan > 0 else 0.0
+    for mr in month_rows:
+        long_rows.append(
+            {
+                "group_id": int(group_id),
+                "group_path": group_path,
+                "building_id": building_id,
+                "building_name": building_name,
+                "month": mr["month"],
+                "plan": mr["plan"],
+                "fact": mr["fact"],
+                "balance": mr["balance"],
+                "pct": mr["pct"],
+                "is_total": False,
+            }
+        )
+    long_rows.append(
+        {
+            "group_id": int(group_id),
+            "group_path": group_path,
+            "building_id": building_id,
+            "building_name": building_name,
+            "month": None,
+            "plan": cum_plan,
+            "fact": cum_fact,
+            "balance": balance,
+            "pct": pct,
+            "is_total": True,
+        }
+    )
 
 
 def build_long_report(engine, params: BuildReportParams) -> pd.DataFrame:
@@ -252,25 +399,41 @@ def build_long_report(engine, params: BuildReportParams) -> pd.DataFrame:
     reporting_month = int(params.reporting_month or _default_reporting_month())
     reporting_month = max(1, min(12, reporting_month))
     metric = "finance" if params.metric == "finance" else "volumes"
+    scope = (params.plan_scope or PLAN_SCOPE_BUILDINGS).strip().lower()
 
-    group_ids = resolve_indicator_ids(engine, year, params.indicator_ids, params.plan_kind)
+    group_ids = resolve_indicator_ids(
+        engine,
+        year,
+        params.indicator_ids,
+        params.plan_kind,
+        plan_scope=scope,
+    )
     if not group_ids:
         return pd.DataFrame()
 
     paths = fetch_group_paths(engine, group_ids)
-    plans_df = fetch_building_plans(
-        engine,
-        year,
-        reporting_month,
-        group_ids,
-        params.building_ids,
-        metric,
-        plan_kind=params.plan_kind,
-    )
+    if scope == PLAN_SCOPE_ORG_ONLY:
+        plans_df = fetch_org_plans(
+            engine,
+            year,
+            reporting_month,
+            group_ids,
+            metric,
+            plan_kind=params.plan_kind,
+        )
+    else:
+        plans_df = fetch_building_plans(
+            engine,
+            year,
+            reporting_month,
+            group_ids,
+            params.building_ids,
+            metric,
+            plan_kind=params.plan_kind,
+        )
     if plans_df.empty:
         return pd.DataFrame()
 
-    # пары с ненулевым планом за период (если require_building_plan)
     period_totals = (
         plans_df.groupby(["group_id", "building_id", "building_name"], as_index=False)["plan"]
         .sum()
@@ -281,6 +444,7 @@ def build_long_report(engine, params: BuildReportParams) -> pd.DataFrame:
         return pd.DataFrame()
 
     long_rows: list[dict] = []
+    fetch_fact = fetch_fact_org if scope == PLAN_SCOPE_ORG_ONLY else fetch_fact_by_building
 
     for group_id in group_ids:
         pair_rows = period_totals[period_totals["group_id"] == group_id]
@@ -288,34 +452,45 @@ def build_long_report(engine, params: BuildReportParams) -> pd.DataFrame:
             continue
 
         filter_conditions = get_filter_conditions([group_id], year)
-        building_ids_for_group = [int(x) for x in pair_rows["building_id"].tolist()]
-        if params.building_ids:
-            allowed = {int(x) for x in params.building_ids}
-            building_ids_for_group = [b for b in building_ids_for_group if b in allowed]
-        if not building_ids_for_group:
-            continue
-
-        fact_all = fetch_fact_by_building(
-            engine,
-            year,
-            group_id,
-            building_ids_for_group,
-            metric,
-            params.unique_flag,
-            filter_conditions,
-        )
-
-        # group fact rows by building
-        fact_by_building: dict[Any, list[dict]] = {}
-        for row in fact_all:
-            bid = row.get("building_id")
-            fact_by_building.setdefault(bid, []).append(row)
-
-        group_plans = plans_df[plans_df["group_id"] == group_id]
         group_path = paths.get(int(group_id), str(group_id))
+        group_plans = plans_df[plans_df["group_id"] == group_id]
+
+        if scope == PLAN_SCOPE_ORG_ONLY:
+            building_ids_for_group = [ORG_BUILDING_ID]
+            fact_all = fetch_fact(
+                engine,
+                year,
+                group_id,
+                metric,
+                params.unique_flag,
+                filter_conditions,
+            )
+            fact_by_building = {ORG_BUILDING_ID: fact_all}
+        else:
+            building_ids_for_group = [int(x) for x in pair_rows["building_id"].tolist()]
+            if params.building_ids:
+                allowed = {int(x) for x in params.building_ids}
+                building_ids_for_group = [b for b in building_ids_for_group if b in allowed]
+            if not building_ids_for_group:
+                continue
+            fact_all = fetch_fact(
+                engine,
+                year,
+                group_id,
+                building_ids_for_group,
+                metric,
+                params.unique_flag,
+                filter_conditions,
+            )
+            fact_by_building: dict[Any, list[dict]] = {}
+            for row in fact_all:
+                bid = row.get("building_id")
+                fact_by_building.setdefault(bid, []).append(row)
 
         for _, pair in pair_rows.iterrows():
             bid = int(pair["building_id"])
+            if bid not in building_ids_for_group:
+                continue
             bname = pair["building_name"]
             plan_months = {
                 int(r["month"]): float(r["plan"] or 0)
@@ -327,39 +502,20 @@ def build_long_report(engine, params: BuildReportParams) -> pd.DataFrame:
                 reporting_month,
                 params.payment_type,
                 period_closed=params.period_closed,
+                period_mode=params.period_mode,
             )
             if params.require_building_plan and cum_plan <= 0:
                 continue
-
-            pct = round(cum_fact / cum_plan * 100, 1) if cum_plan > 0 else 0.0
-            for mr in month_rows:
-                long_rows.append(
-                    {
-                        "group_id": int(group_id),
-                        "group_path": group_path,
-                        "building_id": bid,
-                        "building_name": bname,
-                        "month": mr["month"],
-                        "plan": mr["plan"],
-                        "fact": mr["fact"],
-                        "balance": mr["balance"],
-                        "pct": mr["pct"],
-                        "is_total": False,
-                    }
-                )
-            long_rows.append(
-                {
-                    "group_id": int(group_id),
-                    "group_path": group_path,
-                    "building_id": bid,
-                    "building_name": bname,
-                    "month": None,
-                    "plan": cum_plan,
-                    "fact": cum_fact,
-                    "balance": balance,
-                    "pct": pct,
-                    "is_total": True,
-                }
+            _append_pair_rows(
+                long_rows,
+                group_id=int(group_id),
+                group_path=group_path,
+                building_id=bid,
+                building_name=bname,
+                month_rows=month_rows,
+                cum_plan=cum_plan,
+                cum_fact=cum_fact,
+                balance=balance,
             )
 
     return pd.DataFrame(long_rows)

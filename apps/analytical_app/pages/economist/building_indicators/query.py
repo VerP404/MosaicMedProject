@@ -14,8 +14,23 @@ from apps.plan.services.building_report_engine import (
     LAYOUT_INDICATOR_BUILDING,
     LAYOUT_BUILDING_INDICATOR,
     LAYOUT_INDICATOR_BUILDING_MONTHS,
+    PERIOD_MODE_CUMULATIVE,
+    PERIOD_MODE_MONTH,
+    PLAN_SCOPE_BUILDINGS,
+    PLAN_SCOPE_ORG_ONLY,
     VALID_LAYOUTS,
 )
+
+
+PLAN_SCOPE_OPTIONS = [
+    {"label": "По корпусам", "value": PLAN_SCOPE_BUILDINGS},
+    {"label": "Только БУЗ (план МО)", "value": PLAN_SCOPE_ORG_ONLY},
+]
+
+PERIOD_MODE_OPTIONS = [
+    {"label": "Нарастающе (с января)", "value": PERIOD_MODE_CUMULATIVE},
+    {"label": "За отчётный месяц", "value": PERIOD_MODE_MONTH},
+]
 
 
 def _normalize_plan_kind(plan_kind: str | None) -> str:
@@ -100,6 +115,48 @@ def list_indicator_options(
             label = f"{label}  [МО: {qty}; {mark}]"
         options.append({"label": label, "value": int(row["id"])})
     return options
+
+
+def indicator_ids_with_nonzero_plan(
+    year: int,
+    *,
+    metric: str = "volumes",
+    plan_kind: str = "internal",
+    plan_scope: str = PLAN_SCOPE_BUILDINGS,
+) -> list[int]:
+    """ID индикаторов с ненулевым планом за год (по выбранной метрике и версии плана)."""
+    plan_field = "quantity" if metric != "finance" else "amount"
+    kind = _normalize_plan_kind(plan_kind)
+    scope = (plan_scope or PLAN_SCOPE_BUILDINGS).strip().lower()
+    if scope == PLAN_SCOPE_ORG_ONLY:
+        query = text(
+            f"""
+            SELECT ap.group_id AS id
+            FROM plan_annualplan ap
+            LEFT JOIN plan_monthlyplan mp ON mp.annual_plan_id = ap.id
+            WHERE ap.year = :year AND ap.plan_kind = :plan_kind
+            GROUP BY ap.group_id
+            HAVING COALESCE(SUM(mp.{plan_field}), 0) > 0
+            ORDER BY ap.group_id
+            """
+        )
+    else:
+        query = text(
+            f"""
+            SELECT ap.group_id AS id
+            FROM plan_annualplan ap
+            INNER JOIN plan_buildingplan bp ON bp.annual_plan_id = ap.id
+            INNER JOIN plan_monthlybuildingplan mbp ON mbp.building_plan_id = bp.id
+            WHERE ap.year = :year AND ap.plan_kind = :plan_kind
+            GROUP BY ap.group_id
+            HAVING COALESCE(SUM(mbp.{plan_field}), 0) > 0
+            ORDER BY ap.group_id
+            """
+        )
+    df = pd.read_sql(query, engine, params={"year": int(year), "plan_kind": kind})
+    if df.empty:
+        return []
+    return [int(x) for x in df["id"].tolist()]
 
 
 def list_building_options() -> list[dict]:
@@ -422,9 +479,17 @@ def run_building_report(
     require_building_plan: bool = True,
     period_closed: bool = False,
     plan_kind: str = "internal",
+    plan_scope: str = PLAN_SCOPE_BUILDINGS,
+    period_mode: str = PERIOD_MODE_CUMULATIVE,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     if layout not in VALID_LAYOUTS:
         layout = LAYOUT_INDICATOR_BUILDING
+    scope = (plan_scope or PLAN_SCOPE_BUILDINGS).strip().lower()
+    if scope not in (PLAN_SCOPE_BUILDINGS, PLAN_SCOPE_ORG_ONLY):
+        scope = PLAN_SCOPE_BUILDINGS
+    mode = (period_mode or PERIOD_MODE_CUMULATIVE).strip().lower()
+    if mode not in (PERIOD_MODE_CUMULATIVE, PERIOD_MODE_MONTH):
+        mode = PERIOD_MODE_CUMULATIVE
     params = BuildReportParams(
         year=year,
         reporting_month=reporting_month,
@@ -436,6 +501,8 @@ def run_building_report(
         unique_flag=unique_flag,
         require_building_plan=require_building_plan,
         plan_kind=_normalize_plan_kind(plan_kind),
+        plan_scope=scope,
+        period_mode=mode,
     )
     return build_report(engine, params, layout=layout)
 

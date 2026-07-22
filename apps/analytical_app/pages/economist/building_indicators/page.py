@@ -19,11 +19,14 @@ from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.economist.building_indicators.query import (
     DEFAULT_PRINT_CONFIG,
     LAYOUT_OPTIONS,
+    PERIOD_MODE_OPTIONS,
     PLAN_KIND_OPTIONS,
+    PLAN_SCOPE_OPTIONS,
     delete_preset,
     delete_print_template,
     get_preset,
     get_print_template,
+    indicator_ids_with_nonzero_plan,
     list_indicator_options,
     list_presets,
     list_print_templates,
@@ -63,9 +66,8 @@ def _report_tab(presets, indicators, buildings, month_options, month_num):
                     [
                         html.H5("Шаблон набора (пресет)", className="mb-2"),
                         html.P(
-                            "Это не ввод планов. Здесь собираете набор индикаторов (+ корпуса, вид таблицы) "
-                            "и сохраняете шаблон, чтобы каждый раз быстро смотреть план/факт по этому набору.",
-                            className="text-muted mb-3",
+                            "Сохраните набор индикаторов, корпусов и параметров, чтобы быстро повторять отчёт.",
+                            className="text-muted small mb-2",
                         ),
                         dbc.Row(
                             [
@@ -76,216 +78,315 @@ def _report_tab(presets, indicators, buildings, month_options, month_num):
                                         placeholder="Выберите сохранённый шаблон",
                                         clearable=True,
                                     ),
-                                    width=4,
+                                    md=4,
                                 ),
                                 dbc.Col(
                                     dbc.Input(
                                         id=f"input-preset-name-{type_page}",
-                                        placeholder="Название шаблона, напр. Неотложка+ДВ4",
+                                        placeholder="Название шаблона",
                                         type="text",
                                     ),
-                                    width=3,
+                                    md=3,
                                 ),
                                 dbc.Col(
                                     dbc.ButtonGroup(
                                         [
-                                            dbc.Button("Загрузить", id=f"btn-load-preset-{type_page}", color="secondary"),
-                                            dbc.Button("Сохранить", id=f"btn-save-preset-{type_page}", color="primary"),
+                                            dbc.Button("Загрузить", id=f"btn-load-preset-{type_page}", color="secondary", size="sm"),
+                                            dbc.Button("Сохранить", id=f"btn-save-preset-{type_page}", color="primary", size="sm"),
                                             dbc.Button(
                                                 "Сохранить как",
                                                 id=f"btn-save-as-preset-{type_page}",
                                                 color="outline-primary",
+                                                size="sm",
                                             ),
-                                            dbc.Button("Удалить", id=f"btn-delete-preset-{type_page}", color="danger"),
+                                            dbc.Button("Удалить", id=f"btn-delete-preset-{type_page}", color="danger", size="sm"),
                                         ]
                                     ),
-                                    width=5,
+                                    md=5,
                                 ),
                             ],
                             className="g-2 align-items-center",
                         ),
                     ]
                 ),
-                className="mb-3 shadow-sm",
+                className="mb-2 shadow-sm",
             ),
             dbc.Accordion(
                 [
                     dbc.AccordionItem(
                         [
                             html.P(
-                                "1) Отметьте нужные индикаторы  2) при необходимости корпуса  "
-                                "3) вид таблицы / метрику  4) «Сформировать». "
-                                "Цифры плана берутся из вкладки «Ввод планов», факт — из оказанных услуг.",
-                                className="text-muted mb-3",
+                                "План — из «Ввод планов», факт — из оказанных услуг. Пустой список индикаторов = все с планом.",
+                                className="text-muted small mb-2",
                             ),
                             dbc.Row(
                                 [
                                     dbc.Col(
                                         [
-                                            html.Label("Какие индикаторы в отчёт", className="fw-bold"),
+                                            html.Label("Год", className="fw-bold small mb-1"),
+                                            filter_years(type_page),
+                                        ],
+                                        xs=6,
+                                        sm=4,
+                                        md=2,
+                                        lg=2,
+                                    ),
+                                    dbc.Col(
+                                        [
+                                            html.Label("Отчётный месяц", className="fw-bold small mb-1"),
+                                            dcc.Dropdown(
+                                                id=f"dropdown-reporting-month-{type_page}",
+                                                options=month_options,
+                                                value=month_num,
+                                                clearable=False,
+                                            ),
+                                        ],
+                                        xs=6,
+                                        sm=4,
+                                        md=2,
+                                        lg=2,
+                                    ),
+                                    dbc.Col(
+                                        dbc.Button(
+                                            "Сформировать",
+                                            id=f"btn-generate-{type_page}",
+                                            color="success",
+                                            size="sm",
+                                            className="mt-4",
+                                        ),
+                                        xs="auto",
+                                    ),
+                                    dbc.Col(
+                                        dbc.Button(
+                                            "Excel",
+                                            id=f"btn-excel-{type_page}",
+                                            color="outline-success",
+                                            size="sm",
+                                            className="mt-4",
+                                            disabled=True,
+                                        ),
+                                        xs="auto",
+                                    ),
+                                    dbc.Col(
+                                        html.Div(
+                                            id=f"status-{type_page}",
+                                            className="text-muted small mt-4",
+                                        ),
+                                        className="flex-grow-1",
+                                    ),
+                                ],
+                                className="g-2 mb-3 align-items-start",
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        [
+                                            html.Div(
+                                                [
+                                                    html.Label(
+                                                        "Индикаторы",
+                                                        className="fw-bold small mb-0 me-2",
+                                                    ),
+                                                    dbc.Button(
+                                                        "С ненулевым планом",
+                                                        id=f"btn-select-nonzero-plan-{type_page}",
+                                                        color="link",
+                                                        size="sm",
+                                                        className="p-0 align-baseline",
+                                                    ),
+                                                ],
+                                                className="d-flex flex-wrap align-items-center gap-2 mb-1",
+                                            ),
                                             dcc.Dropdown(
                                                 id=f"dropdown-indicators-{type_page}",
                                                 options=indicators,
                                                 multi=True,
-                                                placeholder="Пусто = все, у которых есть план по корпусам",
+                                                placeholder="Все с планом по корпусам",
                                             ),
                                         ],
-                                        width=6,
+                                        lg=7,
                                     ),
                                     dbc.Col(
                                         [
-                                            html.Label("Какие корпуса показать", className="fw-bold"),
+                                            html.Label("Корпуса", className="fw-bold small mb-1"),
                                             dcc.Dropdown(
                                                 id=f"dropdown-buildings-{type_page}",
                                                 options=buildings,
                                                 multi=True,
-                                                placeholder="Пусто = все корпуса",
+                                                placeholder="Все корпуса",
+                                            ),
+                                            html.Div(
+                                                id=f"hint-buildings-{type_page}",
+                                                className="text-muted small mt-1",
                                             ),
                                         ],
-                                        width=6,
+                                        lg=5,
                                     ),
                                 ],
-                                className="mb-3",
+                                className="g-2 mb-3",
                             ),
                             dbc.Row(
                                 [
                                     dbc.Col(
                                         [
-                                            html.Label("Как разложить таблицу", className="fw-bold"),
+                                            html.Label("Раскладка", className="fw-bold small mb-1"),
                                             dbc.RadioItems(
                                                 id=f"radio-layout-{type_page}",
                                                 options=LAYOUT_OPTIONS,
                                                 value=LAYOUT_INDICATOR_BUILDING,
                                                 inline=False,
+                                                className="small",
                                             ),
                                         ],
-                                        width=4,
+                                        md=12,
+                                        lg=3,
+                                        xl=2,
                                     ),
                                     dbc.Col(
                                         [
-                                            html.Label("Метрика", className="fw-bold"),
-                                            dcc.Dropdown(
-                                                id=f"dropdown-metric-{type_page}",
-                                                options=[
-                                                    {"label": "Объёмы", "value": "volumes"},
-                                                    {"label": "Финансы", "value": "finance"},
+                                            dbc.Row(
+                                                [
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Метрика", className="fw-bold small mb-1"),
+                                                            dcc.Dropdown(
+                                                                id=f"dropdown-metric-{type_page}",
+                                                                options=[
+                                                                    {"label": "Объёмы", "value": "volumes"},
+                                                                    {"label": "Финансы", "value": "finance"},
+                                                                ],
+                                                                value="volumes",
+                                                                clearable=False,
+                                                            ),
+                                                        ],
+                                                        xs=6,
+                                                        md=4,
+                                                        lg=3,
+                                                        xl=2,
+                                                    ),
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Версия плана", className="fw-bold small mb-1"),
+                                                            dcc.Dropdown(
+                                                                id=f"dropdown-plan-kind-{type_page}",
+                                                                options=PLAN_KIND_OPTIONS,
+                                                                value="internal",
+                                                                clearable=False,
+                                                            ),
+                                                        ],
+                                                        xs=6,
+                                                        md=4,
+                                                        lg=3,
+                                                        xl=2,
+                                                    ),
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Уровень", className="fw-bold small mb-1"),
+                                                            dcc.Dropdown(
+                                                                id=f"dropdown-plan-scope-{type_page}",
+                                                                options=PLAN_SCOPE_OPTIONS,
+                                                                value="buildings",
+                                                                clearable=False,
+                                                            ),
+                                                        ],
+                                                        xs=6,
+                                                        md=4,
+                                                        lg=3,
+                                                        xl=2,
+                                                    ),
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Период", className="fw-bold small mb-1"),
+                                                            dcc.Dropdown(
+                                                                id=f"dropdown-period-mode-{type_page}",
+                                                                options=PERIOD_MODE_OPTIONS,
+                                                                value="cumulative",
+                                                                clearable=False,
+                                                            ),
+                                                        ],
+                                                        xs=6,
+                                                        md=4,
+                                                        lg=3,
+                                                        xl=2,
+                                                    ),
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Факт за месяц", className="fw-bold small mb-1"),
+                                                            dcc.Dropdown(
+                                                                id=f"dropdown-payment-{type_page}",
+                                                                options=[
+                                                                    {
+                                                                        "label": "Предъявл.+оплач. (1,2,3,4,6,8,19)",
+                                                                        "value": "presented",
+                                                                    },
+                                                                    {
+                                                                        "label": "Предъявленные (2,3)",
+                                                                        "value": "presented_2_3",
+                                                                    },
+                                                                ],
+                                                                value="presented",
+                                                                clearable=False,
+                                                            ),
+                                                        ],
+                                                        xs=12,
+                                                        md=8,
+                                                        lg=6,
+                                                        xl=4,
+                                                    ),
                                                 ],
-                                                value="volumes",
-                                                clearable=False,
+                                                className="g-2",
                                             ),
-                                            html.Label("Версия плана", className="fw-bold mt-2"),
-                                            dcc.Dropdown(
-                                                id=f"dropdown-plan-kind-{type_page}",
-                                                options=PLAN_KIND_OPTIONS,
-                                                value="internal",
-                                                clearable=False,
-                                            ),
-                                            dbc.Switch(
-                                                id=f"switch-period-closed-{type_page}",
-                                                label="Период закрыт (факт = только оплаченные)",
-                                                value=False,
-                                                className="mt-3",
-                                            ),
-                                            html.Label("Факт за отчётный месяц", className="fw-bold mt-2"),
-                                            dcc.Dropdown(
-                                                id=f"dropdown-payment-{type_page}",
-                                                options=[
-                                                    {
-                                                        "label": "Предъявленные и оплаченные (1,2,3,4,6,8,19)",
-                                                        "value": "presented",
-                                                    },
-                                                    {
-                                                        "label": "Предъявленные (2,3)",
-                                                        "value": "presented_2_3",
-                                                    },
+                                            dbc.Row(
+                                                [
+                                                    dbc.Col(
+                                                        dbc.Switch(
+                                                            id=f"switch-unique-{type_page}",
+                                                            label="Уникальные пациенты",
+                                                            value=False,
+                                                            className="small",
+                                                        ),
+                                                        width="auto",
+                                                    ),
+                                                    dbc.Col(
+                                                        dbc.Switch(
+                                                            id=f"switch-require-plan-{type_page}",
+                                                            label="Только с планом",
+                                                            value=True,
+                                                            className="small",
+                                                        ),
+                                                        width="auto",
+                                                    ),
+                                                    dbc.Col(
+                                                        dbc.Switch(
+                                                            id=f"switch-period-closed-{type_page}",
+                                                            label="Период закрыт",
+                                                            value=False,
+                                                            className="small",
+                                                        ),
+                                                        width="auto",
+                                                    ),
                                                 ],
-                                                value="presented",
-                                                clearable=False,
+                                                className="g-3 mt-2 align-items-center",
                                             ),
                                             html.P(
-                                                "Режим выше — только для выбранного месяца отчёта. "
-                                                "За остальные месяцы в нарастающем итоге всегда статус 3 (оплаченные).",
-                                                className="text-muted small mt-1 mb-0",
+                                                "Факт за отчётный месяц — по выбору выше; "
+                                                "в нарастающем итоге остальные месяцы считаются как оплаченные (3).",
+                                                className="text-muted small mt-2 mb-0",
                                             ),
                                         ],
-                                        width=4,
+                                        md=12,
+                                        lg=9,
+                                        xl=10,
                                     ),
-                                    dbc.Col(
-                                        [
-                                            dbc.Switch(
-                                                id=f"switch-unique-{type_page}",
-                                                label="Уникальные пациенты",
-                                                value=False,
-                                                className="mt-4",
-                                            ),
-                                            dbc.Switch(
-                                                id=f"switch-require-plan-{type_page}",
-                                                label="Только где есть план корпуса",
-                                                value=True,
-                                                className="mt-2",
-                                            ),
-                                        ],
-                                        width=4,
-                                    ),
-                                ]
+                                ],
+                                className="g-2 align-items-start",
                             ),
                         ],
                         title="Состав отчёта (набор индикаторов)",
                     )
                 ],
                 start_collapsed=False,
-                className="mb-3",
-            ),
-            dbc.Card(
-                dbc.CardBody(
-                    [
-                        dbc.Row(
-                            [
-                                dbc.Col(
-                                    [
-                                        html.Label("Год", className="fw-bold"),
-                                        filter_years(type_page),
-                                    ],
-                                    width=2,
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Отчётный месяц", className="fw-bold"),
-                                        dcc.Dropdown(
-                                            id=f"dropdown-reporting-month-{type_page}",
-                                            options=month_options,
-                                            value=month_num,
-                                            clearable=False,
-                                        ),
-                                    ],
-                                    width=3,
-                                ),
-                                dbc.Col(
-                                    dbc.Button(
-                                        "Сформировать",
-                                        id=f"btn-generate-{type_page}",
-                                        color="success",
-                                        className="mt-4",
-                                    ),
-                                    width=2,
-                                ),
-                                dbc.Col(
-                                    dbc.Button(
-                                        "Excel",
-                                        id=f"btn-excel-{type_page}",
-                                        color="outline-success",
-                                        className="mt-4",
-                                        disabled=True,
-                                    ),
-                                    width=2,
-                                ),
-                            ],
-                            className="align-items-start",
-                        ),
-                        html.Div(id=f"status-{type_page}", className="mt-2 text-muted"),
-                    ]
-                ),
-                className="mb-3 shadow-sm",
+                className="mb-2",
             ),
             dcc.Loading(
                 id=f"loading-{type_page}",
@@ -736,6 +837,9 @@ def _collect_config(
     unique_flag,
     require_plan,
     period_closed=False,
+    plan_kind="internal",
+    plan_scope="buildings",
+    period_mode="cumulative",
 ) -> dict:
     return {
         "indicator_ids": indicators or [],
@@ -746,12 +850,15 @@ def _collect_config(
         "period_closed": bool(period_closed),
         "unique_flag": bool(unique_flag),
         "require_building_plan": bool(require_plan),
+        "plan_kind": plan_kind or "internal",
+        "plan_scope": plan_scope or "buildings",
+        "period_mode": period_mode or "cumulative",
         "columns": ["plan", "fact", "pct", "balance"],
     }
 
 
 PAYMENT_OPTIONS_OPEN = [
-    {"label": "Предъявленные и оплаченные (1,2,3,4,6,8,19)", "value": "presented"},
+    {"label": "Предъявл.+оплач. (1,2,3,4,6,8,19)", "value": "presented"},
     {"label": "Предъявленные (2,3)", "value": "presented_2_3"},
 ]
 PAYMENT_OPTIONS_CLOSED = [
@@ -792,9 +899,44 @@ def refresh_indicators(year, plan_kind):
 
 @app.callback(
     Output(f"dropdown-indicators-{type_page}", "value"),
+    Input(f"btn-select-nonzero-plan-{type_page}", "n_clicks"),
+    State(f"dropdown-year-{type_page}", "value"),
+    State(f"dropdown-metric-{type_page}", "value"),
+    State(f"dropdown-plan-kind-{type_page}", "value"),
+    State(f"dropdown-plan-scope-{type_page}", "value"),
+    prevent_initial_call=True,
+)
+def select_nonzero_plan_indicators(n_clicks, year, metric, plan_kind, plan_scope):
+    if not n_clicks or not year:
+        raise PreventUpdate
+    ids = indicator_ids_with_nonzero_plan(
+        int(year),
+        metric=metric or "volumes",
+        plan_kind=plan_kind or "internal",
+        plan_scope=plan_scope or "buildings",
+    )
+    return ids
+
+
+@app.callback(
+    Output(f"dropdown-buildings-{type_page}", "disabled"),
+    Output(f"hint-buildings-{type_page}", "children"),
+    Input(f"dropdown-plan-scope-{type_page}", "value"),
+)
+def toggle_buildings_for_scope(plan_scope):
+    if plan_scope == "org_only":
+        return True, "В режиме «Только БУЗ» корпуса не используются — план и факт по МО."
+    return False, ""
+
+
+@app.callback(
+    Output(f"dropdown-indicators-{type_page}", "value", allow_duplicate=True),
     Output(f"dropdown-buildings-{type_page}", "value"),
     Output(f"radio-layout-{type_page}", "value"),
     Output(f"dropdown-metric-{type_page}", "value"),
+    Output(f"dropdown-plan-kind-{type_page}", "value"),
+    Output(f"dropdown-plan-scope-{type_page}", "value"),
+    Output(f"dropdown-period-mode-{type_page}", "value"),
     Output(f"switch-unique-{type_page}", "value"),
     Output(f"switch-require-plan-{type_page}", "value"),
     Output(f"switch-period-closed-{type_page}", "value"),
@@ -816,6 +958,9 @@ def refresh_indicators(year, plan_kind):
     State(f"dropdown-buildings-{type_page}", "value"),
     State(f"radio-layout-{type_page}", "value"),
     State(f"dropdown-metric-{type_page}", "value"),
+    State(f"dropdown-plan-kind-{type_page}", "value"),
+    State(f"dropdown-plan-scope-{type_page}", "value"),
+    State(f"dropdown-period-mode-{type_page}", "value"),
     State(f"dropdown-payment-{type_page}", "value"),
     State(f"switch-unique-{type_page}", "value"),
     State(f"switch-require-plan-{type_page}", "value"),
@@ -834,6 +979,9 @@ def manage_presets(
     buildings,
     layout,
     metric,
+    plan_kind,
+    plan_scope,
+    period_mode,
     payment,
     unique_flag,
     require_plan,
@@ -845,7 +993,7 @@ def manage_presets(
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
     presets = list_presets()
 
-    noop_fields = (no_update,) * 10
+    noop_fields = (no_update,) * 13
 
     if trigger == f"btn-load-preset-{type_page}":
         if not selected_preset:
@@ -865,6 +1013,9 @@ def manage_presets(
             cfg.get("building_ids") or [],
             cfg.get("layout") or LAYOUT_INDICATOR_BUILDING,
             cfg.get("metric") or "volumes",
+            cfg.get("plan_kind") or "internal",
+            cfg.get("plan_scope") or "buildings",
+            cfg.get("period_mode") or "cumulative",
             bool(cfg.get("unique_flag", False)),
             bool(cfg.get("require_building_plan", True)),
             closed,
@@ -878,7 +1029,17 @@ def manage_presets(
         )
 
     config = _collect_config(
-        indicators, buildings, layout, metric, payment, unique_flag, require_plan, period_closed
+        indicators,
+        buildings,
+        layout,
+        metric,
+        payment,
+        unique_flag,
+        require_plan,
+        period_closed,
+        plan_kind=plan_kind,
+        plan_scope=plan_scope,
+        period_mode=period_mode,
     )
 
     if trigger == f"btn-save-as-preset-{type_page}":
@@ -891,7 +1052,7 @@ def manage_presets(
             return (*noop_fields, f"Ошибка сохранения: {exc}", "danger", True, presets)
         presets = list_presets()
         return (
-            *(no_update,) * 8,
+            *(no_update,) * 11,
             name,
             new_id,
             f"Создан пресет «{name}»",
@@ -911,7 +1072,7 @@ def manage_presets(
             return (*noop_fields, f"Ошибка сохранения: {exc}", "danger", True, presets)
         presets = list_presets()
         return (
-            *(no_update,) * 8,
+            *(no_update,) * 11,
             name,
             new_id,
             f"Сохранён пресет «{name}»",
@@ -930,7 +1091,7 @@ def manage_presets(
             return (*noop_fields, f"Ошибка удаления: {exc}", "danger", True, presets)
         presets = list_presets()
         return (
-            *(no_update,) * 8,
+            *(no_update,) * 11,
             "",
             None,
             "Пресет удалён",
@@ -956,6 +1117,8 @@ def manage_presets(
     State(f"radio-layout-{type_page}", "value"),
     State(f"dropdown-metric-{type_page}", "value"),
     State(f"dropdown-plan-kind-{type_page}", "value"),
+    State(f"dropdown-plan-scope-{type_page}", "value"),
+    State(f"dropdown-period-mode-{type_page}", "value"),
     State(f"dropdown-payment-{type_page}", "value"),
     State(f"switch-unique-{type_page}", "value"),
     State(f"switch-require-plan-{type_page}", "value"),
@@ -971,6 +1134,8 @@ def generate_report(
     layout,
     metric,
     plan_kind,
+    plan_scope,
+    period_mode,
     payment,
     unique_flag,
     require_plan,
@@ -994,12 +1159,19 @@ def generate_report(
             require_building_plan=bool(require_plan),
             period_closed=bool(period_closed),
             plan_kind=plan_kind or "internal",
+            plan_scope=plan_scope or "buildings",
+            period_mode=period_mode or "cumulative",
         )
     except Exception as exc:
         return [], [], None, True, f"Ошибка: {exc}"
 
     if pivoted is None or pivoted.empty:
-        return [], [], None, True, "Нет данных (проверьте планы корпусов и выбранные индикаторы)"
+        empty_hint = (
+            "Нет данных (проверьте планы МО и выбранные индикаторы)"
+            if plan_scope == "org_only"
+            else "Нет данных (проверьте планы корпусов и выбранные индикаторы)"
+        )
+        return [], [], None, True, empty_hint
 
     columns = [{"name": c, "id": c} for c in pivoted.columns]
     records = pivoted.to_dict("records")
@@ -1012,13 +1184,19 @@ def generate_report(
             else "предъявленные+оплаченные 1,2,3,4,6,8,19"
         )
     )
+    scope_label = "БУЗ (план МО)" if plan_scope == "org_only" else "по корпусам"
+    period_label = (
+        f"за месяц {reporting_month}"
+        if period_mode == "month"
+        else f"нарастающе до {reporting_month} мес."
+    )
     return (
         columns,
         records,
         {"columns": list(pivoted.columns), "records": records},
         False,
         (
-            f"Строк: {len(records)}. Год {year}, отчётный месяц {reporting_month}. "
+            f"Строк: {len(records)}. Год {year}, {period_label}, {scope_label}. "
             f"Факт за месяц: {mode_label}; остальные месяцы: оплаченные (3)."
         ),
     )

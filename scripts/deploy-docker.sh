@@ -15,8 +15,8 @@ set -euo pipefail
 ROOT="${MOSAICMED_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$ROOT"
 
-if [ ! -f .env ]; then
-  echo "[deploy-docker] ERROR: нет файла .env. Скопируйте: cp .env.docker.example .env" >&2
+if [ ! -f .env.docker ]; then
+  echo "[deploy-docker] ERROR: нет .env.docker. Скопируйте: cp .env.docker.example .env.docker" >&2
   exit 1
 fi
 
@@ -26,16 +26,18 @@ git pull --ff-only || {
   exit 1
 }
 
+COMPOSE=(docker compose --env-file .env.docker)
+
 if [ "${DEPLOY_SKIP_BUILD:-0}" != "1" ]; then
   echo "[deploy-docker] docker compose build mosaicmed"
-  docker compose build mosaicmed
+  "${COMPOSE[@]}" build mosaicmed
 fi
 
 echo "[deploy-docker] docker compose up -d"
-docker compose up -d
+"${COMPOSE[@]}" up -d
 
 echo "[deploy-docker] status:"
-docker compose ps
+"${COMPOSE[@]}" ps
 
-echo "[deploy-docker] done. Логи: docker compose logs -f mosaicmed"
+echo "[deploy-docker] done. Логи: docker compose --env-file .env.docker logs -f mosaicmed"
 echo "[deploy-docker] Документация: docs/docker.md"

@@ -802,7 +802,7 @@ def get_groups_for_indicators_report(selected_year, plan_kind: str = "internal")
     """
     Получает группы для отчета индикаторов.
     Выбираются группы, у которых AnnualPlan.show_in_indicators_report = True для указанного года.
-    Сортировка по названию (алфавит).
+    Порядок — как в админке (AnnualPlan.sort_order), затем по названию.
     Возвращает полную иерархию групп через обратный слэш (\\).
     """
     from sqlalchemy import text
@@ -849,10 +849,12 @@ def get_groups_for_indicators_report(selected_year, plan_kind: str = "internal")
         query, engine, params={"selected_year": selected_year, "plan_kind": kind}
     )
 
-    if not groups.empty and "name" in groups.columns:
-        groups = groups.assign(_sort=groups["name"].astype(str).str.casefold()).sort_values(
-            by=["_sort"], na_position="last"
-        ).drop(columns=["_sort"])
+    if not groups.empty:
+        groups = groups.sort_values(
+            by=["sort_order", "name"],
+            ascending=[True, True],
+            na_position="last",
+        ).reset_index(drop=True)
 
     return groups
 
@@ -1494,11 +1496,12 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
     return query
 
 
-def sql_query_plans(selected_year):
+def sql_query_plans(selected_year, plan_kind: str = "tfoms"):
     """
     Возвращает SQL-запрос для получения планов по объемам и финансам.
-    Принимает год (число) и возвращает строку SQL-запроса.
+    Принимает год (число) и версию плана (internal | tfoms).
     """
+    kind = _normalize_plan_kind(plan_kind)
     return f"""
     WITH RECURSIVE group_hierarchy AS (
         SELECT
@@ -1530,6 +1533,7 @@ def sql_query_plans(selected_year):
         JOIN plan_groupindicators g ON g.id = ap.group_id
         JOIN group_hierarchy gh ON gh.id = ap.group_id
         WHERE ap.year = {selected_year}
+          AND ap.plan_kind = '{kind}'
     )
     SELECT
         name || ' - Объемы' AS "Показатель",
