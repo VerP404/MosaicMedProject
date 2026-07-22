@@ -2060,11 +2060,22 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
 
         start_time = time.time()
         columns1, data1 = TableUpdater.query_to_df(engine, sql_query)
+        # Порядок как в админке (AnnualPlan.sort_order), не по алфавиту
         if data1:
-            data1 = sorted(
-                data1,
-                key=lambda r: str(r.get("type") or r.get("Группа показателей") or "").casefold(),
-            )
+            kind = plan_kind or "tfoms"
+            groups = get_groups_for_indicators_report(selected_year, plan_kind=kind)
+            order_map = {
+                int(row["id"]): idx for idx, row in groups.iterrows()
+            }
+
+            def _row_sort_key(row):
+                gid = row.get("group_id")
+                try:
+                    return order_map.get(int(gid), 10**9)
+                except (TypeError, ValueError):
+                    return 10**9
+
+            data1 = sorted(data1, key=_row_sort_key)
         
         # Добавляем расчет нарастающего плана для каждой группы (только если show_plan включен)
         if data1 and show_plan:
