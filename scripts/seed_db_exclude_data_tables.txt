@@ -1,0 +1,71 @@
+# Таблицы, чьи ДАННЫЕ не попадают в seed-дамп (схема остаётся).
+# Одна таблица / pattern на строку. Комментарии с #.
+# Используется scripts/dump_seed_database.sh → pg_dump --exclude-table-data=
+
+# --- Операционные данные МО (load_data) ---
+load_data_*
+
+# --- Структура конкретной МО ---
+organization_*
+oms_reference_medicalorganizationomstarget
+oms_reference_medicalorganizationomstarget_categories
+
+# --- Числовые планы и привязки к корпусам/врачам ---
+plan_groupindicators_buildings
+plan_groupbuildingdepartment
+plan_annualplan
+plan_monthlyplan
+plan_buildingplan
+plan_monthlybuildingplan
+plan_departmentplan
+plan_monthlydepartmentplan
+plan_chiefdashboard
+plan_annualdoctorplan
+plan_monthlydoctorplan
+plan_organizationindicatorconfig
+
+# --- Персонал МО (справочники specialty/profile оставляем) ---
+personnel_person
+personnel_person_telegram_groups
+personnel_doctorrecord
+personnel_staffrecord
+personnel_rg014
+personnel_digitalsignature
+personnel_maternityleave
+personnel_doctorreportingrecord
+
+# --- Пациенты / льготы / журналы обращений ---
+beneficiaries_patient
+beneficiaries_patientdrugsupply
+beneficiaries_prescriptionflow
+beneficiaries_drugstock
+journal_person
+journal_employee
+journal_appeal
+journal_appeal_*
+journal_citizenappeal
+journal_citizenappeal_*
+people_*
+person_*
+talon_ticket
+drug_benefits_patient
+drug_benefits_prescription
+
+# --- География / зоны МО ---
+zones_address
+zones_organization
+zones_organizationaddress
+zones_corpus
+zones_corpusaddress
+zones_site
+zones_siteaddress
+
+# --- Отчёты / прочие runtime-данные МО ---
+reports_*
+dn_app_*
+gar_*
+peopledash_*
+
+# --- Служебные логи (не нужны на старте) ---
+django_admin_log
+django_session
