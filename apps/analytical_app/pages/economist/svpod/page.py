@@ -19,6 +19,13 @@ from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups, sql_query_indicators, sql_query_indicators_details, clear_cache, get_groups_for_indicators_report, get_plan_by_months_for_group, sql_query_plans, sql_query_inogorod_monthly
 import pandas as pd
 from apps.analytical_app.query_executor import engine
+from apps.plan.services.finance_unit import (
+    FINANCE_UNIT_DROPDOWN_OPTIONS,
+    finance_unit_label,
+    get_default_finance_unit,
+    normalize_finance_unit,
+    scale_rows_money,
+)
 
 type_page = "econ-sv-pod"
 type_page_indicators = "econ-sv-pod-indicators"
@@ -186,6 +193,19 @@ current_report_tab = html.Div(
                                                 {'label': 'Финансы', 'value': 'finance'}
                                             ],
                                             value='volumes',
+                                            clearable=False,
+                                            style={"width": "100%"}
+                                        ),
+                                    ],
+                                    width=2
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Ед. финансов:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'finance-unit-{type_page}',
+                                            options=FINANCE_UNIT_DROPDOWN_OPTIONS,
+                                            value=get_default_finance_unit(),
                                             clearable=False,
                                             style={"width": "100%"}
                                         ),
@@ -363,6 +383,19 @@ cumulative_report_tab = html.Div(
                                                 {'label': 'Финансы', 'value': 'finance'}
                                             ],
                                             value='volumes',
+                                            clearable=False,
+                                            style={"width": "100%"}
+                                        ),
+                                    ],
+                                    width=2
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Ед. финансов:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'finance-unit-cumulative-{type_page}',
+                                            options=FINANCE_UNIT_DROPDOWN_OPTIONS,
+                                            value=get_default_finance_unit(),
                                             clearable=False,
                                             style={"width": "100%"}
                                         ),
@@ -1009,6 +1042,7 @@ def _normalize_building_ids(building_ids):
      ],
     Input(f'update-button-{type_page}', 'n_clicks'),
     State(f'mode-toggle-{type_page}', 'value'),
+    State(f'finance-unit-{type_page}', 'value'),
     State(f'unique-toggle-{type_page}', 'value'),
     State(f'dropdown-year-{type_page}', 'value'),
     State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
@@ -1018,6 +1052,7 @@ def _normalize_building_ids(building_ids):
 )
 def update_table_with_plan_and_balance(n_clicks,
                                        mode,
+                                       finance_unit,
                                        unique_flag,
                                        selected_year,
                                        selected_levels,
@@ -1240,6 +1275,10 @@ def update_table_with_plan_and_balance(n_clicks,
         applied = (applied + "; " if applied else "") + f"корпус id={buildings}"
     kind_label = "ТФОМС" if (plan_kind or "tfoms") == "tfoms" else "внутренний"
     applied = (applied + "; " if applied else "") + f"план: {kind_label}"
+    if mode == "finance":
+        unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
+        fact_data = scale_rows_money(fact_data, unit)
+        applied = (applied + "; " if applied else "") + f"ед.: {finance_unit_label(unit)}"
 
     return columns, fact_data, loading_output, applied, status_text
 
@@ -1457,13 +1496,25 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
     State(f'dropdown-year-{type_page}-cumulative', 'value'),
     State(f'report-type-toggle-cumulative-{type_page}', 'value'),
     State(f'mode-toggle-cumulative-{type_page}', 'value'),
+    State(f'finance-unit-cumulative-{type_page}', 'value'),
     State(f'payment-type-toggle-cumulative-{type_page}', 'value'),
     State(f'reporting-month-cumulative-{type_page}', 'value'),
     State(f'unique-toggle-cumulative-{type_page}', 'value'),
     State(f'dropdown-plan-kind-cumulative-{type_page}', 'value'),
     State(f'dropdown-building-cumulative-{type_page}', 'value'),
 )
-def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payment_type, reporting_month, unique_flag, plan_kind, building_ids):
+def generate_cumulative_report(
+    n_clicks,
+    selected_year,
+    report_type,
+    mode,
+    finance_unit,
+    payment_type,
+    reporting_month,
+    unique_flag,
+    plan_kind,
+    building_ids,
+):
     if n_clicks is None:
         raise PreventUpdate
     
@@ -1765,6 +1816,13 @@ def generate_cumulative_report(n_clicks, selected_year, report_type, mode, payme
             # Подсчитываем количество записей (только строки с числовыми значениями месяца)
             record_count = len([r for r in data if isinstance(r.get("month"), int)])
             status_text = f"Запрос выполнен за {time_text}. Найдено записей: {record_count}"
+
+        if mode == "finance":
+            unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
+            data = scale_rows_money(data, unit)
+            status_text = (
+                f"{status_text} Финансы: {finance_unit_label(unit)}."
+            )
         
         return columns, data, style_cell_conditional, loading_output, status_text
         

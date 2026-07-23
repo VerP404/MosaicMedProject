@@ -36,6 +36,13 @@ from apps.analytical_app.pages.economist.building_indicators.query import (
     save_print_template,
 )
 from apps.plan.services.building_report_engine import LAYOUT_INDICATOR_BUILDING
+from apps.plan.services.finance_unit import (
+    FINANCE_UNIT_DROPDOWN_OPTIONS,
+    finance_unit_label,
+    get_default_finance_unit,
+    normalize_finance_unit,
+    scale_pivoted_finance_records,
+)
 from apps.plan.services.print_form_engine import (
     build_print_form_data,
     render_print_form_html,
@@ -257,6 +264,22 @@ def _report_tab(presets, indicators, buildings, month_options, month_num):
                                                                 ],
                                                                 value="volumes",
                                                                 clearable=False,
+                                                            ),
+                                                        ],
+                                                        xs=6,
+                                                        md=4,
+                                                        lg=3,
+                                                        xl=2,
+                                                    ),
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Ед. финансов", className="fw-bold small mb-1"),
+                                                            dcc.Dropdown(
+                                                                id=f"dropdown-finance-unit-{type_page}",
+                                                                options=FINANCE_UNIT_DROPDOWN_OPTIONS,
+                                                                value=get_default_finance_unit(),
+                                                                clearable=False,
+                                                                disabled=False,
                                                             ),
                                                         ],
                                                         xs=6,
@@ -1116,6 +1139,7 @@ def manage_presets(
     State(f"dropdown-buildings-{type_page}", "value"),
     State(f"radio-layout-{type_page}", "value"),
     State(f"dropdown-metric-{type_page}", "value"),
+    State(f"dropdown-finance-unit-{type_page}", "value"),
     State(f"dropdown-plan-kind-{type_page}", "value"),
     State(f"dropdown-plan-scope-{type_page}", "value"),
     State(f"dropdown-period-mode-{type_page}", "value"),
@@ -1133,6 +1157,7 @@ def generate_report(
     buildings,
     layout,
     metric,
+    finance_unit,
     plan_kind,
     plan_scope,
     period_mode,
@@ -1175,6 +1200,9 @@ def generate_report(
 
     columns = [{"name": c, "id": c} for c in pivoted.columns]
     records = pivoted.to_dict("records")
+    unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
+    if (metric or "volumes") == "finance":
+        records = scale_pivoted_finance_records(records, unit, layout=layout)
     mode_label = (
         "оплаченные (3)"
         if period_closed or payment == "paid"
@@ -1190,6 +1218,11 @@ def generate_report(
         if period_mode == "month"
         else f"нарастающе до {reporting_month} мес."
     )
+    unit_note = (
+        f" Финансы: {finance_unit_label(unit)}."
+        if (metric or "volumes") == "finance"
+        else ""
+    )
     return (
         columns,
         records,
@@ -1197,7 +1230,7 @@ def generate_report(
         False,
         (
             f"Строк: {len(records)}. Год {year}, {period_label}, {scope_label}. "
-            f"Факт за месяц: {mode_label}; остальные месяцы: оплаченные (3)."
+            f"Факт за месяц: {mode_label}; остальные месяцы: оплаченные (3).{unit_note}"
         ),
     )
 

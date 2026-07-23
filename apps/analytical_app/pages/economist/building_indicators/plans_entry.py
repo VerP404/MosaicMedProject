@@ -17,6 +17,17 @@ from apps.analytical_app.pages.economist.building_indicators.query import (
     remove_building_from_dual_plan,
     save_dual_indicator_plan_form,
 )
+from apps.plan.services.finance_unit import (
+    FINANCE_UNIT_DROPDOWN_OPTIONS,
+    FINANCE_UNIT_RUBLES,
+    convert_dual_payload_units,
+    finance_unit_label,
+    get_default_finance_unit,
+    normalize_finance_unit,
+    rubles_to_display,
+    scale_dual_payload_amounts,
+    scale_kind_payload_amounts,
+)
 
 type_page_plans = "econ-building-indicators-plans"
 PLAN_EDIT_EXISTING = "bie-edit-existing"
@@ -41,14 +52,19 @@ def _form_month_columns():
     return cols
 
 
-def _form_rows_from_payload(payload: dict) -> list[dict]:
+def _amt_metric_label(unit: str | None = None) -> str:
+    return f"Финансы ({finance_unit_label(unit)})"
+
+
+def _form_rows_from_payload(payload: dict, unit: str | None = None) -> list[dict]:
     rows: list[dict] = []
+    unit = normalize_finance_unit(unit or get_default_finance_unit())
 
     def _add(row_label: str, building_id, metric: str, values: dict):
         is_amt = metric == "amount"
         data = {
             "row_label": row_label,
-            "metric_label": "Финансы" if is_amt else "Объёмы",
+            "metric_label": _amt_metric_label(unit) if is_amt else "Объёмы",
             "building_id": building_id,
             "metric": metric,
         }
@@ -161,7 +177,13 @@ def _merge_tables_into_dual(payload: dict | None, table_ids, tables_data) -> dic
     return base
 
 
-def _render_catalog(catalog: list[dict], *, page: int = 1, page_size: int = CATALOG_PAGE_SIZE) -> html.Div:
+def _render_catalog(
+    catalog: list[dict],
+    *,
+    page: int = 1,
+    page_size: int = CATALOG_PAGE_SIZE,
+    unit: str | None = None,
+) -> html.Div:
     if not catalog:
         return html.P(
             "Нет показателей с флагом «Отображать в отчете индикаторов» "
@@ -175,6 +197,8 @@ def _render_catalog(catalog: list[dict], *, page: int = 1, page_size: int = CATA
     page = max(1, min(int(page or 1), max_page))
     start = (page - 1) * page_size
     page_items = catalog[start : start + page_size]
+    unit = normalize_finance_unit(unit or get_default_finance_unit())
+    unit_lbl = finance_unit_label(unit)
 
     rows = []
     for item in page_items:
@@ -188,17 +212,19 @@ def _render_catalog(catalog: list[dict], *, page: int = 1, page_size: int = CATA
         )
         tfoms_mark = "есть" if item.get("tfoms_has_buildings") else "нет"
         int_mark = "есть" if item.get("internal_has_buildings") else "нет"
+        tfoms_amt = rubles_to_display(item.get("tfoms_amt_total", 0), unit)
+        int_amt = rubles_to_display(item.get("internal_amt_total", 0), unit)
         rows.append(
             html.Tr(
                 [
                     html.Td(btn),
                     html.Td(item["group_path"]),
                     html.Td(
-                        f"{item.get('tfoms_qty_total', 0)} / {item.get('tfoms_amt_total', 0)}",
+                        f"{item.get('tfoms_qty_total', 0)} / {tfoms_amt}",
                         className="text-nowrap",
                     ),
                     html.Td(
-                        f"{item.get('internal_qty_total', 0)} / {item.get('internal_amt_total', 0)}",
+                        f"{item.get('internal_qty_total', 0)} / {int_amt}",
                         className="text-nowrap",
                     ),
                     html.Td(f"ТФОМС: {tfoms_mark}; внутр.: {int_mark}", className="text-muted small"),
@@ -215,8 +241,8 @@ def _render_catalog(catalog: list[dict], *, page: int = 1, page_size: int = CATA
                             [
                                 html.Th(""),
                                 html.Th("Показатель"),
-                                html.Th("ТФОМС объём / финансы"),
-                                html.Th("Внутр. объём / финансы"),
+                                html.Th(f"ТФОМС объём / финансы ({unit_lbl})"),
+                                html.Th(f"Внутр. объём / финансы ({unit_lbl})"),
                                 html.Th("Корпуса"),
                             ]
                         )
@@ -230,25 +256,31 @@ def _render_catalog(catalog: list[dict], *, page: int = 1, page_size: int = CATA
             ),
             html.P(
                 f"Стр. {page} из {max_page} · показано {len(page_items)} из {total} "
-                f"(только с «Отображать в отчете индикаторов»).",
+                f"(только с «Отображать в отчете индикаторов»). "
+                f"Финансы в каталоге: {unit_lbl}.",
                 className="text-muted small mt-2 mb-0",
             ),
         ]
     )
 
 
-def _render_form_table(payload: dict, *, plan_kind: str) -> dash_table.DataTable:
+def _render_form_table(
+    payload: dict,
+    *,
+    plan_kind: str,
+    unit: str | None = None,
+) -> dash_table.DataTable:
     return dash_table.DataTable(
         id={"type": PLAN_FORM_TABLE, "index": plan_kind},
         columns=_form_month_columns(),
-        data=_form_rows_from_payload(payload),
+        data=_form_rows_from_payload(payload, unit=unit),
         editable=True,
         page_size=40,
         style_table={"overflowX": "auto"},
         style_cell={"minWidth": "50px", "textAlign": "center", "padding": "4px"},
         style_cell_conditional=[
             {"if": {"column_id": "row_label"}, "textAlign": "left", "minWidth": "160px"},
-            {"if": {"column_id": "metric_label"}, "minWidth": "90px"},
+            {"if": {"column_id": "metric_label"}, "minWidth": "110px"},
         ],
         style_header={"fontWeight": "bold"},
         style_data_conditional=[
@@ -263,21 +295,24 @@ def _render_form_table(payload: dict, *, plan_kind: str) -> dash_table.DataTable
     )
 
 
-def _render_dual_form(payload: dict) -> html.Div:
+def _render_dual_form(payload: dict, unit: str | None = None) -> html.Div:
+    unit = normalize_finance_unit(unit or get_default_finance_unit())
     return html.Div(
         [
             html.H5(payload.get("group_path") or "Индикатор", className="mb-2"),
             html.P(
                 "Две версии плана: сначала ТФОМС, затем внутренний. "
                 "Σ корпусов не должна превышать план МО в каждой версии "
-                "(или включите подъём плана МО).",
+                "(или включите подъём плана МО). "
+                f"Финансы вводятся в {finance_unit_label(unit)} "
+                "(в БД всегда сохраняются рубли).",
                 className="text-muted small mb-3",
             ),
             html.H6("План ТФОМС", className="mb-2"),
-            _render_form_table(payload.get("tfoms") or {}, plan_kind="tfoms"),
+            _render_form_table(payload.get("tfoms") or {}, plan_kind="tfoms", unit=unit),
             html.Hr(className="my-3"),
             html.H6("Внутренний план", className="mb-2"),
-            _render_form_table(payload.get("internal") or {}, plan_kind="internal"),
+            _render_form_table(payload.get("internal") or {}, plan_kind="internal", unit=unit),
         ]
     )
 
@@ -434,6 +469,18 @@ def plans_entry_tab() -> html.Div:
                             [
                                 dbc.Col(
                                     [
+                                        html.Label("Ед. финансов", className="small mb-0"),
+                                        dcc.Dropdown(
+                                            id=f"dropdown-finance-unit-{type_page_plans}",
+                                            options=FINANCE_UNIT_DROPDOWN_OPTIONS,
+                                            value=get_default_finance_unit(),
+                                            clearable=False,
+                                        ),
+                                    ],
+                                    width=2,
+                                ),
+                                dbc.Col(
+                                    [
                                         html.Label("Годовой объём", className="small mb-0"),
                                         dbc.Input(
                                             id=f"input-annual-qty-{type_page_plans}",
@@ -447,7 +494,11 @@ def plans_entry_tab() -> html.Div:
                                 ),
                                 dbc.Col(
                                     [
-                                        html.Label("Годовые финансы", className="small mb-0"),
+                                        html.Label(
+                                            id=f"label-annual-amt-{type_page_plans}",
+                                            children=f"Годовые финансы ({finance_unit_label(get_default_finance_unit())})",
+                                            className="small mb-0",
+                                        ),
                                         dbc.Input(
                                             id=f"input-annual-amt-{type_page_plans}",
                                             type="number",
@@ -474,7 +525,8 @@ def plans_entry_tab() -> html.Div:
                         html.P(
                             "Распределение в выбранную версию: в «План МО», "
                             "или в выбранный корпус (если указан). "
-                            "Январь = год − среднее×11, остальные месяцы = среднее.",
+                            "Январь = год − среднее×11, остальные месяцы = среднее. "
+                            "Единица финансов — из MainSettings или переключателя; в БД всегда рубли.",
                             className="text-muted small mb-2",
                         ),
                         dcc.Loading(
@@ -553,6 +605,14 @@ def render_plan_catalog_page(catalog, page):
 
 
 @app.callback(
+    Output(f"label-annual-amt-{type_page_plans}", "children"),
+    Input(f"dropdown-finance-unit-{type_page_plans}", "value"),
+)
+def update_annual_amt_label(unit):
+    return f"Годовые финансы ({finance_unit_label(unit)})"
+
+
+@app.callback(
     Output(f"div-plan-editor-{type_page_plans}", "children"),
     Output(f"store-plan-form-{type_page_plans}", "data"),
     Output(f"store-plan-meta-{type_page_plans}", "data"),
@@ -569,6 +629,7 @@ def render_plan_catalog_page(catalog, page):
     Input(f"btn-remove-building-{type_page_plans}", "n_clicks"),
     Input(f"btn-distribute-{type_page_plans}", "n_clicks"),
     Input(f"btn-save-plans-{type_page_plans}", "n_clicks"),
+    Input(f"dropdown-finance-unit-{type_page_plans}", "value"),
     State(f"dropdown-year-{type_page_plans}", "value"),
     State(f"dropdown-add-building-{type_page_plans}", "value"),
     State(f"dropdown-add-building-kind-{type_page_plans}", "value"),
@@ -588,6 +649,7 @@ def plan_form_actions(
     remove_clicks,
     distribute_clicks,
     save_clicks,
+    finance_unit,
     year,
     add_building_id,
     add_building_kind,
@@ -605,6 +667,8 @@ def plan_form_actions(
     if trigger == ".":
         raise PreventUpdate
 
+    unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
+
     def _out(*eight, clear_annual: bool = False):
         aq, aa = (None, None) if clear_annual else (no_update, no_update)
         return (*eight, aq, aa)
@@ -620,6 +684,28 @@ def plan_form_actions(
     if f"btn-close-form-{type_page_plans}" in trigger:
         return _out(*empty, "Форма закрыта", "secondary", True, clear_annual=True)
 
+    # Смена ед. финансов при открытой форме: пересчитать UI через рубли
+    if f"dropdown-finance-unit-{type_page_plans}" in trigger:
+        if not form_store or not meta:
+            raise PreventUpdate
+        prev_unit = normalize_finance_unit((meta or {}).get("finance_unit") or FINANCE_UNIT_RUBLES)
+        if prev_unit == unit:
+            raise PreventUpdate
+        dual = _merge_tables_into_dual(form_store, table_ids, tables_data)
+        dual = convert_dual_payload_units(dual, prev_unit, unit)
+        meta_out = dict(meta or {})
+        meta_out["finance_unit"] = unit
+        return _out(
+            _render_dual_form(dual, unit=unit),
+            dual,
+            meta_out,
+            dual.get("available_buildings") or [],
+            no_update,
+            f"Единица финансов: {finance_unit_label(unit)} (данные пересчитаны)",
+            "info",
+            True,
+        )
+
     if PLAN_EDIT_EXISTING in trigger:
         if not any(edit_clicks or []):
             raise PreventUpdate
@@ -632,6 +718,7 @@ def plan_form_actions(
             return _out(no_update, no_update, no_update, no_update, no_update, "Укажите год", "warning", True)
         try:
             payload = load_dual_indicator_plan_form(int(year), group_id)
+            payload = scale_dual_payload_amounts(payload, unit, to_display=True)
         except Exception as exc:
             return _out(
                 no_update,
@@ -647,9 +734,10 @@ def plan_form_actions(
             "year": int(year),
             "group_id": group_id,
             "group_path": payload.get("group_path"),
+            "finance_unit": unit,
         }
         return _out(
-            _render_dual_form(payload),
+            _render_dual_form(payload, unit=unit),
             payload,
             meta_out,
             payload.get("available_buildings") or [],
@@ -682,6 +770,7 @@ def plan_form_actions(
                 int(add_building_id),
                 kind,
             )
+            payload = scale_dual_payload_amounts(payload, unit, to_display=True)
         except Exception as exc:
             return _out(
                 no_update,
@@ -694,10 +783,12 @@ def plan_form_actions(
                 True,
             )
         kind_label = "ТФОМС" if kind == "tfoms" else "внутренний"
+        meta_out = dict(meta or {})
+        meta_out["finance_unit"] = unit
         return _out(
-            _render_dual_form(payload),
+            _render_dual_form(payload, unit=unit),
             payload,
-            meta,
+            meta_out,
             payload.get("available_buildings") or [],
             None,
             f"Корпус добавлен в план {kind_label}",
@@ -736,6 +827,7 @@ def plan_form_actions(
                 int(add_building_id),
                 kind,
             )
+            payload = scale_dual_payload_amounts(payload, unit, to_display=True)
         except Exception as exc:
             return _out(
                 no_update,
@@ -748,10 +840,12 @@ def plan_form_actions(
                 True,
             )
         kind_label = "ТФОМС" if kind == "tfoms" else "внутренний"
+        meta_out = dict(meta or {})
+        meta_out["finance_unit"] = unit
         return _out(
-            _render_dual_form(payload),
+            _render_dual_form(payload, unit=unit),
             payload,
-            meta,
+            meta_out,
             payload.get("available_buildings") or [],
             None,
             f"Корпус удалён из плана {kind_label}",
@@ -828,11 +922,13 @@ def plan_form_actions(
             f"Распределено ({', '.join(parts)}) → {kind_label}, {target_label}. "
             "Не забудьте сохранить."
         )
+        meta_out = dict(meta or {})
+        meta_out["finance_unit"] = unit
         # После распределения тоже очищаем поля — значения уже в таблице
         return _out(
-            _render_dual_form(dual),
+            _render_dual_form(dual, unit=unit),
             dual,
-            meta,
+            meta_out,
             dual.get("available_buildings") or [],
             add_building_id,
             msg,
@@ -856,8 +952,16 @@ def plan_form_actions(
                 "warning",
                 True,
             )
-        tfoms_payload = _payload_from_form_rows(by_kind["tfoms"])
-        internal_payload = _payload_from_form_rows(by_kind["internal"])
+        tfoms_payload = scale_kind_payload_amounts(
+            _payload_from_form_rows(by_kind["tfoms"]),
+            unit,
+            to_display=False,
+        )
+        internal_payload = scale_kind_payload_amounts(
+            _payload_from_form_rows(by_kind["internal"]),
+            unit,
+            to_display=False,
+        )
         try:
             result = save_dual_indicator_plan_form(
                 year=int(year),
@@ -882,6 +986,7 @@ def plan_form_actions(
             return _out(no_update, no_update, no_update, no_update, no_update, errs, "danger", True)
         try:
             payload = load_dual_indicator_plan_form(int(year), int(meta["group_id"]))
+            payload = scale_dual_payload_amounts(payload, unit, to_display=True)
         except Exception:
             payload = None
         msg = (
@@ -890,11 +995,13 @@ def plan_form_actions(
         )
         if result.get("raised_org_months"):
             msg += f"; план МО поднят в {result['raised_org_months']} мес."
+        meta_out = dict(meta or {})
+        meta_out["finance_unit"] = unit
         if payload:
             return _out(
-                _render_dual_form(payload),
+                _render_dual_form(payload, unit=unit),
                 payload,
-                meta,
+                meta_out,
                 payload.get("available_buildings") or [],
                 None,
                 msg,

@@ -2,12 +2,32 @@ from django.db import models
 
 
 class MainSettings(models.Model):
+    class FinancePlanUnit(models.TextChoices):
+        RUBLES = "rubles", "Рубли"
+        THOUSANDS = "thousands", "Тысячи рублей"
+
     dash_ip = models.GenericIPAddressField(default='127.0.0.1')
     dash_port = models.PositiveIntegerField(default=5000)
     main_app_ip = models.GenericIPAddressField(default='127.0.0.1')
     main_app_port = models.PositiveIntegerField(default=8000)
     dash_chief_ip = models.GenericIPAddressField(default='127.0.0.1')
     dash_chief_port = models.PositiveIntegerField(default=5010)
+    dash_dn_port = models.PositiveIntegerField(
+        default=7777,
+        verbose_name='Порт Dash «Подбор услуг ДН» (dash_dn)',
+        help_text='Отдельное приложение на том же IP/хосте, что и основной сайт (например :7777).',
+    )
+    finance_plan_unit = models.CharField(
+        max_length=16,
+        choices=FinancePlanUnit.choices,
+        default=FinancePlanUnit.RUBLES,
+        verbose_name="Единица финансов (план/отчёты)",
+        help_text=(
+            "В базе план и факт всегда в рублях. "
+            "Настройка задаёт единицу ввода планов и отображения по умолчанию в отчётах "
+            "(руб. или тыс. руб.). На страницах можно переключить просмотр."
+        ),
+    )
     kauz_server_ip = models.GenericIPAddressField(default='127.0.0.1', verbose_name="КАУЗ: IP сервера")
     kauz_database_path = models.CharField(max_length=255, default='-', verbose_name="КАУЗ: Путь к базе данных")
     kauz_port = models.PositiveIntegerField(default=3050, verbose_name="КАУЗ: Порт")
@@ -35,6 +55,10 @@ class MainSettings(models.Model):
 
     def get_dash_chief_url(self):
         return f"http://{self.dash_chief_ip}:{self.dash_chief_port}"
+
+    def get_dash_dn_url(self, host_without_port: str, scheme: str = 'http') -> str:
+        """URL приложения dash_dn на том же хосте, что у пользователя (без привязки к dash_ip)."""
+        return f"{scheme}://{host_without_port}:{self.dash_dn_port}"
 
     def get_filebrowser_url(self):
         return f"http://{self.filebrowser_ip}:{self.filebrowser_port}"
@@ -102,7 +126,7 @@ class MenuItem(models.Model):
         'Ссылка',
         max_length=255,
         blank=True,
-        help_text='Имя URL (например: home, beneficiaries:home), путь (/admin/) или спец. код: dash_url, dash_chief_url, dash_update'
+        help_text='Имя URL (например: home, beneficiaries:home), путь (/admin/) или спец. код: dash_url, dash_chief_url, dash_dn_url, dash_update'
     )
     icon_type = models.CharField('Тип иконки', max_length=10, choices=ICON_CHOICES, default=ICON_FEATHER)
     icon_name = models.CharField('Иконка', max_length=50, blank=True, help_text='Например: home, bar-chart-2 или fa-heart-pulse')
