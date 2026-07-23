@@ -235,29 +235,52 @@ current_report_tab = html.Div(
                                             className="mt-2"
                                         ),
                                     ],
-                                    width=3
+                                    width=2
                                 ),
                                 dbc.Col(
-                                    dcc.Dropdown(
-                                        id=f'month-selector-{type_page}',
-                                        options=[
-                                            {'label': 'Январь', 'value': 1},
-                                            {'label': 'Февраль', 'value': 2},
-                                            {'label': 'Март', 'value': 3},
-                                            {'label': 'Апрель', 'value': 4},
-                                            {'label': 'Май', 'value': 5},
-                                            {'label': 'Июнь', 'value': 6},
-                                            {'label': 'Июль', 'value': 7},
-                                            {'label': 'Август', 'value': 8},
-                                            {'label': 'Сентябрь', 'value': 9},
-                                            {'label': 'Октябрь', 'value': 10},
-                                            {'label': 'Ноябрь', 'value': 11},
-                                            {'label': 'Декабрь', 'value': 12}
-                                        ],
-                                        placeholder="Выберите месяц",
-                                        value=None
-                                    ),
+                                    [
+                                        html.Label("Месяц:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dcc.Dropdown(
+                                            id=f'month-selector-{type_page}',
+                                            options=[
+                                                {'label': 'Январь', 'value': 1},
+                                                {'label': 'Февраль', 'value': 2},
+                                                {'label': 'Март', 'value': 3},
+                                                {'label': 'Апрель', 'value': 4},
+                                                {'label': 'Май', 'value': 5},
+                                                {'label': 'Июнь', 'value': 6},
+                                                {'label': 'Июль', 'value': 7},
+                                                {'label': 'Август', 'value': 8},
+                                                {'label': 'Сентябрь', 'value': 9},
+                                                {'label': 'Октябрь', 'value': 10},
+                                                {'label': 'Ноябрь', 'value': 11},
+                                                {'label': 'Декабрь', 'value': 12}
+                                            ],
+                                            placeholder="Авто (по дате)",
+                                            value=None,
+                                            clearable=True,
+                                            style={"width": "100%"},
+                                        ),
+                                    ],
                                     width=2
+                                ),
+                                dbc.Col(
+                                    [
+                                        html.Label("Факт:", style={"font-weight": "bold", "margin-bottom": "5px"}),
+                                        dbc.Checklist(
+                                            id=f'switch-month-closed-{type_page}',
+                                            options=[
+                                                {
+                                                    "label": "Завершённый месяц (статусы 2,3)",
+                                                    "value": "closed",
+                                                }
+                                            ],
+                                            value=[],
+                                            switch=True,
+                                            className="mt-1",
+                                        ),
+                                    ],
+                                    width=3
                                 ),
                                 dbc.Col(
                                     [
@@ -964,6 +987,78 @@ def display_dynamic_dropdowns(values):
     return dropdowns
 
 
+def _normalize_building_ids(building_ids):
+    if not building_ids:
+        return None
+    if not isinstance(building_ids, (list, tuple)):
+        building_ids = [building_ids]
+    out = []
+    for b in building_ids:
+        if b is None or b == "":
+            continue
+        try:
+            out.append(int(b))
+        except (TypeError, ValueError):
+            continue
+    return out or None
+
+
+def _month_closed_enabled(switch_value) -> bool:
+    """Switch «Завершённый месяц» (Checklist value=['closed'])."""
+    if switch_value is True:
+        return True
+    if isinstance(switch_value, (list, tuple, set)):
+        return "closed" in switch_value or True in switch_value
+    return False
+
+
+def compute_svpod_month_fact(
+    row: dict,
+    month: int,
+    *,
+    reporting_month: int,
+    current_day: int,
+    month_closed: bool,
+    total_ispravleno_all_months: float = 0,
+    manually_selected: bool = False,
+) -> float:
+    """
+    Факт месяца для вкладки «выполнение по месяцам».
+
+    month_closed=True (как presented_2_3 в индикаторах по корпусам):
+      - отчётный месяц: статусы 2+3 (в_тфомс + оплачено)
+      - более ранние месяцы: только 3
+      - будущие: 0
+
+    month_closed=False — прежняя календарная логика
+    (ручной выбор месяца раньше давал только 3; при closed=False оставляем это).
+    """
+    paid = float(row.get("оплачено", 0) or 0)
+    tfoms = float(row.get("в_тфомс", 0) or 0)
+    new_ = float(row.get("новые", 0) or 0)
+    fixed = float(total_ispravleno_all_months or 0)
+
+    if month_closed:
+        if month == reporting_month:
+            return tfoms + paid
+        if month < reporting_month:
+            return paid
+        return 0.0
+
+    if manually_selected and month == reporting_month:
+        return paid
+
+    if month < reporting_month - 1:
+        return paid
+    if month == reporting_month - 1:
+        if current_day <= 10:
+            return new_ + tfoms + paid + fixed
+        return paid
+    if month == reporting_month:
+        return new_ + tfoms + paid + fixed
+    return 0.0
+
+
 def fetch_plan_data(selected_level, year, mode='volumes', plan_kind='internal', building_ids=None):
     """Получение плановых данных (помесячно).
     Без building_ids — план МО (MonthlyPlan).
@@ -1016,23 +1111,6 @@ def fetch_plan_data(selected_level, year, mode='volumes', plan_kind='internal', 
         return {row["month"]: row["plan"] for row in result}
 
 
-def _normalize_building_ids(building_ids):
-    """Приводит значение dropdown корпуса к list[int] или None."""
-    if not building_ids:
-        return None
-    if not isinstance(building_ids, (list, tuple)):
-        building_ids = [building_ids]
-    out = []
-    for b in building_ids:
-        if b is None or b == "":
-            continue
-        try:
-            out.append(int(b))
-        except (TypeError, ValueError):
-            continue
-    return out or None
-
-
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data'),
@@ -1047,6 +1125,7 @@ def _normalize_building_ids(building_ids):
     State(f'dropdown-year-{type_page}', 'value'),
     State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
     State(f'month-selector-{type_page}', 'value'),
+    State(f'switch-month-closed-{type_page}', 'value'),
     State(f'dropdown-plan-kind-{type_page}', 'value'),
     State(f'dropdown-building-{type_page}', 'value'),
 )
@@ -1057,6 +1136,7 @@ def update_table_with_plan_and_balance(n_clicks,
                                        selected_year,
                                        selected_levels,
                                        selected_month,
+                                       month_closed_switch,
                                        plan_kind,
                                        building_ids):
     if n_clicks is None:
@@ -1107,6 +1187,8 @@ def update_table_with_plan_and_balance(n_clicks,
     default_month = today.month - 1 if today.day <= 5 else today.month
     current_day = today.day
     current_month = selected_month if selected_month is not None else default_month
+    month_closed = _month_closed_enabled(month_closed_switch)
+    manually_selected = selected_month is not None
 
     # Формируем список месяцев для отображения: от 1 до current_month
     months_to_show = list(range(1, current_month + 1))
@@ -1156,37 +1238,15 @@ def update_table_with_plan_and_balance(n_clicks,
         row["Входящий остаток"] = incoming_balance
         row["План"] = (row["План 1/12"] or 0) + (row["Входящий остаток"] or 0)
 
-        # Расчёт «Факт» по текущему дню.
-        manually_selected = selected_month is not None and m == selected_month
-
-        # Расчёт «Факт» по текущему дню.
-        if manually_selected:
-            # Если пользователь выбрал месяц, то как раньше — только оплаченные
-            row["Факт"] = row.get("оплачено", 0)
-        else:
-            if m < current_month - 1:
-                row["Факт"] = row.get("оплачено", 0)
-            elif m == current_month - 1:
-                if current_day <= 10:
-                    # Используем total_ispravleno_all_months вместо row["исправлено"]
-                    row["Факт"] = (
-                            row.get("новые", 0) +
-                            row.get("в_тфомс", 0) +
-                            row.get("оплачено", 0) +
-                            total_ispravleno_all_months
-                    )
-                else:
-                    row["Факт"] = row.get("оплачено", 0)
-            elif m == current_month:
-                # Для текущего месяца тоже используем total_ispravleno_all_months
-                row["Факт"] = (
-                        row.get("новые", 0) +
-                        row.get("в_тфомс", 0) +
-                        row.get("оплачено", 0) +
-                        total_ispravleno_all_months
-                )
-            else:
-                row["Факт"] = 0
+        row["Факт"] = compute_svpod_month_fact(
+            row,
+            m,
+            reporting_month=current_month,
+            current_day=current_day,
+            month_closed=month_closed,
+            total_ispravleno_all_months=total_ispravleno_all_months,
+            manually_selected=manually_selected,
+        )
 
         if row["План"] > 0:
             row["%"] = round(row["Факт"] / row["План"] * 100, 1)
@@ -1275,6 +1335,8 @@ def update_table_with_plan_and_balance(n_clicks,
         applied = (applied + "; " if applied else "") + f"корпус id={buildings}"
     kind_label = "ТФОМС" if (plan_kind or "tfoms") == "tfoms" else "внутренний"
     applied = (applied + "; " if applied else "") + f"план: {kind_label}"
+    if month_closed:
+        applied = (applied + "; " if applied else "") + "факт: завершённый месяц (2,3)"
     if mode == "finance":
         unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
         fact_data = scale_rows_money(fact_data, unit)
@@ -1314,12 +1376,13 @@ def update_details_button_state(active_cell):
         State(f'result-table1-{type_page}', 'active_cell'),
         State(f'dropdown-year-{type_page}', 'value'),
         State(f'month-selector-{type_page}', 'value'),
+        State(f'switch-month-closed-{type_page}', 'value'),
         State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
         State(f'dropdown-building-{type_page}', 'value'),
     ]
 )
-def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selected_month, 
-                      selected_levels, building_ids):
+def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selected_month,
+                      month_closed_switch, selected_levels, building_ids):
     if not n_clicks or not active_cell or not table_data:
         return '', [], []
     
@@ -1350,6 +1413,7 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
         # Получаем условия фильтрации
         filter_conditions = get_filter_conditions(group_ids, selected_year)
         buildings = _normalize_building_ids(building_ids)
+        month_closed = _month_closed_enabled(month_closed_switch)
         
         # Определяем месяц для фильтрации (изначально)
         filter_month = selected_month if selected_month is not None else None
@@ -1367,75 +1431,75 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
         if column_id == 'Факт':
             # Для "Факт" показываем записи, которые учитываются в расчете факта
             # Логика должна соответствовать расчету в основном запросе
+            today = datetime.today()
+            default_month = today.month - 1 if today.day <= 5 else today.month
+            reporting_month = selected_month if selected_month is not None else default_month
+            current_day = today.day
+
             if month_name == "Нарастающе" or month_name == "Год":
-                # Для нарастающих и годовых показателей "Факт" = сумма "Факт" по месяцам
-                # Каждый месяц имеет свою логику расчета "Факт"
-                # Создаем сложный запрос, который повторяет логику расчета для каждого месяца
-                from datetime import datetime
-                today = datetime.today()
-                current_month = today.month
-                current_day = today.day
-                
-                # Создаем условия для каждого месяца точно как в расчете "Факт"
                 month_conditions = []
-                for m in range(1, 13):
-                    if m < current_month - 1:
-                        # Прошлые месяцы: только оплаченные
-                        month_conditions.append(f"(report_month_number = {m} AND status = '3')")
-                    elif m == current_month - 1:
+                for m in range(1, reporting_month + 1):
+                    if month_closed:
+                        if m == reporting_month:
+                            month_conditions.append(
+                                f"(report_month_number = {m} AND status IN ('2', '3'))"
+                            )
+                        else:
+                            month_conditions.append(
+                                f"(report_month_number = {m} AND status = '3')"
+                            )
+                    elif m < reporting_month - 1:
+                        month_conditions.append(
+                            f"(report_month_number = {m} AND status = '3')"
+                        )
+                    elif m == reporting_month - 1:
                         if current_day <= 10:
-                            # Предыдущий месяц, день <= 10: новые+в_тфомс+оплачено+исправлено
-                            # Исправлено берется из total_ispravleno_all_months (за ВСЕ месяцы)
-                            month_conditions.append(f"(report_month_number = {m} AND status IN ('1', '2', '3'))")
-                            # Добавляем исправленные записи за ВСЕ месяцы для предыдущего месяца
+                            month_conditions.append(
+                                f"(report_month_number = {m} AND status IN ('1', '2', '3'))"
+                            )
                             month_conditions.append(f"(status IN ('6', '8', '4', '19'))")
                         else:
-                            # Предыдущий месяц, день > 10: только оплаченные
-                            month_conditions.append(f"(report_month_number = {m} AND status = '3')")
-                    elif m == current_month:
-                        # Текущий месяц: новые+в_тфомс+оплачено+исправлено
-                        # Исправлено берется из total_ispravleno_all_months (за ВСЕ месяцы)
-                        month_conditions.append(f"(report_month_number = {m} AND status IN ('1', '2', '3'))")
-                        # Добавляем исправленные записи за ВСЕ месяцы для текущего месяца
-                        month_conditions.append(f"(status IN ('6', '8', '4', '19'))")
-                    # Будущие месяцы не учитываются (Факт = 0)
+                            month_conditions.append(
+                                f"(report_month_number = {m} AND status = '3')"
+                            )
+                    elif m == reporting_month:
+                        if selected_month is not None:
+                            month_conditions.append(
+                                f"(report_month_number = {m} AND status = '3')"
+                            )
+                        else:
+                            month_conditions.append(
+                                f"(report_month_number = {m} AND status IN ('1', '2', '3'))"
+                            )
+                            month_conditions.append(f"(status IN ('6', '8', '4', '19'))")
                 
-                # Объединяем условия через OR
                 if month_conditions:
-                    # Передаем специальный параметр для сложной логики
                     status_filter = f"COMPLEX_LOGIC:{':'.join(month_conditions)}"
                 else:
-                    status_filter = ['3']  # Fallback
+                    status_filter = ['3']
                 
-                # Убираем фильтр по месяцу для нарастающих показателей
                 filter_month = None
             else:
-                # Для конкретного месяца - логика зависит от того, выбран ли месяц вручную
-                if selected_month is not None:
-                    # Если пользователь выбрал месяц вручную - только оплаченные
-                    status_filter = ['3']  # Только оплачено
+                if isinstance(month_name, int):
+                    month_num = month_name
+                elif isinstance(month_name, str) and month_name.isdigit():
+                    month_num = int(month_name)
                 else:
-                    # Если месяц выбран автоматически - зависит от текущего месяца
-                    from datetime import datetime
-                    today = datetime.today()
-                    current_month = today.month
-                    # Определяем номер месяца
-                    if isinstance(month_name, int):
-                        month_num = month_name
-                    elif isinstance(month_name, str) and month_name.isdigit():
-                        month_num = int(month_name)
+                    month_num = None
+
+                if month_closed:
+                    if month_num == reporting_month:
+                        status_filter = ['2', '3']
                     else:
-                        month_num = None
-                    
-                    if month_num and month_num < current_month - 1:
-                        # Для прошлых месяцев - только оплаченные
                         status_filter = ['3']
-                    elif month_num and (month_num == current_month - 1 or month_num == current_month):
-                        # Для текущего и предыдущего месяца - новые + в_тфомс + оплачено + исправлено
-                        status_filter = ['1', '2', '3', '4', '6', '8', '19']
-                    else:
-                        # По умолчанию - только оплаченные
-                        status_filter = ['3']
+                elif selected_month is not None:
+                    status_filter = ['3']
+                elif month_num and month_num < reporting_month - 1:
+                    status_filter = ['3']
+                elif month_num and (month_num == reporting_month - 1 or month_num == reporting_month):
+                    status_filter = ['1', '2', '3', '4', '6', '8', '19']
+                else:
+                    status_filter = ['3']
         elif column_id == 'новые':
             status_filter = ['1']  # Новые талоны
         elif column_id == 'в_тфомс':
