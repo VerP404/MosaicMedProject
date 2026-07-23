@@ -520,7 +520,7 @@ indicators_tab = html.Div(
                                             dcc.Dropdown(
                                                 id=f'dropdown-plan-kind-{type_page_indicators}',
                                                 options=PLAN_KIND_OPTIONS,
-                                                value='tfoms',
+                                                value='internal',
                                                 clearable=False,
                                             ),
                                         ],
@@ -2051,7 +2051,7 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
             start_date_input_formatted, end_date_input_formatted,
             start_date_treatment_formatted, end_date_treatment_formatted,
             selected_status_tuple, include_status4,
-            plan_kind or "tfoms",
+            plan_kind or "internal",
             cache_key,
         )
 
@@ -2062,7 +2062,7 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
         columns1, data1 = TableUpdater.query_to_df(engine, sql_query)
         # Порядок как в админке (AnnualPlan.sort_order), не по алфавиту
         if data1:
-            kind = plan_kind or "tfoms"
+            kind = plan_kind or "internal"
             groups = get_groups_for_indicators_report(selected_year, plan_kind=kind)
             order_map = {
                 int(row["id"]): idx for idx, row in groups.iterrows()
@@ -2081,7 +2081,7 @@ def update_table_indicators(n_clicks, value_doctor, value_profile, selected_peri
         if data1 and show_plan:
             # Получаем список месяцев
             months_list = list(range(selected_period[0], selected_period[1] + 1))
-            kind = plan_kind or "tfoms"
+            kind = plan_kind or "internal"
             
             # Для каждой строки рассчитываем нарастающий план
             for row in data1:
