@@ -97,13 +97,46 @@ docker compose exec db pg_restore -U postgres -d mosaicmed --clean --if-exists /
 
 ## Переменные окружения
 
-Шаблон: [`.env.docker.example`](../.env.docker.example) → скопировать в **`.env.docker`** (не путать с нативным `.env` разработчика).
+Шаблон: [`.env.docker.example`](../.env.docker.example) → скопировать в **`.env.docker`**.
+
+Обязательно заполните: `POSTGRES_PASSWORD`, `SECRET_KEY`, `OMS_BROWSER`, `OMS_BASE_URL` (иначе Dagster selenium не стартует), при необходимости `ISZL_*`, `ORGANIZATIONS`.
 
 Запуск всегда с `--env-file .env.docker`.
 
 Django prod читает `Name`, `USER`, `PASSWORD`, `HOST`, `PORT` — в Compose для `mosaicmed` задаётся `HOST=db`.
 
-`RUN_IMPORT_INDICATORS=1` в `.env` — при старте выполнить `import_indicators_structure` (как в `update_MosaicMed.sh`).
+`RUN_IMPORT_INDICATORS=1` в `.env.docker` — при старте выполнить `import_indicators_structure` (как в `update_MosaicMed.sh`).
+
+## Стартовый дамп без данных чужой МО
+
+Чтобы развернуть новую МО на базе со справочниками и структурой индикаторов, но **без** талонов / ЭМД / журналов / корпусов / планов объёмов другой организации:
+
+```bash
+# На машине с доступом к заполненной БД:
+chmod +x scripts/dump_seed_database.sh
+export PGPASSWORD=...
+./scripts/dump_seed_database.sh -h localhost -p 55433 -U postgres -d mosaicmed \
+  -f backup/mosaicmed_seed.dump
+```
+
+Список исключаемых таблиц: [`scripts/seed_db_exclude_data_tables.txt`](../scripts/seed_db_exclude_data_tables.txt).
+
+Восстановление на проде:
+
+```bash
+docker compose --env-file .env.docker up -d db
+# дождаться healthy
+
+# файл в ./backup монтируется в db как /backup:ro
+docker compose --env-file .env.docker exec -T db \
+  pg_restore -U postgres -d mosaicmed --no-owner --clean --if-exists \
+  /backup/mosaicmed_seed.dump
+
+docker compose --env-file .env.docker up -d --build mosaicmed
+# migrate уже в entrypoint; при RUN_IMPORT_INDICATORS=1 — структура индикаторов
+```
+
+После этого импортируйте **свою** оргструктуру (админка organization export/import), пользователей и планы.
 
 ## Логи и отладка
 
