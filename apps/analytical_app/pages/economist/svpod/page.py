@@ -1059,6 +1059,16 @@ def compute_svpod_month_fact(
     return 0.0
 
 
+def _as_float(value, default: float = 0.0) -> float:
+    """Безопасно привести Decimal/None/str к float (финансы из Postgres)."""
+    if value is None or value == "":
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def fetch_plan_data(selected_level, year, mode='volumes', plan_kind='internal', building_ids=None):
     """Получение плановых данных (помесячно).
     Без building_ids — план МО (MonthlyPlan).
@@ -1093,7 +1103,7 @@ def fetch_plan_data(selected_level, year, mode='volumes', plan_kind='internal', 
                 result = connection.execute(
                     query, {"selected_level": selected_level, "year": year, "plan_kind": kind}
                 ).mappings()
-                return {row["month"]: row["plan"] for row in result}
+                return {row["month"]: _as_float(row["plan"]) for row in result}
 
     query = text(f"""
         SELECT mp.month, SUM(mp.{plan_field}) AS plan
@@ -1108,7 +1118,7 @@ def fetch_plan_data(selected_level, year, mode='volumes', plan_kind='internal', 
         result = connection.execute(
             query, {"selected_level": selected_level, "year": year, "plan_kind": kind}
         ).mappings()
-        return {row["month"]: row["plan"] for row in result}
+        return {row["month"]: _as_float(row["plan"]) for row in result}
 
 
 @app.callback(
@@ -1167,7 +1177,9 @@ def update_table_with_plan_and_balance(n_clicks,
     )
     execution_time = time.time() - start_time
     # Добавляем общую сумму "исправлено"
-    total_ispravleno_all_months = sum(row.get("исправлено", 0) or 0 for row in fact_data_list)
+    total_ispravleno_all_months = sum(
+        _as_float(row.get("исправлено", 0)) for row in fact_data_list
+    )
     # Превращаем список словарей fact_data_list в dict по ключу "month"
     fact_dict = {}
     for row in fact_data_list:
@@ -1201,79 +1213,83 @@ def update_table_with_plan_and_balance(n_clicks,
         # Базовая заготовка на случай, если нет данных вообще
         row_template = {
             "month": m,
-            "План 1/12": 0,
-            "Входящий остаток": 0,
-            "План": 0,
-            "Факт": 0,
-            "%": 0,
-            "Остаток": 0,
-            "новые": 0,
-            "в_тфомс": 0,
-            "оплачено": 0,
-            "исправлено": 0,
-            "отказано": 0,
-            "отменено": 0,
+            "План 1/12": 0.0,
+            "Входящий остаток": 0.0,
+            "План": 0.0,
+            "Факт": 0.0,
+            "%": 0.0,
+            "Остаток": 0.0,
+            "новые": 0.0,
+            "в_тфомс": 0.0,
+            "оплачено": 0.0,
+            "исправлено": 0.0,
+            "отказано": 0.0,
+            "отменено": 0.0,
         }
 
         # Если в fact_dict есть запись для этого месяца, берём данные
         if m in fact_dict:
             source = fact_dict[m]
-            # mode='finance' -> суммы, mode='volumes' -> кол-во
-            row_template["новые"] = source.get("новые", 0) or 0
-            row_template["в_тфомс"] = source.get("в_тфомс", 0) or 0
-            row_template["оплачено"] = source.get("оплачено", 0) or 0
-            row_template["исправлено"] = source.get("исправлено", 0) or 0
-            row_template["отказано"] = source.get("отказано", 0) or 0
-            row_template["отменено"] = source.get("отменено", 0) or 0
+            # mode='finance' -> суммы (Decimal из PG), mode='volumes' -> кол-во
+            row_template["новые"] = _as_float(source.get("новые", 0))
+            row_template["в_тфомс"] = _as_float(source.get("в_тфомс", 0))
+            row_template["оплачено"] = _as_float(source.get("оплачено", 0))
+            row_template["исправлено"] = _as_float(source.get("исправлено", 0))
+            row_template["отказано"] = _as_float(source.get("отказано", 0))
+            row_template["отменено"] = _as_float(source.get("отменено", 0))
 
         # Подставляем план, если он есть
-        row_template["План 1/12"] = plan_data.get(m, 0)
+        row_template["План 1/12"] = _as_float(plan_data.get(m, 0))
 
         fact_data.append(row_template)
 
     # Теперь пробегаемся по fact_data и рассчитываем Факт, Остаток, % и т.д.
-    incoming_balance = 0
+    incoming_balance = 0.0
     for row in fact_data:
         m = row["month"]
-        row["Входящий остаток"] = incoming_balance
-        row["План"] = (row["План 1/12"] or 0) + (row["Входящий остаток"] or 0)
+        row["Входящий остаток"] = float(incoming_balance)
+        row["План"] = _as_float(row["План 1/12"]) + _as_float(row["Входящий остаток"])
 
-        row["Факт"] = compute_svpod_month_fact(
-            row,
-            m,
-            reporting_month=current_month,
-            current_day=current_day,
-            month_closed=month_closed,
-            total_ispravleno_all_months=total_ispravleno_all_months,
-            manually_selected=manually_selected,
+        row["Факт"] = float(
+            compute_svpod_month_fact(
+                row,
+                m,
+                reporting_month=current_month,
+                current_day=current_day,
+                month_closed=month_closed,
+                total_ispravleno_all_months=total_ispravleno_all_months,
+                manually_selected=manually_selected,
+            )
         )
 
-        if row["План"] > 0:
-            row["%"] = round(row["Факт"] / row["План"] * 100, 1)
+        plan_val = _as_float(row["План"])
+        fact_val = _as_float(row["Факт"])
+        if plan_val > 0:
+            row["%"] = round(fact_val / plan_val * 100, 1)
         else:
-            row["%"] = 0
+            row["%"] = 0.0
 
-        row["Остаток"] = (row["План"] or 0) - (row["Факт"] or 0)
+        row["Остаток"] = plan_val - fact_val
         incoming_balance = row["Остаток"]
 
     # Добавим строку «Нарастающе»
     if fact_data:
-        total_plan_12 = sum(r["План 1/12"] for r in fact_data)
-        total_fact = sum(r["Факт"] for r in fact_data)
-        total_new = sum(r["новые"] for r in fact_data)
-        total_tfoms = sum(r["в_тфомс"] for r in fact_data)
-        total_oplacheno = sum(r["оплачено"] for r in fact_data)
-        total_ispravleno = sum(r["исправлено"] for r in fact_data)
-        total_otkazano = sum(r["отказано"] for r in fact_data)
-        total_otmeneno = sum(r["отменено"] for r in fact_data)
+        total_plan_12 = sum(_as_float(r["План 1/12"]) for r in fact_data)
+        total_fact = sum(_as_float(r["Факт"]) for r in fact_data)
+        total_new = sum(_as_float(r["новые"]) for r in fact_data)
+        total_tfoms = sum(_as_float(r["в_тфомс"]) for r in fact_data)
+        total_oplacheno = sum(_as_float(r["оплачено"]) for r in fact_data)
+        total_ispravleno = sum(_as_float(r["исправлено"]) for r in fact_data)
+        total_otkazano = sum(_as_float(r["отказано"]) for r in fact_data)
+        total_otmeneno = sum(_as_float(r["отменено"]) for r in fact_data)
         cumulative_row = {
             "month": "Нарастающе",
-            "План 1/12": 0,
-            "Входящий остаток": 0,
+            "План 1/12": 0.0,
+            "Входящий остаток": 0.0,
             "План": total_plan_12,
             "Факт": total_fact,
-            "Остаток": fact_data[-1]["Остаток"],
-            "%": round(total_fact / total_plan_12 * 100, 1) if total_plan_12 > 0 else 0,
+            "Остаток": _as_float(fact_data[-1]["Остаток"]),
+            "%": round(total_fact / total_plan_12 * 100, 1) if total_plan_12 > 0 else 0.0,
             "новые": total_new,
             "в_тфомс": total_tfoms,
             "оплачено": total_oplacheno,
@@ -1284,23 +1300,37 @@ def update_table_with_plan_and_balance(n_clicks,
         fact_data.append(cumulative_row)
 
     # Добавим строку «Год» (1..12)
-    year_plan = sum(plan_data.get(m, 0) for m in range(1, 13))
+    year_plan = sum(_as_float(plan_data.get(m, 0)) for m in range(1, 13))
     if fact_data:
-        total_fact_overall = sum(r["Факт"] for r in fact_data if isinstance(r["month"], int))
+        total_fact_overall = sum(
+            _as_float(r["Факт"]) for r in fact_data if isinstance(r["month"], int)
+        )
         year_row = {
             "month": "Год",
-            "План 1/12": 0,
-            "Входящий остаток": 0,
+            "План 1/12": 0.0,
+            "Входящий остаток": 0.0,
             "План": year_plan,
             "Факт": total_fact_overall,
             "Остаток": year_plan - total_fact_overall,
-            "%": round(total_fact_overall / year_plan * 100, 1) if year_plan else 0,
-            "новые": sum(r["новые"] for r in fact_data if isinstance(r["month"], int)),
-            "в_тфомс": sum(r["в_тфомс"] for r in fact_data if isinstance(r["month"], int)),
-            "оплачено": sum(r["оплачено"] for r in fact_data if isinstance(r["month"], int)),
-            "исправлено": sum(r["исправлено"] for r in fact_data if isinstance(r["month"], int)),
-            "отказано": sum(r["отказано"] for r in fact_data if isinstance(r["month"], int)),
-            "отменено": sum(r["отменено"] for r in fact_data if isinstance(r["month"], int)),
+            "%": round(total_fact_overall / year_plan * 100, 1) if year_plan else 0.0,
+            "новые": sum(
+                _as_float(r["новые"]) for r in fact_data if isinstance(r["month"], int)
+            ),
+            "в_тфомс": sum(
+                _as_float(r["в_тфомс"]) for r in fact_data if isinstance(r["month"], int)
+            ),
+            "оплачено": sum(
+                _as_float(r["оплачено"]) for r in fact_data if isinstance(r["month"], int)
+            ),
+            "исправлено": sum(
+                _as_float(r["исправлено"]) for r in fact_data if isinstance(r["month"], int)
+            ),
+            "отказано": sum(
+                _as_float(r["отказано"]) for r in fact_data if isinstance(r["month"], int)
+            ),
+            "отменено": sum(
+                _as_float(r["отменено"]) for r in fact_data if isinstance(r["month"], int)
+            ),
         }
         fact_data.append(year_row)
 
