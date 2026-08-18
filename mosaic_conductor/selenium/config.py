@@ -5,6 +5,7 @@ OMS_BASE_URL = os.getenv("OMS_BASE_URL")
 OMS_USERNAME = os.getenv("OMS_USERNAME")
 OMS_PASSWORD = os.getenv("OMS_PASSWORD")
 CHROME_DRIVER = os.getenv("CHROME_DRIVER")
+GECKO_DRIVER = os.getenv("GECKO_DRIVER")
 
 
 

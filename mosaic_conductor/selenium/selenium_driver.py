@@ -3,56 +3,13 @@ import time
 from dagster import resource
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 import tempfile
 import subprocess
 import platform
 import socket
-import requests
-import glob
 
-from mosaic_conductor.selenium.config import CHROME_DRIVER
-
-
-def get_chrome_version():
-    try:
-        system = platform.system().lower()
-        if system == 'windows':
-            cmd = r'reg query "HKEY_CURRENT_USER\Software\Google\Chrome\BLBeacon" /v version'
-            output = subprocess.check_output(cmd, shell=True).decode('utf-8')
-            return output.strip().split()[-1]
-        elif system == 'linux':
-            # Пробуем разные пути к Chrome в Linux
-            chrome_paths = [
-                '/usr/bin/google-chrome',
-                '/usr/bin/google-chrome-stable',
-                '/snap/bin/google-chrome',
-                '/usr/bin/chromium-browser',
-                '/usr/bin/chromium'
-            ]
-
-            for path in chrome_paths:
-                if os.path.exists(path):
-                    try:
-                        output = subprocess.check_output([path, '--version'], stderr=subprocess.STDOUT).decode('utf-8')
-                        return output.strip().split()[-1]
-                    except subprocess.CalledProcessError:
-                        continue
-
-            # Если не нашли Chrome, пробуем через which
-            try:
-                chrome_path = subprocess.check_output(['which', 'google-chrome']).decode('utf-8').strip()
-                output = subprocess.check_output([chrome_path, '--version'], stderr=subprocess.STDOUT).decode('utf-8')
-                return output.strip().split()[-1]
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                pass
-
-            return "Chrome не найден в системе"
-        else:
-            return f"Неподдерживаемая операционная система: {system}"
-    except Exception as e:
-        return f"Не удалось определить версию Chrome: {str(e)}"
+from mosaic_conductor.selenium.driver_resolver import ensure_driver, get_chrome_version
 
 
 def is_port_in_use(port):
@@ -66,64 +23,6 @@ def find_available_port():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('', 0))
         return s.getsockname()[1]
-
-
-def check_internet_connection():
-    """Проверяет доступность интернета."""
-    try:
-        response = requests.get('https://www.google.com', timeout=5)
-        return response.status_code == 200
-    except:
-        return False
-
-
-def find_local_chromedriver():
-    """Ищет локальный chromedriver в системе."""
-    possible_paths = [
-        '/usr/bin/chromedriver',
-        '/usr/local/bin/chromedriver',
-        '/opt/chromedriver',
-        './chromedriver',
-        './utils/geckodriver.exe',  # fallback на geckodriver если есть
-        './utils/chromedriver.exe',  # возможный путь к chromedriver
-    ]
-    
-    # Ищем в текущей директории и подпапках
-    current_dir = os.getcwd()
-    search_patterns = [
-        os.path.join(current_dir, '**/chromedriver*'),
-        os.path.join(current_dir, '**/geckodriver*'),
-        os.path.join(current_dir, 'utils/**/chromedriver*'),
-        os.path.join(current_dir, 'utils/**/geckodriver*'),
-    ]
-    
-    for pattern in search_patterns:
-        matches = glob.glob(pattern, recursive=True)
-        for match in matches:
-            if os.path.isfile(match) and os.access(match, os.X_OK):
-                return match
-    
-    # Проверяем стандартные пути
-    for path in possible_paths:
-        if os.path.exists(path) and os.access(path, os.X_OK):
-            return path
-    
-    return None
-
-
-def get_chromedriver_offline():
-    """Получает путь к chromedriver в офлайн режиме."""
-    # Сначала проверяем переменную окружения
-    if CHROME_DRIVER and os.path.exists(CHROME_DRIVER):
-        return CHROME_DRIVER
-    
-    # Ищем локальный драйвер
-    local_driver = find_local_chromedriver()
-    if local_driver:
-        return local_driver
-    
-    # Если ничего не найдено, возвращаем None
-    return None
 
 
 @resource(
@@ -172,7 +71,6 @@ def selenium_driver_resource(context):
 
     try:
         if browser == "firefox":
-            from webdriver_manager.firefox import GeckoDriverManager
             from selenium.webdriver.firefox.options import Options as FirefoxOptions
             from selenium.webdriver.firefox.service import Service as FirefoxService
 
@@ -184,7 +82,9 @@ def selenium_driver_resource(context):
             profile.set_preference("browser.download.dir", temp_download_folder)
             profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
             options.profile = profile  # назначаем профиль опциям
-            service = FirefoxService(GeckoDriverManager().install())
+            driver_path = ensure_driver("firefox", context.log)
+            context.log.info(f"Используем GeckoDriver: {driver_path}")
+            service = FirefoxService(executable_path=driver_path)
             driver = webdriver.Firefox(service=service, options=options)
 
         elif browser == "chrome":
@@ -238,46 +138,9 @@ def selenium_driver_resource(context):
             options.add_experimental_option('useAutomationExtension', False)
 
             try:
-                driver_path = None
-                
-                # Сначала проверяем переменную окружения
-                if CHROME_DRIVER and os.path.exists(CHROME_DRIVER):
-                    context.log.info(f"Используем ChromeDriver из переменной окружения: {CHROME_DRIVER}")
-                    driver_path = CHROME_DRIVER
-                else:
-                    # Проверяем доступность интернета
-                    if check_internet_connection():
-                        try:
-                            context.log.info("Интернет доступен, пытаемся загрузить ChromeDriver через webdriver-manager")
-                            driver_path = ChromeDriverManager().install()
-                            context.log.info(f"Установлен ChromeDriver по пути: {driver_path}")
-                        except Exception as e:
-                            context.log.warning(f"Не удалось загрузить ChromeDriver через webdriver-manager: {e}")
-                            context.log.info("Переходим к поиску локального драйвера")
-                            driver_path = get_chromedriver_offline()
-                    else:
-                        context.log.warning("Интернет недоступен, ищем локальный ChromeDriver")
-                        driver_path = get_chromedriver_offline()
-                
-                # Если драйвер не найден, пробуем найти локально
-                if not driver_path:
-                    context.log.info("Пытаемся найти локальный ChromeDriver")
-                    driver_path = get_chromedriver_offline()
-                
-                if not driver_path:
-                    raise Exception("Не удалось найти ChromeDriver. Установите драйвер вручную или проверьте подключение к интернету.")
-                
+                driver_path = ensure_driver("chrome", context.log)
                 context.log.info(f"Используем ChromeDriver: {driver_path}")
 
-                # Устанавливаем права на выполнение для ChromeDriver в Linux
-                if platform.system().lower() == 'linux':
-                    try:
-                        os.chmod(driver_path, 0o755)
-                        context.log.info("Установлены права на выполнение для ChromeDriver")
-                    except Exception as e:
-                        context.log.warning(f"Не удалось установить права на выполнение для ChromeDriver: {str(e)}")
-
-                # Получаем версию ChromeDriver
                 try:
                     driver_version = subprocess.check_output([driver_path, '--version']).decode('utf-8').strip()
                     context.log.info(f"Версия ChromeDriver: {driver_version}")

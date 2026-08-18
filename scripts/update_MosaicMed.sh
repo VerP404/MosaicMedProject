@@ -84,6 +84,43 @@ check_and_add_env_variable() {
     fi
 }
 
+# Если переменная отсутствует или не указывает на существующий файл — записать путь к кэшу проекта
+fix_driver_env_path() {
+    local env_file=".env"
+    local var_name=$1
+    local desired_path=$2
+    local var_comment=$3
+
+    if [ ! -f "$env_file" ]; then
+        touch "$env_file"
+    fi
+
+    local current=""
+    if grep -q "^${var_name}=" "$env_file"; then
+        current=$(grep "^${var_name}=" "$env_file" | tail -n 1 | cut -d= -f2-)
+        current="${current%\"}"
+        current="${current#\"}"
+        current="${current%\'}"
+        current="${current#\'}"
+    fi
+
+    if [ -n "$current" ] && [ -f "$current" ]; then
+        echo "[INFO] $var_name уже указывает на существующий файл: $current"
+        return 0
+    fi
+
+    if grep -q "^${var_name}=" "$env_file"; then
+        echo "[INFO] Обновляем $var_name=$desired_path в $env_file (прежнее значение не является путём к файлу)."
+        sed -i "s|^${var_name}=.*|${var_name}=${desired_path}|" "$env_file"
+    else
+        echo "[INFO] Добавляем $var_name=$desired_path в $env_file..."
+        if [ -n "$var_comment" ]; then
+            echo -e "\n# $var_comment" >> "$env_file"
+        fi
+        echo "${var_name}=${desired_path}" >> "$env_file"
+    fi
+}
+
 # Проверка и добавление необходимых переменных окружения
 echo "[INFO] Проверка и обновление файла .env..."
 
@@ -120,6 +157,18 @@ if [ $? -ne 0 ]; then
 else
     echo "[INFO] Зависимости установлены."
 fi
+
+# Прогрев ChromeDriver/GeckoDriver в кэш проекта (не в /tmp)
+echo "[INFO] Прогрев браузерных драйверов..."
+if python3.12 mosaic_conductor/selenium/ensure_browser_drivers.py; then
+    echo "[INFO] Браузерные драйверы подготовлены."
+else
+    echo "[WARN] Не удалось прогреть браузерные драйверы. Selenium job'ы могут не запуститься без кэша и интернета."
+fi
+
+PROJECT_ROOT="$(pwd)"
+fix_driver_env_path "CHROME_DRIVER" "${PROJECT_ROOT}/mosaic_conductor/selenium/.drivers/chromedriver" "абсолютный путь к ChromeDriver, не версия"
+fix_driver_env_path "GECKO_DRIVER" "${PROJECT_ROOT}/mosaic_conductor/selenium/.drivers/geckodriver" "абсолютный путь к GeckoDriver, не версия"
 
 # Выполнение миграций
 echo "[INFO] Выполнение миграций (python3.12 manage.py migrate)..."
