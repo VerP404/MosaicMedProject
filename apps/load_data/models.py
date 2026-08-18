@@ -425,13 +425,13 @@ class Reference(TimeStampedModel):
 
 
 class KvazarAnalysisOrder(TimeStampedModel):
-    number = models.CharField("Номер", max_length=255, unique=True)
+    number = models.TextField("Номер", unique=True)
     status = models.CharField("Статус", max_length=255, default="-")
     lis = models.CharField("ЛИС", max_length=255, default="-")
     patient = models.CharField("Пациент", max_length=255, default="-")
-    doctor = models.CharField("Врач", max_length=500, default="-")
-    operator = models.CharField("Оператор", max_length=500, default="-")
-    diagnosis = models.CharField("Диагноз", max_length=500, default="-")
+    doctor = models.TextField("Врач", default="-")
+    operator = models.TextField("Оператор", default="-")
+    diagnosis = models.TextField("Диагноз", default="-")
     services = models.TextField("Услуги", default="-")
     order_created_at = models.CharField("Создан", max_length=255, default="-")
     payment_source = models.CharField("Источник оплаты", max_length=255, default="-")
