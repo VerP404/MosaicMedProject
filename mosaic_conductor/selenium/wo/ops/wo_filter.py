@@ -7,6 +7,27 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 
+OJIDANIE_TIMEOUT_SECONDS = 25 * 60
+
+
+def ojidanie(driver, max_seconds=OJIDANIE_TIMEOUT_SECONDS):
+    """Ждёт исчезновения «Пожалуйста, подождите...» не дольше max_seconds."""
+    deadline = time.time() + max_seconds
+    while time.time() < deadline:
+        try:
+            soup = BeautifulSoup(driver.page_source, "html.parser")
+            info = soup.find("h2", {"class": "jss170 jss176"}).get_text()
+            if info == "Пожалуйста, подождите...":
+                time.sleep(2)
+                continue
+            return
+        except AttributeError:
+            return
+    raise TimeoutError(
+        f"OMS не завершил загрузку за {max_seconds // 60} мин "
+        "(индикатор «Пожалуйста, подождите...»)."
+    )
+
 
 @op(
     config_schema={
@@ -78,29 +99,10 @@ def filter_input_op(context, site_url: str):
 
     context.log.info("Фильтры установлены корректно, нажимаем Enter для выполнения поиска.")
 
-    def parse_html():
-        source_data = driver.page_source
-        soup = BeautifulSoup(source_data, 'html.parser')
-        return soup
-
-    def ojidanie():
-        flag = True
-        while flag:
-            try:
-                soup = parse_html()
-                info = soup.find('h2', {'class': 'jss170 jss176'}).get_text()
-                if info == 'Пожалуйста, подождите...':
-                    flag = True
-                    time.sleep(2)
-                else:
-                    flag = False
-            except AttributeError:
-                flag = False
-
     find_button = driver.find_element(By.XPATH,
                                       '//*[@id="menu"]/div/div[1]/div/div[4]/div/div[4]/div/button')
     find_button.click()
-    ojidanie()
+    ojidanie(driver)
     # Ожидание загрузки
     loading_indicator_locator = (By.XPATH,
                                  '//h2[contains(@class, "jss170") and contains(@class, "jss176") and text()="Пожалуйста, подождите..."]')
@@ -227,29 +229,10 @@ def filter_input_detail_op(context, site_url: str):
 
     context.log.info("Фильтры установлены корректно, нажимаем Enter для выполнения поиска.")
 
-    def parse_html():
-        source_data = driver.page_source
-        soup = BeautifulSoup(source_data, 'html.parser')
-        return soup
-
-    def ojidanie():
-        flag = True
-        while flag:
-            try:
-                soup = parse_html()
-                info = soup.find('h2', {'class': 'jss170 jss176'}).get_text()
-                if info == 'Пожалуйста, подождите...':
-                    flag = True
-                    time.sleep(2)
-                else:
-                    flag = False
-            except AttributeError:
-                flag = False
-
     find_button = driver.find_element(By.XPATH,
                                       '//*[@id="menu"]/div/div[5]/div/div/div[2]/button')
     find_button.click()
-    ojidanie()
+    ojidanie(driver)
     # Ожидание загрузки
     loading_indicator_locator = (By.XPATH,
                                  '//h2[contains(@class, "jss170") and contains(@class, "jss176") and text()="Пожалуйста, подождите..."]')
@@ -378,29 +361,10 @@ def filter_input_error_op(context, site_url: str):
 
     context.log.info("Фильтры установлены корректно, нажимаем Enter для выполнения поиска.")
 
-    def parse_html():
-        source_data = driver.page_source
-        soup = BeautifulSoup(source_data, 'html.parser')
-        return soup
-
-    def ojidanie():
-        flag = True
-        while flag:
-            try:
-                soup = parse_html()
-                info = soup.find('h2', {'class': 'jss170 jss176'}).get_text()
-                if info == 'Пожалуйста, подождите...':
-                    flag = True
-                    time.sleep(2)
-                else:
-                    flag = False
-            except AttributeError:
-                flag = False
-
     find_button = driver.find_element(By.XPATH,
                                       '//*[@id="menu"]/div/div[4]/div/div[3]/div/button')
     find_button.click()
-    ojidanie()
+    ojidanie(driver)
     # Ожидание загрузки
     loading_indicator_locator = (By.XPATH,
                                  '//h2[contains(@class, "jss170") and contains(@class, "jss176") and text()="Пожалуйста, подождите..."]')

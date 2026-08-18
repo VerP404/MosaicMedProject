@@ -65,6 +65,7 @@ def create_download_job(
         resource_defs={"selenium_driver": selenium_driver_resource},
         config=job_config,
         executor_def=in_process_executor,
+        tags={"dagster/max_runtime": str(40 * 60)},
     )
 
 

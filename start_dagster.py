@@ -58,6 +58,10 @@ schedule_storage:
   class: SqliteScheduleStorage
   config:
     base_dir: "{final_home}/storage"
+
+run_monitoring:
+  enabled: true
+  poll_interval_seconds: 30
 """
     dagster_yaml_path.write_text(dagster_yaml_content, encoding="utf-8")
     print(f"Сгенерирован {dagster_yaml_path}")
