@@ -158,12 +158,12 @@ else
     echo "[INFO] Зависимости установлены."
 fi
 
-# Прогрев ChromeDriver/GeckoDriver в кэш проекта (не в /tmp)
-echo "[INFO] Прогрев браузерных драйверов..."
-if python3.12 mosaic_conductor/selenium/ensure_browser_drivers.py; then
-    echo "[INFO] Браузерные драйверы подготовлены."
+# Проверка браузерных драйверов (скачивает только если нет в кэше, таймаут 60 сек)
+echo "[INFO] Проверка браузерных драйверов..."
+if timeout 60 python3.12 -u mosaic_conductor/selenium/ensure_browser_drivers.py; then
+    echo "[INFO] Браузерные драйверы готовы."
 else
-    echo "[WARN] Не удалось прогреть браузерные драйверы. Selenium job'ы могут не запуститься без кэша и интернета."
+    echo "[WARN] Не удалось подготовить браузерные драйверы. Selenium job'ы могут не запуститься без кэша и интернета."
 fi
 
 PROJECT_ROOT="$(pwd)"

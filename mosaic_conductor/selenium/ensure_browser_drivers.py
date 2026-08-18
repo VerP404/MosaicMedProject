@@ -15,7 +15,7 @@ try:
 except ImportError:
     pass
 
-from mosaic_conductor.selenium.driver_resolver import DRIVERS_DIR, ensure_driver
+from mosaic_conductor.selenium.driver_resolver import DRIVERS_DIR, ensure_driver, find_cached_driver
 
 
 def _needed_browsers():
@@ -36,8 +36,14 @@ def main():
     ok = []
     failed = []
     for browser in needed:
+        cached = find_cached_driver(browser)
+        if cached:
+            print(f"[INFO] {browser}: драйвер уже есть — {cached}")
+            ok.append(browser)
+            continue
         try:
-            path = ensure_driver(browser, refresh=True)
+            print(f"[INFO] {browser}: драйвер не найден, скачиваем...")
+            path = ensure_driver(browser)
             print(f"[INFO] {browser}: {path}")
             ok.append(browser)
         except Exception as e:
