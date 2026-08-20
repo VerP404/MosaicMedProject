@@ -5,7 +5,6 @@ from apps.analytical_app.pages.economist.disp_by_ages.page import economist_disp
 from apps.analytical_app.pages.economist.doctors.page import economist_doctors_talon_list
 from apps.analytical_app.pages.head.dispensary.adults.main import head_adults_dd_main
 from apps.analytical_app.pages.head.dispensary.adults.tab1 import adults_dv1
-from apps.analytical_app.pages.head.dispensary.adults.tab10 import adults_dv10
 from apps.analytical_app.pages.head.dispensary.adults.tab3 import adults_dv3
 from apps.analytical_app.pages.head.dispensary.adults.tab8 import adults_dv8
 from apps.analytical_app.pages.head.dispensary.adults.tab9 import adults_dv9
@@ -111,9 +110,9 @@ routes_head = {
         dbc.Breadcrumb(items=[
             {"label": "Заведующий", "href": "/head"},
             {"label": "Диспансеризация взрослых", "href": "/head/adults"},
-            {"label": "По возрастам и группам здоровья", "active": True},
+            {"label": "Диспансеризация взрослых по возрастам", "active": True},
         ]),
-        adults_dv10
+        adults_dv3
     ]),
     "/head/adults/dv11": html.Div([
         dbc.Breadcrumb(items=[

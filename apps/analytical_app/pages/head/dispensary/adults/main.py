@@ -21,7 +21,7 @@ cards_row_1 = dbc.Row(
         dbc.Col(
             create_card(3, type_page,
                         "Диспансеризация по возрастам",
-                        "Все виды диспансеризации с разбивкой по возрастам"),
+                        "По возрастам, видам, полу, корпусу, отделению и группе здоровья"),
             className="d-flex"
         ),
         dbc.Col(
@@ -41,12 +41,6 @@ cards_row_1 = dbc.Row(
 )
 cards_row_2 = dbc.Row(
     [
-        dbc.Col(
-            create_card(10, type_page,
-                        "По возрастам и группам здоровья",
-                        "Формирует отчет по возрастам и группам здоровья в диспансеризации."),
-            className="d-flex"
-        ),
         dbc.Col(
             create_card(11, type_page,
                         "Анализ карт на формирование ЭМД",
@@ -101,7 +95,7 @@ head_adults_dd_main = html.Div([
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 3, 8, 9, 10, 11, 12, 13, 14, 15, 16]],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in [1, 3, 8, 9, 11, 12, 13, 14, 15, 16]],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -117,7 +111,6 @@ def navigate_pages(*n_clicks):
         3: f"/{main_link}/dv3",
         8: f"/{main_link}/dv8",
         9: f"/{main_link}/dv9",
-        10: f"/{main_link}/dv10",
         11: f"/{main_link}/dv11",
         12: f"/{main_link}/dv12",
         13: f"/{main_link}/dv13",

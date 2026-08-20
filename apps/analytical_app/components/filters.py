@@ -184,7 +184,7 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
     query = f"""
         SELECT ARRAY_AGG(doctor.id) AS doctor_ids,
                CONCAT(person.last_name, ' ', SUBSTRING(person.first_name, 1, 1), '.', SUBSTRING(person.patronymic, 1, 1), '. - ',
-                      CASE 
+                      CASE
                           WHEN pp.description = 'общей врачебной практике (семейной медицине)' THEN 'ВОП'
                           WHEN pp.description = 'акушерству и гинекологии (за исключением использования вспомогательных репродуктивных технологий и искусственного прерывания беременности)' THEN 'акушерству и гинекологии'
                         ELSE pp.description
@@ -615,7 +615,7 @@ def parse_doctor_ids(doctor_value):
     return doctor_ids
 
 
-def filter_health_group(page):
+def filter_health_group(page, default=None):
     # 1) Получаем все группы из БД (включая "-")
     sql = text("""
         SELECT DISTINCT health_group
@@ -632,8 +632,8 @@ def filter_health_group(page):
         {"label": "Все", "value": "all"},
     ] + [{"label": g, "value": g} for g in groups]
 
-    # 3) По-умолчанию «С группой»
-    default = ["with"]
+    if default is None:
+        default = ["with"]
 
     return html.Div([
         html.Label("Группа здоровья", style={"font-weight": "bold"}),
