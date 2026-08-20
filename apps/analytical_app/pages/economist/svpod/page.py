@@ -14,7 +14,7 @@ from apps.analytical_app.components.filters import filter_years, update_buttons,
     get_current_reporting_month, get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
     get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
-    filter_status, status_groups, months_sql_labels
+    filter_status, status_groups, months_sql_labels, months_dict, current_year
 from apps.analytical_app.elements import card_table
 from apps.analytical_app.pages.economist.svpod.query import sql_query_rep, get_filter_conditions, sql_query_svpod_details, get_cumulative_report_for_all_groups, sql_query_indicators, sql_query_indicators_details, clear_cache, get_groups_for_indicators_report, get_plan_by_months_for_group, sql_query_plans, sql_query_inogorod_monthly
 import pandas as pd
@@ -112,6 +112,173 @@ PLAN_KIND_OPTIONS = [
     {"label": "Внутренний", "value": "internal"},
     {"label": "ТФОМС", "value": "tfoms"},
 ]
+MONTH_DROPDOWN_OPTIONS = [
+    {"label": name, "value": num} for num, name in months_dict.items()
+]
+_FILTER_CARD_STYLE = {
+    "width": "100%",
+    "padding": "0rem",
+    "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+    "border-radius": "10px",
+    "overflow": "visible",
+}
+
+
+def _year_dropdown(page_id):
+    return dcc.Dropdown(
+        options=[{"label": str(year), "value": year} for year in range(2023, current_year + 2)],
+        id=f"dropdown-year-{page_id}",
+        value=current_year,
+        clearable=False,
+        style={"minWidth": "92px"},
+    )
+
+
+def _flex_field(label, control, flex="1 1 0", min_width="88px"):
+    return html.Div(
+        [
+            html.Label(label, className="fw-semibold small text-muted mb-1 text-nowrap"),
+            control,
+        ],
+        style={"flex": flex, "minWidth": min_width},
+    )
+
+
+def _muted_hint(label, tooltip, hint_id):
+    return html.Div(
+        [
+            html.Span(label, id=hint_id, className="text-muted small"),
+            dbc.Tooltip(tooltip, target=hint_id, placement="bottom"),
+        ]
+    )
+
+
+def _indicator_name(group_id):
+    if group_id is None:
+        return None
+    try:
+        gid = int(group_id)
+    except (TypeError, ValueError):
+        return None
+    with engine.connect() as connection:
+        row = connection.execute(
+            text("SELECT name FROM plan_groupindicators WHERE id = :id"),
+            {"id": gid},
+        ).first()
+    return row[0] if row else None
+
+
+def _indicator_path_title(values, options_list=None):
+    names = []
+    options_list = options_list or []
+    for index, value in enumerate(values or []):
+        if value is None or value == "":
+            break
+        label = None
+        options = options_list[index] if index < len(options_list) else None
+        if options:
+            for option in options:
+                if option.get("value") == value:
+                    label = option.get("label")
+                    break
+        if not label:
+            label = _indicator_name(value)
+        if label:
+            names.append(label)
+    return " / ".join(names) if names else "Данные"
+
+
+def _building_names(building_ids):
+    if not building_ids:
+        return []
+    mapping = {opt["value"]: opt["label"] for opt in get_available_buildings()}
+    return [mapping.get(b, str(b)) for b in building_ids]
+
+
+def _applied_rules_hint(
+    *,
+    filter_conditions=None,
+    indicator_name=None,
+    selected_year,
+    mode,
+    finance_unit,
+    unique_flag,
+    selected_month,
+    month_closed,
+    plan_kind,
+    buildings,
+):
+    parts = []
+    if indicator_name:
+        parts.append(indicator_name)
+    if filter_conditions:
+        parts.append(filter_conditions)
+    if selected_year:
+        parts.append(f"год: {selected_year}")
+    parts.append("финансы" if mode == "finance" else "объемы")
+    kind_label = "ТФОМС" if (plan_kind or "tfoms") == "tfoms" else "внутренний"
+    parts.append(f"план: {kind_label}")
+    if selected_month:
+        parts.append(f"месяц: {months_dict.get(selected_month, selected_month)}")
+    else:
+        parts.append("месяц: авто")
+    if month_closed:
+        parts.append("факт: завершённый месяц (2,3)")
+    if unique_flag:
+        parts.append("уникальные пациенты")
+    names = _building_names(buildings)
+    if names:
+        parts.append(f"корпус: {', '.join(names)}")
+    if mode == "finance":
+        unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
+        parts.append(f"ед.: {finance_unit_label(unit)}")
+    tooltip = "; ".join(parts) if parts else "Условия не заданы"
+    return _muted_hint("Правила", tooltip, f"rules-hint-{type_page}")
+
+
+_applied_filter_chips = _applied_rules_hint
+
+
+def _level_dropdowns_row(values):
+    dropdowns = []
+    level = 0
+    options = get_level_options()
+    value = values[0] if values else None
+    dropdowns.append(
+        dbc.Col(
+            dcc.Dropdown(
+                id={"type": "dynamic-dropdown", "index": level},
+                options=options,
+                placeholder="Выберите уровень 1",
+                value=value,
+            ),
+            xs=12,
+            md=4,
+            lg=3,
+        )
+    )
+    while True:
+        if value is None:
+            break
+        options = get_level_options(value)
+        if not options:
+            break
+        level += 1
+        value = values[level] if len(values) > level else None
+        dropdowns.append(
+            dbc.Col(
+                dcc.Dropdown(
+                    id={"type": "dynamic-dropdown", "index": level},
+                    options=options,
+                    placeholder=f"Выберите уровень {level + 1}",
+                    value=value,
+                ),
+                xs=12,
+                md=4,
+                lg=3,
+            )
+        )
+    return dbc.Row(dropdowns, className="g-2")
 
 
 # Кэшированная функция для SQL-запроса индикаторов
@@ -149,199 +316,199 @@ current_report_tab = html.Div(
         dbc.Row(
             dbc.Col(
                 dbc.Card(
-                    dbc.CardBody(
+            [
+                dbc.CardHeader(
+                    dbc.Row(
                         [
-                            dbc.CardHeader("Фильтры"),
-                            dbc.Row([
-                                dbc.Col(update_buttons(type_page), width=2),
-                                dbc.Col(filter_years(type_page), width=1),
-                                dbc.Col(dbc.Alert(
-                                    "Отобраны талоны: местные (по полису ОМС), сумма талона не равна 0",
-                                    color="primary"), width=4),
-                                dbc.Col(
-                                    dbc.Alert(
-                                        [
-                                            html.P("Примененные фильтры:", style={"margin-bottom": "5px"}),
-                                            html.Div(id=f"applied-filters-{type_page}", style={"margin-top": "10px"})
-                                        ],
-                                        color="warning"
-                                    ),
-                                    width=4
+                            dbc.Col(html.Span("Фильтры", className="fw-semibold"), width="auto"),
+                            dbc.Col(
+                                dbc.Button(
+                                    "Обновить",
+                                    id=f"update-button-{type_page}",
+                                    color="primary",
+                                    size="sm",
                                 ),
-                            ]),
-                            dbc.Row([
-                                html.Div(id='dropdown-container', children=[
-                                    dbc.Col(
-                                        dcc.Dropdown(
-                                            id={'type': 'dynamic-dropdown', 'index': 0},
-                                            options=[],
-                                            placeholder="Выберите уровень 1",
-                                            value=None
-                                        ),
-                                        width=3
-                                    ),
-                                ]),
-                            ]),
-                            dbc.Row([
-                                dbc.Col(
+                                width="auto",
+                            ),
+                            dbc.Col(
+                                _year_dropdown(type_page),
+                                width="auto",
+                                style={"minWidth": "100px"},
+                            ),
+                            dbc.Col(
+                                html.Div(
                                     [
-                                        html.Label("Режим:", style={"font-weight": "bold", "margin-bottom": "5px"}),
-                                        dcc.Dropdown(
-                                            id=f'mode-toggle-{type_page}',
-                                            options=[
-                                                {'label': 'Объемы', 'value': 'volumes'},
-                                                {'label': 'Финансы', 'value': 'finance'}
-                                            ],
-                                            value='volumes',
-                                            clearable=False,
-                                            style={"width": "100%"}
+                                        _muted_hint(
+                                            "Местные · сумма ≠ 0",
+                                            "Отобраны талоны: местные (по полису ОМС), сумма талона не равна 0",
+                                            f"selection-hint-{type_page}",
+                                        ),
+                                        html.Div(
+                                            id=f"applied-filters-{type_page}",
+                                            children=_muted_hint(
+                                                "Правила",
+                                                "Условия выбранного индикатора появятся после обновления",
+                                                f"rules-hint-{type_page}",
+                                            ),
                                         ),
                                     ],
-                                    width=2
+                                    className="d-flex flex-wrap align-items-center gap-3",
                                 ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Ед. финансов:", style={"font-weight": "bold", "margin-bottom": "5px"}),
-                                        dcc.Dropdown(
-                                            id=f'finance-unit-{type_page}',
-                                            options=FINANCE_UNIT_DROPDOWN_OPTIONS,
-                                            value=get_default_finance_unit(),
-                                            clearable=False,
-                                            style={"width": "100%"}
-                                        ),
-                                    ],
-                                    width=2
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Версия плана:", style={"font-weight": "bold", "margin-bottom": "5px"}),
-                                        dcc.Dropdown(
-                                            id=f'dropdown-plan-kind-{type_page}',
-                                            options=PLAN_KIND_OPTIONS,
-                                            value='tfoms',
-                                            clearable=False,
-                                            style={"width": "100%"}
-                                        ),
-                                    ],
-                                    width=2
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Уникальные пациенты:", style={"font-weight": "bold", "margin-bottom": "5px"}),
-                                        dbc.Checkbox(
-                                            id=f'unique-toggle-{type_page}',
-                                            label="Включить",
-                                            value=False,
-                                            className="mt-2"
-                                        ),
-                                    ],
-                                    width=2
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Месяц:", style={"font-weight": "bold", "margin-bottom": "5px"}),
-                                        dcc.Dropdown(
-                                            id=f'month-selector-{type_page}',
-                                            options=[
-                                                {'label': 'Январь', 'value': 1},
-                                                {'label': 'Февраль', 'value': 2},
-                                                {'label': 'Март', 'value': 3},
-                                                {'label': 'Апрель', 'value': 4},
-                                                {'label': 'Май', 'value': 5},
-                                                {'label': 'Июнь', 'value': 6},
-                                                {'label': 'Июль', 'value': 7},
-                                                {'label': 'Август', 'value': 8},
-                                                {'label': 'Сентябрь', 'value': 9},
-                                                {'label': 'Октябрь', 'value': 10},
-                                                {'label': 'Ноябрь', 'value': 11},
-                                                {'label': 'Декабрь', 'value': 12}
-                                            ],
-                                            placeholder="Авто (по дате)",
-                                            value=None,
-                                            clearable=True,
-                                            style={"width": "100%"},
-                                        ),
-                                    ],
-                                    width=2
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Факт:", style={"font-weight": "bold", "margin-bottom": "5px"}),
-                                        dbc.Checklist(
-                                            id=f'switch-month-closed-{type_page}',
-                                            options=[
-                                                {
-                                                    "label": "Завершённый месяц (статусы 2,3)",
-                                                    "value": "closed",
-                                                }
-                                            ],
-                                            value=[],
-                                            switch=True,
-                                            className="mt-1",
-                                        ),
-                                    ],
-                                    width=3
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label("Корпус:", style={"font-weight": "bold", "margin-bottom": "5px"}),
-                                        dcc.Dropdown(
-                                            id=f'dropdown-building-{type_page}',
-                                            options=get_available_buildings(),
-                                            placeholder="Все корпуса",
-                                            clearable=True,
-                                            multi=True,
-                                            style={"width": "100%"},
-                                        ),
-                                    ],
-                                    width=3
-                                ),
-                            ], style={'margin-bottom': '10px'})
-                        ]
+                                className="ms-auto",
+                                width="auto",
+                            ),
+                        ],
+                        className="g-2 align-items-center",
                     ),
-                    style={"width": "100%", "padding": "0rem", "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
-                           "border-radius": "10px"}
+                    className="py-2",
                 ),
-                width=12
-            ),
-            style={"margin": "0 auto", "padding": "0rem"}
+                dbc.CardBody(
+                    [
+                        html.Div(
+                            id="dropdown-container",
+                            children=_level_dropdowns_row([]),
+                            className="mb-2",
+                        ),
+                        html.Div(
+                            [
+                                _flex_field(
+                                    "Режим",
+                                    dcc.Dropdown(
+                                        id=f"mode-toggle-{type_page}",
+                                        options=[
+                                            {"label": "Объемы", "value": "volumes"},
+                                            {"label": "Финансы", "value": "finance"},
+                                        ],
+                                        value="volumes",
+                                        clearable=False,
+                                    ),
+                                    flex="1 1 0",
+                                    min_width="110px",
+                                ),
+                                _flex_field(
+                                    "Ед. финансов",
+                                    dcc.Dropdown(
+                                        id=f"finance-unit-{type_page}",
+                                        options=FINANCE_UNIT_DROPDOWN_OPTIONS,
+                                        value=get_default_finance_unit(),
+                                        clearable=False,
+                                    ),
+                                    flex="0 0 92px",
+                                    min_width="92px",
+                                ),
+                                _flex_field(
+                                    "Версия плана",
+                                    dcc.Dropdown(
+                                        id=f"dropdown-plan-kind-{type_page}",
+                                        options=PLAN_KIND_OPTIONS,
+                                        value="tfoms",
+                                        clearable=False,
+                                    ),
+                                    flex="1 1 0",
+                                    min_width="110px",
+                                ),
+                                _flex_field(
+                                    "Месяц",
+                                    dcc.Dropdown(
+                                        id=f"month-selector-{type_page}",
+                                        options=MONTH_DROPDOWN_OPTIONS,
+                                        placeholder="Авто (по дате)",
+                                        value=None,
+                                        clearable=True,
+                                    ),
+                                    flex="1 1 0",
+                                    min_width="130px",
+                                ),
+                                _flex_field(
+                                    "Корпус",
+                                    dcc.Dropdown(
+                                        id=f"dropdown-building-{type_page}",
+                                        options=get_available_buildings(),
+                                        placeholder="Все корпуса",
+                                        clearable=True,
+                                        multi=True,
+                                    ),
+                                    flex="1.4 1 0",
+                                    min_width="150px",
+                                ),
+                                html.Div(
+                                    [
+                                        dbc.Switch(
+                                            id=f"unique-toggle-{type_page}",
+                                            label="Уникальные пациенты",
+                                            value=False,
+                                            className="mb-0",
+                                        ),
+                                        dbc.Switch(
+                                            id=f"switch-month-closed-{type_page}",
+                                            label="Завершённый месяц (2,3)",
+                                            value=False,
+                                            className="mb-0",
+                                        ),
+                                    ],
+                                    className="d-flex flex-nowrap align-items-center gap-3 flex-shrink-0 pb-1",
+                                ),
+                            ],
+                            className="d-flex flex-nowrap align-items-end gap-2 w-100",
+                        ),
+                    ],
+                    className="py-2",
+                ),
+            ],
+            style=_FILTER_CARD_STYLE,
+            className="w-100",
         ),
-        dbc.Row([
-            dbc.Col([
-                html.Div(id=f'loading-status-{type_page}', style={'text-align': 'center', 'margin': '10px 0'}),
-            ], width=12)
-        ]),
+                width=12,
+            ),
+            style={"margin": "0 auto", "padding": "0rem"},
+        ),
         dcc.Loading(id=f'loading-output-{type_page}', type='default'),
-        card_table(f'result-table1-{type_page}', "Данные", column_selectable='multi'),
+        card_table(
+            f'result-table1-{type_page}',
+            html.Span("Данные", id=f"data-card-title-{type_page}"),
+            column_selectable='multi',
+        ),
+        html.Div(
+            id=f'loading-status-{type_page}',
+            className='text-muted small px-2 py-1',
+        ),
         dcc.Store(id=f'selected-data-{type_page}'),
-        # Таблица детализации
-        dbc.Card([
-            dbc.CardHeader("Детализация по талонам"),
-            dbc.CardBody([
-                html.Div(id=f'details-title-{type_page}', style={"fontWeight": "bold", "marginBottom": "10px"}),
-                # Кнопка детализации
-                dbc.Row([
-                    dbc.Col(
-                        dbc.Button(
-                            "Детализация",
-                            id=f'details-button-{type_page}',
-                            color="primary",
-                            size="sm",
-                            disabled=True,
-                            className="mb-3"
-                        ), width="auto"
-                    )
-                ]),
-                card_table(f'details-table-{type_page}', "Детали", page_size=20)
-            ])
-        ], className="mt-3", style={
-            "width": "100%",
-            "padding": "0rem",
-            "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
-            "border-radius": "10px"
-        })
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    [
+                        dbc.CardHeader("Детализация по талонам"),
+                        dbc.CardBody([
+                            html.Div(
+                                id=f'details-title-{type_page}',
+                                style={"fontWeight": "bold", "marginBottom": "10px"},
+                            ),
+                            dbc.Button(
+                                "Детализация",
+                                id=f'details-button-{type_page}',
+                                color="primary",
+                                size="sm",
+                                disabled=True,
+                                className="mb-3",
+                            ),
+                            card_table(f'details-table-{type_page}', "Детали", page_size=20),
+                        ]),
+                    ],
+                    className="mt-3",
+                    style={
+                        "width": "100%",
+                        "padding": "0rem",
+                        "box-shadow": "0 4px 8px 0 rgba(0, 0, 0, 0.2)",
+                        "border-radius": "10px",
+                    },
+                ),
+                width=12,
+            ),
+            style={"margin": "0 auto", "padding": "0rem"},
+        ),
     ],
-    style={"padding": "0rem"}
+    className="w-100",
+    style={"padding": "0rem"},
 )
 
 # Контент для вкладки "Нарастающе по всем показателям"
@@ -949,42 +1116,7 @@ def calculate_sum_and_count(n_clicks, rows, selected_cells, mode):
     Input({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
 )
 def display_dynamic_dropdowns(values):
-    dropdowns = []
-    level = 0
-    options = get_level_options()
-    value = values[0] if values else None
-
-    dropdown = dbc.Col(
-        dcc.Dropdown(
-            id={'type': 'dynamic-dropdown', 'index': level},
-            options=options,
-            placeholder="Выберите уровень 1",
-            value=value
-        ),
-        width=3
-    )
-    dropdowns.append(dropdown)
-
-    while True:
-        if value is None:
-            break
-        options = get_level_options(value)
-        if not options:
-            break
-        level += 1
-        value = values[level] if len(values) > level else None
-        dropdown = dbc.Col(
-            dcc.Dropdown(
-                id={'type': 'dynamic-dropdown', 'index': level},
-                options=options,
-                placeholder=f"Выберите уровень {level + 1}",
-                value=value
-            ),
-            width=3
-        )
-        dropdowns.append(dropdown)
-
-    return dropdowns
+    return _level_dropdowns_row(values or [])
 
 
 def _normalize_building_ids(building_ids):
@@ -1127,6 +1259,7 @@ def fetch_plan_data(selected_level, year, mode='volumes', plan_kind='internal', 
      Output(f'loading-output-{type_page}', 'children'),
      Output(f'applied-filters-{type_page}', 'children'),
      Output(f'loading-status-{type_page}', 'children'),
+     Output(f'data-card-title-{type_page}', 'children'),
      ],
     Input(f'update-button-{type_page}', 'n_clicks'),
     State(f'mode-toggle-{type_page}', 'value'),
@@ -1134,6 +1267,7 @@ def fetch_plan_data(selected_level, year, mode='volumes', plan_kind='internal', 
     State(f'unique-toggle-{type_page}', 'value'),
     State(f'dropdown-year-{type_page}', 'value'),
     State({'type': 'dynamic-dropdown', 'index': ALL}, 'value'),
+    State({'type': 'dynamic-dropdown', 'index': ALL}, 'options'),
     State(f'month-selector-{type_page}', 'value'),
     State(f'switch-month-closed-{type_page}', 'value'),
     State(f'dropdown-plan-kind-{type_page}', 'value'),
@@ -1145,6 +1279,7 @@ def update_table_with_plan_and_balance(n_clicks,
                                        unique_flag,
                                        selected_year,
                                        selected_levels,
+                                       selected_level_options,
                                        selected_month,
                                        month_closed_switch,
                                        plan_kind,
@@ -1360,19 +1495,25 @@ def update_table_with_plan_and_balance(n_clicks,
     record_count = len([r for r in fact_data if isinstance(r.get("month"), int)])
     status_text = f"Запрос выполнен за {time_text}. Найдено записей: {record_count}"
 
-    applied = filter_conditions or ""
-    if buildings:
-        applied = (applied + "; " if applied else "") + f"корпус id={buildings}"
-    kind_label = "ТФОМС" if (plan_kind or "tfoms") == "tfoms" else "внутренний"
-    applied = (applied + "; " if applied else "") + f"план: {kind_label}"
-    if month_closed:
-        applied = (applied + "; " if applied else "") + "факт: завершённый месяц (2,3)"
     if mode == "finance":
         unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
         fact_data = scale_rows_money(fact_data, unit)
-        applied = (applied + "; " if applied else "") + f"ед.: {finance_unit_label(unit)}"
 
-    return columns, fact_data, loading_output, applied, status_text
+    applied = _applied_rules_hint(
+        filter_conditions=filter_conditions,
+        indicator_name=_indicator_name(selected_level),
+        selected_year=selected_year,
+        mode=mode,
+        finance_unit=finance_unit,
+        unique_flag=unique,
+        selected_month=selected_month,
+        month_closed=month_closed,
+        plan_kind=plan_kind,
+        buildings=buildings,
+    )
+
+    title = _indicator_path_title(selected_levels, selected_level_options)
+    return columns, fact_data, loading_output, applied, status_text, title
 
 
 # Callback для активации кнопки детализации при выборе строки
