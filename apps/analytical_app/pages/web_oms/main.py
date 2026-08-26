@@ -36,6 +36,10 @@ cards_row_1 = dbc.Row(
         dbc.Col(create_card(8, type_page,
                             "Талоны по датам",
                             "Талоны по датам с фильтром по дате окончания лечения и дате формирования")),
+        dbc.Col(create_card(9, type_page,
+                            "Конструктор отчётов",
+                            "Соберите отчёт: строки, показатели, фильтры, режим (кол-во / сумма / уникальные)",
+                            color_button="primary")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
 )
@@ -54,7 +58,7 @@ web_oms_main = html.Div([
 # Обновленный callback для навигации
 @app.callback(
     Output(f'url-{type_page}', 'pathname'),
-    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 9)],
+    [Input(f'open-report-{i}-{type_page}', 'n_clicks') for i in range(1, 10)],
     prevent_initial_call=True
 )
 def navigate_pages(*n_clicks):
@@ -73,7 +77,8 @@ def navigate_pages(*n_clicks):
         5: f"/{main_link}/web_oms_rep5",
         6: f"/{main_link}/web_oms_rep6",
         7: f"/{main_link}/web_oms_rep7",
-        8: f"/{main_link}/web_oms_rep8"
+        8: f"/{main_link}/web_oms_rep8",
+        9: f"/{main_link}/web_oms_rep9",
     }
 
     return route_map[report_num]
