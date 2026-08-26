@@ -79,19 +79,32 @@ run_monitoring:
 
     os.environ["DAGSTER_HOME"] = final_home
 
-    # Явные пути из venv Scripts — иначе на Windows Popen не находит exe вне PATH
-    scripts_dir = Path(sys.executable).resolve().parent
-    ext = ".exe" if platform.system() == "Windows" else ""
+    # CLI лежат в bin/Scripts venv. НЕ делать Path(sys.executable).resolve():
+    # на Linux python в .venv/bin — symlink на /usr/bin/python3.x, resolve() уводит в /usr/bin.
+    if platform.system() == "Windows":
+        scripts_dir = Path(sys.prefix) / "Scripts"
+        ext = ".exe"
+    else:
+        scripts_dir = Path(sys.prefix) / "bin"
+        ext = ""
     daemon_bin = scripts_dir / f"dagster-daemon{ext}"
     webserver_bin = scripts_dir / f"dagster-webserver{ext}"
     if not daemon_bin.exists() or not webserver_bin.exists():
-        print(
-            f"Не найдены CLI Dagster в {scripts_dir}\n"
-            f"  daemon: {daemon_bin.exists()}  webserver: {webserver_bin.exists()}\n"
-            "Запускайте из активированного .venv или: pip install dagster dagster-webserver",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        # запасной вариант: рядом с интерпретатором без resolve()
+        alt_dir = Path(sys.executable).parent
+        alt_daemon = alt_dir / f"dagster-daemon{ext}"
+        alt_web = alt_dir / f"dagster-webserver{ext}"
+        if alt_daemon.exists() and alt_web.exists():
+            scripts_dir, daemon_bin, webserver_bin = alt_dir, alt_daemon, alt_web
+        else:
+            print(
+                f"Не найдены CLI Dagster в {scripts_dir}\n"
+                f"  daemon: {daemon_bin.exists()}  webserver: {webserver_bin.exists()}\n"
+                f"  sys.executable={sys.executable}  sys.prefix={sys.prefix}\n"
+                "Запускайте из активированного .venv или: pip install dagster dagster-webserver",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # dagit deprecated → dagster-webserver; явно передаём workspace
     daemon_cmd = [str(daemon_bin), "run"]
