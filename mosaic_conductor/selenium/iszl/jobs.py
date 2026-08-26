@@ -69,30 +69,31 @@ def create_download_job(
     )
 
 
-# Задача для скачивания отчета по диспансерному наблюдению
+# Задача для скачивания отчета по диспансерному наблюдению → ETL iszl_job_dn
 iszl_download_dispanser_job = create_download_job(
     job_name="iszl_download_dispanser_job",
     target_url=ISZL_BASE_URL,
     browser=ISZL_BROWSER,
-    temp_download_folder=os.path.join(os.getcwd(), "uploads", "iszl", "dispanser"),
+    temp_download_folder=os.path.join(os.getcwd(), "uploads", "iszl", "dn"),
     destination_folders=[
-        os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "iszl", "dispanser")
+        os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "iszl", "dn")
     ],
-    file_pattern="dispanser_*.csv",
+    # Ищем любой CSV; при копировании имя нормализуется в Report_*.csv под mapping ETL
+    file_pattern="*.csv",
     filter_iszl_input_op_fn=iszl_filter_input_dispanser_op,
     extra_filter_config={},
 )
 
-# Задача для скачивания других отчетов в формате CSV
+# Задача для скачивания отчётов (ДН по месту работы) → ETL iszl_job_dn_work
 iszl_download_csv_job = create_download_job(
     job_name="iszl_download_csv_job",
     target_url=ISZL_BASE_URL,
     browser=ISZL_BROWSER,
-    temp_download_folder=os.path.join(os.getcwd(), "uploads", "iszl", "reports"),
+    temp_download_folder=os.path.join(os.getcwd(), "uploads", "iszl", "dn_work"),
     destination_folders=[
-        os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "iszl", "reports")
+        os.path.join(os.getcwd(), "mosaic_conductor", "etl", "data", "iszl", "dn_work")
     ],
-    file_pattern="report_*.csv",
+    file_pattern="*.csv",
     filter_iszl_input_op_fn=iszl_filter_input_download_op,
     extra_filter_config={},
 )

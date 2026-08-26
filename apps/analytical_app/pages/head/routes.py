@@ -25,6 +25,7 @@ from apps.analytical_app.pages.head.dispensary.reproductive.main import head_rep
 from apps.analytical_app.pages.head.dispensary.reproductive.tab1 import reproductive_dr1
 from apps.analytical_app.pages.head.dispensary.reproductive.tab2 import reproductive_dr2
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
+from apps.analytical_app.pages.head.dn.page import head_dn
 from apps.analytical_app.pages.head.doctors.page import layout_doctors_goal
 from apps.analytical_app.pages.head.journal.journal import layout_journal
 from apps.analytical_app.pages.head.main import head_main
@@ -45,6 +46,13 @@ routes_head = {
             {"label": "Диспансерное наблюдение работающих", "active": True},
         ]),
         head_dn_job
+    ]),
+    "/head/dn": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Заведующий", "href": "/head"},
+            {"label": "Диспансерное наблюдение (ИСЗЛ)", "active": True},
+        ]),
+        head_dn
     ]),
     "/head/statistic-sharapova": html.Div([
         dbc.Breadcrumb(items=[

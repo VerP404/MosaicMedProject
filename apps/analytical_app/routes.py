@@ -22,6 +22,7 @@ from apps.analytical_app.pages.economist.building_indicators.page import economi
 import dash_bootstrap_components as dbc
 
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
+from apps.analytical_app.pages.head.dn.page import head_dn
 from apps.analytical_app.pages.head.doctors.page import layout_doctors_goal
 from apps.analytical_app.pages.head.routes import routes_head
 from apps.analytical_app.pages.iszl.main import iszl_main
@@ -47,6 +48,7 @@ from apps.analytical_app.pages.web_oms.status_talon.tab5 import web_oms_5
 from apps.analytical_app.pages.web_oms.status_talon.tab6 import web_oms_6
 from apps.analytical_app.pages.web_oms.status_talon.tab7 import adults_dv10 as web_oms_7
 from apps.analytical_app.pages.web_oms.status_talon.tab8 import web_oms_8
+from apps.analytical_app.pages.web_oms.status_talon.constructor import web_oms_9
 
 # Все маршруты для страниц
 routes = {
@@ -275,6 +277,13 @@ routes = {
         ]),
         web_oms_8
     ]),
+    "/web_oms/web_oms_rep9": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "WEB.ОМС", "href": "/web_oms"},
+            {"label": "Конструктор отчётов", "active": True},
+        ]),
+        web_oms_9
+    ]),
 
     "/iszl": iszl_main,
     "/iszl/svpod": html.Div([
@@ -304,6 +313,13 @@ routes = {
             {"label": "Диспансерное наблюдение работающих", "active": True},
         ]),
         head_dn_job
+    ]),
+    "/iszl/dn": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "ИСЗЛ", "href": "/iszl"},
+            {"label": "Диспансерное наблюдение (ИСЗЛ)", "active": True},
+        ]),
+        head_dn
     ]),
 }
 

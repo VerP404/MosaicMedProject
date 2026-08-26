@@ -39,13 +39,19 @@ def move_iszl_downloaded_file_op(context, previous_step_result: str = "") -> str
     if not found_file:
         raise Exception(f"Файл не найден в указанное время в папке {temp_download_folder} по шаблону {file_pattern}.")
 
-    # Для каждого пути из списка destination_folders копируем найденный файл
+    # ETL mapping ждёт Report*.csv — нормализуем имя при копировании
+    original_name = os.path.basename(found_file)
+    if original_name.lower().startswith("report"):
+        dest_filename = original_name
+    else:
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        dest_filename = f"Report_{stamp}.csv"
+
     for dest in destination_folders:
         if not os.path.exists(dest):
             os.makedirs(dest)
             context.log.info(f"Папка {dest} создана.")
-        filename = os.path.basename(found_file)
-        destination_path = os.path.join(dest, filename)
+        destination_path = os.path.join(dest, dest_filename)
         shutil.copy(found_file, destination_path)
         context.log.info(f"Файл скопирован в {destination_path}")
 

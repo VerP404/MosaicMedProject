@@ -24,7 +24,7 @@ cards_row_2 = dbc.Row(
     [
         dbc.Col(create_card(5, type_page, "Отчет Шараповой по ДН", "Еженедельный отчет Шараповой по ДН по дате создания талонов цель 3.")),
         dbc.Col(create_card(6, type_page, "131 форма", "131 форма по данным из WEB-ОМС")),
-        dbc.Col(create_card(7, type_page, "- Диспансерное наблюдение", "-")),
+        dbc.Col(create_card(7, type_page, "Диспансерное наблюдение (ИСЗЛ)", "План ИСЗЛ ↔ талоны ОМС, выбывшие, Квазар")),
         dbc.Col(create_card(8, type_page, "Обращения граждан", "Дашборд обращений граждан")),
     ],
     className="row-cols-1 row-cols-md-4 g-4 mb-4 align-items-stretch"
@@ -73,7 +73,7 @@ def navigate_pages(*n_clicks):
         4: f"/{main_link}/dn_job",
         5: f"/{main_link}/statistic-sharapova",
         6: f"/{main_link}/dispensary-reports",
-        7: f"/{main_link}/dispensary-reports",
+        7: f"/{main_link}/dn",
         8: f"/{main_link}/journal",
         9: f"/{main_link}/doctors_talon",
         10: f"/{main_link}/doctors_talon_goals",

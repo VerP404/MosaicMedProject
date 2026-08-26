@@ -453,7 +453,8 @@
         "date_update_list"
       ],
       "encoding": "cp1251",
-      "delimiter": ";"
+      "delimiter": ";",
+      "load_all_matching_files": true
     },
     "load_data_dn_work_iszl": {
       "file": {

@@ -16,6 +16,7 @@ from .update import update_personnel_op
 from .update_emd_talon import update_emd_talon_id_op
 from .update_error import update_error_log_is_fixed_op
 from .update_oms_data import update_oms_data_op
+from .sync_dn import sync_dn_from_iszl_op
 
 kvazar_assets = [
     kvazar_db_check,
@@ -142,6 +143,8 @@ iszl_job_dn = create_etl_job(
     "load_data_dispansery_iszl",
     "iszl/dn",
     "mapping.json",
+    op_fn=sync_dn_from_iszl_op,
+    op_config={"year": 0},  # 0 → текущий календарный год в op
 )
 iszl_job_dn_work = create_etl_job(
     "iszl_job_dn_work",

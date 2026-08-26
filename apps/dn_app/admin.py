@@ -2,47 +2,69 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
-from .models import Person, Encounter, Observation, DataImport
+from .models import Person, Encounter, Observation, DataImport, DnLine, DnFact
 
 
-class ObservationInline(TabularInline):
-    model = Observation
+class DnLineInline(TabularInline):
+    model = DnLine
     extra = 0
     fields = (
-        'pdwid', 'plan_month', 'plan_year', 'status', 'actual_date', 
-        'talon_number', 'date_begin', 'date_end', 'is_current'
+        "pdwid",
+        "ds_code",
+        "plan_year",
+        "category_168n",
+        "profile_cluster",
+        "status",
+        "out_of_168n",
+        "is_current",
+        "talon_number",
     )
-    readonly_fields = ('effective_from',)
-
-
-class EncounterInline(TabularInline):
-    model = Encounter
-    extra = 0
-    fields = ('pid', 'ldwid', 'ds')
-    inlines = [ObservationInline]
+    show_change_link = True
 
 
 @admin.register(Person)
 class PersonAdmin(ModelAdmin):
-    list_display = ('fio', 'enp', 'dr', 'is_detached', 'last_import_date')
-    list_filter = ('is_detached', 'last_import_date')
-    search_fields = ('fio', 'enp')
-    inlines = [EncounterInline]
-    readonly_fields = ('detached_date', 'last_import_date')
-    
+    list_display = ("fio", "enp", "dr", "lpuuch", "is_detached", "last_import_date")
+    list_filter = ("is_detached", "last_import_date")
+    search_fields = ("fio", "enp")
+    inlines = [DnLineInline]
+    readonly_fields = ("detached_date", "last_import_date")
+
     fieldsets = (
-        ('Основная информация', {
-            'fields': ('enp', 'fio', 'dr')
-        }),
-        ('Статус', {
-            'fields': ('is_detached', 'detached_date', 'last_import_date')
-        }),
+        ("Основная информация", {"fields": ("enp", "fio", "dr", "lpuuch")}),
+        ("Статус", {"fields": ("is_detached", "detached_date", "last_import_date")}),
     )
-    
+
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
-        extra_context['upload_url'] = reverse('dn_app:upload_csv')
+        extra_context["upload_url"] = reverse("dn_app:upload_csv")
         return super().changelist_view(request, extra_context=extra_context)
+
+
+@admin.register(DnLine)
+class DnLineAdmin(ModelAdmin):
+    list_display = (
+        "pdwid",
+        "person",
+        "ds_code",
+        "plan_year",
+        "category_168n",
+        "profile_cluster",
+        "status",
+        "out_of_168n",
+        "is_current",
+    )
+    list_filter = ("plan_year", "status", "category_168n", "out_of_168n", "is_current", "profile_cluster")
+    search_fields = ("pdwid", "ds_code", "person__enp", "person__fio", "doctor")
+    raw_id_fields = ("person", "import_batch")
+
+
+@admin.register(DnFact)
+class DnFactAdmin(ModelAdmin):
+    list_display = ("enp", "ds_code", "report_year", "source", "goal", "talon", "status")
+    list_filter = ("source", "goal", "report_year")
+    search_fields = ("enp", "ds_code", "talon")
+    raw_id_fields = ("person",)
 
 
 @admin.register(Encounter)

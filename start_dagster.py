@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
-import os
-import sys
-import subprocess
+"""Запуск dagster-webserver (UI) и dagster-daemon с автогенерацией dagster.yaml."""
+from __future__ import annotations
+
 import argparse
-import signal
+import os
 import platform
+import signal
+import subprocess
+import sys
+import time
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Запуск dagit (UI) и dagster-daemon в одном файле, с автогенерацией dagster.yaml"
+        description="Запуск dagster-webserver (UI) и dagster-daemon, с автогенерацией dagster.yaml"
     )
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", default="3000")
@@ -24,7 +30,14 @@ def main():
         print("Папка mosaic_conductor не найдена", file=sys.stderr)
         sys.exit(1)
 
-    # 1) Определяем папку для DAGSTER_HOME (можно взять из .env или задать руками)
+    workspace = base_dir / "workspace.yaml"
+    if not workspace.exists():
+        print(f"Не найден {workspace}", file=sys.stderr)
+        sys.exit(1)
+
+    # Работаем из корня проекта — иначе workspace.yaml / пакеты могут не подхватиться
+    os.chdir(base_dir)
+
     env_dagster_home = os.getenv("DAGSTER_HOME")
     if env_dagster_home:
         dagster_home = Path(env_dagster_home)
@@ -34,11 +47,9 @@ def main():
     dagster_home.mkdir(parents=True, exist_ok=True)
     (dagster_home / "storage").mkdir(parents=True, exist_ok=True)
 
-    # 2) Формируем абсолютный путь
     final_home = str(dagster_home.resolve()).replace("\\", "/")
     print(f"DAGSTER_HOME: {final_home}")
 
-    # 3) Генерируем (перезаписываем) файл dagster.yaml в папке DAGSTER_HOME
     dagster_yaml_path = dagster_home / "dagster.yaml"
     dagster_yaml_content = f"""\
 run_storage:
@@ -66,41 +77,100 @@ run_monitoring:
     dagster_yaml_path.write_text(dagster_yaml_content, encoding="utf-8")
     print(f"Сгенерирован {dagster_yaml_path}")
 
-    # 4) Устанавливаем переменную окружения (на всякий случай)
     os.environ["DAGSTER_HOME"] = final_home
 
-    # 5) Запускаем daemon + webserver
-    daemon_cmd = ["dagster-daemon", "run"]
-    webserver_cmd = ["dagit", "--host", args.host, "--port", args.port]
+    # Явные пути из venv Scripts — иначе на Windows Popen не находит exe вне PATH
+    scripts_dir = Path(sys.executable).resolve().parent
+    ext = ".exe" if platform.system() == "Windows" else ""
+    daemon_bin = scripts_dir / f"dagster-daemon{ext}"
+    webserver_bin = scripts_dir / f"dagster-webserver{ext}"
+    if not daemon_bin.exists() or not webserver_bin.exists():
+        print(
+            f"Не найдены CLI Dagster в {scripts_dir}\n"
+            f"  daemon: {daemon_bin.exists()}  webserver: {webserver_bin.exists()}\n"
+            "Запускайте из активированного .venv или: pip install dagster dagster-webserver",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
-    # Если Linux, оборачиваем команды в xvfb-run для эмуляции дисплея
-    use_xvfb = os.getenv("DAGSTER_USE_XVFB", "1").strip() not in {"0", "false", "no"}
+    # dagit deprecated → dagster-webserver; явно передаём workspace
+    daemon_cmd = [str(daemon_bin), "run"]
+    webserver_cmd = [
+        str(webserver_bin),
+        "--host",
+        args.host,
+        "--port",
+        str(args.port),
+        "-w",
+        str(workspace),
+    ]
+
+    use_xvfb = os.getenv("DAGSTER_USE_XVFB", "1").strip().lower() not in {"0", "false", "no"}
     if platform.system() == "Linux" and use_xvfb:
         daemon_cmd = ["xvfb-run", "-a"] + daemon_cmd
         webserver_cmd = ["xvfb-run", "-a"] + webserver_cmd
+
     print("Запускаем daemon:", " ".join(daemon_cmd))
-    print("Запускаем dagit:", " ".join(webserver_cmd))
+    print("Запускаем webserver:", " ".join(webserver_cmd))
+    print(f"UI: http://127.0.0.1:{args.port}/  (Ctrl+C — остановка)")
 
-    daemon_proc = subprocess.Popen(daemon_cmd)
-    webserver_proc = subprocess.Popen(webserver_cmd)
+    popen_kwargs = {}
+    if platform.system() == "Windows":
+        # Отдельная группа процессов: Ctrl+C не рвёт детей хаотично до нашего shutdown
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
 
-    def shutdown(signum, frame):
-        print("Останавливаем процессы...")
-        daemon_proc.terminate()
-        webserver_proc.terminate()
-        sys.exit(0)
+    daemon_proc = subprocess.Popen(daemon_cmd, **popen_kwargs)
+    webserver_proc = subprocess.Popen(webserver_cmd, **popen_kwargs)
+
+    stopping = False
+
+    def shutdown(signum=None, frame=None):
+        nonlocal stopping
+        if stopping:
+            return
+        stopping = True
+        print("\nОстанавливаем процессы...")
+        for proc in (daemon_proc, webserver_proc):
+            if proc.poll() is None:
+                try:
+                    proc.terminate()
+                except OSError:
+                    pass
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            if daemon_proc.poll() is not None and webserver_proc.poll() is not None:
+                break
+            time.sleep(0.2)
+        for proc in (daemon_proc, webserver_proc):
+            if proc.poll() is None:
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
 
     signal.signal(signal.SIGINT, shutdown)
-    signal.signal(signal.SIGTERM, shutdown)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, shutdown)
 
     try:
-        while daemon_proc.poll() is None and webserver_proc.poll() is None:
-            pass
+        while not stopping:
+            d_code = daemon_proc.poll()
+            w_code = webserver_proc.poll()
+            if d_code is not None:
+                print(f"daemon завершился с кодом {d_code}")
+                break
+            if w_code is not None:
+                print(f"webserver завершился с кодом {w_code}")
+                break
+            time.sleep(0.5)
     except KeyboardInterrupt:
-        shutdown(None, None)
+        shutdown()
 
-    daemon_proc.terminate()
-    webserver_proc.terminate()
+    if not stopping:
+        shutdown()
+
+    sys.exit(1 if (daemon_proc.returncode or webserver_proc.returncode) else 0)
+
 
 if __name__ == "__main__":
     main()

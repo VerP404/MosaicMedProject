@@ -10,6 +10,7 @@ from apps.analytical_app.pages.administrator.adverse_events import admin_adverse
 from apps.analytical_app.pages.administrator.digital_signatures.page import admin_digital_signatures
 from apps.analytical_app.pages.economist.disp_by_ages.page import economist_dispensary_age
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
+from apps.analytical_app.pages.head.dn.page import head_dn
 
 routes_administrator = {
     "/admin": admin_main,
@@ -65,5 +66,12 @@ routes_administrator = {
             {"label": "Диспансерное наблюдение работающих", "active": True},
         ]),
         head_dn_job
+    ]),
+    "/admin/dn": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Администратор", "href": "/admin"},
+            {"label": "Диспансерное наблюдение (ИСЗЛ)", "active": True},
+        ]),
+        head_dn
     ]),
 }

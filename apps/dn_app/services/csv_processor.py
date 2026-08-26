@@ -300,89 +300,87 @@ class DNCSVProcessor:
             self.stats['detached_count'] = 0
     
     def _match_with_oms_talons(self):
-        """Сопоставляет наблюдения с талонами ОМС из load_data_oms_data"""
+        """Сопоставляет наблюдения с талонами ОМС из load_data_talons"""
         from django.db import connection
-        
-        # Получаем все активные наблюдения за этот год
-        observations = Observation.objects.filter(
-            plan_year=self.year,
-            is_current=True,
-            status__in=['planned', 'not_completed']
-        ).select_related('encounter__person')
-        
-        if not observations.exists():
+
+        observations = list(
+            Observation.objects.filter(
+                plan_year=self.year,
+                is_current=True,
+                status__in=["planned", "not_completed"],
+            ).select_related("encounter__person")
+        )
+        if not observations:
             return
-        
-        # Получаем ENP пациентов
-        enp_list = list(observations.values_list('encounter__person__enp', flat=True).distinct())
-        
+
+        enp_list = list({o.encounter.person.enp for o in observations})
         if not enp_list:
             return
-        
-        # Формируем запрос к таблице load_data_oms_data
-        enp_placeholders = ','.join([f"'{enp}'" for enp in enp_list])
-        
+
+        placeholders = ",".join(["%s"] * len(enp_list))
         query = f"""
-        SELECT 
-            enp,
+        SELECT
+            CASE WHEN enp = '-' THEN policy ELSE enp END AS enp,
             talon,
-            treatment_start,
             treatment_end,
-            main_diagnosis_code,
-            additional_diagnosis_codes,
+            CASE WHEN main_diagnosis = '-' THEN NULL
+                 ELSE SPLIT_PART(main_diagnosis, ' ', 1) END AS main_diagnosis_code,
+            additional_diagnosis AS additional_diagnosis_codes,
             report_year
-        FROM load_data_oms_data 
-        WHERE enp IN ({enp_placeholders})
-        AND report_year = {self.year}
+        FROM load_data_talons
+        WHERE CASE WHEN enp = '-' THEN policy ELSE enp END IN ({placeholders})
+          AND (
+                (report_year ~ '^[0-9]+$' AND report_year::int = %s)
+                OR (
+                    COALESCE(NULLIF(report_year, '-'), '') !~ '^[0-9]+$'
+                    AND treatment_end ~ '^[0-9]{{2}}-[0-9]{{2}}-[0-9]{{4}}$'
+                    AND EXTRACT(YEAR FROM TO_DATE(treatment_end, 'DD-MM-YYYY')) = %s
+                )
+              )
         """
-        
+
         try:
             with connection.cursor() as cursor:
-                cursor.execute(query)
+                cursor.execute(query, [*enp_list, self.year, self.year])
                 columns = [col[0] for col in cursor.description]
                 oms_records = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            
-            # Сопоставляем наблюдения с талонами
+
+            by_enp = {}
+            for rec in oms_records:
+                by_enp.setdefault(str(rec.get("enp") or "").strip(), []).append(rec)
+
             for observation in observations:
                 person_enp = observation.encounter.person.enp
                 diagnosis = observation.encounter.ds
-                
-                # Ищем соответствующие талоны
                 matching_talons = [
-                    talon for talon in oms_records
-                    if talon['enp'] == person_enp and self._diagnosis_matches(
-                        diagnosis, 
-                        talon.get('main_diagnosis_code', ''),
-                        talon.get('additional_diagnosis_codes', '')
+                    talon
+                    for talon in by_enp.get(person_enp, [])
+                    if self._diagnosis_matches(
+                        diagnosis,
+                        talon.get("main_diagnosis_code", ""),
+                        talon.get("additional_diagnosis_codes", ""),
                     )
                 ]
-                
+
                 if matching_talons:
-                    # Берем первый подходящий талон
                     talon = matching_talons[0]
-                    observation.status = 'completed'
-                    observation.talon_number = talon.get('talon', '')
-                    
-                    # Пытаемся определить дату посещения
-                    if talon.get('treatment_end'):
+                    observation.status = "completed"
+                    observation.talon_number = talon.get("talon", "")
+                    if talon.get("treatment_end"):
                         try:
-                            if isinstance(talon['treatment_end'], str):
-                                observation.actual_date = self._parse_date(talon['treatment_end'])
+                            if isinstance(talon["treatment_end"], str):
+                                observation.actual_date = self._parse_date(talon["treatment_end"])
                             else:
-                                observation.actual_date = talon['treatment_end']
-                        except:
+                                observation.actual_date = talon["treatment_end"]
+                        except Exception:
                             pass
-                    
                     observation.save()
-                else:
-                    # Если талонов нет, но наблюдение запланировано - помечаем как не выполненное
-                    if observation.status == 'planned':
-                        observation.status = 'not_completed'
-                        observation.save()
-        
+                elif observation.status == "planned":
+                    observation.status = "not_completed"
+                    observation.save()
+
         except Exception as e:
-            # Логируем ошибку, но не прерываем процесс
-            self.stats['errors'].append(f"Ошибка сопоставления с талонами ОМС: {str(e)}")
+            self.stats["errors"].append(f"Ошибка сопоставления с талонами ОМС: {str(e)}")
     
     def _diagnosis_matches(self, observation_diagnosis, main_diagnosis, additional_diagnoses):
         """Проверяет, соответствует ли диагноз наблюдения диагнозам в талоне"""

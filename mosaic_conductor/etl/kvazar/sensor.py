@@ -289,7 +289,7 @@ def kvazar_sensor_journal_appeals(context):
 iszl_sensor_dn = create_sensor(
     iszl_job_dn,
     "iszl_sensor_dn",
-    "ИСЗЛ: Население",
+    "ИСЗЛ: Диспансерное наблюдение",
     "mosaic_conductor/etl/data/iszl/dn",
     "load_data_dispansery_iszl",
     "mosaic_conductor/etl/config/mapping.json"

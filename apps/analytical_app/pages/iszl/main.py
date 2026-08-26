@@ -10,8 +10,8 @@ label = "ИСЗЛ"  # для хлебных крошек
 cards_row_1 = dbc.Row(
     [
         dbc.Col(create_card(1, type_page,
-                            "-",
-                            "-")),
+                            "Диспансерное наблюдение (ИСЗЛ)",
+                            "План ИСЗЛ ↔ талоны ОМС, выбывшие, Квазар")),
         dbc.Col(create_card(2, type_page,
                             "-",
                             "-")),
@@ -19,8 +19,8 @@ cards_row_1 = dbc.Row(
                             "-",
                             "-")),
         dbc.Col(create_card(4, type_page,
-                            "-",
-                            "-")),
+                            "ДН работающих",
+                            "Анализ работающих не прикрепленных пациентов")),
     ],
     className="mb-4 align-items-stretch",
 )
@@ -56,8 +56,8 @@ def navigate_pages(open_report_1, open_report_2, open_report_3, open_report_4):
 
     if button_id.startswith("open-report-") and f'{main_link}' in button_id:
         if button_id == f'open-report-1-{type_page}' and open_report_1:
-            breadcrumb_items.append({"active": True})
-            return f'/{main_link}/svpod', breadcrumb_items
+            breadcrumb_items.append({"label": "ДН ИСЗЛ", "active": True})
+            return f'/{main_link}/dn', breadcrumb_items
         elif button_id == f'open-report-2-{type_page}' and open_report_2:
             breadcrumb_items.append({"active": True})
             return f'/{main_link}/doctors', breadcrumb_items

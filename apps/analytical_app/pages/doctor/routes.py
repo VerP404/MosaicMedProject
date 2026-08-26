@@ -7,6 +7,7 @@ from apps.analytical_app.pages.doctor.dn_services.page import doctor_dn_services
 from apps.analytical_app.pages.doctor.errors.page import layout_error_log
 from apps.analytical_app.pages.doctor.main import doctor_main
 from apps.analytical_app.pages.head.dn_job.page import head_dn_job
+from apps.analytical_app.pages.head.dn.page import head_dn
 
 routes_doctors = {
     "/doctor": doctor_main,
@@ -31,6 +32,13 @@ routes_doctors = {
             {"label": "Диспансерное наблюдение работающих", "active": True},
         ]),
         head_dn_job
+    ]),
+    "/doctor/dn": html.Div([
+        dbc.Breadcrumb(items=[
+            {"label": "Врач", "href": "/doctor"},
+            {"label": "Диспансерное наблюдение (ИСЗЛ)", "active": True},
+        ]),
+        head_dn
     ]),
     "/doctor/error": html.Div([
         dbc.Breadcrumb(items=[

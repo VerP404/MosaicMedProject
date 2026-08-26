@@ -689,3 +689,34 @@ class OmsData(TimeStampedModel):
                 name="omsdata_talon_src_doc_uniq"
             ),
         ]
+
+
+class DnKvazar(TimeStampedModel):
+    """Журнал диспансерного наблюдения Квазар (bronze)."""
+
+    enp = models.CharField("ЕНП", max_length=64, db_index=True, default="-")
+    fio = models.CharField("ФИО", max_length=255, default="-")
+    dr = models.CharField("Дата рождения", max_length=50, default="-")
+    sex = models.CharField("Пол", max_length=20, default="-")
+    phone = models.CharField("Телефон", max_length=64, default="-")
+    ds = models.CharField("Диагноз (сырой)", max_length=512, default="-")
+    ds_code = models.CharField("Код МКБ", max_length=32, db_index=True, default="", blank=True)
+    date_begin = models.CharField("Дата постановки", max_length=50, default="-")
+    date_end = models.CharField("Дата снятия", max_length=50, default="-")
+    doctor = models.CharField("Врач", max_length=255, default="-")
+    specialty = models.CharField("Специальность", max_length=255, default="-")
+    lpuuch = models.CharField("Участок", max_length=255, default="-")
+    mo = models.CharField("МО", max_length=255, default="-")
+    row_hash = models.CharField("Хеш строки", max_length=64, unique=True, db_index=True)
+    source_file = models.CharField("Файл", max_length=255, default="-")
+
+    def __str__(self):
+        return f"{self.enp} {self.ds_code}"
+
+    class Meta:
+        db_table = "load_data_dn_kvazar"
+        verbose_name = "ДН Квазар"
+        verbose_name_plural = "ДН Квазар"
+        indexes = [
+            models.Index(fields=["enp", "ds_code"]),
+        ]
