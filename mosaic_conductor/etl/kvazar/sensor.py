@@ -103,6 +103,57 @@ def create_sensor(job, sensor_name, description, data_folder, table_name, mappin
             yield SkipReason("Нет валидных файлов.")
             return
 
+        # Один job читает все Report* сразу (load_all_matching_files) —
+        # нельзя запускать RunRequest на каждый файл: получится N параллельных
+        # полных загрузок одной таблицы.
+        load_all = bool(table_config.get("load_all_matching_files", False))
+        if load_all:
+            fingerprint_parts = []
+            for file in sorted(valid_files):
+                file_path = os.path.join(data_folder, file)
+                fingerprint_parts.append(f"{file}:{os.path.getsize(file_path)}")
+            fingerprint = "|".join(fingerprint_parts)
+            batch_key = f"batch-{hashlib.md5(fingerprint.encode('utf-8')).hexdigest()[:16]}"
+
+            prev_batch = sensor_state.get("__batch_run_key__")
+            if prev_batch == batch_key:
+                runs = context.instance.get_runs()
+                matching_run = next(
+                    (r for r in runs if r.tags.get("dagster/run_key") == batch_key),
+                    None,
+                )
+                if matching_run and not matching_run.is_finished:
+                    context.log.info(
+                        f"Пакет из {len(valid_files)} файлов уже обрабатывается "
+                        f"(run_key={batch_key}), пропускаем."
+                    )
+                    yield SkipReason("Batch already running.")
+                    return
+                if matching_run and matching_run.is_success:
+                    for file in list(valid_files):
+                        file_path = os.path.join(data_folder, file)
+                        try:
+                            os.remove(file_path)
+                            context.log.info(f"Файл {file} успешно обработан и удалён.")
+                        except Exception as e:
+                            context.log.error(f"Ошибка удаления файла {file}: {e}")
+                        sensor_state.pop(file, None)
+                    sensor_state.pop("__batch_run_key__", None)
+                    _save_state(context, sensor_state)
+                    yield SkipReason("Batch already succeeded; files cleaned.")
+                    return
+
+            context.log.info(
+                f"Запуск ОДНОГО процесса на {len(valid_files)} файл(ов), run_key={batch_key}"
+            )
+            yield RunRequest(run_key=batch_key, run_config={})
+            sensor_state["__batch_run_key__"] = batch_key
+            for file in valid_files:
+                file_path = os.path.join(data_folder, file)
+                sensor_state[file] = os.path.getsize(file_path)
+            _save_state(context, sensor_state)
+            return
+
         for file in valid_files:
             file_path = os.path.join(data_folder, file)
             current_size = os.path.getsize(file_path)
