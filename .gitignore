@@ -6,6 +6,8 @@ db.sqlite3
 *.csv
 *.xlsx
 *.xls
+# справочник 168н для prod import
+!apps/dn_reference/data/диагнозы по 168н.xlsx
 **/__pycache__/
 staticfiles
 uploads

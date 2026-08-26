@@ -10,7 +10,7 @@
 
 ```bash
 python manage.py load_iszl_dn_years --clear
-python manage.py import_dn_diagnoses_168n
+python manage.py import_dn_diagnoses_168n "apps/dn_reference/data/диагнозы по 168н.xlsx"
 python manage.py sync_dn_from_iszl --year=2026
 python manage.py load_dn_kvazar --clear
 ```
