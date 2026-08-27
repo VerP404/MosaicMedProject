@@ -228,6 +228,127 @@ def sql_query_dispensary_age(
     """
 
 
+# СМО местных: Инкомед / Согаз; остальные — иногородние (как в financial_indicators)
+SMO_INKOMED = ("36065",)
+SMO_SOGAZ = ("36071", "36079")
+SMO_LOCAL = SMO_INKOMED + SMO_SOGAZ
+
+
+def sql_query_dogvn_65_plus(
+    selected_year,
+    months_range=None,
+    inogorod=None,
+    sanction=None,
+    amount_null=None,
+    building=None,
+    department=None,
+    input_start=None,
+    input_end=None,
+    treatment_start=None,
+    treatment_end=None,
+    report_type="month",
+    status_list=None,
+    health_groups=None,
+    icd_codes=None,
+):
+    """
+    ДОГВН 65+: только цель ДВ4, возраст >= 65.
+    Столбцы по страховым: Инкомед / Согаз / Иногородние × Ж/М/Итого.
+    """
+    conds = [
+        f"report_year = {int(selected_year)}",
+        "age >= 65",
+        "goal = 'ДВ4'",
+    ]
+
+    if report_type == "month" and months_range and len(months_range) >= 2:
+        start_m, end_m = int(months_range[0]), int(months_range[1])
+        conds.append(f"report_month BETWEEN {start_m} AND {end_m}")
+    elif report_type == "initial_input" and input_start and input_end:
+        conds.append(
+            f"initial_input_date BETWEEN '{_sql_quote(input_start[:10])}' "
+            f"AND '{_sql_quote(input_end[:10])}'"
+        )
+    elif report_type == "treatment" and treatment_start and treatment_end:
+        conds.append(
+            f"treatment_end BETWEEN '{_sql_quote(treatment_start[:10])}' "
+            f"AND '{_sql_quote(treatment_end[:10])}'"
+        )
+
+    if inogorod == "1":
+        # местные СМО
+        local = ", ".join(f"'{c}'" for c in SMO_LOCAL)
+        conds.append(f"smo_code IN ({local})")
+    elif inogorod == "2":
+        local = ", ".join(f"'{c}'" for c in SMO_LOCAL)
+        conds.append(f"smo_code NOT IN ({local})")
+
+    if sanction == "1":
+        conds.append("(sanctions IN ('-', '0') OR sanctions IS NULL)")
+    elif sanction == "2":
+        conds.append("sanctions NOT IN ('-', '0') AND sanctions IS NOT NULL")
+
+    if amount_null == "1":
+        conds.append("amount_numeric IS NOT NULL AND amount_numeric <> 0")
+    elif amount_null == "2":
+        conds.append("(amount_numeric IS NULL OR amount_numeric = 0)")
+
+    building_ids = _as_int_list(building)
+    if building_ids:
+        conds.append("building_id IN (" + ", ".join(map(str, building_ids)) + ")")
+    department_ids = _as_int_list(department)
+    if department_ids:
+        conds.append("department_id IN (" + ", ".join(map(str, department_ids)) + ")")
+
+    if status_list:
+        conds.append(
+            "status IN (" + ", ".join(f"'{_sql_quote(s)}'" for s in status_list) + ")"
+        )
+
+    if health_groups:
+        if "all" in health_groups:
+            pass
+        elif health_groups == ["with"] or (len(health_groups) == 1 and health_groups[0] == "with"):
+            conds.append("health_group <> '-'")
+        else:
+            values = ", ".join(f"'{_sql_quote(hg)}'" for hg in health_groups if hg not in ("all", "with"))
+            if values:
+                conds.append(f"health_group IN ({values})")
+
+    if icd_codes:
+        conds.append(
+            "main_diagnosis_code IN ("
+            + ", ".join(f"'{_sql_quote(c)}'" for c in icd_codes)
+            + ")"
+        )
+
+    ink = ", ".join(f"'{c}'" for c in SMO_INKOMED)
+    sog = ", ".join(f"'{c}'" for c in SMO_SOGAZ)
+    local = ", ".join(f"'{c}'" for c in SMO_LOCAL)
+    where = " AND ".join(conds)
+
+    return f"""
+    SELECT
+      age,
+      COUNT(*) FILTER (WHERE smo_code IN ({ink}) AND gender = 'Ж') AS ink_ж,
+      COUNT(*) FILTER (WHERE smo_code IN ({ink}) AND gender = 'М') AS ink_м,
+      COUNT(*) FILTER (WHERE smo_code IN ({ink})) AS ink_итог,
+      COUNT(*) FILTER (WHERE smo_code IN ({sog}) AND gender = 'Ж') AS sog_ж,
+      COUNT(*) FILTER (WHERE smo_code IN ({sog}) AND gender = 'М') AS sog_м,
+      COUNT(*) FILTER (WHERE smo_code IN ({sog})) AS sog_итог,
+      COUNT(*) FILTER (WHERE smo_code NOT IN ({local}) AND gender = 'Ж') AS inog_ж,
+      COUNT(*) FILTER (WHERE smo_code NOT IN ({local}) AND gender = 'М') AS inog_м,
+      COUNT(*) FILTER (WHERE smo_code NOT IN ({local})) AS inog_итог,
+      COUNT(*) FILTER (WHERE gender = 'Ж') AS всего_ж,
+      COUNT(*) FILTER (WHERE gender = 'М') AS всего_м,
+      COUNT(*) AS общий_итог
+    FROM load_data_oms_data
+    WHERE {where}
+    GROUP BY age
+    ORDER BY age
+    """
+
+
 def sql_query_dispensary_amount_group(selected_year, months_placeholder, inogorod, sanction, amount_null,
                                       building=None,
                                       department=None,
