@@ -16,6 +16,10 @@ PORT_DASH = int(os.getenv('PORT_DASH', '5000'))
 HOST_DASH = os.getenv('HOST_DASH', '0.0.0.0')
 DJANGO_API_BASE = os.getenv('DJANGO_API_BASE', 'http://127.0.0.1:8000')
 
+from apps.dn_matrix.runtime import ensure_django
+
+ensure_django()
+
 from dash import dcc, html
 from apps.analytical_app.app import app
 from apps.analytical_app.routes import register_routes, routes
@@ -38,9 +42,8 @@ app.layout = html.Div(
         dcc.Store(id='current-month-name', data=None),
         dcc.Store(id='sidebar-state', data="collapsed"),  # Хранилище для состояния сайдбара
         dcc.Interval(id='date-interval-main', interval=600000, n_intervals=0),  # 10 минут
-        dcc.Location(id="url", refresh=True),
-        # Редирект на внешний dash_dn (тот же хост, другой порт); callback в pages/doctor/main.py
-        dcc.Location(id="redirect-dn-external", refresh=True),
+        # refresh=False keeps app state; avoids full page reloads ("as if F5")
+        dcc.Location(id="url", refresh=False),
         create_navbar(),
         create_modal_168n(),
         create_modal_status(),

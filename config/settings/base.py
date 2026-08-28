@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'apps.talon',
     'apps.dn_app',
     'apps.dn_reference',
+    'apps.dn_matrix',
     'apps.beneficiaries',
     'apps.references',
     'apps.gar',
