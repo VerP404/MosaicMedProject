@@ -321,9 +321,28 @@ class BatchPickNotPassedTests(TestCase):
         )
         DnServiceRequirement.objects.create(service=self.svc_ecg, diagnosis=self.d_i11, specialty=self.spec)
         DnServiceRequirement.objects.create(service=self.svc_glu, diagnosis=self.d_e11, specialty=self.spec)
+        self.svc_visit = DnService.objects.create(
+            edition=self.edition,
+            code="B04.047.001",
+            title="Диспансерный прием терапевта",
+            sort_order=2,
+        )
+        DnServiceRequirement.objects.create(service=self.svc_visit, diagnosis=self.d_i11, specialty=self.spec)
+        period = DnServicePricePeriod.objects.create(
+            edition=self.edition, code="p1", title="", valid_from=date(2026, 1, 1), valid_to=None
+        )
+        DnServicePrice.objects.create(period=period, service=self.svc_ecg, amount="50.00", currency="RUB")
+        DnServicePrice.objects.create(period=period, service=self.svc_glu, amount="20.00", currency="RUB")
+        DnServicePrice.objects.create(period=period, service=self.svc_visit, amount="100.00", currency="RUB")
 
     def test_grouped_includes_secondary_services(self):
-        from apps.dn_matrix.services.batch_pick import COL_SERVICES, enrich_not_passed_rows
+        from apps.dn_matrix.services.batch_pick import (
+            COL_SERVICES,
+            COL_SUM_1,
+            COL_SUM_2,
+            COL_SUM_3,
+            enrich_not_passed_rows,
+        )
 
         rows, status = enrich_not_passed_rows(
             [
@@ -338,6 +357,9 @@ class BatchPickNotPassedTests(TestCase):
         )
         self.assertIn("A04.10.002", rows[0][COL_SERVICES])
         self.assertIn("A09.05.023", rows[0][COL_SERVICES])
+        self.assertEqual(rows[0][COL_SUM_1], "170.00")
+        self.assertEqual(rows[0][COL_SUM_2], "270.00")
+        self.assertEqual(rows[0][COL_SUM_3], "370.00")
         self.assertIn("Batch", status)
 
     def test_detail_ignores_accompanying(self):

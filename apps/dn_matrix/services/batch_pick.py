@@ -11,10 +11,14 @@ from apps.dn_matrix.services.matrix import (
     normalize_mkb,
     select_services_from_cache,
 )
+from apps.dn_matrix.services.pick_pricing import format_amount, sum_services_amount
 from apps.dn_reference.specialty_clusters import THERAPY_CLUSTER, is_therapy_specialty, specialty_to_cluster
 
 COL_SERVICES = "Услуги матрицы"
 COL_UNAVAILABLE = "Не проводится (матрица)"
+COL_SUM_1 = "Сумма 1 явка"
+COL_SUM_2 = "Сумма 2 явки"
+COL_SUM_3 = "Сумма 3 явки"
 COL_NOTE = "Матрица: примечание"
 
 _SPLIT_MKB = re.compile(r"[,;/|]+")
@@ -115,6 +119,36 @@ def _format_codes(services: list[dict]) -> tuple[str, str]:
     return ", ".join(included), ", ".join(skipped)
 
 
+def _visit_sums(services: list[dict], max_visits: int) -> tuple[str, str, str]:
+    amounts: list[str] = []
+    for n in (1, 2, 3):
+        if n > max_visits:
+            amounts.append("")
+            continue
+        total, _ = sum_services_amount(services, n, max_visits=max_visits)
+        amounts.append(format_amount(total))
+    return amounts[0], amounts[1], amounts[2]
+
+
+def _set_matrix_cols(
+    row: dict[str, Any],
+    *,
+    services: str = "",
+    unavailable: str = "",
+    sum1: str = "",
+    sum2: str = "",
+    sum3: str = "",
+    note: str = "",
+) -> dict[str, Any]:
+    row[COL_SERVICES] = services
+    row[COL_UNAVAILABLE] = unavailable
+    row[COL_SUM_1] = sum1
+    row[COL_SUM_2] = sum2
+    row[COL_SUM_3] = sum3
+    row[COL_NOTE] = note
+    return row
+
+
 def enrich_not_passed_rows(
     rows: list[dict[str, Any]],
     edition: MatrixEdition,
@@ -127,7 +161,8 @@ def enrich_not_passed_rows(
 
     cache = build_matrix_pick_cache(edition)
     specialties = list(edition.specialties.all().order_by("sort_order", "id"))
-    memo: dict[tuple, tuple[str, str, str]] = {}
+    max_visits = min(max(int(edition.max_doctor_visits or 3), 1), 3)
+    memo: dict[tuple, tuple[str, str, str, str, str, str]] = {}
     spec_memo: dict[tuple[str, str], int | None] = {}
 
     out: list[dict[str, Any]] = []
@@ -147,9 +182,7 @@ def enrich_not_passed_rows(
             profile = _first_present(row, ("Профиль", "profile_cluster"))
 
         if not mkb:
-            row[COL_SERVICES] = ""
-            row[COL_UNAVAILABLE] = ""
-            row[COL_NOTE] = "нет МКБ"
+            _set_matrix_cols(row, note="нет МКБ")
             empty_diag += 1
             out.append(row)
             continue
@@ -159,9 +192,7 @@ def enrich_not_passed_rows(
             spec_memo[spec_key] = resolve_specialty_id(cache, specialties, profile=profile, mkb_code=mkb)
         specialty_id = spec_memo[spec_key]
         if specialty_id is None:
-            row[COL_SERVICES] = ""
-            row[COL_UNAVAILABLE] = ""
-            row[COL_NOTE] = "нет специальности матрицы для профиля"
+            _set_matrix_cols(row, note="нет специальности матрицы для профиля")
             no_spec += 1
             out.append(row)
             continue
@@ -175,20 +206,27 @@ def enrich_not_passed_rows(
                 secondary_mkb_list=secondary or None,
             )
             codes, skipped = _format_codes(services)
+            sum1, sum2, sum3 = _visit_sums(services, max_visits)
             if diagnosis_id is None:
                 note = "диагноз не найден в матрице"
             elif not services:
                 note = "нет услуг по правилам матрицы"
             else:
                 note = ""
-            memo[pick_key] = (codes, skipped, note)
+            memo[pick_key] = (codes, skipped, note, sum1, sum2, sum3)
 
-        codes, skipped, note = memo[pick_key]
+        codes, skipped, note, sum1, sum2, sum3 = memo[pick_key]
         if note == "диагноз не найден в матрице" or note == "нет услуг по правилам матрицы":
             no_link += 1
-        row[COL_SERVICES] = codes
-        row[COL_UNAVAILABLE] = skipped
-        row[COL_NOTE] = note
+        _set_matrix_cols(
+            row,
+            services=codes,
+            unavailable=skipped,
+            sum1=sum1,
+            sum2=sum2,
+            sum3=sum3,
+            note=note,
+        )
         out.append(row)
 
     status = (

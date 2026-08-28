@@ -69,6 +69,34 @@ SELECT
 FROM latest
 GROUP BY 1
 ORDER BY iszl_diag_rows DESC
+    """
+
+
+def _sql_latest_phones_cte(alias: str = "phones") -> str:
+    """Последний непустой телефон из журнала обращений на ЕНП (как в ДВ tab12/tab13)."""
+    return f"""
+{alias} AS (
+    SELECT DISTINCT ON (regexp_replace(enp, '\\D', '', 'g'))
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        phone
+    FROM load_data_journal_appeals
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND COALESCE(NULLIF(phone, '-'), '') <> ''
+    ORDER BY regexp_replace(enp, '\\D', '', 'g'),
+             COALESCE(
+                 CASE WHEN acceptance_date ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
+                      THEN to_date(SUBSTRING(acceptance_date FROM 1 FOR 10), 'YYYY-MM-DD') END,
+                 CASE WHEN acceptance_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}[ ]+[0-9]{{2}}:[0-9]{{2}}'
+                      THEN to_timestamp(acceptance_date, 'DD.MM.YYYY HH24:MI')::date END,
+                 CASE WHEN acceptance_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}$'
+                      THEN to_date(acceptance_date, 'DD.MM.YYYY') END,
+                 CASE WHEN record_date ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
+                      THEN to_date(SUBSTRING(record_date FROM 1 FOR 10), 'YYYY-MM-DD') END,
+                 CASE WHEN record_date ~ '^[0-9]{{2}}\\.[0-9]{{2}}\\.[0-9]{{4}}$'
+                      THEN to_date(record_date, 'DD.MM.YYYY') END
+             ) DESC NULLS LAST,
+             id DESC
+)
 """
 
 
@@ -84,11 +112,13 @@ def sql_not_passed(year: int, category: str = "", profile: str = "", limit: int 
     return f"""
 WITH latest AS (
 {_latest_plan_rows(y)}
-)
+),
+{_sql_latest_phones_cte("phones")}
 SELECT
     p.enp,
     p.fio,
     p.dr,
+    COALESCE(ph.phone, '') AS phone,
     p.lpuuch,
     x.ldwid,
     x.ds_code,
@@ -100,6 +130,7 @@ SELECT
     x.pdwid
 FROM latest x
 JOIN dn_app_person p ON p.id = x.person_id
+LEFT JOIN phones ph ON regexp_replace(COALESCE(p.enp, ''), '\\D', '', 'g') = ph.enp_norm
 WHERE x.status = 'not_completed'
   AND x.out_of_168n = FALSE
   {extra}
@@ -177,11 +208,13 @@ cnt AS (
     SELECT enp, profile_cluster, COUNT(*) AS diag_count
     FROM base
     GROUP BY enp, profile_cluster
-)
+),
+{_sql_latest_phones_cte("phones")}
 SELECT
     m.enp,
     m.fio,
     m.dr,
+    COALESCE(ph.phone, '') AS phone,
     m.lpuuch,
     m.profile_cluster AS main_profile,
     m.category_168n AS main_category,
@@ -194,6 +227,7 @@ SELECT
 FROM main m
 JOIN cnt c ON c.enp = m.enp AND c.profile_cluster = m.profile_cluster
 LEFT JOIN acc a ON a.enp = m.enp AND a.profile_cluster = m.profile_cluster
+LEFT JOIN phones ph ON regexp_replace(COALESCE(m.enp, ''), '\\D', '', 'g') = ph.enp_norm
 ORDER BY m.fio, m.profile_cluster
 LIMIT 20000
 """
