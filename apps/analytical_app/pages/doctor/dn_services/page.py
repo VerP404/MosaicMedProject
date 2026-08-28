@@ -12,7 +12,9 @@ from apps.dn_matrix.runtime import ensure_django
 ensure_django()
 
 from apps.dn_matrix.services.workspace import (
+    add_unavailable_service,
     default_edition,
+    delete_unavailable_services,
     diagnosis_options,
     directory_diagnoses,
     directory_diagnosis_specialties,
@@ -24,7 +26,9 @@ from apps.dn_matrix.services.workspace import (
     edition_options,
     get_edition,
     pick_services,
+    service_code_options,
     specialty_options,
+    unavailable_table,
 )
 
 type_page = "doctor-dn-services"
@@ -52,6 +56,7 @@ def _to_table(rows: list[dict]):
 
 
 PICK_COL_STYLE = [
+    {"if": {"column_id": "Проводится"}, "minWidth": "118px", "maxWidth": "140px", "width": "124px"},
     {"if": {"column_id": "Код"}, "minWidth": "108px", "maxWidth": "128px", "width": "112px"},
     {"if": {"column_id": "Название"}, "minWidth": "280px", "width": "38%"},
     {"if": {"column_id": "Подбор"}, "minWidth": "118px", "maxWidth": "150px", "width": "128px"},
@@ -65,6 +70,24 @@ PICK_COL_STYLE = [
     {"if": {"column_id": "Цена за ед."}, "minWidth": "78px", "maxWidth": "96px", "width": "88px", "textAlign": "right"},
     {"if": {"column_id": "Кол-во"}, "minWidth": "52px", "maxWidth": "64px", "width": "58px", "textAlign": "right"},
     {"if": {"column_id": "Сумма"}, "minWidth": "78px", "maxWidth": "100px", "width": "88px", "textAlign": "right"},
+]
+
+PICK_ROW_STYLE = [
+    {
+        "if": {"filter_query": '{_excluded} = "1"'},
+        "backgroundColor": "#f4f4f5",
+        "color": "#71717a",
+        "textDecoration": "line-through",
+        "fontStyle": "italic",
+    },
+    {
+        "if": {"filter_query": '{_excluded} = "1"', "column_id": "Проводится"},
+        "color": "#b45309",
+        "fontWeight": "700",
+        "textDecoration": "none",
+        "fontStyle": "normal",
+        "backgroundColor": "#fff7ed",
+    },
 ]
 
 
@@ -188,6 +211,8 @@ pick_tab = dbc.Row(
                             filter_action="native",
                             export_format="xlsx",
                             export_headers="display",
+                            hidden_columns=["_excluded"],
+                            css=[{"selector": ".show-hide", "rule": "display: none"}],
                             style_table={"overflowX": "auto"},
                             style_cell={
                                 "fontSize": "12px",
@@ -197,6 +222,12 @@ pick_tab = dbc.Row(
                             },
                             style_header={"fontWeight": "600", "whiteSpace": "normal"},
                             style_cell_conditional=PICK_COL_STYLE,
+                            style_data_conditional=PICK_ROW_STYLE,
+                        ),
+                        html.Small(
+                            "Строки «не проводится» зачёркнуты и в сумму не входят. "
+                            "Список задаётся на вкладке «Не проводится».",
+                            className="text-muted d-block mt-2",
                         ),
                     ],
                     className="py-3 px-3",
@@ -230,6 +261,102 @@ dir_tab = html.Div(
     ]
 )
 
+excl_tab = html.Div(
+    [
+        html.P(
+            "Список услуг, которые в этом ЛПУ не проводятся. Они остаются в таблице подбора "
+            "(зачёркнутые, колонка «не проводится»), но не входят в сумму. "
+            "Список общий для всех врачей и не стирается при обновлении пакета матрицы.",
+            className="text-muted",
+        ),
+        dbc.Row(
+            [
+                dbc.Col(
+                    [
+                        _field(
+                            "Услуга",
+                            dcc.Dropdown(
+                                id=f"dropdown-excl-service-{type_page}",
+                                options=service_code_options(_initial_edition) if _initial_edition else [],
+                                placeholder="Начните вводить код или название...",
+                                clearable=True,
+                                searchable=True,
+                                optionHeight=64,
+                                className="dn-long-dd",
+                            ),
+                            html.Small(
+                                "Введите код (например A09.05.023) или слово из названия, затем кликните нужную строку.",
+                                className="text-muted",
+                            ),
+                        ),
+                        _field(
+                            "Только для диагноза (необязательно)",
+                            dcc.Dropdown(
+                                id=f"dropdown-excl-mkb-{type_page}",
+                                options=diagnosis_options(_initial_edition) if _initial_edition else [],
+                                placeholder="Пусто — для всех диагнозов",
+                                clearable=True,
+                                searchable=True,
+                                optionHeight=42,
+                                className="dn-long-dd",
+                            ),
+                        ),
+                        _field(
+                            "Комментарий",
+                            dbc.Input(
+                                id=f"input-excl-note-{type_page}",
+                                placeholder="Например: нет оборудования",
+                                type="text",
+                            ),
+                        ),
+                        dbc.Button(
+                            "Добавить в список «не проводится»",
+                            id=f"btn-excl-add-{type_page}",
+                            color="warning",
+                            className="w-100 mb-2",
+                        ),
+                        dbc.Button(
+                            "Убрать выбранные строки",
+                            id=f"btn-excl-delete-{type_page}",
+                            color="secondary",
+                            outline=True,
+                            className="w-100",
+                        ),
+                    ],
+                    xs=12,
+                    lg=4,
+                    className="mb-3",
+                ),
+                dbc.Col(
+                    [
+                        html.Div(id=f"excl-alert-{type_page}"),
+                        dash_table.DataTable(
+                            id=f"excl-table-{type_page}",
+                            page_size=15,
+                            sort_action="native",
+                            row_selectable="multi",
+                            selected_rows=[],
+                            style_table={"overflowX": "auto"},
+                            style_cell={
+                                "fontSize": "12px",
+                                "padding": "4px 8px",
+                                "whiteSpace": "normal",
+                                "textAlign": "left",
+                            },
+                            style_header={"fontWeight": "600"},
+                            hidden_columns=["id"],
+                            css=[{"selector": ".show-hide", "rule": "display: none"}],
+                        ),
+                    ],
+                    xs=12,
+                    lg=8,
+                ),
+            ],
+            className="g-3",
+        ),
+    ]
+)
+
 doctor_dn_services = html.Div(
     [
         html.H5("Подбор услуг ДН", className="mb-1"),
@@ -240,6 +367,7 @@ doctor_dn_services = html.Div(
         dbc.Tabs(
             [
                 dbc.Tab(pick_tab, label="Подбор", tab_id="tab-pick"),
+                dbc.Tab(excl_tab, label="Не проводится", tab_id="tab-excl"),
                 dbc.Tab(dir_tab, label="Справочники", tab_id="tab-dir"),
             ],
             active_tab="tab-pick",
@@ -340,7 +468,13 @@ def run_pick(n_clicks, edition_id, specialty_id, mkb, additional, visits):
     extra = ", ".join(additional or [])
 
     visit_lines = [
-        html.Div([html.Strong("Позиций: "), str(result["count"])]),
+        html.Div(
+            [
+                html.Strong("Позиций в матрице: "),
+                str(result["count"] + result["excluded_count"]),
+            ]
+        ),
+        html.Div([html.Strong("Входят в расчёт: "), str(result["count"])]),
         html.Div(
             [
                 html.Strong(f"Сумма при выбранных явках ({result['visits']}): "),
@@ -348,6 +482,17 @@ def run_pick(n_clicks, edition_id, specialty_id, mkb, additional, visits):
             ]
         ),
     ]
+    if result["excluded_count"]:
+        visit_lines.append(
+            html.Div(
+                [
+                    html.Strong("Не проводится в ЛПУ: "),
+                    f"{result['excluded_count']} "
+                    f"(в сумму не входят, {result['excluded_total']} ₽)",
+                ],
+                className="text-warning",
+            )
+        )
     visit_labels = {1: "1 явка", 2: "2 явки", 3: "3 явки"}
     for n, amt in (result.get("sums") or {}).items():
         visit_lines.append(
@@ -382,6 +527,91 @@ def run_pick(n_clicks, edition_id, specialty_id, mkb, additional, visits):
     )
     cols, data = _to_table(result["rows"])
     return summary, visit_lines, cols, data
+
+
+@app.callback(
+    Output(f"excl-alert-{type_page}", "children"),
+    Output(f"excl-table-{type_page}", "columns"),
+    Output(f"excl-table-{type_page}", "data"),
+    Output(f"dropdown-excl-service-{type_page}", "options"),
+    Output(f"dropdown-excl-mkb-{type_page}", "options"),
+    Output(f"dropdown-excl-service-{type_page}", "value"),
+    Output(f"dropdown-excl-mkb-{type_page}", "value"),
+    Output(f"excl-table-{type_page}", "selected_rows"),
+    Input(f"dropdown-edition-{type_page}", "value"),
+    Input(f"btn-excl-add-{type_page}", "n_clicks"),
+    Input(f"btn-excl-delete-{type_page}", "n_clicks"),
+    State(f"dropdown-excl-service-{type_page}", "value"),
+    State(f"dropdown-excl-mkb-{type_page}", "value"),
+    State(f"input-excl-note-{type_page}", "value"),
+    State(f"excl-table-{type_page}", "data"),
+    State(f"excl-table-{type_page}", "selected_rows"),
+)
+def manage_unavailable(
+    edition_id,
+    _add_clicks,
+    _del_clicks,
+    service_code,
+    mkb,
+    note,
+    table_data,
+    selected_rows,
+):
+    edition = get_edition(edition_id)
+    empty_alert = html.Span()
+    if not edition:
+        return (
+            dbc.Alert("Выберите редакцию матрицы.", color="warning", className="py-2"),
+            [],
+            [],
+            [],
+            [],
+            None,
+            None,
+            [],
+        )
+
+    triggered = callback_context.triggered[0]["prop_id"].split(".")[0] if callback_context.triggered else ""
+    alert = empty_alert
+    clear_service = service_code
+    clear_mkb = mkb
+
+    if triggered == f"btn-excl-add-{type_page}":
+        ok, msg = add_unavailable_service(edition, str(service_code or ""), mkb, note or "")
+        alert = dbc.Alert(msg, color="success" if ok else "warning", className="py-2")
+        if ok:
+            clear_service = None
+            clear_mkb = None
+    elif triggered == f"btn-excl-delete-{type_page}":
+        ids = []
+        for idx in selected_rows or []:
+            if table_data and 0 <= idx < len(table_data):
+                try:
+                    ids.append(int(table_data[idx]["id"]))
+                except (KeyError, TypeError, ValueError):
+                    continue
+        deleted = delete_unavailable_services(edition, ids)
+        if deleted:
+            alert = dbc.Alert(f"Убрано из списка: {deleted}.", color="success", className="py-2")
+        else:
+            alert = dbc.Alert("Выберите строки в таблице и нажмите «Убрать выбранные строки».", color="warning", className="py-2")
+    elif triggered == f"dropdown-edition-{type_page}":
+        clear_service = None
+        clear_mkb = None
+
+    rows = unavailable_table(edition)
+    cols, data = _to_table(rows)
+    display_cols = [c for c in cols if c["id"] != "id"]
+    return (
+        alert,
+        display_cols,
+        data,
+        service_code_options(edition),
+        diagnosis_options(edition),
+        clear_service,
+        clear_mkb,
+        [],
+    )
 
 
 @app.callback(

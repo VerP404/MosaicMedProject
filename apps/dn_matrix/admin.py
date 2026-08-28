@@ -84,3 +84,10 @@ class DnServicePriceAdmin(ModelAdmin):
 class DnServiceRequirementAdmin(ModelAdmin):
     list_display = ("service", "specialty", "diagnosis", "diagnosis_group")
     search_fields = ("service__code", "service__title")
+
+
+@admin.register(m.DnUnavailableService)
+class DnUnavailableServiceAdmin(ModelAdmin):
+    list_display = ("service_code", "mkb_code", "edition", "note", "created_at")
+    list_filter = ("edition",)
+    search_fields = ("service_code", "mkb_code", "note")

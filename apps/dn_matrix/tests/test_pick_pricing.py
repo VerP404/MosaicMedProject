@@ -38,3 +38,14 @@ class PickPricingTests(TestCase):
 
     def test_parse_price_comma(self):
         self.assertEqual(parse_price_amount("1,5"), Decimal("1.5"))
+
+    def test_sum_skips_unavailable(self):
+        services = [
+            {"title": "Анализ", "price": "50", "unavailable": True},
+            {"title": "Анализ 2", "price": "20"},
+        ]
+        total, missing = sum_services_amount(services, visits=1)
+        self.assertFalse(missing)
+        self.assertEqual(total, Decimal("20"))
+        total_all, _ = sum_services_amount(services, visits=1, skip_unavailable=False)
+        self.assertEqual(total_all, Decimal("70"))

@@ -40,14 +40,18 @@ def sum_services_amount(
     visits: int,
     *,
     max_visits: int = 3,
+    skip_unavailable: bool = True,
 ) -> tuple[Decimal, bool]:
     """
     Сумма по списку услуг pick. Возвращает (amount, missing_prices).
-    missing_prices=True, если хотя бы у одной услуги нет цены.
+    missing_prices=True, если хотя бы у одной учитываемой услуги нет цены.
+    Услуги с unavailable=True в сумму не входят.
     """
     total = Decimal("0")
     missing_prices = False
     for row in services:
+        if skip_unavailable and row.get("unavailable"):
+            continue
         title = str(row.get("title") or "")
         amt = parse_price_amount(row.get("price"))
         if amt is None:

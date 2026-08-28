@@ -13,10 +13,12 @@ from apps.dn_matrix.models import (
     DnServicePrice,
     DnServicePricePeriod,
     DnSpecialty,
+    DnUnavailableService,
     MatrixEdition,
 )
-from apps.dn_matrix.services.matrix import cap_doctor_visits, select_services_for_context
+from apps.dn_matrix.services.matrix import cap_doctor_visits, normalize_mkb, select_services_for_context
 from apps.dn_matrix.services.pick_pricing import format_amount, service_line_qty, sum_services_amount
+from apps.dn_matrix.services.service_codes import normalize_dn_service_code
 
 def _service_title_without_code(code: str, title: str) -> str:
     """Убирает код из начала названия, если он уже продублирован в title матрицы."""
@@ -113,9 +115,13 @@ def pick_services(
     def is_per_visit(title: str) -> bool:
         return "диспансерный прием" in (title or "").lower()
 
-    services = sorted(services, key=lambda r: (0 if is_per_visit(r["title"]) else 1, r["title"]))
+    services = sorted(
+        services,
+        key=lambda r: (1 if r.get("unavailable") else 0, 0 if is_per_visit(r["title"]) else 1, r["title"]),
+    )
     rows = []
     for s in services:
+        unavailable = bool(s.get("unavailable"))
         qty = service_line_qty(s["title"], visits_capped, max_visits=edition.max_doctor_visits)
         price = s.get("price")
         amount = None
@@ -124,6 +130,7 @@ def pick_services(
         sex = s.get("sex_restriction") or ""
         rows.append(
             {
+                "Проводится": "не проводится" if unavailable else "да",
                 "Код": s["code"],
                 "Название": _service_title_without_code(s["code"], s["title"]),
                 "Подбор": PICK_SOURCE_LABELS.get(s.get("pick_source") or "", s.get("pick_source") or "—"),
@@ -132,10 +139,16 @@ def pick_services(
                 "Цена за ед.": price or "—",
                 "Кол-во": qty,
                 "Сумма": format_amount(amount) if amount is not None else "—",
+                "_excluded": "1" if unavailable else "0",
             }
         )
     max_visits = min(max(int(edition.max_doctor_visits or 3), 1), 3)
+    included = [s for s in services if not s.get("unavailable")]
+    excluded = [s for s in services if s.get("unavailable")]
     total, missing = sum_services_amount(services, visits_capped, max_visits=max_visits)
+    excluded_total, _ = sum_services_amount(
+        excluded, visits_capped, max_visits=max_visits, skip_unavailable=False
+    )
     sums: dict[int, str] = {}
     for n in range(1, 4):
         if n <= max_visits:
@@ -150,7 +163,9 @@ def pick_services(
         "total": format_amount(total),
         "sums": sums,
         "missing_prices": missing,
-        "count": len(rows),
+        "count": len(included),
+        "excluded_count": len(excluded),
+        "excluded_total": format_amount(excluded_total),
     }
 
 
@@ -232,3 +247,76 @@ def directory_prices(edition: MatrixEdition) -> list[dict]:
             }
         )
     return rows
+
+
+def service_code_options(edition: MatrixEdition) -> list[dict]:
+    rows = []
+    for s in DnService.objects.filter(edition=edition).order_by("sort_order", "code"):
+        code = normalize_dn_service_code(s.code) or s.code
+        title = _service_title_without_code(s.code, s.title)
+        label = f"{code} — {title}" if title else code
+        rows.append({"label": label, "value": code})
+    return rows
+
+
+def unavailable_table(edition: MatrixEdition) -> list[dict]:
+    titles = {
+        normalize_dn_service_code(s.code) or s.code: _service_title_without_code(s.code, s.title)
+        for s in DnService.objects.filter(edition=edition)
+    }
+    diag_titles = {
+        normalize_mkb(d.mkb_code): (d.title or "").strip()
+        for d in DnDiagnosis.objects.filter(edition=edition)
+    }
+    rows = []
+    for row in DnUnavailableService.objects.filter(edition=edition).order_by("service_code", "mkb_code"):
+        code = row.service_code
+        title = titles.get(code) or ""
+        mkb = row.mkb_code or ""
+        if mkb:
+            dtitle = diag_titles.get(mkb, "")
+            scope = f"{mkb} — {dtitle}" if dtitle else mkb
+        else:
+            scope = "Все диагнозы"
+        rows.append(
+            {
+                "id": row.id,
+                "Код": code,
+                "Название": title or "нет в текущей матрице",
+                "Диагноз": scope,
+                "Комментарий": row.note or "",
+            }
+        )
+    return rows
+
+
+def add_unavailable_service(
+    edition: MatrixEdition,
+    service_code: str,
+    mkb_code: str | None = None,
+    note: str = "",
+) -> tuple[bool, str]:
+    code = normalize_dn_service_code(service_code)
+    if not code:
+        return False, "Выберите услугу."
+    mkb = normalize_mkb(mkb_code)
+    if mkb and not DnDiagnosis.objects.filter(edition=edition, mkb_code=mkb).exists():
+        return False, f"Диагноз {mkb} не найден в этой редакции."
+    known = {normalize_dn_service_code(s.code) for s in DnService.objects.filter(edition=edition)}
+    if code not in known:
+        return False, f"Услуга {code} не найдена в этой редакции."
+    obj, created = DnUnavailableService.objects.get_or_create(
+        edition=edition,
+        service_code=code,
+        mkb_code=mkb,
+        defaults={"note": (note or "")[:256]},
+    )
+    if not created:
+        return False, "Эта услуга уже в списке «не проводится»."
+    return True, "Услуга добавлена в список «не проводится»."
+
+
+def delete_unavailable_services(edition: MatrixEdition, ids: list[int]) -> int:
+    if not ids:
+        return 0
+    return DnUnavailableService.objects.filter(edition=edition, id__in=ids).delete()[0]

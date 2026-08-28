@@ -287,3 +287,60 @@ class DnServiceRequirement(models.Model):
 
     def __str__(self) -> str:
         return f"req svc={self.service_id}"
+
+
+class DnUnavailableService(models.Model):
+    """Услуга матрицы, которую ЛПУ не проводит. Не входит в пакет JSON и переживает повторный импорт."""
+
+    edition = models.ForeignKey(
+        MatrixEdition,
+        on_delete=models.CASCADE,
+        related_name="unavailable_services",
+        verbose_name="Издание",
+    )
+    service_code = models.CharField(
+        "Код услуги",
+        max_length=32,
+        db_index=True,
+        help_text="Код из матрицы. Хранится строкой, чтобы список не стирался при повторном импорте пакета.",
+    )
+    mkb_code = models.CharField(
+        "Код МКБ",
+        max_length=16,
+        blank=True,
+        default="",
+        help_text="Пусто — услуга не проводится при любом диагнозе. Иначе только для этого МКБ.",
+    )
+    note = models.CharField("Комментарий", max_length=256, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Услуга, которая не проводится"
+        verbose_name_plural = "ДН: услуги, которые не проводятся"
+        ordering = ["service_code", "mkb_code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["edition", "service_code", "mkb_code"],
+                name="dn_matrix_unavail_ed_svc_mkb",
+            )
+        ]
+
+    def clean(self):
+        super().clean()
+        from apps.dn_matrix.services.matrix import normalize_mkb
+        from apps.dn_matrix.services.service_codes import normalize_dn_service_code
+
+        self.service_code = normalize_dn_service_code(self.service_code)
+        self.mkb_code = normalize_mkb(self.mkb_code)
+        if not self.service_code:
+            raise ValidationError({"service_code": "Укажите код услуги."})
+
+    def save(self, *args, **kwargs):
+        self.service_code = (self.service_code or "").strip()
+        self.mkb_code = (self.mkb_code or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        scope = self.mkb_code or "все диагнозы"
+        return f"{self.service_code} ({scope})"

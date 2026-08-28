@@ -23,6 +23,7 @@ from apps.analytical_app.pages.head.dn.services import (
     build_not_passed_grouped,
     build_out_of_168n,
     build_summary,
+    enrich_not_passed_with_matrix,
     patient_card,
     patient_meta,
     search_patients,
@@ -398,9 +399,11 @@ def render_tab(active_tab, store, np_mode):
         hint = (
             "Строка = пациент + профиль. Другой профиль — отдельная строка. "
             "Основной МКБ по группе: БСК > ОНКО > СД > Прочие; рядом сопутствующие МКБ того же профиля. "
-            "Excel — выбранный режим."
+            "«Получить услуги матрицы» считает набор по действующей редакции (основной + сопутствующие) "
+            "и не входит в первую загрузку — это отдельный проход. Excel — выбранный режим."
             if grouped
-            else "Детальный список по каждому диагнозу (ldwID). Excel — текущий режим."
+            else "Детальный список по каждому диагнозу (ldwID). "
+            "«Получить услуги матрицы» считает набор только по этому МКБ, без сопутствующих. Excel — текущий режим."
         )
         return html.Div(
             [
@@ -422,10 +425,31 @@ def render_tab(active_tab, store, np_mode):
                     inline=True,
                     className="mb-2",
                 ),
-                html.P(id=f"np-hint-{type_page}", className="text-muted small", children=hint),
                 html.Div(
-                    id=f"np-table-host-{type_page}",
-                    children=_table(df, f"tbl-np-{type_page}"),
+                    [
+                        html.Button(
+                            "Получить услуги матрицы",
+                            id=f"btn-np-matrix-{type_page}",
+                            className="btn btn-outline-primary me-2",
+                        ),
+                        html.Span(
+                            id=f"np-matrix-status-{type_page}",
+                            className="text-muted small",
+                            children=store.get("matrix_status")
+                            or "Сначала загрузите список, затем нажмите «Получить услуги матрицы».",
+                        ),
+                    ],
+                    className="mb-2",
+                ),
+                html.P(id=f"np-hint-{type_page}", className="text-muted small", children=hint),
+                dcc.Loading(
+                    id=f"loading-np-matrix-{type_page}",
+                    type="circle",
+                    color="#0d6efd",
+                    children=html.Div(
+                        id=f"np-table-host-{type_page}",
+                        children=_table(df, f"tbl-np-{type_page}"),
+                    ),
                 ),
             ]
         )
@@ -513,6 +537,48 @@ def switch_np_mode(mode, store):
         else "Детальный список по каждому диагнозу (ldwID). Excel — текущий режим."
     )
     return mode or "detail", _table(df, f"tbl-np-{type_page}"), hint
+
+
+@app.callback(
+    Output(f"store-{type_page}", "data", allow_duplicate=True),
+    Input(f"btn-np-matrix-{type_page}", "n_clicks"),
+    State(f"store-{type_page}", "data"),
+    State(f"store-np-mode-{type_page}", "data"),
+    prevent_initial_call=True,
+)
+def fill_not_passed_matrix(n_clicks, store, np_mode):
+    if not n_clicks:
+        raise PreventUpdate
+    store = dict(store or {})
+    grouped = (np_mode or "detail") == "grouped"
+    key = "not_passed_grouped" if grouped else "not_passed"
+    rows = list(store.get(key) or [])
+    if not rows:
+        store["matrix_status"] = "Сначала нажмите «Получить данные», затем «Получить услуги матрицы»."
+        return store
+    try:
+        enriched, status = enrich_not_passed_with_matrix(rows, grouped=grouped)
+    except Exception as e:
+        store["matrix_status"] = f"Ошибка подбора матрицы: {e}"
+        return store
+    store[key] = enriched
+    store["matrix_status"] = status
+    return store
+
+
+app.clientside_callback(
+    """
+    function(n_clicks) {
+        if (!n_clicks) {
+            return window.dash_clientside.no_update;
+        }
+        return "Считаем услуги по матрице… это может занять время";
+    }
+    """,
+    Output(f"np-matrix-status-{type_page}", "children", allow_duplicate=True),
+    Input(f"btn-np-matrix-{type_page}", "n_clicks"),
+    prevent_initial_call=True,
+)
 
 
 def _sheets_from_store(store: dict, np_mode: str = "detail") -> dict[str, pd.DataFrame]:

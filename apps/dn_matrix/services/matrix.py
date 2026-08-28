@@ -18,6 +18,7 @@ from apps.dn_matrix.models import (
     DnServicePrice,
     DnServicePricePeriod,
     DnServiceRequirement,
+    DnUnavailableService,
     MatrixEdition,
 )
 from apps.dn_matrix.services.service_codes import normalize_dn_service_code
@@ -199,6 +200,8 @@ class MatrixPickCache:
     prices_by_period_id: dict[int, dict[int, Decimal]]
     period_by_date: dict[date, DnServicePricePeriod | None] = field(default_factory=dict)
     max_doctor_visits: int = 3
+    unavailable_codes: frozenset[str] = field(default_factory=frozenset)
+    unavailable_codes_by_mkb: dict[str, frozenset[str]] = field(default_factory=dict)
 
 
 def _resolve_period_from_list(periods: list[DnServicePricePeriod], price_on: date | None) -> DnServicePricePeriod | None:
@@ -326,6 +329,20 @@ def build_matrix_pick_cache(edition: MatrixEdition) -> MatrixPickCache:
     ):
         prices_by_period_id[int(period_id)][int(svc_id)] = amt
 
+    unavailable_codes: set[str] = set()
+    unavailable_by_mkb: dict[str, set[str]] = defaultdict(set)
+    for raw_code, mkb in DnUnavailableService.objects.filter(edition_id=edition_id).values_list(
+        "service_code", "mkb_code"
+    ):
+        code = normalize_dn_service_code(raw_code)
+        if not code:
+            continue
+        mkb_norm = normalize_mkb(mkb)
+        if mkb_norm:
+            unavailable_by_mkb[mkb_norm].add(code)
+        else:
+            unavailable_codes.add(code)
+
     return MatrixPickCache(
         edition_id=edition_id,
         mkb_to_diagnosis_id=mkb_to_diagnosis_id,
@@ -340,6 +357,8 @@ def build_matrix_pick_cache(edition: MatrixEdition) -> MatrixPickCache:
         periods=periods,
         prices_by_period_id=dict(prices_by_period_id),
         max_doctor_visits=min(max(int(edition.max_doctor_visits or 3), 1), 3),
+        unavailable_codes=frozenset(unavailable_codes),
+        unavailable_codes_by_mkb={k: frozenset(v) for k, v in unavailable_by_mkb.items()},
     )
 
 
@@ -357,6 +376,18 @@ def _requirement_tuple_matches(
     if req_grp and req_grp not in diagnosis_group_ids:
         return False
     return True
+
+
+def service_marked_unavailable(cache: MatrixPickCache, service_code: str, mkb_code: str | None) -> bool:
+    code = normalize_dn_service_code(service_code)
+    if not code:
+        return False
+    if code in cache.unavailable_codes:
+        return True
+    mkb = normalize_mkb(mkb_code)
+    if not mkb:
+        return False
+    return code in cache.unavailable_codes_by_mkb.get(mkb, frozenset())
 
 
 def _service_applies_cached(
@@ -498,10 +529,11 @@ def select_services_from_cache(
             group_main,
             secondary_diagnosis_ids,
         )
+        service_code = normalize_dn_service_code(code)
         out.append(
             {
                 "id": svc_id,
-                "code": normalize_dn_service_code(code),
+                "code": service_code,
                 "title": title,
                 "price": str(amt) if amt is not None else None,
                 "currency": "RUB",
@@ -509,6 +541,7 @@ def select_services_from_cache(
                 "pick_source": pick_source,
                 "obligation": "не задано",
                 "sex_restriction": svc_sex or None,
+                "unavailable": service_marked_unavailable(cache, service_code, mkb_code),
             }
         )
     return out, period, diagnosis_id

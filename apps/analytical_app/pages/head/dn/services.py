@@ -185,6 +185,20 @@ def build_iszl_not_in_kvazar(engine, year: int) -> pd.DataFrame:
     return localize_df(_read(engine, sql_iszl_not_in_kvazar(year)))
 
 
+def enrich_not_passed_with_matrix(rows: list[dict], *, grouped: bool) -> tuple[list[dict], str]:
+    """Подбор услуг действующей матрицы. Вызывать отдельно от SQL-выгрузки."""
+    from apps.dn_matrix.runtime import ensure_django
+
+    ensure_django()
+    from apps.dn_matrix.services.batch_pick import enrich_not_passed_rows
+    from apps.dn_matrix.services.workspace import default_edition
+
+    edition = default_edition()
+    if not edition:
+        return rows, "Нет загруженной редакции матрицы. Сначала импортируйте JSON-пакет."
+    return enrich_not_passed_rows(rows or [], edition, grouped=grouped)
+
+
 def dataframe_to_excel_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
