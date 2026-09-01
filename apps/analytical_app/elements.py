@@ -14,9 +14,13 @@ def card_table(
     hidden_columns=None,
     show_sum_button=False,
     merge_duplicate_headers=False,
+    style_cell=None,
     style_cell_conditional=None,
+    style_header=None,
     style_header_conditional=None,
-    markdown_options=None
+    markdown_options=None,
+    fill_width=True,
+    css=None,
 ):
     """
     Возвращает карточку с Dash DataTable.
@@ -30,8 +34,12 @@ def card_table(
     - hidden_columns:           список id скрытых столбцов
     - show_sum_button:          показывать кнопку «Суммировать»
     - merge_duplicate_headers:  склеивать дублирующиеся первые уровни заголовков
+    - style_cell:               базовые стили ячеек
     - style_cell_conditional:   условные стили для ячеек
+    - style_header:             базовые стили заголовков
     - style_header_conditional: условные стили для заголовков столбцов
+    - fill_width:               растягивать таблицу на ширину контейнера
+    - css:                      доп. CSS DataTable (селектор + rule)
     """
     table_kwargs = {
         'id': id_table,
@@ -41,8 +49,9 @@ def card_table(
         'sort_mode': 'multi',
         'export_format': 'xlsx',
         'export_headers': 'display',
+        'fill_width': fill_width,
         'style_table': {'overflowX': 'auto'},
-        'style_cell': {'minWidth': '0px', 'maxWidth': '180px', 'whiteSpace': 'normal'},
+        'style_cell': style_cell or {'minWidth': '0px', 'maxWidth': '180px', 'whiteSpace': 'normal'},
         'merge_duplicate_headers': merge_duplicate_headers,
         'cell_selectable': True,  # Включаем выделение ячеек
         'selected_cells': []      # Инициализируем пустым списком
@@ -56,12 +65,16 @@ def card_table(
         table_kwargs['row_selectable'] = row_selectable
     if hidden_columns is not None:
         table_kwargs['hidden_columns'] = hidden_columns
+    if style_header is not None:
+        table_kwargs['style_header'] = style_header
     if style_cell_conditional is not None:
         table_kwargs['style_cell_conditional'] = style_cell_conditional
     if style_header_conditional is not None:
         table_kwargs['style_header_conditional'] = style_header_conditional
     if markdown_options is not None:
         table_kwargs['markdown_options'] = markdown_options
+    if css is not None:
+        table_kwargs['css'] = css
 
     sum_button_section = None
     if show_sum_button:

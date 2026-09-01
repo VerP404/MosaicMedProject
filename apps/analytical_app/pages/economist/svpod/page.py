@@ -54,6 +54,69 @@ INOGOROD_GROUP_LABELS = {
     "Исправлен(6,8,19)": "Исправлен",
 }
 
+_SVPOD_MONEY_COL_IDS = {
+    "План",
+    "Факт",
+    "Остаток",
+    "новые",
+    "в_тфомс",
+    "оплачено",
+    "исправлено",
+    "отказано",
+    "отменено",
+    "План 1/12",
+    "Входящий остаток",
+}
+_SVPOD_OPEN_STATUSES = ["1", "2", "3", "4", "6", "8", "19"]
+
+# «124 690 800.00» в одну строку; месяц/% уже.
+_SVPOD_MONTHLY_STYLE_CELL = {
+    "whiteSpace": "nowrap",
+    "textAlign": "right",
+    "padding": "4px 6px",
+    "fontSize": "12px",
+}
+_SVPOD_MONTHLY_STYLE_HEADER = {
+    "whiteSpace": "normal",
+    "textAlign": "center",
+    "fontWeight": "600",
+    "fontSize": "12px",
+    "padding": "6px 4px",
+}
+
+
+def _svpod_monthly_column_styles(extra=None):
+    """Ширины колонок помесячной таблицы: узкие месяц/%, деньги без переноса."""
+    styles = [
+        {
+            "if": {"column_id": "month"},
+            "minWidth": "100px",
+            "width": "100px",
+            "maxWidth": "116px",
+            "textAlign": "center",
+        },
+        {
+            "if": {"column_id": "%"},
+            "minWidth": "56px",
+            "width": "56px",
+            "maxWidth": "68px",
+            "textAlign": "right",
+        },
+    ]
+    for cid in _SVPOD_MONEY_COL_IDS:
+        styles.append(
+            {
+                "if": {"column_id": cid},
+                "minWidth": "118px",
+                "width": "128px",
+                "maxWidth": "168px",
+                "textAlign": "right",
+            }
+        )
+    if extra:
+        styles.extend(extra)
+    return styles
+
 
 def build_inogorod_columns():
     columns = [{"name": ["", "Месяц"], "id": "month", "type": "text"}]
@@ -468,6 +531,10 @@ current_report_tab = html.Div(
             f'result-table1-{type_page}',
             html.Span("Данные", id=f"data-card-title-{type_page}"),
             column_selectable='multi',
+            merge_duplicate_headers=True,
+            style_cell=_SVPOD_MONTHLY_STYLE_CELL,
+            style_cell_conditional=_svpod_monthly_column_styles(),
+            style_header=_SVPOD_MONTHLY_STYLE_HEADER,
         ),
         html.Div(
             id=f'loading-status-{type_page}',
@@ -674,7 +741,14 @@ cumulative_report_tab = html.Div(
             ], width=12)
         ]),
         dcc.Loading(id=f'loading-cumulative-{type_page}', type='default'),
-        card_table(f'cumulative-table-{type_page}', "Отчет нарастающим итогом по всем показателям", column_selectable='multi'),
+        card_table(
+            f'cumulative-table-{type_page}',
+            "Отчет нарастающим итогом по всем показателям",
+            column_selectable='multi',
+            merge_duplicate_headers=True,
+            style_cell=_SVPOD_MONTHLY_STYLE_CELL,
+            style_header=_SVPOD_MONTHLY_STYLE_HEADER,
+        ),
     ],
     style={"padding": "0rem"}
 )
@@ -1143,22 +1217,6 @@ def _month_closed_enabled(switch_value) -> bool:
     if isinstance(switch_value, (list, tuple, set)):
         return "closed" in switch_value or True in switch_value
     return False
-
-
-_SVPOD_MONEY_COL_IDS = {
-    "План",
-    "Факт",
-    "Остаток",
-    "новые",
-    "в_тфомс",
-    "оплачено",
-    "исправлено",
-    "отказано",
-    "отменено",
-    "План 1/12",
-    "Входящий остаток",
-}
-_SVPOD_OPEN_STATUSES = ["1", "2", "3", "4", "6", "8", "19"]
 
 
 def _svpod_money_format() -> Format:
@@ -1831,21 +1889,27 @@ def generate_cumulative_report(
     
     loading_output = html.Div([dcc.Loading(type="default")])
     
-    # Стили для столбцов - делаем "Группа показателей" или "Месяц" шире
-    style_cell_conditional = [
-        {
-            'if': {'column_id': 'Группа показателей'},
-            'minWidth': '300px',
-            'maxWidth': '400px',
-            'width': '350px'
-        },
-        {
-            'if': {'column_id': 'month'},
-            'minWidth': '150px',
-            'maxWidth': '200px',
-            'width': '180px'
-        }
-    ]
+    # Стили для столбцов: группа шире, месяц/% уже, деньги без переноса
+    style_cell_conditional = _svpod_monthly_column_styles(
+        extra=[
+            {
+                'if': {'column_id': 'Группа показателей'},
+                'minWidth': '240px',
+                'maxWidth': '360px',
+                'width': '280px',
+                'textAlign': 'left',
+                'whiteSpace': 'normal',
+            },
+            {
+                'if': {'column_id': 'group_name'},
+                'minWidth': '240px',
+                'maxWidth': '360px',
+                'width': '280px',
+                'textAlign': 'left',
+                'whiteSpace': 'normal',
+            },
+        ]
+    )
     
     try:
         unique = unique_flag if unique_flag is not None else False
