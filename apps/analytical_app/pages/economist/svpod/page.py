@@ -3,6 +3,7 @@ import time
 from functools import lru_cache
 
 from dash import html, dcc, Output, Input, State, ALL, exceptions
+from dash.dash_table.Format import Format, Group, Scheme
 import dash_bootstrap_components as dbc
 import pandas as pd
 from dash.exceptions import PreventUpdate
@@ -1144,6 +1145,79 @@ def _month_closed_enabled(switch_value) -> bool:
     return False
 
 
+_SVPOD_MONEY_COL_IDS = {
+    "План",
+    "Факт",
+    "Остаток",
+    "новые",
+    "в_тфомс",
+    "оплачено",
+    "исправлено",
+    "отказано",
+    "отменено",
+    "План 1/12",
+    "Входящий остаток",
+}
+_SVPOD_OPEN_STATUSES = ["1", "2", "3", "4", "6", "8", "19"]
+
+
+def _svpod_money_format() -> Format:
+    return Format(
+        scheme=Scheme.fixed,
+        precision=2,
+        group=Group.yes,
+        groups=3,
+        group_delimiter=" ",
+        decimal_delimiter=".",
+    )
+
+
+def _format_svpod_columns(columns, *, finance: bool):
+    """В режиме финансов: 2 знака, разряды. % — 1 знак."""
+    if not finance:
+        return columns
+    money_fmt = _svpod_money_format()
+    pct_fmt = Format(scheme=Scheme.fixed, precision=1)
+    out = []
+    for col in columns:
+        col = dict(col)
+        cid = col.get("id")
+        if cid in _SVPOD_MONEY_COL_IDS:
+            col["type"] = "numeric"
+            col["format"] = money_fmt
+        elif cid == "%":
+            col["type"] = "numeric"
+            col["format"] = pct_fmt
+        out.append(col)
+    return out
+
+
+def svpod_month_is_open(
+    month: int,
+    *,
+    reporting_month: int,
+    current_day: int,
+    calendar_month: int | None,
+    month_closed: bool,
+    manually_selected: bool,
+) -> bool:
+    """
+    Месяц ещё «в работе»: новые + в ТФОМС + оплачено + исправлено этого месяца.
+
+    Льгота до 10-го числа — только для календарного предыдущего месяца
+    (август до 10 сентября), а не для reporting_month-1: иначе 1–5 сентября
+    (когда отчётный уже август) июль ошибочно остаётся открытым.
+    """
+    if month_closed or manually_selected:
+        return False
+    if month == reporting_month:
+        return True
+    if not calendar_month:
+        return False
+    prev_calendar = calendar_month - 1 if calendar_month > 1 else 12
+    return month == prev_calendar and current_day <= 10
+
+
 def compute_svpod_month_fact(
     row: dict,
     month: int,
@@ -1151,7 +1225,7 @@ def compute_svpod_month_fact(
     reporting_month: int,
     current_day: int,
     month_closed: bool,
-    total_ispravleno_all_months: float = 0,
+    calendar_month: int | None = None,
     manually_selected: bool = False,
 ) -> float:
     """
@@ -1162,13 +1236,15 @@ def compute_svpod_month_fact(
       - более ранние месяцы: только 3
       - будущие: 0
 
-    month_closed=False — прежняя календарная логика
-    (ручной выбор месяца раньше давал только 3; при closed=False оставляем это).
+    month_closed=False:
+      - отчётный месяц (и календарный предыдущий до 10-го): новые+ТФОМС+оплачено+исправлено этого месяца
+      - более ранние: только оплачено
+      - ручной выбор месяца: только оплачено
     """
     paid = float(row.get("оплачено", 0) or 0)
     tfoms = float(row.get("в_тфомс", 0) or 0)
     new_ = float(row.get("новые", 0) or 0)
-    fixed = float(total_ispravleno_all_months or 0)
+    fixed = float(row.get("исправлено", 0) or 0)
 
     if month_closed:
         if month == reporting_month:
@@ -1180,14 +1256,17 @@ def compute_svpod_month_fact(
     if manually_selected and month == reporting_month:
         return paid
 
-    if month < reporting_month - 1:
-        return paid
-    if month == reporting_month - 1:
-        if current_day <= 10:
-            return new_ + tfoms + paid + fixed
-        return paid
-    if month == reporting_month:
+    if svpod_month_is_open(
+        month,
+        reporting_month=reporting_month,
+        current_day=current_day,
+        calendar_month=calendar_month,
+        month_closed=False,
+        manually_selected=manually_selected,
+    ):
         return new_ + tfoms + paid + fixed
+    if month < reporting_month:
+        return paid
     return 0.0
 
 
@@ -1311,10 +1390,6 @@ def update_table_with_plan_and_balance(n_clicks,
                       building=buildings)
     )
     execution_time = time.time() - start_time
-    # Добавляем общую сумму "исправлено"
-    total_ispravleno_all_months = sum(
-        _as_float(row.get("исправлено", 0)) for row in fact_data_list
-    )
     # Превращаем список словарей fact_data_list в dict по ключу "month"
     fact_dict = {}
     for row in fact_data_list:
@@ -1392,7 +1467,7 @@ def update_table_with_plan_and_balance(n_clicks,
                 reporting_month=current_month,
                 current_day=current_day,
                 month_closed=month_closed,
-                total_ispravleno_all_months=total_ispravleno_all_months,
+                calendar_month=today.month,
                 manually_selected=manually_selected,
             )
         )
@@ -1498,6 +1573,7 @@ def update_table_with_plan_and_balance(n_clicks,
     if mode == "finance":
         unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
         fact_data = scale_rows_money(fact_data, unit)
+        columns = _format_svpod_columns(columns, finance=True)
 
     applied = _applied_rules_hint(
         filter_conditions=filter_conditions,
@@ -1606,6 +1682,9 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
             default_month = today.month - 1 if today.day <= 5 else today.month
             reporting_month = selected_month if selected_month is not None else default_month
             current_day = today.day
+            calendar_month = today.month
+            manually_selected = selected_month is not None
+            open_status_sql = "status IN ('1', '2', '3', '4', '6', '8', '19')"
 
             if month_name == "Нарастающе" or month_name == "Год":
                 month_conditions = []
@@ -1619,30 +1698,21 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
                             month_conditions.append(
                                 f"(report_month_number = {m} AND status = '3')"
                             )
-                    elif m < reporting_month - 1:
+                    elif svpod_month_is_open(
+                        m,
+                        reporting_month=reporting_month,
+                        current_day=current_day,
+                        calendar_month=calendar_month,
+                        month_closed=False,
+                        manually_selected=manually_selected,
+                    ):
+                        month_conditions.append(
+                            f"(report_month_number = {m} AND {open_status_sql})"
+                        )
+                    else:
                         month_conditions.append(
                             f"(report_month_number = {m} AND status = '3')"
                         )
-                    elif m == reporting_month - 1:
-                        if current_day <= 10:
-                            month_conditions.append(
-                                f"(report_month_number = {m} AND status IN ('1', '2', '3'))"
-                            )
-                            month_conditions.append(f"(status IN ('6', '8', '4', '19'))")
-                        else:
-                            month_conditions.append(
-                                f"(report_month_number = {m} AND status = '3')"
-                            )
-                    elif m == reporting_month:
-                        if selected_month is not None:
-                            month_conditions.append(
-                                f"(report_month_number = {m} AND status = '3')"
-                            )
-                        else:
-                            month_conditions.append(
-                                f"(report_month_number = {m} AND status IN ('1', '2', '3'))"
-                            )
-                            month_conditions.append(f"(status IN ('6', '8', '4', '19'))")
                 
                 if month_conditions:
                     status_filter = f"COMPLEX_LOGIC:{':'.join(month_conditions)}"
@@ -1663,12 +1733,15 @@ def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selecte
                         status_filter = ['2', '3']
                     else:
                         status_filter = ['3']
-                elif selected_month is not None:
-                    status_filter = ['3']
-                elif month_num and month_num < reporting_month - 1:
-                    status_filter = ['3']
-                elif month_num and (month_num == reporting_month - 1 or month_num == reporting_month):
-                    status_filter = ['1', '2', '3', '4', '6', '8', '19']
+                elif month_num and svpod_month_is_open(
+                    month_num,
+                    reporting_month=reporting_month,
+                    current_day=current_day,
+                    calendar_month=calendar_month,
+                    month_closed=False,
+                    manually_selected=manually_selected,
+                ):
+                    status_filter = list(_SVPOD_OPEN_STATUSES)
                 else:
                     status_filter = ['3']
         elif column_id == 'новые':
@@ -1944,8 +2017,7 @@ def generate_cumulative_report(
                 plan_data = fetch_plan_data(
                     group_id, selected_year, mode, plan_kind=plan_kind, building_ids=buildings
                 )
-                total_ispravleno_all_months = sum(row.get("исправлено", 0) or 0 for row in fact_data_list)
-                
+
                 incoming_balance = 0
                 group_data = []
                 
@@ -1979,7 +2051,7 @@ def generate_cumulative_report(
                                 (month_data.get("новые", 0) or 0) +
                                 (month_data.get("в_тфомс", 0) or 0) +
                                 (month_data.get("оплачено", 0) or 0) +
-                                total_ispravleno_all_months
+                                (month_data.get("исправлено", 0) or 0)
                             )
                         else:
                             month_fact = 0
@@ -2055,6 +2127,7 @@ def generate_cumulative_report(
         if mode == "finance":
             unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
             data = scale_rows_money(data, unit)
+            columns = _format_svpod_columns(columns, finance=True)
             status_text = (
                 f"{status_text} Финансы: {finance_unit_label(unit)}."
             )

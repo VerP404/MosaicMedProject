@@ -179,9 +179,7 @@ def scale_money_value_in_row(
     keys: Iterable[str],
     unit: str | None,
 ) -> None:
-    """In-place: рубли → display для перечисленных ключей."""
-    if normalize_finance_unit(unit) == FINANCE_UNIT_RUBLES:
-        return
+    """In-place: рубли → display для перечисленных ключей (всегда с округлением до копеек)."""
     for key in keys:
         if key in row and row[key] is not None:
             try:
@@ -195,11 +193,12 @@ def scale_rows_money(
     unit: str | None,
     keys: Sequence[str] = SVPOD_MONEY_KEYS,
 ) -> list[dict]:
-    """Копия строк с масштабированием денежных полей (для отчётов)."""
+    """Копия строк с масштабированием денежных полей (для отчётов).
+
+    Для рублей не делит на 1000, но округляет до 2 знаков (убирает float-шум).
+    """
     if not rows:
         return []
-    if normalize_finance_unit(unit) == FINANCE_UNIT_RUBLES:
-        return [dict(r) for r in rows]
     out = []
     for r in rows:
         row = dict(r)

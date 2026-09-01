@@ -56,6 +56,13 @@ class FinanceUnitHelpersTests(TestCase):
         self.assertEqual(out[0]["Факт"], 0.5)
         self.assertEqual(out[0]["%"], 50.0)
 
+    def test_scale_rows_money_rubles_rounds_float_noise(self):
+        rows = [{"План": 38732016.730000004, "%": 41.5, "Остаток": 27099199.860000003}]
+        out = scale_rows_money(rows, FINANCE_UNIT_RUBLES)
+        self.assertEqual(out[0]["План"], 38732016.73)
+        self.assertEqual(out[0]["Остаток"], 27099199.86)
+        self.assertEqual(out[0]["%"], 41.5)
+
     def test_default_from_settings(self):
         MainSettings.objects.all().delete()
         MainSettings.objects.create(finance_plan_unit=FINANCE_UNIT_THOUSANDS)

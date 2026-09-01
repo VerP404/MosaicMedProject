@@ -952,9 +952,6 @@ def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_f
             ).mappings()
             plan_data = {row["month"]: row["plan"] for row in result}
         
-        # Рассчитываем общую сумму "исправлено" за все месяцы
-        total_ispravleno_all_months = sum(row.get("исправлено", 0) or 0 for row in fact_data_list)
-        
         # Собираем данные по месяцам
         cumulative_fact = 0
         cumulative_new = 0
@@ -988,12 +985,12 @@ def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_f
                     # Для месяцев < отчетного: только оплаченные (статус 3)
                     month_fact = month_data.get("оплачено", 0) or 0
                 elif m == current_month:
-                    # Для отчетного месяца: новые+в_тфомс+оплачено+исправлено
+                    # Для отчетного месяца: новые+в_тфомс+оплачено+исправлено этого месяца
                     month_fact = (
                         (month_data.get("новые", 0) or 0) +
                         (month_data.get("в_тфомс", 0) or 0) +
                         (month_data.get("оплачено", 0) or 0) +
-                        total_ispravleno_all_months
+                        (month_data.get("исправлено", 0) or 0)
                     )
                 else:
                     month_fact = 0
