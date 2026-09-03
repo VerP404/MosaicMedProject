@@ -118,6 +118,15 @@ def build_not_passed_grouped(engine, year: int, category: str = "", profile: str
     return localize_df(_read(engine, sql_not_passed_grouped(year, category, profile)))
 
 
+def build_not_passed_grouped_for_enps(engine, year: int, enps: list[str]) -> pd.DataFrame:
+    """Не прошедшие по пациенту только для указанных ЕНП (дотягивание диагнозов из файла)."""
+    cleaned = ["".join(ch for ch in str(e or "") if ch.isdigit()) for e in enps]
+    cleaned = [e for e in cleaned if e]
+    if not cleaned:
+        return pd.DataFrame()
+    return localize_df(_read(engine, sql_not_passed_grouped(year, enps=cleaned)))
+
+
 def build_out_of_168n(engine, year: int) -> pd.DataFrame:
     return localize_df(_read(engine, sql_out_of_168n(year)))
 

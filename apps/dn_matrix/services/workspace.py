@@ -4,6 +4,9 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from django.db import connection
+from django.db.utils import OperationalError, ProgrammingError
+
 from apps.dn_matrix.models import (
     DnDiagnosis,
     DnDiagnosisGroup,
@@ -48,6 +51,26 @@ SEX_LABELS = {
 }
 
 
+def _without_matrix_tables(default):
+    """Импорт Dash не должен падать, если миграции dn_matrix ещё не применены."""
+
+    def deco(fn):
+        def wrapped(*args, **kwargs):
+            try:
+                return fn(*args, **kwargs)
+            except (ProgrammingError, OperationalError):
+                try:
+                    connection.rollback()
+                except Exception:
+                    pass
+                return default
+
+        return wrapped
+
+    return deco
+
+
+@_without_matrix_tables(None)
 def default_edition() -> MatrixEdition | None:
     active = MatrixEdition.objects.filter(status=MatrixEdition.Status.ACTIVE).order_by("-effective_from", "-id").first()
     if active:
@@ -55,6 +78,7 @@ def default_edition() -> MatrixEdition | None:
     return MatrixEdition.objects.exclude(status=MatrixEdition.Status.ARCHIVED).order_by("-effective_from", "-id").first()
 
 
+@_without_matrix_tables([])
 def edition_options() -> list[dict]:
     rows = []
     for e in MatrixEdition.objects.exclude(status=MatrixEdition.Status.ARCHIVED).order_by("-effective_from", "code"):

@@ -12,6 +12,16 @@ from dash.exceptions import PreventUpdate
 
 from apps.analytical_app.app import app
 from apps.analytical_app.components.filters import filter_years
+from apps.analytical_app.pages.head.dn.bundle_tab import (
+    bundle_upload_panel,
+    register_bundle_callbacks,
+    render_bundle_tab,
+)
+from apps.analytical_app.pages.head.dn.fix_tab import (
+    fix_upload_panel,
+    register_fix_callbacks,
+    render_fix_tab,
+)
 from apps.analytical_app.pages.head.dn.services import (
     build_dropped_diagnoses,
     build_etl_status,
@@ -69,7 +79,13 @@ head_dn = html.Div(
         dcc.Store(id=f"store-enp-{type_page}", storage_type="memory"),
         dcc.Store(id=f"store-card-{type_page}", storage_type="memory"),
         dcc.Store(id=f"store-np-mode-{type_page}", data="detail", storage_type="memory"),
+        dcc.Store(id=f"store-bundle-file-{type_page}", storage_type="memory"),
+        dcc.Store(id=f"store-bundle-source-{type_page}", data="file", storage_type="memory"),
+        dcc.Store(id=f"store-fix-file-{type_page}", storage_type="memory"),
+        dcc.Store(id=f"store-fix-report-{type_page}", storage_type="memory"),
         dcc.Download(id=f"download-xlsx-{type_page}"),
+        dcc.Download(id=f"download-bundle-{type_page}"),
+        dcc.Download(id=f"download-fix-{type_page}"),
         dbc.Row(
             [
                 dbc.Col(
@@ -206,12 +222,16 @@ head_dn = html.Div(
             children=[
                 dbc.Tab(label="Сводка ИСЗЛ", tab_id="tab-summary"),
                 dbc.Tab(label="Не прошедшие", tab_id="tab-not-passed"),
+                dbc.Tab(label="Простановка услуг", tab_id="tab-bundle"),
+                dbc.Tab(label="Исправление талонов", tab_id="tab-fix"),
                 dbc.Tab(label="Вне 168н → 305", tab_id="tab-305"),
                 dbc.Tab(label="Нет в текущем / снять·внести", tab_id="tab-missing"),
                 dbc.Tab(label="Квазар ↔ ИСЗЛ", tab_id="tab-kvazar"),
                 dbc.Tab(label="Статус загрузки", tab_id="tab-status"),
             ],
         ),
+        bundle_upload_panel(type_page),
+        fix_upload_panel(type_page),
         dcc.Loading(
             id=f"loading-tabs-{type_page}",
             type="default",
@@ -364,8 +384,11 @@ def select_patient(selected, data, year):
     Input(f"tabs-{type_page}", "active_tab"),
     Input(f"store-{type_page}", "data"),
     State(f"store-np-mode-{type_page}", "data"),
+    State(f"store-bundle-file-{type_page}", "data"),
+    State(f"store-fix-file-{type_page}", "data"),
+    State(f"store-fix-report-{type_page}", "data"),
 )
-def render_tab(active_tab, store, np_mode):
+def render_tab(active_tab, store, np_mode, file_store, fix_file_store, fix_report_store):
     store = store or {}
     year = store.get("year") or "—"
     np_mode = np_mode or "detail"
@@ -453,6 +476,12 @@ def render_tab(active_tab, store, np_mode):
                 ),
             ]
         )
+
+    if active_tab == "tab-bundle":
+        return render_bundle_tab(type_page, store, file_store)
+
+    if active_tab == "tab-fix":
+        return render_fix_tab(type_page, store, fix_file_store, fix_report_store)
 
     if active_tab == "tab-305":
         return html.Div(
@@ -647,6 +676,7 @@ def export_excel(n_tab, n_all, n_card, store, card_store, active_tab, np_mode):
 
     tab_map = {
         "tab-not-passed": {np_sheet: all_sheets[np_sheet]},
+        "tab-bundle": {"Не прошедшие по пациенту": pd.DataFrame(store.get("not_passed_grouped") or [])},
         "tab-305": {"Вне 168н 305": all_sheets["Вне 168н 305"]},
         "tab-missing": {
             "Нет в текущем": all_sheets["Нет в текущем"],
@@ -664,3 +694,7 @@ def export_excel(n_tab, n_all, n_card, store, card_store, active_tab, np_mode):
     sheets = tab_map.get(active_tab) or all_sheets
     suffix = "grouped" if (active_tab == "tab-not-passed" and np_mode == "grouped") else active_tab
     return send_bytes(lambda b: to_excel(b, sheets), f"dn_iszl_{suffix}_{year}.xlsx")
+
+
+register_bundle_callbacks(app, type_page)
+register_fix_callbacks(app, type_page)

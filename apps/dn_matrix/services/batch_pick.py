@@ -74,18 +74,23 @@ def resolve_specialty_id(
         return None
 
     profile_n = (profile or "").strip()
+    if profile_n in {"—", "-", "нет"}:
+        profile_n = ""
     cluster = specialty_to_cluster(profile_n) or profile_n
 
     def by_title(items: list[DnSpecialty], needle: str) -> DnSpecialty | None:
         n = needle.lower().replace("ё", "е")
+        if not n:
+            return None
         for s in items:
             if (s.title or "").lower().replace("ё", "е") == n:
                 return s
         return None
 
-    exact = by_title(pool, profile_n)
-    if exact:
-        return exact.id
+    if profile_n:
+        exact = by_title(pool, profile_n)
+        if exact:
+            return exact.id
 
     if cluster == THERAPY_CLUSTER:
         therapy = [s for s in pool if is_therapy_specialty(s.title)]
@@ -93,16 +98,55 @@ def resolve_specialty_id(
             therapy.sort(key=lambda s: (_therapy_rank(s.title), s.sort_order, s.id))
             return therapy[0].id
 
-    clustered = [s for s in pool if specialty_to_cluster(s.title) == cluster]
-    if len(clustered) == 1:
-        return clustered[0].id
-    if clustered:
-        clustered.sort(key=lambda s: (s.sort_order, s.id))
-        return clustered[0].id
+    if profile_n and cluster:
+        clustered = [s for s in pool if specialty_to_cluster(s.title) == cluster]
+        if len(clustered) == 1:
+            return clustered[0].id
+        if clustered:
+            clustered.sort(key=lambda s: (s.sort_order, s.id))
+            return clustered[0].id
 
     if len(linked) == 1:
         return linked[0].id
+    if linked:
+        return _pick_specialty_without_profile(cache, linked, diagnosis_id)
     return None
+
+
+def _pick_specialty_without_profile(
+    cache: MatrixPickCache,
+    linked: list[DnSpecialty],
+    diagnosis_id: int | None,
+) -> int | None:
+    """Файл цели 3 часто без колонки профиля: берём основную специальность диагноза."""
+    if not linked:
+        return None
+    billable = [
+        s
+        for s in linked
+        if diagnosis_id is not None and (diagnosis_id, s.id) in cache.diagnosis_specialty_billable
+    ] or list(linked)
+    cat = ""
+    if diagnosis_id is not None:
+        cat = (cache.diagnosis_id_to_category.get(diagnosis_id) or ("", ""))[1].upper()
+
+    def _first(items: list[DnSpecialty]) -> int:
+        items.sort(key=lambda s: (_therapy_rank(s.title), s.sort_order, s.id))
+        return items[0].id
+
+    if cat == "СД":
+        endo = [s for s in billable if "эндокрин" in (s.title or "").lower().replace("ё", "е")]
+        if endo:
+            return _first(endo)
+    if cat == "ОНКО":
+        onko = [s for s in billable if "онколог" in (s.title or "").lower().replace("ё", "е")]
+        if onko:
+            return _first(onko)
+
+    therapy = [s for s in billable if is_therapy_specialty(s.title)]
+    if therapy:
+        return _first(therapy)
+    return _first(billable)
 
 
 def _format_codes(services: list[dict]) -> tuple[str, str]:

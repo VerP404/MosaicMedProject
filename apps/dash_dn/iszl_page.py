@@ -1,5 +1,6 @@
 """
-Вкладка «ИСЗЛ» — загрузка CSV из внешней системы и расчет потребности в услугах ДН.
+Вкладка «ИСЗЛ» — загрузка CSV из внешней системы, расчет потребности в услугах ДН
+и сверка с журналом талонов (список не прошедших).
 """
 from __future__ import annotations
 
@@ -9,6 +10,7 @@ import io
 import re
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, dcc, html, dash_table
@@ -17,6 +19,8 @@ from sqlalchemy import bindparam, text
 
 from apps.dash_dn.app import dash_dn_app as app
 from apps.dash_dn.catalog_periods import default_active_catalog
+from apps.dash_dn.detail_services_report import read_detail_csv_from_bytes
+from apps.dash_dn.iszl_reconciliation import build_not_passed_report, read_semicolon_csv
 from apps.dash_dn.sqlite_catalog.db import get_engine
 
 PREFIX = "dash-dn-iszl"
@@ -53,34 +57,53 @@ def _table(table_id: str, page_size: int = 20):
     )
 
 
+def _upload_box(upload_id: str, label: str, icon: str = "bi-cloud-upload"):
+    return dcc.Upload(
+        id=upload_id,
+        children=html.Div(
+            [html.I(className=f"bi {icon} me-2"), label],
+            className="small",
+        ),
+        className="border rounded-3 p-3 text-center bg-white",
+        style={"cursor": "pointer"},
+        multiple=False,
+    )
+
+
 def layout_body():
     return html.Div(
         [
             html.P(
-                "Загрузите CSV из ИСЗЛ (формат Report - *.csv). "
-                "Расчет: для каждого пациента берутся все диагнозы, затем подбираются услуги "
-                "из справочника ДН. Если одна и та же услуга встречается по нескольким диагнозам "
-                "одного пациента, она учитывается один раз.",
+                "1) Загрузите CSV из ИСЗЛ (Report - *.csv) — расчёт потребности в услугах ДН. "
+                "2) Для списка «не прошедших» добавьте journal CSV (талоны) и, при необходимости, "
+                "detail_services CSV (сверка услуг, как во вкладке «Анализ»).",
                 className="text-muted small",
             ),
             dbc.Row(
                 [
+                    dbc.Col(_upload_box(f"{PREFIX}-upload", "CSV ИСЗЛ (Report)"), md=4),
+                    dbc.Col(_upload_box(f"{PREFIX}-upload-journal", "journal CSV (талоны)", "bi-journal-text"), md=4),
                     dbc.Col(
-                        dcc.Upload(
-                            id=f"{PREFIX}-upload",
-                            children=html.Div(
-                                [
-                                    html.I(className="bi bi-cloud-upload me-2"),
-                                    "Перетащите CSV сюда или нажмите для выбора файла",
-                                ],
-                                className="small",
-                            ),
-                            className="border rounded-3 p-4 text-center bg-white",
-                            style={"cursor": "pointer"},
-                            multiple=False,
+                        _upload_box(
+                            f"{PREFIX}-upload-detail",
+                            "detail_services CSV (опционально)",
+                            "bi-file-earmark-spreadsheet",
                         ),
-                        md=8,
+                        md=4,
                     ),
+                ],
+                className="g-2 mb-2",
+            ),
+            dbc.Row(
+                [
+                    dbc.Col(html.Div(id=f"{PREFIX}-upload-status-iszl", className="small text-muted"), md=4),
+                    dbc.Col(html.Div(id=f"{PREFIX}-upload-status-journal", className="small text-muted"), md=4),
+                    dbc.Col(html.Div(id=f"{PREFIX}-upload-status-detail", className="small text-muted"), md=4),
+                ],
+                className="g-2 mb-3",
+            ),
+            dbc.Row(
+                [
                     dbc.Col(
                         [
                             dbc.Label("Год плана (PlanYear)", className="small fw-semibold"),
@@ -105,12 +128,25 @@ def layout_body():
                                 className="small mt-2",
                             ),
                         ],
-                        md=4,
+                        md=3,
+                    ),
+                    dbc.Col(
+                        dbc.Button(
+                            "Сверка: не прошедшие",
+                            id=f"{PREFIX}-run-reconcile",
+                            color="primary",
+                            size="sm",
+                            className="mt-4",
+                        ),
+                        md=3,
                     ),
                 ],
-                className="g-3 mb-3",
+                className="g-3 mb-3 align-items-start",
             ),
+            dcc.Store(id=f"{PREFIX}-upload-cache", data={}),
+            dcc.Store(id=f"{PREFIX}-not-passed-store", data=None),
             html.Div(id=f"{PREFIX}-msg", className="mb-2"),
+            html.Div(id=f"{PREFIX}-reconcile-msg", className="mb-2"),
             html.Div(id=f"{PREFIX}-summary", className="mb-3"),
             dbc.Tabs(
                 [
@@ -124,10 +160,39 @@ def layout_body():
                         tab_id="iszl-diagnoses",
                         children=html.Div(_table(f"{PREFIX}-tbl-diagnoses"), className="pt-3"),
                     ),
+                    dbc.Tab(
+                        label="Не прошедшие",
+                        tab_id="iszl-not-passed",
+                        children=html.Div(
+                            [
+                                html.Div(id=f"{PREFIX}-not-passed-summary", className="mb-2"),
+                                _table(f"{PREFIX}-tbl-not-passed", page_size=25),
+                            ],
+                            className="pt-3",
+                        ),
+                    ),
                 ]
             ),
         ]
     )
+
+
+def _uploads_dir() -> Path:
+    base = Path(__file__).resolve().parent / "data" / "uploads"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def _safe_name(name: str) -> str:
+    n = re.sub(r"[^0-9A-Za-zА-Яа-я._-]+", "_", str(name or "").strip())
+    return n[:120] or "upload.csv"
+
+
+def _save_upload(kind: str, filename: str, raw: bytes) -> Path:
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out = _uploads_dir() / f"iszl_{kind}_{ts}_{_safe_name(filename)}"
+    out.write_bytes(raw)
+    return out
 
 
 def _decode_csv_bytes(raw: bytes) -> str:
@@ -190,10 +255,6 @@ def _load_services_for_icd_codes(
     icd_codes: set[str] | list[str],
     catalog: str | None = None,
 ) -> dict[str, list[tuple[str, str, int]]]:
-    """
-    Код МКБ -> список (код услуги, название, is_required).
-    Возвращаем и обязательные, и необязательные услуги.
-    """
     from apps.dash_dn.catalog_periods import default_active_catalog
 
     catalog = (catalog or default_active_catalog()).strip() or default_active_catalog()
@@ -321,12 +382,10 @@ def _build_iszl_report(
             fallback_services = services_by_diag_lookup.get(diag.split(".")[0], [])
             chosen = direct_services or fallback_services
 
-            service_bases_for_diag: set[str] = set()
             for svc_code, svc_name, svc_required in chosen:
                 base = _service_code_base(svc_code)
                 if not base:
                     continue
-                service_bases_for_diag.add(base)
                 patient_to_service_bases[enp].add(base)
                 if base not in service_meta:
                     service_meta[base] = (str(svc_code), str(svc_name or ""))
@@ -417,6 +476,106 @@ COLS_DIAG = [
     {"name": "Услуг по диагнозу", "id": "svc_count", "type": "numeric"},
     {"name": "Коды услуг", "id": "services"},
 ]
+
+COLS_NOT_PASSED = [
+    {"name": "ЕНП", "id": "enp_display"},
+    {"name": "ФИО", "id": "fio"},
+    {"name": "ДР", "id": "dr"},
+    {"name": "Участок", "id": "lpuuch"},
+    {"name": "Группа (основной)", "id": "diagnosis_group"},
+    {"name": "Основной диагноз", "id": "primary_diagnosis"},
+    {"name": "Код МКБ", "id": "primary_code"},
+    {"name": "Диагнозы ИСЗЛ", "id": "iszl_diagnoses"},
+    {"name": "Незакрытые", "id": "unclosed_diagnoses"},
+    {"name": "Талоны", "id": "talons"},
+    {"name": "Причина", "id": "reason"},
+    {"name": "Врач (ИСЗЛ)", "id": "fio_doctor"},
+    {"name": "Адрес", "id": "adr"},
+    {"name": "Детали талонов", "id": "talon_details"},
+]
+
+
+def _rows_for_table(not_passed_rows: list[dict]) -> list[dict]:
+    out = []
+    for r in not_passed_rows:
+        row = dict(r)
+        row["enp_display"] = row.get("enp") or ""
+        out.append(row)
+    return out
+
+
+@app.callback(
+    Output(f"{PREFIX}-upload-cache", "data"),
+    Input(f"{PREFIX}-upload", "contents"),
+    State(f"{PREFIX}-upload", "filename"),
+    Input(f"{PREFIX}-upload-journal", "contents"),
+    State(f"{PREFIX}-upload-journal", "filename"),
+    Input(f"{PREFIX}-upload-detail", "contents"),
+    State(f"{PREFIX}-upload-detail", "filename"),
+    State(f"{PREFIX}-upload-cache", "data"),
+    prevent_initial_call=True,
+)
+def cache_iszl_uploads(iszl_c, iszl_n, journal_c, journal_n, detail_c, detail_n, prev):
+    prev = prev or {}
+    out = dict(prev)
+    for contents, name, kind in (
+        (iszl_c, iszl_n, "iszl"),
+        (journal_c, journal_n, "journal"),
+        (detail_c, detail_n, "detail"),
+    ):
+        if not contents:
+            continue
+        try:
+            _m, s = contents.split(",", 1)
+            raw = base64.b64decode(s)
+            p = _save_upload(kind, name or f"{kind}.csv", raw)
+            out[f"{kind}_path"] = str(p)
+            out[f"{kind}_name"] = str(name or p.name)
+        except Exception:
+            pass
+    return out
+
+
+@app.callback(
+    Output(f"{PREFIX}-upload-status-iszl", "children"),
+    Input(f"{PREFIX}-upload", "filename"),
+    Input(f"{PREFIX}-upload-cache", "data"),
+)
+def status_iszl_upload(filename, cache):
+    if filename:
+        return f"ИСЗЛ: {filename}"
+    cache = cache or {}
+    if cache.get("iszl_name"):
+        return f"ИСЗЛ: {cache['iszl_name']} (из кеша)"
+    return "ИСЗЛ: не выбран"
+
+
+@app.callback(
+    Output(f"{PREFIX}-upload-status-journal", "children"),
+    Input(f"{PREFIX}-upload-journal", "filename"),
+    Input(f"{PREFIX}-upload-cache", "data"),
+)
+def status_journal_upload(filename, cache):
+    if filename:
+        return f"journal: {filename}"
+    cache = cache or {}
+    if cache.get("journal_name"):
+        return f"journal: {cache['journal_name']} (из кеша)"
+    return "journal: не выбран"
+
+
+@app.callback(
+    Output(f"{PREFIX}-upload-status-detail", "children"),
+    Input(f"{PREFIX}-upload-detail", "filename"),
+    Input(f"{PREFIX}-upload-cache", "data"),
+)
+def status_detail_upload(filename, cache):
+    if filename:
+        return f"detail_services: {filename}"
+    cache = cache or {}
+    if cache.get("detail_name"):
+        return f"detail_services: {cache['detail_name']} (из кеша)"
+    return "detail_services: не выбран (сверка услуг без файла)"
 
 
 @app.callback(
@@ -521,3 +680,101 @@ def run_iszl_analysis(contents, filename, year_value, only_active_flags, active_
         report["diagnosis_table"],
         COLS_DIAG,
     )
+
+
+@app.callback(
+    Output(f"{PREFIX}-reconcile-msg", "children"),
+    Output(f"{PREFIX}-not-passed-summary", "children"),
+    Output(f"{PREFIX}-tbl-not-passed", "data"),
+    Output(f"{PREFIX}-tbl-not-passed", "columns"),
+    Output(f"{PREFIX}-not-passed-store", "data"),
+    Input(f"{PREFIX}-run-reconcile", "n_clicks"),
+    State(f"{PREFIX}-upload-cache", "data"),
+    State(f"{PREFIX}-year", "value"),
+    State(f"{PREFIX}-only-active", "value"),
+    State("dash-dn-active-catalog", "data"),
+    prevent_initial_call=True,
+)
+def run_iszl_reconcile(n_clicks, upload_cache, year_value, only_active_flags, active_catalog):
+    if not n_clicks:
+        raise PreventUpdate
+
+    cache = upload_cache or {}
+    iszl_path = str(cache.get("iszl_path") or "").strip()
+    journal_path = str(cache.get("journal_path") or "").strip()
+    detail_path = str(cache.get("detail_path") or "").strip()
+
+    empty = (
+        dbc.Alert("Загрузите CSV ИСЗЛ и journal CSV (талоны).", color="warning", className="py-2 mb-0"),
+        "",
+        [],
+        COLS_NOT_PASSED,
+        None,
+    )
+
+    if not iszl_path or not Path(iszl_path).exists():
+        return empty
+    if not journal_path or not Path(journal_path).exists():
+        return (
+            dbc.Alert("Загрузите journal CSV с талонами.", color="warning", className="py-2 mb-0"),
+            "",
+            [],
+            COLS_NOT_PASSED,
+            None,
+        )
+
+    try:
+        year = int(year_value) if year_value is not None else datetime.now().year
+    except (TypeError, ValueError):
+        year = datetime.now().year
+    only_active = "only_active" in (only_active_flags or [])
+    cat = str(active_catalog or default_active_catalog()).strip() or default_active_catalog()
+
+    try:
+        iszl_rows = _read_iszl_csv(Path(iszl_path).read_bytes())
+        journal_rows = read_semicolon_csv(Path(journal_path).read_bytes())
+        detail_rows: list[dict[str, str]] = []
+        if detail_path and Path(detail_path).exists():
+            _headers, detail_rows = read_detail_csv_from_bytes(Path(detail_path).read_bytes())
+
+        report = build_not_passed_report(
+            iszl_rows,
+            journal_rows,
+            detail_rows,
+            year,
+            only_active,
+            catalog=cat,
+        )
+    except Exception as e:
+        return (
+            dbc.Alert(f"Ошибка сверки: {e}", color="danger", className="py-2 mb-0"),
+            "",
+            [],
+            COLS_NOT_PASSED,
+            None,
+        )
+
+    table_rows = _rows_for_table(report["not_passed_rows"])
+    detail_note = "с detail_services" if report["has_detail"] else "без detail_services (только journal)"
+    msg = dbc.Alert(
+        f"Сверка завершена ({detail_note}). "
+        f"Пациентов в плане: {report['total_patients']}, "
+        f"прошли: {report['passed_count']}, "
+        f"не прошли: {report['not_passed_count']}. "
+        f"Каталог: {cat}.",
+        color="success" if report["not_passed_count"] == 0 else "warning",
+        className="py-2 mb-0",
+    )
+    summary = html.P(
+        f"Не прошедшие: {report['not_passed_count']} из {report['total_patients']}. "
+        "Таблицу можно экспортировать в Excel (кнопка над таблицей).",
+        className="small text-muted mb-0",
+    )
+
+    store = {
+        "rows": report["not_passed_rows"],
+        "year": year,
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+
+    return msg, summary, table_rows, COLS_NOT_PASSED, store

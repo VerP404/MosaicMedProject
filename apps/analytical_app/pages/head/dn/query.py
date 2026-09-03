@@ -139,7 +139,26 @@ ORDER BY x.plan_month_num, p.fio
 """
 
 
-def sql_not_passed_grouped(year: int, category: str = "", profile: str = "") -> str:
+def _enp_in_sql(enps: list[str] | None) -> str:
+    if not enps:
+        return ""
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in enps:
+        digits = "".join(ch for ch in str(raw or "") if ch.isdigit())
+        if not digits or digits in seen:
+            continue
+        seen.add(digits)
+        cleaned.append(digits)
+        if len(cleaned) >= 5000:
+            break
+    if not cleaned:
+        return ""
+    listed = ", ".join("'" + e + "'" for e in cleaned)
+    return f" AND regexp_replace(COALESCE(p.enp, ''), '\\D', '', 'g') IN ({listed})"
+
+
+def sql_not_passed_grouped(year: int, category: str = "", profile: str = "", enps: list[str] | None = None) -> str:
     """
     Режим «по пациенту + профилю»: одна строка на человека и профиль.
     Основной МКБ — по приоритету группы: БСК > ОНКО > СД > Прочие.
@@ -152,6 +171,7 @@ def sql_not_passed_grouped(year: int, category: str = "", profile: str = "") -> 
         extra += f" AND x.category_168n = '{category.replace(chr(39), '')}'"
     if profile:
         extra += f" AND x.profile_cluster = '{profile.replace(chr(39), '')}'"
+    extra += _enp_in_sql(enps)
     return f"""
 WITH latest AS (
 {_latest_plan_rows(y)}
@@ -646,3 +666,287 @@ WHERE k.enp IS NULL
 ORDER BY issue, i.fio
 LIMIT 5000
 """
+
+
+GOAL3_ACTIVE_STATUSES = ("1", "2", "3", "4", "5", "6", "7", "8", "12", "18", "19")
+
+# LIKE с %% — pandas/psycopg воспринимают одиночный % как плейсхолдер (immutabledict is not a sequence).
+
+_JOURNAL_APPOINTMENT_TS = """
+        COALESCE(
+          CASE WHEN j.acceptance_date LIKE '____-__-__%%'
+               THEN to_date(SUBSTRING(j.acceptance_date FROM 1 FOR 10), 'YYYY-MM-DD')::timestamp END,
+          CASE WHEN j.acceptance_date LIKE '__.__.____%%'
+               THEN to_timestamp(SUBSTRING(j.acceptance_date FROM 1 FOR 16), 'DD.MM.YYYY HH24:MI') END,
+          CASE WHEN j.record_date LIKE '____-__-__%%'
+               THEN to_date(SUBSTRING(j.record_date FROM 1 FOR 10), 'YYYY-MM-DD')::timestamp END,
+          CASE WHEN j.record_date LIKE '__.__.____%%'
+               THEN to_date(SUBSTRING(j.record_date FROM 1 FOR 10), 'DD.MM.YYYY')::timestamp END
+        )
+"""
+
+_JOURNAL_NO_SHOW_SQL = """
+      AND NOT (
+        LOWER(TRIM(COALESCE(j.no_show, ''))) IN ('да', 'true', '1', 'yes', '+')
+        OR LOWER(COALESCE(j.no_show, '')) LIKE '%%не явил%%'
+      )
+"""
+
+
+def _iso_date_sql(value) -> str:
+    text = str(value or "")[:10]
+    if len(text) != 10 or text[4] != "-" or text[7] != "-":
+        raise ValueError("Ожидается дата YYYY-MM-DD.")
+    return text
+
+
+def _departments_sql(departments: list[str] | None) -> str:
+    if not departments:
+        return ""
+    safe = []
+    for raw in departments:
+        name = str(raw or "").strip()
+        if not name:
+            continue
+        safe.append("'" + name.replace("'", "''") + "'")
+    if not safe:
+        return ""
+    return " AND j.department IN (" + ", ".join(safe) + ")"
+
+
+def sql_journal_departments() -> str:
+    return """
+    SELECT DISTINCT department
+    FROM load_data_journal_appeals
+    WHERE COALESCE(NULLIF(department, '-'), '') <> ''
+    ORDER BY department
+    """
+
+
+def sql_journal_visits_in_period(
+    date_from,
+    date_to,
+    departments: list[str] | None = None,
+) -> str:
+    """Посещения поликлиники: номер (серия/номер полиса журнала), ЕНП, дата, врач, подразделение."""
+    start = _iso_date_sql(date_from)
+    end = _iso_date_sql(date_to)
+    dept = _departments_sql(departments)
+    return f"""
+    SELECT
+        regexp_replace(COALESCE(j.enp, ''), '\\D', '', 'g') AS enp_norm,
+        j.enp,
+        TRIM(COALESCE(j.patient_last_name, '') || ' ' || COALESCE(j.patient_first_name, '') || ' ' || COALESCE(j.patient_middle_name, '')) AS fio,
+        j.birth_date,
+        j.department,
+        j.employee_last_name,
+        j.employee_first_name,
+        j.employee_middle_name,
+        COALESCE(NULLIF(TRIM(j.number), ''), NULLIF(TRIM(j.series), ''), '') AS journal_number,
+        ({_JOURNAL_APPOINTMENT_TS})::date AS visit_date
+    FROM load_data_journal_appeals j
+    WHERE COALESCE(NULLIF(j.enp, '-'), '') <> ''
+      {_JOURNAL_NO_SHOW_SQL}
+      {dept}
+      AND ({_JOURNAL_APPOINTMENT_TS})::date BETWEEN DATE '{start}' AND DATE '{end}'
+    ORDER BY visit_date, j.enp
+    """
+
+
+def sql_journal_blocked_dates(enps: list[str], date_from, date_to) -> str:
+    """Все даты журнала по ЕНП в расширенном окне (чтобы явки ДН не пересеклись)."""
+    start = _iso_date_sql(date_from)
+    end = _iso_date_sql(date_to)
+    extra = _enp_in_sql(enps).replace("p.enp", "j.enp")
+    if not extra:
+        return "SELECT NULL::text AS enp_norm, NULL::date AS visit_date WHERE FALSE"
+    return f"""
+    SELECT
+        regexp_replace(COALESCE(j.enp, ''), '\\D', '', 'g') AS enp_norm,
+        ({_JOURNAL_APPOINTMENT_TS})::date AS visit_date
+    FROM load_data_journal_appeals j
+    WHERE COALESCE(NULLIF(j.enp, '-'), '') <> ''
+      {_JOURNAL_NO_SHOW_SQL}
+      {extra}
+      AND ({_JOURNAL_APPOINTMENT_TS})::date BETWEEN DATE '{start}' - INTERVAL '14 days'
+          AND DATE '{end}' + INTERVAL '90 days'
+    """
+
+
+def sql_goal3_active_by_group(year: int, enps: list[str] | None = None) -> str:
+    """Талоны цели 3 в рабочих статусах: ЕНП + группа 168н по коду МКБ."""
+    y = int(year)
+    statuses = ", ".join("'" + s + "'" for s in GOAL3_ACTIVE_STATUSES)
+    extra = _enp_in_sql(enps).replace("p.enp", "o.enp")
+    return f"""
+    WITH latest AS (
+    {_latest_plan_rows(y)}
+    ),
+    mkb_cat AS (
+        SELECT DISTINCT ON (UPPER(TRIM(ds_code)))
+            UPPER(TRIM(ds_code)) AS mkb,
+            COALESCE(NULLIF(TRIM(category_168n), ''), 'Прочие') AS category_168n
+        FROM latest
+        WHERE NULLIF(TRIM(ds_code), '') IS NOT NULL
+        ORDER BY UPPER(TRIM(ds_code)), category_168n
+    )
+    SELECT DISTINCT
+        regexp_replace(COALESCE(o.enp, ''), '\\D', '', 'g') AS enp_norm,
+        UPPER(NULLIF(TRIM(o.main_diagnosis_code), '')) AS mkb,
+        COALESCE(c.category_168n, 'Прочие') AS category_168n
+    FROM load_data_oms_data o
+    LEFT JOIN mkb_cat c ON c.mkb = UPPER(NULLIF(TRIM(o.main_diagnosis_code), ''))
+    WHERE o.report_year = {y}
+      AND TRIM(COALESCE(o.goal, '')) IN ('3', '03')
+      AND TRIM(COALESCE(o.status, '')) IN ({statuses})
+      {extra}
+    """
+
+
+def sql_doctor_codes_by_name() -> str:
+    return """
+    SELECT DISTINCT ON (LOWER(TRIM(last_name)), LOWER(TRIM(first_name)))
+        LOWER(TRIM(last_name)) AS last_name,
+        LOWER(TRIM(first_name)) AS first_name,
+        doctor_code
+    FROM load_data_doctor
+    WHERE COALESCE(NULLIF(TRIM(doctor_code), '-'), '') <> ''
+      AND COALESCE(NULLIF(TRIM(last_name), '-'), '') <> ''
+    ORDER BY LOWER(TRIM(last_name)), LOWER(TRIM(first_name)), id DESC
+    """
+
+
+_TALON_END_DATE_SQL = """
+COALESCE(
+  CASE WHEN t.treatment_end ~ '^\\d{4}-\\d{2}-\\d{2}'
+       THEN to_date(SUBSTRING(t.treatment_end FROM 1 FOR 10), 'YYYY-MM-DD') END,
+  CASE WHEN t.treatment_end ~ '^\\d{2}-\\d{2}-\\d{4}'
+       THEN to_date(SUBSTRING(t.treatment_end FROM 1 FOR 10), 'DD-MM-YYYY') END,
+  CASE WHEN t.treatment_end ~ '^\\d{2}\\.\\d{2}\\.\\d{4}'
+       THEN to_date(SUBSTRING(t.treatment_end FROM 1 FOR 10), 'DD.MM.YYYY') END
+)
+"""
+
+
+def _status_in_sql(statuses: list[str] | None) -> str:
+    if not statuses:
+        return ""
+    safe = []
+    for raw in statuses:
+        code = str(raw or "").strip()
+        if not code:
+            continue
+        safe.append("'" + code.replace("'", "''") + "'")
+    if not safe:
+        return ""
+    return (
+        " AND regexp_replace(TRIM(COALESCE(t.status, '')), '\\.0$', '') IN ("
+        + ", ".join(safe)
+        + ")"
+    )
+
+
+def sql_goal3_talon_departments(year: int) -> str:
+    y = int(year)
+    return f"""
+    SELECT DISTINCT department
+    FROM (
+        SELECT department, goal, report_year FROM load_data_talons
+        UNION ALL
+        SELECT department, goal, report_year FROM load_data_complex_talons
+    ) t
+    WHERE TRIM(COALESCE(t.goal, '')) IN ('3', '03')
+      AND TRIM(COALESCE(t.report_year, '')) IN ('{y}', '{y}.0')
+      AND COALESCE(NULLIF(TRIM(t.department), '-'), '') <> ''
+    ORDER BY department
+    """
+
+
+def sql_goal3_journal_talons(
+    year: int,
+    date_from,
+    date_to,
+    departments: list[str] | None = None,
+    statuses: list[str] | None = None,
+) -> str:
+    """Талоны цели 3 из журнала WEB.ОМС (обычные + комплексные)."""
+    y = int(year)
+    start = _iso_date_sql(date_from)
+    end = _iso_date_sql(date_to)
+    dept = ""
+    if departments:
+        names = []
+        for raw in departments:
+            name = str(raw or "").strip()
+            if name:
+                names.append("'" + name.replace("'", "''") + "'")
+        if names:
+            dept = " AND t.department IN (" + ", ".join(names) + ")"
+    status_sql = _status_in_sql(statuses)
+    return f"""
+    SELECT DISTINCT ON (t.talon)
+        t.talon,
+        t.enp,
+        t.status,
+        t.goal,
+        t.patient,
+        t.gender,
+        t.birth_date,
+        t.treatment_start,
+        t.treatment_end,
+        t.doctor,
+        t.doctor_profile,
+        t.specialty,
+        t.department,
+        t.main_diagnosis,
+        t.additional_diagnosis,
+        t.visits,
+        t.mo_visits,
+        t.case_code,
+        t.talon_type,
+        t.result,
+        t.outcome,
+        t.main_disease_character,
+        t.dispensary_monitoring,
+        t.care_conditions
+    FROM (
+        SELECT talon, enp, status, goal, patient, gender, birth_date,
+               treatment_start, treatment_end, doctor, doctor_profile, specialty,
+               department, main_diagnosis, additional_diagnosis, visits, mo_visits,
+               case_code, talon_type, result, outcome, main_disease_character,
+               dispensary_monitoring, care_conditions, report_year
+        FROM load_data_talons
+        UNION ALL
+        SELECT talon, enp, status, goal, patient, gender, birth_date,
+               treatment_start, treatment_end, doctor, doctor_profile, specialty,
+               department, main_diagnosis, additional_diagnosis, visits, mo_visits,
+               case_code, talon_type, result, outcome, main_disease_character,
+               dispensary_monitoring, care_conditions, report_year
+        FROM load_data_complex_talons
+    ) t
+    WHERE TRIM(COALESCE(t.goal, '')) IN ('3', '03')
+      AND TRIM(COALESCE(t.report_year, '')) IN ('{y}', '{y}.0')
+      AND ({_TALON_END_DATE_SQL}) BETWEEN DATE '{start}' AND DATE '{end}'
+      {dept}
+      {status_sql}
+    ORDER BY t.talon, ({_TALON_END_DATE_SQL}) DESC NULLS LAST
+    """
+
+
+def sql_iszl_mkb_by_enp(year: int, enps: list[str] | None = None) -> str:
+    y = int(year)
+    extra = _enp_in_sql(enps)
+    return f"""
+    SELECT
+        regexp_replace(COALESCE(p.enp, ''), '\\D', '', 'g') AS enp_norm,
+        UPPER(NULLIF(TRIM(l.ds_code), '')) AS mkb
+    FROM dn_app_dnline l
+    JOIN dn_app_person p ON p.id = l.person_id
+    WHERE l.plan_year = {y}
+      AND l.is_current = TRUE
+      AND COALESCE(l.out_of_168n, FALSE) = FALSE
+      AND NULLIF(TRIM(l.ds_code), '') IS NOT NULL
+      {extra}
+    """
+
+
