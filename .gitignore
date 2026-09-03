@@ -8,6 +8,8 @@ db.sqlite3
 *.xls
 # справочник 168н для prod import
 !apps/dn_reference/data/диагнозы по 168н.xlsx
+# справочник школ здоровья (цель 307)
+!apps/health_schools/data/catalog.xlsx
 **/__pycache__/
 staticfiles
 uploads

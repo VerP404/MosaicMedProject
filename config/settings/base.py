@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'apps.dn_app',
     'apps.dn_reference',
     'apps.dn_matrix',
+    'apps.health_schools',
     'apps.beneficiaries',
     'apps.references',
     'apps.gar',
@@ -271,6 +272,7 @@ UNFOLD = {
                 "items": [
                     {"title": "ДН-модуль", "icon": "monitor_heart", "link": "/admin/dn_app/"},
                     {"title": "Справочники ДН (диагнозы, услуги)", "icon": "menu_book", "link": "/admin/dn_reference/"},
+                    {"title": "Школы здоровья (цель 307)", "icon": "school", "link": "/admin/health_schools/"},
                 ],
             },
             {
