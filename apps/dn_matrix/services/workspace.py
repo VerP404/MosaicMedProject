@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.db import connection
+from django.db.models.functions import Lower
 from django.db.utils import OperationalError, ProgrammingError
 
 from apps.dn_matrix.models import (
@@ -97,10 +98,14 @@ def get_edition(edition_id: int | None) -> MatrixEdition | None:
     return default_edition()
 
 
-def specialty_options(edition: MatrixEdition) -> list[dict]:
+def specialty_options(edition: MatrixEdition, mkb: str | None = None) -> list[dict]:
+    qs = edition.specialties.all()
+    code = normalize_mkb(mkb)
+    if code:
+        qs = qs.filter(diagnosis_links__diagnosis__mkb_code__iexact=code).distinct()
     return [
         {"label": s.title or s.code, "value": s.id}
-        for s in edition.specialties.all().order_by("sort_order", "title", "code")
+        for s in qs.order_by(Lower("title"), "code")
     ]
 
 

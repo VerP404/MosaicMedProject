@@ -372,3 +372,41 @@ class BatchPickNotPassedTests(TestCase):
         )
         self.assertIn("A04.10.002", rows[0][COL_SERVICES])
         self.assertNotIn("A09.05.023", rows[0][COL_SERVICES])
+
+
+class SpecialtyOptionsTests(TestCase):
+    def setUp(self):
+        self.edition = MatrixEdition.objects.create(
+            code="spec-opt",
+            title="Spec options",
+            effective_from=date(2026, 1, 1),
+            status=MatrixEdition.Status.DRAFT,
+        )
+        self.cat = DnDiagnosisCategory.objects.create(edition=self.edition, code="c1", title="Cat")
+        self.therapy = DnSpecialty.objects.create(
+            edition=self.edition, code="ther", title="Терапия", sort_order=9
+        )
+        self.cardio = DnSpecialty.objects.create(
+            edition=self.edition, code="card", title="Кардиология", sort_order=1
+        )
+        self.endo = DnSpecialty.objects.create(
+            edition=self.edition, code="endo", title="Эндокринология", sort_order=2
+        )
+        diag = DnDiagnosis.objects.create(
+            edition=self.edition, category=self.cat, mkb_code="I10", title="Гипертония"
+        )
+        DnDiagnosisSpecialty.objects.create(diagnosis=diag, specialty=self.therapy)
+        DnDiagnosisSpecialty.objects.create(diagnosis=diag, specialty=self.cardio)
+
+    def test_sorted_alphabetically(self):
+        from apps.dn_matrix.services.workspace import specialty_options
+
+        labels = [o["label"] for o in specialty_options(self.edition)]
+        self.assertEqual(labels, ["Кардиология", "Терапия", "Эндокринология"])
+
+    def test_filter_by_diagnosis(self):
+        from apps.dn_matrix.services.workspace import specialty_options
+
+        labels = [o["label"] for o in specialty_options(self.edition, "I10")]
+        self.assertEqual(labels, ["Кардиология", "Терапия"])
+

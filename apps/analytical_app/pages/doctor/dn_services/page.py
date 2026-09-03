@@ -395,7 +395,7 @@ def sync_filters(edition_id, specialty_id, mkb, current_visits):
     if not edition:
         return [], None, [], None, _visit_options(3), 1, "Нет загруженных редакций матрицы."
 
-    spec_opts = specialty_options(edition)
+    spec_opts = specialty_options(edition, mkb)
     spec_ids = {o["value"] for o in spec_opts}
     if specialty_id not in spec_ids:
         specialty_id = None
