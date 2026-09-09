@@ -12,11 +12,18 @@ CURRENT_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 # Указываем путь к папке assets
 ASSETS_PATH = os.path.join(CURRENT_DIRECTORY, 'assets')
 
-app = dash.Dash(__name__,
-                suppress_callback_exceptions=True,
-                assets_folder=ASSETS_PATH,
-                serve_locally=True
-                )
+# CSS/JS/шрифты из assets/ (Bootstrap, bootstrap-icons, Font Awesome) — без CDN.
+app = dash.Dash(
+    __name__,
+    suppress_callback_exceptions=True,
+    assets_folder=ASSETS_PATH,
+    serve_locally=True,
+    external_stylesheets=[
+        "/assets/css/bootstrap.min.css",
+        "/assets/css/bootstrap-icons.css",
+        "/assets/css/all.min.css",
+    ],
+)
 
 app.server.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
 app.title = 'МозаикаМед: Аналитика'

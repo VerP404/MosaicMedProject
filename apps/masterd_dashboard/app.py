@@ -35,7 +35,13 @@ def get_default_organization_name():
     except Exception:
         return ""
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, '/assets/style.css'])
+os.environ.setdefault("DASH_DISABLE_VERSION_CHECK", "true")
+
+app = dash.Dash(
+    __name__,
+    serve_locally=True,
+    external_stylesheets=["/assets/css/bootstrap.min.css", "/assets/style.css"],
+)
 
 # Определение цветов и стилей блоков
 style_td = {'padding': '0 10px 0 0', 'color': 'green', 'fontSize': '1.1rem'}

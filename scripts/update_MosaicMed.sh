@@ -179,6 +179,14 @@ else
     echo "[INFO] Миграции выполнены успешно."
 fi
 
+echo "[INFO] Сбор статики (python3.12 manage.py collectstatic --noinput)..."
+python3.12 manage.py collectstatic --noinput
+if [ $? -ne 0 ]; then
+    echo "[WARN] collectstatic завершился с ошибкой. CSS/шрифты в Django могут не открыться без интернета."
+else
+    echo "[INFO] Статика собрана."
+fi
+
 # Создание папок для файлов с данными
 echo "[INFO] Создание папок (python3.12 mosaic_conductor/etl/create_folders.py)..."
 python3.12 mosaic_conductor/etl/create_folders.py

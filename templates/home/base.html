@@ -13,8 +13,9 @@
     <title>МозаикаМед</title>
 
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'vendor/inter/inter.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
+    {% block extra_css %}{% endblock %}
 </head>
 
 <body>
@@ -37,6 +38,7 @@
 </div>
 
 <script src="{% static 'js/app.js' %}"></script>
+{% block extra_js %}{% endblock %}
 <script>
     // Проверяем, существует ли элемент перед добавлением обработчика
     document.addEventListener('DOMContentLoaded', function() {

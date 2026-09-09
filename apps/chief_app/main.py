@@ -59,4 +59,4 @@ def update_card3(n_clicks):
 
 
 if __name__ == "__main__":
-    app.run_server(debug=DEBUG_DASH, host='0.0.0.0', port=PORT_DASH_CHIEF)
+    app.run(debug=DEBUG_DASH, host='0.0.0.0', port=PORT_DASH_CHIEF, dev_tools_disable_version_check=True)

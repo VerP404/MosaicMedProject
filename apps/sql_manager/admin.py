@@ -26,12 +26,12 @@ class SQLQueryAdmin(admin.ModelAdmin):
 
     class Media:
         css = {
-            'all': ('https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/codemirror.min.css',),
+            'all': ('vendor/codemirror/codemirror.min.css',),
         }
         js = (
-            'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/codemirror.min.js',
-            'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/mode/sql/sql.min.js',
-            'js/codemirror_init.js',  # Путь к нашему JS файлу
+            'vendor/codemirror/codemirror.min.js',
+            'vendor/codemirror/sql.min.js',
+            'js/codemirror_init.js',
         )
 
 
