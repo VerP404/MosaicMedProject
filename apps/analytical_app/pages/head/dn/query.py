@@ -63,13 +63,106 @@ WITH latest AS (
 )
 SELECT
     COALESCE(NULLIF(category_168n, ''), '(вне 168н)') AS category_168n,
-    COUNT(*) AS iszl_diag_rows,
+    COUNT(*) AS planned_rows,
     COUNT(*) FILTER (WHERE status = 'completed') AS completed,
     COUNT(*) FILTER (WHERE status = 'not_completed' AND out_of_168n = FALSE) AS not_passed
 FROM latest
 GROUP BY 1
-ORDER BY iszl_diag_rows DESC
+ORDER BY planned_rows DESC
     """
+
+
+def _due_not_planned_ctes(year: int) -> str:
+    """Открытые линии прошлых лет, которых нет в плане выбранного года.
+
+    План года — silver. «Есть ранее» — bronze ИСЗЛ (DateEnd пустой / «-»).
+    Ключи группируются без DISTINCT ON и без join справочника на сырые строки.
+    """
+    y = int(year)
+    return f"""
+curr AS (
+    SELECT DISTINCT
+        REPLACE(TRIM(p.enp), '`', '') AS enp,
+        NULLIF(TRIM(l.ldwid), '') AS ldwid,
+        UPPER(l.ds_code) AS ds_code
+    FROM dn_app_dnline l
+    JOIN dn_app_person p ON p.id = l.person_id
+    WHERE l.plan_year = {y} AND l.is_current = TRUE
+),
+curr_enp AS (
+    SELECT DISTINCT enp FROM curr
+),
+curr_ldw AS (
+    SELECT DISTINCT enp, ldwid
+    FROM curr
+    WHERE ldwid IS NOT NULL AND ldwid <> ''
+),
+curr_ds AS (
+    SELECT DISTINCT enp, ds_code
+    FROM curr
+    WHERE ds_code IS NOT NULL AND ds_code <> ''
+),
+prior AS (
+    SELECT
+        REPLACE(TRIM(enp), '`', '') AS enp,
+        NULLIF(TRIM(ldwid), '') AS ldwid,
+        UPPER(SPLIT_PART(TRIM(ds), ' ', 1)) AS ds_code,
+        MAX(fio) AS fio,
+        MAX(dr) AS dr,
+        MAX(lpuuch) AS lpuuch,
+        MAX(ds) AS ds,
+        MAX(CAST(SPLIT_PART(TRIM(plan_year), '.', 1) AS INT)) AS prior_year,
+        MAX(fio_doctor) AS doctor,
+        MAX(pdwid) AS pdwid
+    FROM load_data_dispansery_iszl
+    WHERE plan_year ~ '^[0-9]'
+      AND CAST(SPLIT_PART(TRIM(plan_year), '.', 1) AS INT) < {y}
+      AND COALESCE(NULLIF(TRIM(date_end), ''), '-') IN ('-', '', 'None', 'nan')
+      AND REPLACE(TRIM(enp), '`', '') NOT IN ('', '-', 'None', 'nan')
+    GROUP BY 1, 2, 3
+),
+due AS (
+    SELECT
+        pr.*,
+        CASE WHEN ce.enp IS NULL THEN 'нет в году' ELSE 'диагноз не в плане' END AS due_kind
+    FROM prior pr
+    LEFT JOIN curr_enp ce ON ce.enp = pr.enp
+    LEFT JOIN curr_ldw cl
+        ON cl.enp = pr.enp
+       AND pr.ldwid IS NOT NULL AND pr.ldwid <> ''
+       AND cl.ldwid = pr.ldwid
+    LEFT JOIN curr_ds cd
+        ON cd.enp = pr.enp
+       AND cd.ds_code = pr.ds_code
+    WHERE cl.enp IS NULL
+      AND cd.enp IS NULL
+)
+"""
+
+
+def sql_due_not_planned(year: int) -> str:
+    """Все подлежащие без плана (для сводки и списков)."""
+    return f"""
+WITH {_due_not_planned_ctes(year)}
+SELECT
+    due.enp,
+    due.fio,
+    due.dr,
+    due.lpuuch,
+    due.ldwid,
+    due.ds_code,
+    due.ds,
+    due.prior_year,
+    due.doctor,
+    due.pdwid,
+    due.due_kind,
+    COALESCE(NULLIF(cat.name, ''), '(вне 168н)') AS category_168n
+FROM due
+LEFT JOIN dn_reference_dndiagnosis d
+    ON d.is_active = TRUE
+   AND UPPER(d.code) = due.ds_code
+LEFT JOIN dn_reference_dndiagnosiscategory cat ON cat.id = d.category_id
+"""
 
 
 def _sql_latest_phones_cte(alias: str = "phones") -> str:
@@ -281,85 +374,30 @@ LIMIT 5000
 
 
 def sql_missing_prior(year: int) -> str:
-    """ЕНП были в предыдущие годы, нет в выбранном году (по факту присутствия в ИСЗЛ)."""
-    y = int(year)
+    """Подлежащие: были в прошлые годы, DateEnd пустой, пациента нет в плане выбранного года."""
     return f"""
-WITH prior AS (
-    SELECT DISTINCT ON (NULLIF(TRIM(l.ldwid), ''), p.enp, l.ds_code)
-        p.enp, p.fio, p.dr, p.lpuuch,
-        l.ldwid, l.ds_code, l.ds, l.plan_year AS prior_year,
-        l.doctor, l.category_168n, l.pdwid
-    FROM dn_app_dnline l
-    JOIN dn_app_person p ON p.id = l.person_id
-    WHERE l.plan_year < {y}
-    ORDER BY
-        NULLIF(TRIM(l.ldwid), ''),
-        p.enp,
-        l.ds_code,
-        l.plan_year DESC,
-        {_month_num('l')} DESC
-),
-curr_enp AS (
-    SELECT DISTINCT p.enp
-    FROM dn_app_dnline l
-    JOIN dn_app_person p ON p.id = l.person_id
-    WHERE l.plan_year = {y} AND l.is_current = TRUE
-)
-SELECT pr.*
-FROM prior pr
-WHERE pr.enp NOT IN (SELECT enp FROM curr_enp)
-ORDER BY pr.prior_year DESC, pr.fio
+SELECT *
+FROM (
+{sql_due_not_planned(year)}
+) t
+WHERE due_kind = 'нет в году'
+ORDER BY prior_year DESC, fio
 LIMIT 5000
 """
 
 
 def sql_dropped_diagnoses(year: int) -> str:
-    """Диагнозы (ldwid) были в предыдущие годы; пациент есть в текущем, диагноза нет — снять/внести."""
-    y = int(year)
+    """Подлежащие: пациент есть в плане года, открытый диагноз прошлых лет в план не внесён."""
     return f"""
-WITH prior AS (
-    SELECT DISTINCT ON (NULLIF(TRIM(l.ldwid), ''), p.enp, l.ds_code)
-        p.enp, p.fio, p.lpuuch,
-        l.ldwid, l.ds_code, l.ds, l.plan_year AS prior_year,
-        l.category_168n, l.doctor, l.pdwid
-    FROM dn_app_dnline l
-    JOIN dn_app_person p ON p.id = l.person_id
-    WHERE l.plan_year < {y}
-      AND NULLIF(TRIM(l.ldwid), '') IS NOT NULL
-    ORDER BY
-        NULLIF(TRIM(l.ldwid), ''),
-        p.enp,
-        l.ds_code,
-        l.plan_year DESC,
-        {_month_num('l')} DESC
-),
-curr AS (
-    SELECT DISTINCT
-        p.enp,
-        NULLIF(TRIM(l.ldwid), '') AS ldwid,
-        UPPER(l.ds_code) AS ds_code
-    FROM dn_app_dnline l
-    JOIN dn_app_person p ON p.id = l.person_id
-    WHERE l.plan_year = {y} AND l.is_current = TRUE
-),
-curr_enp AS (
-    SELECT DISTINCT enp FROM curr
-)
 SELECT
-    pr.enp, pr.fio, pr.lpuuch, pr.ldwid, pr.ds_code, pr.ds,
-    pr.prior_year, pr.category_168n, pr.doctor,
-    'снять / внести' AS action
-FROM prior pr
-WHERE pr.enp IN (SELECT enp FROM curr_enp)
-  AND NOT EXISTS (
-      SELECT 1 FROM curr c
-      WHERE c.enp = pr.enp
-        AND (
-            (pr.ldwid <> '' AND c.ldwid = pr.ldwid)
-            OR c.ds_code = UPPER(pr.ds_code)
-        )
-  )
-ORDER BY pr.fio
+    enp, fio, lpuuch, ldwid, ds_code, ds, prior_year,
+    category_168n, doctor, pdwid,
+    'внести в план' AS action
+FROM (
+{sql_due_not_planned(year)}
+) t
+WHERE due_kind = 'диагноз не в плане'
+ORDER BY fio
 LIMIT 5000
 """
 
@@ -747,6 +785,7 @@ def sql_journal_visits_in_period(
     FROM load_data_journal_appeals j
     WHERE COALESCE(NULLIF(j.enp, '-'), '') <> ''
       {_JOURNAL_NO_SHOW_SQL}
+      AND COALESCE(NULLIF(TRIM(j.department), '-'), '') <> ''
       {dept}
       AND ({_JOURNAL_APPOINTMENT_TS})::date BETWEEN DATE '{start}' AND DATE '{end}'
     ORDER BY visit_date, j.enp

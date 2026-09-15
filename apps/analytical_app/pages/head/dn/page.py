@@ -24,6 +24,7 @@ from apps.analytical_app.pages.head.dn.fix_tab import (
 )
 from apps.analytical_app.pages.head.dn.services import (
     build_dropped_diagnoses,
+    build_due_not_planned,
     build_etl_status,
     build_iszl_not_in_kvazar,
     build_kvazar_not_in_iszl,
@@ -259,12 +260,13 @@ def load_dn_data(n_clicks, year, category, profile):
     year = int(year or datetime.now().year)
     hide_banner = {"display": "none"}
     try:
-        summary = build_summary(engine, year)
+        due_df = build_due_not_planned(engine, year)
+        summary = build_summary(engine, year, due_df=due_df)
         not_passed = build_not_passed(engine, year, category or "", profile or "")
         not_passed_grouped = build_not_passed_grouped(engine, year, category or "", profile or "")
         out168 = build_out_of_168n(engine, year)
-        missing = build_missing_prior(engine, year)
-        dropped = build_dropped_diagnoses(engine, year)
+        missing = build_missing_prior(engine, year, due_df=due_df)
+        dropped = build_dropped_diagnoses(engine, year, due_df=due_df)
         kv_stats = build_kvazar_stats(engine, year)
         kv_only = build_kvazar_not_in_iszl(engine, year)
         iszl_only = build_iszl_not_in_kvazar(engine, year)
@@ -283,11 +285,13 @@ def load_dn_data(n_clicks, year, category, profile):
             "logs": logs.to_dict("records") if not logs.empty else [],
         }
         status = (
-            f"ИСЗЛ {year}: {summary.get('iszl_diag_rows', 0)} диагнозов "
+            f"ИСЗЛ {year}: план {summary.get('iszl_diag_rows', 0)} "
             f"({summary.get('iszl_enp', 0)} пациентов), "
+            f"подлежащие без плана {summary.get('due_diag_rows', 0)} "
+            f"({summary.get('due_enp', 0)} пациентов), "
+            f"всего на ДН {summary.get('total_diag_rows', 0)}, "
             f"выполнено {summary.get('completed_rows', 0)} ({summary.get('pct_completed', 0)}%), "
-            f"не прошедшие {summary.get('not_passed_rows', 0)}, "
-            f"вне 168н {summary.get('out_of_168n', 0)}"
+            f"не прошедшие {summary.get('not_passed_rows', 0)}"
         )
         return payload, status, hide_banner, False
     except Exception as e:
@@ -396,20 +400,45 @@ def render_tab(active_tab, store, np_mode, file_store, fix_file_store, fix_repor
     if active_tab == "tab-summary":
         s = store.get("summary") or {}
         by_cat = pd.DataFrame(s.get("by_category") or [])
-        cards = dbc.Row(
+        cards_plan = dbc.Row(
             [
-                _metric("Диагнозов в ИСЗЛ", s.get("iszl_diag_rows", 0), f"год {year}, по ldwID (посл. месяц)"),
-                _metric("Пациентов в ИСЗЛ", s.get("iszl_enp", 0), "уникальных ЕНП"),
-                _metric("Выполнено (талон 3)", f"{s.get('pct_completed', 0)}%", f"{s.get('completed_rows', 0)} диагнозов"),
-                _metric("Не прошедшие", s.get("not_passed_rows", 0), "168н без талона"),
+                _metric("Запланировано", s.get("iszl_diag_rows", 0), f"диагнозов плана {year}, посл. месяц ldwID"),
+                _metric("Пациентов в плане", s.get("iszl_enp", 0), "уникальных ЕНП"),
+                _metric("Выполнено (талон 3)", f"{s.get('pct_completed', 0)}%", f"{s.get('completed_rows', 0)} диагнозов плана"),
+                _metric("Не прошедшие", s.get("not_passed_rows", 0), "168н без талона в плане"),
                 _metric("Вне 168н → 305", s.get("out_of_168n", 0), "контроль цели 305"),
+            ],
+            className="mb-2 g-2",
+        )
+        cards_due = dbc.Row(
+            [
+                _metric(
+                    "Подлежащие без плана",
+                    s.get("due_diag_rows", 0),
+                    f"нет в году {s.get('due_diag_absent', 0)}; диагноз не внесён {s.get('due_diag_dropped', 0)}",
+                ),
+                _metric(
+                    "Пациентов подлежащих",
+                    s.get("due_enp", 0),
+                    f"целиком нет в {year}: {s.get('due_enp_absent', 0)}",
+                ),
+                _metric("Всего на ДН", s.get("total_diag_rows", 0), "запланировано + подлежащие без плана"),
+                _metric("Всего пациентов на ДН", s.get("total_enp", 0), "план + нет в году"),
             ],
             className="mb-3 g-2",
         )
         return html.Div(
             [
-                cards,
-                html.H6("По группам 168н (ИСЗЛ)"),
+                cards_plan,
+                cards_due,
+                html.P(
+                    "Запланированные — строки плана выбранного года. "
+                    "Подлежащие без плана — диагнозы прошлых лет с пустой датой снятия (DateEnd), "
+                    "которых нет в плане этого года (пациент целиком не попал в год или диагноз не внесли). "
+                    "Список — вкладка «Нет в текущем / снять·внести».",
+                    className="text-muted small",
+                ),
+                html.H6("По группам 168н (план и подлежащие)"),
                 _table(by_cat, f"tbl-cat-{type_page}"),
             ]
         )
@@ -497,17 +526,17 @@ def render_tab(active_tab, store, np_mode, file_store, fix_file_store, fix_repor
     if active_tab == "tab-missing":
         return html.Div(
             [
-                html.H6("Нет в текущем году"),
+                html.H6("Нет в текущем году (подлежащие)"),
                 html.P(
-                    f"Пациенты, которые есть в ИСЗЛ за предыдущие годы, но отсутствуют в {year}. "
-                    "Строки по диагнозу (ldwID).",
+                    f"Пациенты, которые стояли на ДН в предыдущие годы (DateEnd пустой) и полностью "
+                    f"отсутствуют в плане {year}. Строки по диагнозу (ldwID).",
                     className="text-muted",
                 ),
                 _table(pd.DataFrame(store.get("missing") or []), f"tbl-miss-{type_page}"),
-                html.H6("Снять / внести", className="mt-3"),
+                html.H6("Внести в план", className="mt-3"),
                 html.P(
-                    f"Пациент есть в ИСЗЛ {year}, но диагноз (ldwID), который был в предыдущие годы, "
-                    "в текущем году отсутствует — проверить снятие в ИСЗЛ или внесение в план.",
+                    f"Пациент есть в плане {year}, но открытый диагноз прошлых лет (DateEnd пустой) "
+                    "в текущий план не внесён.",
                     className="text-muted",
                 ),
                 _table(pd.DataFrame(store.get("dropped") or []), f"tbl-drop-{type_page}"),

@@ -9,13 +9,12 @@ import pandas as pd
 from apps.analytical_app.pages.head.dn.query import (
     STATUS_RU,
     sql_by_category,
-    sql_dropped_diagnoses,
+    sql_due_not_planned,
     sql_etl_status,
     sql_iszl_not_in_kvazar,
     sql_kvazar_not_in_iszl,
     sql_kvazar_stats,
     sql_line_summary,
-    sql_missing_prior,
     sql_not_passed,
     sql_not_passed_grouped,
     sql_out_of_168n,
@@ -49,6 +48,10 @@ COL_RU = {
     "action": "Действие",
     "issue": "Расхождение",
     "iszl_diag_rows": "Диагнозов в ИСЗЛ",
+    "planned_rows": "Запланировано",
+    "due_not_planned": "Подлежащие без плана",
+    "total_due": "Всего на ДН",
+    "due_kind": "Тип",
     "completed": "С талоном (выполнено)",
     "not_passed": "Не прошедшие",
     "table_name": "Таблица",
@@ -93,19 +96,86 @@ def localize_df(df: pd.DataFrame) -> pd.DataFrame:
     return out.rename(columns=rename)
 
 
-def build_summary(engine, year: int) -> dict[str, Any]:
+def _due_stats_from_df(due_df: pd.DataFrame) -> dict[str, int]:
+    if due_df is None or due_df.empty or "Ошибка" in due_df.columns:
+        return {
+            "due_diag_rows": 0,
+            "due_enp": 0,
+            "due_enp_absent": 0,
+            "due_diag_absent": 0,
+            "due_diag_dropped": 0,
+        }
+    kind = due_df["due_kind"] if "due_kind" in due_df.columns else pd.Series("", index=due_df.index)
+    absent = kind.eq("нет в году")
+    return {
+        "due_diag_rows": int(len(due_df)),
+        "due_enp": int(due_df["enp"].nunique()) if "enp" in due_df.columns else 0,
+        "due_enp_absent": int(due_df.loc[absent, "enp"].nunique()) if "enp" in due_df.columns else 0,
+        "due_diag_absent": int(absent.sum()),
+        "due_diag_dropped": int((~absent).sum()),
+    }
+
+
+def _merge_category_tables(plan_df: pd.DataFrame, due_df: pd.DataFrame) -> pd.DataFrame:
+    plan = localize_df(plan_df)
+    cat_col = "Группа 168н"
+    due_col = "Подлежащие без плана"
+    if due_df is None or due_df.empty or "Ошибка" in due_df.columns:
+        due_cat = pd.DataFrame(columns=[cat_col, due_col])
+    else:
+        raw_cat = due_df["category_168n"] if "category_168n" in due_df.columns else "(вне 168н)"
+        due_cat = (
+            due_df.assign(**{cat_col: raw_cat.fillna("(вне 168н)").replace("", "(вне 168н)")})
+            .groupby(cat_col, dropna=False)
+            .size()
+            .reset_index(name=due_col)
+        )
+    if plan.empty:
+        merged = due_cat
+        if "Запланировано" not in merged.columns:
+            merged["Запланировано"] = 0
+            merged["С талоном (выполнено)"] = 0
+            merged["Не прошедшие"] = 0
+    else:
+        merged = plan.merge(due_cat, on=cat_col, how="outer")
+    for col in ("Запланировано", "С талоном (выполнено)", "Не прошедшие", due_col):
+        if col not in merged.columns:
+            merged[col] = 0
+        merged[col] = pd.to_numeric(merged[col], errors="coerce").fillna(0).astype(int)
+    merged["Всего на ДН"] = merged["Запланировано"] + merged[due_col]
+    cols = [cat_col, "Запланировано", "С талоном (выполнено)", "Не прошедшие", due_col, "Всего на ДН"]
+    merged = merged[[c for c in cols if c in merged.columns]]
+    return merged.sort_values("Всего на ДН", ascending=False)
+
+
+def build_due_not_planned(engine, year: int) -> pd.DataFrame:
+    return _read(engine, sql_due_not_planned(year))
+
+
+def build_summary(engine, year: int, due_df: pd.DataFrame | None = None) -> dict[str, Any]:
     s = _read(engine, sql_line_summary(year))
     row = s.iloc[0].to_dict() if not s.empty and "Ошибка" not in s.columns else {}
-    by_cat = localize_df(_read(engine, sql_by_category(year)))
+    if due_df is None:
+        due_df = build_due_not_planned(engine, year)
+    due = _due_stats_from_df(due_df)
+    by_cat = _merge_category_tables(_read(engine, sql_by_category(year)), due_df)
     plan = int(row.get("iszl_diag_rows") or 0)
     done = int(row.get("completed") or 0)
+    plan_enp = int(row.get("iszl_enp") or 0)
     return {
         "iszl_diag_rows": plan,
-        "iszl_enp": int(row.get("iszl_enp") or 0),
+        "iszl_enp": plan_enp,
         "completed_rows": done,
         "not_passed_rows": int(row.get("not_passed") or 0),
         "out_of_168n": int(row.get("out_of_168n") or 0),
         "pct_completed": round(100.0 * done / plan, 1) if plan else 0.0,
+        "due_diag_rows": due["due_diag_rows"],
+        "due_enp": due["due_enp"],
+        "due_enp_absent": due["due_enp_absent"],
+        "due_diag_absent": due["due_diag_absent"],
+        "due_diag_dropped": due["due_diag_dropped"],
+        "total_diag_rows": plan + due["due_diag_rows"],
+        "total_enp": plan_enp + due["due_enp_absent"],
         "by_category": by_cat.to_dict("records") if not by_cat.empty else [],
     }
 
@@ -131,12 +201,33 @@ def build_out_of_168n(engine, year: int) -> pd.DataFrame:
     return localize_df(_read(engine, sql_out_of_168n(year)))
 
 
-def build_missing_prior(engine, year: int) -> pd.DataFrame:
-    return localize_df(_read(engine, sql_missing_prior(year)))
+def build_missing_prior(engine, year: int, due_df: pd.DataFrame | None = None) -> pd.DataFrame:
+    if due_df is None:
+        due_df = build_due_not_planned(engine, year)
+    if due_df.empty or "Ошибка" in due_df.columns:
+        return localize_df(due_df)
+    part = due_df[due_df["due_kind"] == "нет в году"].copy() if "due_kind" in due_df.columns else due_df
+    if "prior_year" in part.columns:
+        part = part.sort_values(["prior_year", "fio"], ascending=[False, True], kind="mergesort")
+    return localize_df(part.head(5000))
 
 
-def build_dropped_diagnoses(engine, year: int) -> pd.DataFrame:
-    return localize_df(_read(engine, sql_dropped_diagnoses(year)))
+def build_dropped_diagnoses(engine, year: int, due_df: pd.DataFrame | None = None) -> pd.DataFrame:
+    if due_df is None:
+        due_df = build_due_not_planned(engine, year)
+    if due_df.empty or "Ошибка" in due_df.columns:
+        return localize_df(due_df)
+    part = (
+        due_df[due_df["due_kind"] == "диагноз не в плане"].copy()
+        if "due_kind" in due_df.columns
+        else due_df
+    )
+    part = part.copy()
+    part["action"] = "внести в план"
+    if "fio" in part.columns:
+        part = part.sort_values("fio", kind="mergesort")
+    cols = [c for c in part.columns if c not in ("dr", "due_kind")]
+    return localize_df(part[cols].head(5000))
 
 
 def build_etl_status(engine) -> pd.DataFrame:
