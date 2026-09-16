@@ -839,6 +839,8 @@ def update_doctors_details_button_state(active_cell):
     Output(f"details-title-{type_page}", "children"),
     Output(f"details-table-container-{type_page}", "children"),
     Input(f"details-button-{type_page}", "n_clicks"),
+    State(f"table-{type_page}-doctors", "derived_viewport_data"),
+    State(f"table-{type_page}-doctors", "derived_virtual_data"),
     State(f"table-{type_page}-doctors", "data"),
     State(f"table-{type_page}-doctors", "active_cell"),
     State(f"dropdown-year-{type_page}", "value"),
@@ -861,7 +863,7 @@ def update_doctors_details_button_state(active_cell):
     prevent_initial_call=True,
 )
 def show_doctors_goal_details(
-    n_clicks, table_data, active_cell,
+    n_clicks, viewport_data, virtual_data, table_data, active_cell,
     year, report_type, months_range,
     start_in, end_in, start_tr, end_tr,
     inogorod, sanction, amount_null,
@@ -869,18 +871,25 @@ def show_doctors_goal_details(
     status_mode, status_grp, status_indiv,
     match_mode,
 ):
-    if not n_clicks or not active_cell or not table_data:
+    if not n_clicks or not active_cell:
+        return "", []
+
+    # active_cell.row — индекс в текущей странице (viewport) после фильтра/сортировки
+    rows = viewport_data if viewport_data is not None else (
+        virtual_data if virtual_data is not None else table_data
+    )
+    if not rows:
         return "", []
 
     row_idx = active_cell.get("row")
     column_id = active_cell.get("column_id")
-    if row_idx is None or row_idx >= len(table_data) or not column_id:
+    if row_idx is None or row_idx >= len(rows) or not column_id:
         return "Ошибка: не выбрана ячейка", []
 
     if column_id in {"doctor", "specialty", "building", "department", "doctor_code"}:
         return "Выберите колонку цели, группы целей или «Итого»", []
 
-    row = table_data[row_idx]
+    row = rows[row_idx]
     doctor = row.get("doctor")
     specialty = row.get("specialty")
     building = row.get("building")

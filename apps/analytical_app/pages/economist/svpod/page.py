@@ -1677,6 +1677,8 @@ def update_details_button_state(active_cell):
         Input(f'details-button-{type_page}', 'n_clicks')
     ],
     [
+        State(f'result-table1-{type_page}', 'derived_viewport_data'),
+        State(f'result-table1-{type_page}', 'derived_virtual_data'),
         State(f'result-table1-{type_page}', 'data'),
         State(f'result-table1-{type_page}', 'active_cell'),
         State(f'dropdown-year-{type_page}', 'value'),
@@ -1686,13 +1688,23 @@ def update_details_button_state(active_cell):
         State(f'dropdown-building-{type_page}', 'value'),
     ]
 )
-def show_svpod_details(n_clicks, table_data, active_cell, selected_year, selected_month,
+def show_svpod_details(n_clicks, viewport_data, virtual_data, table_data, active_cell, selected_year, selected_month,
                       month_closed_switch, selected_levels, building_ids):
-    if not n_clicks or not active_cell or not table_data:
+    if not n_clicks or not active_cell:
         return '', [], []
-    
+
+    rows = viewport_data if viewport_data is not None else (
+        virtual_data if virtual_data is not None else table_data
+    )
+    if not rows:
+        return '', [], []
+
+    row_idx = active_cell.get('row')
+    if row_idx is None or row_idx >= len(rows):
+        return 'Ошибка: не выбрана ячейка', [], []
+
     # Получаем данные выбранной строки и колонки
-    row_data = table_data[active_cell.get('row')]
+    row_data = rows[row_idx]
     column_id = active_cell.get('column_id')
     month_name = row_data.get('month')
     
@@ -2639,6 +2651,8 @@ def update_details_button_state_indicators(active_cell):
         Input(f'details-button-{type_page_indicators}', 'n_clicks')
     ],
     [
+        State(f'result-table1-{type_page_indicators}', 'derived_viewport_data'),
+        State(f'result-table1-{type_page_indicators}', 'derived_virtual_data'),
         State(f'result-table1-{type_page_indicators}', 'data'),
         State(f'result-table1-{type_page_indicators}', 'active_cell'),
         State(f'dropdown-doctor-{type_page_indicators}', 'value'),
@@ -2661,16 +2675,26 @@ def update_details_button_state_indicators(active_cell):
         State(f'include-status4-{type_page_indicators}', 'value')
     ]
 )
-def show_indicators_details(n_clicks, table_data, active_cell,
+def show_indicators_details(n_clicks, viewport_data, virtual_data, table_data, active_cell,
                            value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
                            amount_null, building_ids, department_ids, start_date_input, end_date_input,
                            start_date_treatment, end_date_treatment, report_type,
                            status_mode, selected_status_group, selected_individual_statuses,
                            include_status4_override):
-    if not n_clicks or not active_cell or not table_data:
+    if not n_clicks or not active_cell:
         return '', [], []
-    
-    row_data = table_data[active_cell.get('row')]
+
+    rows = viewport_data if viewport_data is not None else (
+        virtual_data if virtual_data is not None else table_data
+    )
+    if not rows:
+        return '', [], []
+
+    row_idx = active_cell.get('row')
+    if row_idx is None or row_idx >= len(rows):
+        return 'Ошибка: не выбрана ячейка', [], []
+
+    row_data = rows[row_idx]
     indicator_type = row_data.get('type')
     
     if not indicator_type:
