@@ -17,31 +17,7 @@ from apps.analytical_app.query_executor import engine
 
 type_page = "eln"
 
-# --- 1) Загружаем из БД списки уникальных значений для ТВСП, Статуса и Причины --- #
-with engine.connect() as conn:
-    tvsp_rows = conn.execute(text("SELECT DISTINCT tvsp FROM load_data_sick_leave_sheets ORDER BY tvsp")).fetchall()
-    status_rows = conn.execute(text("SELECT DISTINCT status FROM load_data_sick_leave_sheets ORDER BY status")).fetchall()
-    reason_rows = conn.execute(text("""
-        SELECT DISTINCT coalesce(incapacity_reason_code, '') as reason
-        FROM load_data_sick_leave_sheets
-        ORDER BY reason
-    """)).fetchall()
-
-# --- 2) Формируем опции для ТВСП, Статуса, Причины --- #
-tvsp_options = [{"label": row[0], "value": row[0]} for row in tvsp_rows if row[0]]
-tvsp_options.insert(0, {"label": "Все", "value": "all"})
-
-status_options = [{"label": row[0], "value": row[0]} for row in status_rows if row[0]]
-status_options.insert(0, {"label": "Все", "value": "all"})
-
-# Для причины, если пустая строка => 'По уходу'
-reason_options = []
-for row in reason_rows:
-    val = row[0] if row[0] else "По уходу"
-    reason_options.append({"label": val, "value": val})
-reason_options.insert(0, {"label": "Все", "value": "all"})
-
-# Опции для "Первичный" – заменяем чекбоксы на RadioItems (три варианта: Все/Да/Нет)
+# Опции фильтров подгружаются лениво при открытии страницы
 first_options = [
     {"label": "Все", "value": "all"},
     {"label": "Да", "value": "да"},
@@ -51,6 +27,12 @@ first_options = [
 # --- 3) Layout --- #
 eln_layout = html.Div(
     [
+        dcc.Interval(
+            id=f"lazy-filters-{type_page}",
+            interval=200,
+            n_intervals=0,
+            max_intervals=1,
+        ),
         dbc.Card(
             [
                 dbc.CardHeader(
@@ -161,7 +143,7 @@ eln_layout = html.Div(
                                                                     dbc.Label("Статус:", className="mb-0"),
                                                                     dcc.Dropdown(
                                                                         id=f"dropdown-status-{type_page}",
-                                                                        options=status_options,
+                                                                        options=[{"label": "Все", "value": "all"}],
                                                                         multi=True,
                                                                         placeholder="Выберите статус...",
                                                                         className="mt-1"
@@ -180,7 +162,7 @@ eln_layout = html.Div(
                                                                     dbc.Label("Код причины:", className="mb-0"),
                                                                     dcc.Dropdown(
                                                                         id=f"dropdown-reason-{type_page}",
-                                                                        options=reason_options,
+                                                                        options=[{"label": "Все", "value": "all"}],
                                                                         multi=True,
                                                                         placeholder="Выберите причину...",
                                                                         className="mt-1"
@@ -213,7 +195,7 @@ eln_layout = html.Div(
                                                                     dbc.Label("ТВСП:", className="mb-0"),
                                                                     dcc.Dropdown(
                                                                         id=f"dropdown-tvsp-{type_page}",
-                                                                        options=tvsp_options,
+                                                                        options=[{"label": "Все", "value": "all"}],
                                                                         multi=True,
                                                                         placeholder="Выберите ТВСП...",
                                                                         className="mt-1"
@@ -267,6 +249,41 @@ eln_layout = html.Div(
     ],
     style={"padding": "15px"}  # Отступ вокруг всей страницы
 )
+
+# Ленивая загрузка опций фильтров ЭЛН
+@app.callback(
+    Output(f"dropdown-tvsp-{type_page}", "options"),
+    Output(f"dropdown-status-{type_page}", "options"),
+    Output(f"dropdown-reason-{type_page}", "options"),
+    Input(f"lazy-filters-{type_page}", "n_intervals"),
+    prevent_initial_call=False,
+)
+def load_eln_filter_options(_n):
+    with engine.connect() as conn:
+        tvsp_rows = conn.execute(
+            text("SELECT DISTINCT tvsp FROM load_data_sick_leave_sheets ORDER BY tvsp")
+        ).fetchall()
+        status_rows = conn.execute(
+            text("SELECT DISTINCT status FROM load_data_sick_leave_sheets ORDER BY status")
+        ).fetchall()
+        reason_rows = conn.execute(text("""
+            SELECT DISTINCT coalesce(incapacity_reason_code, '') as reason
+            FROM load_data_sick_leave_sheets
+            ORDER BY reason
+        """)).fetchall()
+
+    tvsp_options = [{"label": "Все", "value": "all"}] + [
+        {"label": row[0], "value": row[0]} for row in tvsp_rows if row[0]
+    ]
+    status_options = [{"label": "Все", "value": "all"}] + [
+        {"label": row[0], "value": row[0]} for row in status_rows if row[0]
+    ]
+    reason_options = [{"label": "Все", "value": "all"}]
+    for row in reason_rows:
+        val = row[0] if row[0] else "По уходу"
+        reason_options.append({"label": val, "value": val})
+    return tvsp_options, status_options, reason_options
+
 
 # --- 4) Callback для обновления даты окончания (если нужно) --- #
 @app.callback(

@@ -26,6 +26,7 @@ from apps.analytical_app.components.filters import (
     filter_department,
     filter_health_group,
     filter_icd_codes,
+    lazy_oms_filters_interval,
 )
 from apps.analytical_app.pages.head.dispensary.adults.query import (
     sql_query_dispensary_age,
@@ -56,6 +57,7 @@ SUFFIX_MAP = {"ж": "Ж", "м": "М", "итог": "Итого"}
 
 adults_dv3 = html.Div(
     [
+        lazy_oms_filters_interval(type_page),
         dbc.Row(
             dbc.Col(
                 dbc.Card(

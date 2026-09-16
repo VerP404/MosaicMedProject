@@ -30,17 +30,19 @@ col_rename = {
     "run_url": "Ссылка"
 }
 
-with engine.connect() as connection:
-    result = connection.execute(text("SELECT dagster_ip, dagster_port FROM home_mainsettings LIMIT 1"))
-    row = result.fetchone()
-    dagster_url = f"http://{row[0]}:{row[1]}" if row else "http://127.0.0.1:3000"
-    result2 = connection.execute(text("SELECT filebrowser_ip, filebrowser_port FROM home_mainsettings LIMIT 1"))
-    row = result2.fetchone()
-    filebrowser_url = f"http://{row[0]}:{row[1]}" if row else "http://127.0.0.1:8080"
+# URL подставляются лениво при открытии страницы
+dagster_url = "http://127.0.0.1:3000"
+filebrowser_url = "http://127.0.0.1:8080"
 
 # Основной layout страницы
 admin_update_data = html.Div(
     [
+        dcc.Interval(
+            id=f"lazy-links-{type_page}",
+            interval=200,
+            n_intervals=0,
+            max_intervals=1,
+        ),
         # Скрытый Store для обновления таблицы после удаления
         dcc.Store(id=f"table-refresh-store-{type_page}"),
         dbc.Row(
@@ -76,7 +78,13 @@ admin_update_data = html.Div(
                                                 [
                                                     html.H5("Система автоматизации", className="card-title"),
                                                     html.P("Система для контроля работы автоматизации и уведомлений о проблемах"),
-                                                    dbc.Button("Открыть", color="success", href=dagster_url, target="_blank"),
+                                                    dbc.Button(
+                                                        "Открыть",
+                                                        id=f"btn-dagster-{type_page}",
+                                                        color="success",
+                                                        href=dagster_url,
+                                                        target="_blank",
+                                                    ),
                                                 ]
                                             )
                                         ),
@@ -88,7 +96,13 @@ admin_update_data = html.Div(
                                                 [
                                                     html.H5("Файловый браузер", className="card-title"),
                                                     html.P("Пользователь и пароль: admin"),
-                                                    dbc.Button("Открыть", color="warning", href=filebrowser_url, target="_blank"),
+                                                    dbc.Button(
+                                                        "Открыть",
+                                                        id=f"btn-filebrowser-{type_page}",
+                                                        color="warning",
+                                                        href=filebrowser_url,
+                                                        target="_blank",
+                                                    ),
                                                 ]
                                             )
                                         ),
@@ -154,6 +168,26 @@ admin_update_data = html.Div(
     ],
     style={"padding": "0rem"}
 )
+
+
+@app.callback(
+    Output(f"btn-dagster-{type_page}", "href"),
+    Output(f"btn-filebrowser-{type_page}", "href"),
+    Input(f"lazy-links-{type_page}", "n_intervals"),
+    prevent_initial_call=False,
+)
+def load_admin_external_links(_n):
+    with engine.connect() as connection:
+        row = connection.execute(
+            text("SELECT dagster_ip, dagster_port FROM home_mainsettings LIMIT 1")
+        ).fetchone()
+        dagster = f"http://{row[0]}:{row[1]}" if row else "http://127.0.0.1:3000"
+        row2 = connection.execute(
+            text("SELECT filebrowser_ip, filebrowser_port FROM home_mainsettings LIMIT 1")
+        ).fetchone()
+        filebrowser = f"http://{row2[0]}:{row2[1]}" if row2 else "http://127.0.0.1:8080"
+    return dagster, filebrowser
+
 
 # Callback обновления таблицы, с учетом dcc.Store для обновления после удаления
 @app.callback(

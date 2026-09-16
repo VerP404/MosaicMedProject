@@ -1,10 +1,62 @@
 from datetime import datetime, timedelta
-from dash import dcc, html
+from dash import dcc, html, Input, Output
 import dash_bootstrap_components as dbc
 from sqlalchemy import text
 
+from apps.analytical_app.app import app
 from apps.analytical_app.query_executor import engine
 from apps.analytical_app.utils import build_sql_filters
+
+# Страницы, для которых уже зарегистрированы ленивые лоадеры фильтров ОМС
+_registered_oms_filter_loaders = set()
+
+
+def register_oms_filter_loaders(page: str) -> None:
+    """Подгружает health_group / ICD при первом показе страницы (не при импорте)."""
+    if page in _registered_oms_filter_loaders:
+        return
+    _registered_oms_filter_loaders.add(page)
+
+    @app.callback(
+        Output(f"dropdown-health-group-{page}", "options"),
+        Output(f"dropdown-icd-{page}", "options"),
+        Input(f"lazy-oms-filters-{page}", "n_intervals"),
+        prevent_initial_call=False,
+    )
+    def _load_oms_filter_options(_n, _page=page):
+        health_sql = text("""
+            SELECT DISTINCT health_group
+            FROM load_data_oms_data
+            WHERE goal IN ('ДВ4','ДВ2','ОПВ','УД1','УД2','ДР1','ДР2')
+            ORDER BY health_group
+        """)
+        icd_sql = text("""
+            SELECT DISTINCT main_diagnosis_code
+            FROM load_data_oms_data
+            WHERE main_diagnosis_code IS NOT NULL
+              AND main_diagnosis_code != '-'
+            ORDER BY main_diagnosis_code
+        """)
+        with engine.connect() as conn:
+            groups = [row[0] for row in conn.execute(health_sql).fetchall()]
+            codes = [row[0] for row in conn.execute(icd_sql).fetchall()]
+        health_options = [
+            {"label": "С группой", "value": "with"},
+            {"label": "Все", "value": "all"},
+        ] + [{"label": g, "value": g} for g in groups]
+        icd_options = [{"label": code, "value": code} for code in codes]
+        return health_options, icd_options
+
+
+def lazy_oms_filters_interval(page: str):
+    """Один Interval на страницу — триггер для register_oms_filter_loaders."""
+    register_oms_filter_loaders(page)
+    return dcc.Interval(
+        id=f"lazy-oms-filters-{page}",
+        interval=200,
+        n_intervals=0,
+        max_intervals=1,
+    )
 
 # Словарь для группировки статусов
 status_groups = {
@@ -217,6 +269,40 @@ def get_available_doctors(building_ids=None, department_ids=None, profile_ids=No
     except Exception as e:
         print(f"Ошибка в get_available_doctors: {str(e)}")
         return []
+
+
+def get_available_doctor_codes(doctor_ids=None):
+    """Возвращает конкретные коды выбранного врача/врачей (по doctorrecord.id)."""
+    parsed_ids = parse_doctor_ids(doctor_ids)
+    if not parsed_ids:
+        return []
+
+    query = """
+        SELECT
+            dr.id AS doctor_id,
+            COALESCE(NULLIF(dr.doctor_code, ''), 'не указан') AS doctor_code,
+            CONCAT(
+                p.last_name, ' ', SUBSTRING(p.first_name, 1, 1), '.', SUBSTRING(p.patronymic, 1, 1), '.'
+            ) AS doctor_name,
+            COALESCE(pp.description, '-') AS profile_name
+        FROM personnel_doctorrecord dr
+        JOIN personnel_person p ON p.id = dr.person_id
+        LEFT JOIN personnel_profile pp ON pp.id = dr.profile_id
+        WHERE dr.id = ANY(:doctor_ids)
+        ORDER BY doctor_code, doctor_name, dr.id
+    """
+
+    with engine.connect() as connection:
+        result = connection.execute(text(query), {'doctor_ids': parsed_ids})
+        rows = result.fetchall()
+
+    options = []
+    for row in rows:
+        options.append({
+            'label': f"{row[1]} ({row[2]} - {row[3]})",
+            'value': str(row[0])
+        })
+    return options
 
 
 def filter_profile(type_page):
@@ -616,22 +702,7 @@ def parse_doctor_ids(doctor_value):
 
 
 def filter_health_group(page, default=None):
-    # 1) Получаем все группы из БД (включая "-")
-    sql = text("""
-        SELECT DISTINCT health_group
-        FROM load_data_oms_data
-        WHERE goal IN ('ДВ4','ДВ2','ОПВ','УД1','УД2','ДР1','ДР2')
-        ORDER BY health_group
-    """)
-    with engine.connect() as conn:
-        groups = [row[0] for row in conn.execute(sql).fetchall()]
-
-    # 2) Формируем опции: сначала «С группой», потом реальные значения
-    options = [
-        {"label": "С группой", "value": "with"},
-        {"label": "Все", "value": "all"},
-    ] + [{"label": g, "value": g} for g in groups]
-
+    """Опции групп здоровья подгружаются лениво (см. lazy_oms_filters_interval)."""
     if default is None:
         default = ["with"]
 
@@ -639,7 +710,10 @@ def filter_health_group(page, default=None):
         html.Label("Группа здоровья", style={"font-weight": "bold"}),
         dcc.Dropdown(
             id=f"dropdown-health-group-{page}",
-            options=options,
+            options=[
+                {"label": "С группой", "value": "with"},
+                {"label": "Все", "value": "all"},
+            ],
             value=default,
             multi=True,
             clearable=False,
@@ -651,24 +725,12 @@ def filter_health_group(page, default=None):
 
 
 def filter_icd_codes(type_page):
-    # Получаем все коды МКБ сразу
-    query = """
-        SELECT DISTINCT main_diagnosis_code
-        FROM load_data_oms_data
-        WHERE main_diagnosis_code IS NOT NULL
-        AND main_diagnosis_code != '-'
-        ORDER BY main_diagnosis_code
-    """
-    with engine.connect() as connection:
-        result = connection.execute(text(query))
-        codes = [row[0] for row in result.fetchall()]
-    options = [{'label': code, 'value': code} for code in codes]
-
+    """Опции МКБ подгружаются лениво (см. lazy_oms_filters_interval)."""
     return html.Div([
         html.Label("Код МКБ (конкретные)", style={"font-weight": "bold"}),
         dcc.Dropdown(
             id=f"dropdown-icd-{type_page}",
-            options=options,
+            options=[],
             value=[],
             multi=True,
             clearable=True,
@@ -690,9 +752,7 @@ def filter_icd_codes(type_page):
 
 
 def get_icd_codes():
-    """
-    Получает все уникальные коды МКБ из базы данных.
-    """
+    """Уникальные коды МКБ (вызывать только по запросу, не при импорте)."""
     query = """
         SELECT DISTINCT main_diagnosis_code
         FROM load_data_oms_data
@@ -700,12 +760,9 @@ def get_icd_codes():
         AND main_diagnosis_code != '-'
         ORDER BY main_diagnosis_code
     """
-    
     with engine.connect() as connection:
         result = connection.execute(text(query))
         codes = [row[0] for row in result.fetchall()]
-    
-    # Создаем простой список опций
     return [{'label': code, 'value': code} for code in codes]
 
 

@@ -16,30 +16,24 @@ from apps.analytical_app.components.filters import (
     date_picker,
     get_current_reporting_month,
     filter_status,
-    status_groups, filter_health_group,
+    status_groups,
     filter_icd_codes,
     filter_gender,
-    filter_age_range
+    filter_age_range,
 )
-from apps.analytical_app.query_executor import execute_query
+from apps.analytical_app.query_executor import execute_query, engine
+from sqlalchemy import text
 
 type_page = "tab7-wo"
 
-# Функция для создания мультидропдауна с выбором целей
+
 def filter_goals(type_page):
-    query = '''
-        SELECT DISTINCT goal
-        FROM load_data_oms_data
-        WHERE goal IS NOT NULL
-        ORDER BY goal
-    '''
-    goals = [row[0] for row in execute_query(query)]
-    options = [{'label': g, 'value': g} for g in goals]
+    """Мультиселект целей — опции подгружаются лениво."""
     return html.Div([
         html.Label("Цели", style={"font-weight": "bold"}),
         dcc.Dropdown(
             id=f"dropdown-goals-{type_page}",
-            options=options,
+            options=[],
             value=[],
             multi=True,
             clearable=True,
@@ -50,21 +44,14 @@ def filter_goals(type_page):
         )
     ])
 
-# Функция для создания мультидропдауна с выбором корпусов
+
 def filter_buildings(type_page):
-    query = '''
-        SELECT DISTINCT building
-        FROM load_data_oms_data
-        WHERE building IS NOT NULL
-        ORDER BY building
-    '''
-    buildings = [row[0] for row in execute_query(query)]
-    options = [{'label': b, 'value': b} for b in buildings]
+    """Мультиселект корпусов — опции подгружаются лениво."""
     return html.Div([
         html.Label("Корпуса", style={"font-weight": "bold"}),
         dcc.Dropdown(
             id=f"dropdown-buildings-{type_page}",
-            options=options,
+            options=[],
             value=[],
             multi=True,
             clearable=True,
@@ -75,21 +62,14 @@ def filter_buildings(type_page):
         )
     ])
 
-# Функция для создания мультидропдауна с выбором профилей
+
 def filter_profiles(type_page):
-    query = '''
-        SELECT DISTINCT profile
-        FROM load_data_oms_data
-        WHERE profile IS NOT NULL
-        ORDER BY profile
-    '''
-    profiles = [row[0] for row in execute_query(query)]
-    options = [{'label': p, 'value': p} for p in profiles]
+    """Мультиселект профилей — опции подгружаются лениво."""
     return html.Div([
         html.Label("Профили", style={"font-weight": "bold"}),
         dcc.Dropdown(
             id=f"dropdown-profiles-{type_page}",
-            options=options,
+            options=[],
             value=[],
             multi=True,
             clearable=True,
@@ -100,21 +80,14 @@ def filter_profiles(type_page):
         )
     ])
 
-# Функция для создания мультидропдауна с выбором групп здоровья
+
 def filter_health_group(type_page):
-    query = '''
-        SELECT DISTINCT health_group
-        FROM load_data_oms_data
-        WHERE health_group IS NOT NULL
-        ORDER BY health_group
-    '''
-    groups = [row[0] for row in execute_query(query)]
-    options = [{'label': g, 'value': g} for g in groups]
+    """Мультиселект групп здоровья — опции подгружаются лениво."""
     return html.Div([
         html.Label("Группы здоровья", style={"font-weight": "bold"}),
         dcc.Dropdown(
             id=f"dropdown-health-group-{type_page}",
-            options=options,
+            options=[],
             value=[],
             multi=True,
             clearable=True,
@@ -125,8 +98,15 @@ def filter_health_group(type_page):
         )
     ])
 
+
 adults_dv10 = html.Div(
     [
+        dcc.Interval(
+            id=f"lazy-filters-{type_page}",
+            interval=200,
+            n_intervals=0,
+            max_intervals=1,
+        ),
         dbc.Row(
             dbc.Col(
                 dbc.Card(
@@ -333,35 +313,48 @@ adults_dv10 = html.Div(
 )
 
 
-# Callback для загрузки списка целей
+# Ленивая загрузка опций фильтров (не при импорте модуля)
 @app.callback(
     Output(f"dropdown-goals-{type_page}", "options"),
-    Input("date-interval", "n_intervals"),
-    prevent_initial_call=False
+    Output(f"dropdown-buildings-{type_page}", "options"),
+    Output(f"dropdown-profiles-{type_page}", "options"),
+    Output(f"dropdown-health-group-{type_page}", "options"),
+    Output(f"dropdown-icd-{type_page}", "options"),
+    Input(f"lazy-filters-{type_page}", "n_intervals"),
+    prevent_initial_call=False,
 )
-def load_goals(n):
+def load_tab7_filter_options(_n):
     sql = text("""
-        SELECT DISTINCT goal 
-        FROM load_data_oms_data 
-        WHERE goal IS NOT NULL 
-        ORDER BY goal
+        SELECT
+            ARRAY(SELECT DISTINCT goal FROM load_data_oms_data
+                  WHERE goal IS NOT NULL ORDER BY 1) AS goals,
+            ARRAY(SELECT DISTINCT building FROM load_data_oms_data
+                  WHERE building IS NOT NULL ORDER BY 1) AS buildings,
+            ARRAY(SELECT DISTINCT profile FROM load_data_oms_data
+                  WHERE profile IS NOT NULL ORDER BY 1) AS profiles,
+            ARRAY(SELECT DISTINCT health_group FROM load_data_oms_data
+                  WHERE health_group IS NOT NULL ORDER BY 1) AS health_groups,
+            ARRAY(SELECT DISTINCT main_diagnosis_code FROM load_data_oms_data
+                  WHERE main_diagnosis_code IS NOT NULL
+                    AND main_diagnosis_code <> '-'
+                  ORDER BY 1) AS icd_codes
     """)
     with engine.connect() as conn:
-        goals = [row[0] for row in conn.execute(sql).fetchall()]
-    
-    options = [{"label": g, "value": g} for g in goals]
-    return options
+        row = conn.execute(sql).mappings().first()
+    if not row:
+        return [], [], [], [], []
 
+    def _opts(values):
+        return [{"label": v, "value": v} for v in (values or []) if v is not None]
 
-# Для целей
-def get_all_goals():
-    query = '''
-        SELECT DISTINCT goal
-        FROM load_data_oms_data
-        WHERE goal IS NOT NULL
-        ORDER BY goal
-    '''
-    return [row[0] for row in execute_query(query)]
+    return (
+        _opts(row["goals"]),
+        _opts(row["buildings"]),
+        _opts(row["profiles"]),
+        _opts(row["health_groups"]),
+        _opts(row["icd_codes"]),
+    )
+
 
 @app.callback(
     Output(f"dropdown-goals-{type_page}", "value"),
@@ -372,16 +365,6 @@ def update_goals_selection(selected_values):
     return selected_values
 
 
-# Для корпусов
-def get_all_buildings():
-    query = '''
-        SELECT DISTINCT building
-        FROM load_data_oms_data
-        WHERE building IS NOT NULL
-        ORDER BY building
-    '''
-    return [row[0] for row in execute_query(query)]
-
 @app.callback(
     Output(f"dropdown-buildings-{type_page}", "value"),
     Input(f"dropdown-buildings-{type_page}", "value"),
@@ -391,16 +374,6 @@ def update_buildings_selection(selected_values):
     return selected_values
 
 
-# Для профилей
-def get_all_profiles():
-    query = '''
-        SELECT DISTINCT profile
-        FROM load_data_oms_data
-        WHERE profile IS NOT NULL
-        ORDER BY profile
-    '''
-    return [row[0] for row in execute_query(query)]
-
 @app.callback(
     Output(f"dropdown-profiles-{type_page}", "value"),
     Input(f"dropdown-profiles-{type_page}", "value"),
@@ -409,16 +382,6 @@ def get_all_profiles():
 def update_profiles_selection(selected_values):
     return selected_values
 
-
-# Для групп здоровья
-def get_all_health_groups():
-    query = '''
-        SELECT DISTINCT health_group
-        FROM load_data_oms_data
-        WHERE health_group IS NOT NULL
-        ORDER BY health_group
-    '''
-    return [row[0] for row in execute_query(query)]
 
 @app.callback(
     Output(f"dropdown-health-group-{type_page}", "value"),
@@ -459,7 +422,7 @@ def _toggle_date_filters(report_type):
 
 @app.callback(
     Output(f"current-month-name-{type_page}", "children"),
-    Input("date-interval", "n_intervals"),
+    Input(f"lazy-filters-{type_page}", "n_intervals"),
 )
 def _update_current_month(n):
     _, name = get_current_reporting_month()
@@ -481,7 +444,6 @@ from dash.exceptions import PreventUpdate
 import pandas as pd
 import datetime
 from sqlalchemy import text
-from apps.analytical_app.query_executor import engine
 
 
 @app.callback(
@@ -728,25 +690,7 @@ def add_icd_by_pattern(n_clicks, pattern, options, current_values):
     return result
 
 
-# Callback для загрузки списка групп здоровья
-@app.callback(
-    Output(f"dropdown-health-group-{type_page}", "options"),
-    Input("date-interval", "n_intervals"),
-    prevent_initial_call=False
-)
-def load_health_groups(n):
-    sql = text("""
-        SELECT DISTINCT health_group 
-        FROM load_data_oms_data 
-        WHERE health_group IS NOT NULL 
-        ORDER BY health_group
-    """)
-    with engine.connect() as conn:
-        health_groups = [row[0] for row in conn.execute(sql).fetchall()]
-    
-    options = [{"label": hg, "value": hg} for hg in health_groups]
-    return options
-
+# Callback для показа/скрытия SQL запроса
 
 @app.callback(
     [
@@ -879,39 +823,6 @@ def show_details_tab7(active_cell, table_data, selected_months, year, inog, sanc
         {"name": "Доп. диагнозы", "id": "additional_diagnosis_codes"},
     ]
     return columns, df.to_dict("records"), [], None
-
-
-# Callback для загрузки списка полов
-@app.callback(
-    Output(f"dropdown-gender-{type_page}", "options"),
-    Input("date-interval", "n_intervals"),
-    prevent_initial_call=False
-)
-def load_gender_options(n):
-    """
-    Загружает доступные значения пола из базы данных.
-    """
-    sql = text("""
-        SELECT DISTINCT gender 
-        FROM load_data_oms_data 
-        WHERE gender IS NOT NULL 
-        ORDER BY gender
-    """)
-    with engine.connect() as conn:
-        genders = [row[0] for row in conn.execute(sql).fetchall()]
-    
-    # Создаем опции с человекочитаемыми названиями
-    options = [
-        {'label': 'Все', 'value': 'all'},
-        {'label': 'Мужской', 'value': 'М'},
-        {'label': 'Женский', 'value': 'Ж'}
-    ]
-    
-    # Фильтруем только те опции, которые есть в базе
-    available_genders = set(genders)
-    filtered_options = [opt for opt in options if opt['value'] == 'all' or opt['value'] in available_genders]
-    
-    return filtered_options
 
 
 # Callback для показа/скрытия SQL запроса

@@ -23,33 +23,12 @@ _PASS_STATUS_LABELS = {
 
 
 def filter_lpuuch(type_page):
-    """Создает мультиселект дропдаун для выбора участков, отсортированных по последним 3 цифрам"""
-    query = """
-        SELECT DISTINCT lpuuch
-        FROM data_loader_iszlpeople
-        WHERE COALESCE(NULLIF(lpuuch, '-'), '') <> ''
-    """
-    try:
-        lpuuch_list = [row[0] for row in execute_query(query) if row[0]]
-
-        def get_sort_key(lpu):
-            if '_' in lpu:
-                parts = lpu.split('_')
-                if len(parts) == 2 and parts[1].isdigit() and len(parts[1]) >= 3:
-                    return parts[1][-3:]
-                return lpu[-3:] if len(lpu) >= 3 else lpu
-            return lpu[-3:] if len(lpu) >= 3 else lpu
-
-        sorted_lpuuch = sorted(lpuuch_list, key=lambda x: (get_sort_key(x), x))
-        options = [{'label': lpu, 'value': lpu} for lpu in sorted_lpuuch]
-    except Exception:
-        options = []
-
+    """Мультиселект участков — опции подгружаются лениво."""
     return html.Div([
         html.Label("Участки"),
         dcc.Dropdown(
             id=f'dropdown-lpuuch-{type_page}',
-            options=options,
+            options=[],
             value=[],
             multi=True,
             clearable=True,
@@ -60,6 +39,12 @@ def filter_lpuuch(type_page):
 
 
 adults_dv13 = html.Div([
+    dcc.Interval(
+        id=f"lazy-filters-{type_page}",
+        interval=200,
+        n_intervals=0,
+        max_intervals=1,
+    ),
     dbc.Card(
         dbc.CardBody([
             dbc.CardHeader("Фильтры"),
@@ -163,6 +148,34 @@ adults_dv13 = html.Div([
         html.Pre(id=f'debug-info-{type_page}', style={"whiteSpace": "pre-wrap"})
     ], open=False)
 ])
+
+
+@app.callback(
+    Output(f"dropdown-lpuuch-{type_page}", "options"),
+    Input(f"lazy-filters-{type_page}", "n_intervals"),
+    prevent_initial_call=False,
+)
+def load_lpuuch_options(_n):
+    query = """
+        SELECT DISTINCT lpuuch
+        FROM data_loader_iszlpeople
+        WHERE COALESCE(NULLIF(lpuuch, '-'), '') <> ''
+    """
+    try:
+        lpuuch_list = [row[0] for row in execute_query(query) if row[0]]
+
+        def get_sort_key(lpu):
+            if '_' in lpu:
+                parts = lpu.split('_')
+                if len(parts) == 2 and parts[1].isdigit() and len(parts[1]) >= 3:
+                    return parts[1][-3:]
+                return lpu[-3:] if len(lpu) >= 3 else lpu
+            return lpu[-3:] if len(lpu) >= 3 else lpu
+
+        sorted_lpuuch = sorted(lpuuch_list, key=lambda x: (get_sort_key(x), x))
+        return [{'label': lpu, 'value': lpu} for lpu in sorted_lpuuch]
+    except Exception:
+        return []
 
 
 def _normalize_age_bounds(age_from, age_to):

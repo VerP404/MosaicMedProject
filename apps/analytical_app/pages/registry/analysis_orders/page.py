@@ -230,11 +230,17 @@ def _fetch_orders(
     return df[existing_order]
 
 
-payment_options = _payment_source_options()
+payment_options = [{'label': 'Все источники', 'value': 'all'}]
 default_start, default_end = _default_dates()
 
 analysis_orders_page = html.Div(
     [
+        dcc.Interval(
+            id=f"lazy-filters-{type_page}",
+            interval=200,
+            n_intervals=0,
+            max_intervals=1,
+        ),
         dbc.Card(
             dbc.CardBody([
                 html.H5("Фильтры отбора", className="mb-3"),
@@ -330,6 +336,15 @@ analysis_orders_page = html.Div(
     ],
     style={"padding": "20px"}
 )
+
+
+@app.callback(
+    Output(PAYMENT_DROPDOWN_ID, "options"),
+    Input(f"lazy-filters-{type_page}", "n_intervals"),
+    prevent_initial_call=False,
+)
+def load_payment_source_options(_n):
+    return _payment_source_options()
 
 
 @app.callback(

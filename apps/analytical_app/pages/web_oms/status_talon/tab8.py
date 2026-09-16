@@ -90,6 +90,12 @@ def parse_specific_dates(text, year):
 
 web_oms_8 = html.Div(
     [
+        dcc.Interval(
+            id=f"lazy-filters-{type_page}",
+            interval=200,
+            n_intervals=0,
+            max_intervals=1,
+        ),
         dbc.Card(
             dbc.CardBody(
                 [
@@ -236,7 +242,7 @@ web_oms_8 = html.Div(
                                     dbc.Label("Цели:", className="me-2"),
                                     dcc.Dropdown(
                                         id=f"dropdown-goals-{type_page}",
-                                        options=_goal_options(),
+                                        options=[],
                                         value=[],
                                         multi=True,
                                         clearable=True,
@@ -263,6 +269,15 @@ web_oms_8 = html.Div(
     ],
     style={"padding": "0rem"},
 )
+
+
+@app.callback(
+    Output(f"dropdown-goals-{type_page}", "options"),
+    Input(f"lazy-filters-{type_page}", "n_intervals"),
+    prevent_initial_call=False,
+)
+def load_tab8_goal_options(_n):
+    return _goal_options()
 
 
 @app.callback(

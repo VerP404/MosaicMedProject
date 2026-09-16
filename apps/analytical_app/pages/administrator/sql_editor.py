@@ -90,9 +90,6 @@ sql_editor_layout = html.Div([
     ),
     html.Hr(),
     
-    # Отладочная информация
-    html.Div(f"DEBUG: Firebird доступен: {is_firebird_available()}", style={'color': 'red', 'fontSize': '12px'}),
-    
     # SQL редактор
     dbc.Card([
         dbc.CardHeader("SQL Редактор"),

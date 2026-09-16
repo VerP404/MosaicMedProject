@@ -20,6 +20,15 @@ def get_organization_name():
     return "Организация не указана"
 
 
+@app.callback(
+    Output("navbar-org-name", "children"),
+    Input("url", "pathname"),
+    prevent_initial_call=False,
+)
+def load_navbar_organization_name(_pathname):
+    return get_organization_name()
+
+
 # Создаем модальное окно
 def create_modal_168n():
     modal = dbc.Modal(
@@ -76,8 +85,9 @@ def create_modal_goal():
 
 
 def create_navbar():
-    organization_name = get_organization_name()
-    
+    # Название МО подгружается отдельно — без SQL при создании layout
+    organization_name = "…"
+
     # Создаем offcanvas для обновлений
     updates_offcanvas = create_updates_offcanvas()
     
@@ -103,7 +113,7 @@ def create_navbar():
                 html.A(
                     dbc.Row(
                         [
-                            dbc.Col(dbc.NavbarBrand(organization_name, className="ms-2")),
+                            dbc.Col(dbc.NavbarBrand(organization_name, id="navbar-org-name", className="ms-2")),
                         ],
                         align="center",
                         className="g-0",

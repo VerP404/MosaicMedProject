@@ -13,16 +13,14 @@ from apps.analytical_app.pages.head.doctors.query import sql_query_doctors_goal_
 # Страница и SQL для отчёта по врачам (doctors_goal)
 type_page = "doctors_goal"
 
-# Получаем список уникальных целей для выпадающего списка
-with engine.connect() as conn:
-    result = conn.execute(text("SELECT DISTINCT goal FROM data_loader_omsdata ORDER BY goal"))
-    _goal_rows = result.fetchall()
-goal_options = [
-    {'label': row[0], 'value': row[0]}
-    for row in _goal_rows if row[0] is not None and row[0] != '-'
-]
-# Разметка страницы
+# Разметка страницы — цели подгружаются лениво
 layout_doctors_goal = html.Div([
+    dcc.Interval(
+        id=f"lazy-filters-{type_page}",
+        interval=200,
+        n_intervals=0,
+        max_intervals=1,
+    ),
     dbc.Row(
         dbc.Col(
             dbc.Card(
@@ -38,7 +36,7 @@ layout_doctors_goal = html.Div([
                         dbc.Col(
                             dcc.Dropdown(
                                 id=f'dropdown-goal-{type_page}',
-                                options=goal_options,
+                                options=[],
                                 multi=True,
                                 placeholder="Цели"
                             ),
@@ -72,21 +70,37 @@ layout_doctors_goal = html.Div([
 ], style={"padding": "0rem"})
 
 
+@app.callback(
+    Output(f"dropdown-goal-{type_page}", "options"),
+    Input(f"lazy-filters-{type_page}", "n_intervals"),
+    prevent_initial_call=False,
+)
+def load_goal_options(_n):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text(
+                "SELECT DISTINCT goal FROM data_loader_omsdata "
+                "WHERE goal IS NOT NULL AND goal <> '-' ORDER BY goal"
+            )
+        )
+        rows = result.fetchall()
+    return [{'label': row[0], 'value': row[0]} for row in rows if row[0]]
+
+
 # Callback переключения режима выбора статусов
 @app.callback(
     [
         Output(f'status-group-container-{type_page}', 'style'),
         Output(f'status-individual-container-{type_page}', 'style')
     ],
-    [Input(f'status-selection-mode-{type_page}', 'value')]
+    Input(f'status-selection-mode-{type_page}', 'value')
 )
-def toggle_status_selection_mode(mode):
+def toggle_status_mode_doctors_goal(mode):
     if mode == 'group':
         return {'display': 'block'}, {'display': 'none'}
-    else:
-        return {'display': 'none'}, {'display': 'block'}
+    return {'display': 'none'}, {'display': 'block'}
 
-# Callback обновления отчёта по врачам
+
 @app.callback(
     [
         Output(f'result-table-{type_page}', 'columns'),
@@ -141,4 +155,3 @@ def update_table_doctors_goal(
 
     columns, data = TableUpdater.query_to_df(engine, sql)
     return columns, data, None
-

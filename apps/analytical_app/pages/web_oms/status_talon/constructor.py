@@ -135,6 +135,12 @@ def _section(title, children):
 
 web_oms_9 = html.Div(
     [
+        dcc.Interval(
+            id=f"lazy-filters-{type_page}",
+            interval=200,
+            n_intervals=0,
+            max_intervals=1,
+        ),
         html.H4("Конструктор отчётов", className="mb-1"),
         html.P(
             "Соберите отчёт сами: строки → показатели → фильтры. "
@@ -268,7 +274,7 @@ web_oms_9 = html.Div(
                                 html.Label("Цели", className="fw-semibold small mb-1"),
                                 dcc.Dropdown(
                                     id=f"goals-{type_page}",
-                                    options=_goal_options(),
+                                    options=[],
                                     multi=True,
                                     placeholder="Все цели",
                                 ),
@@ -280,7 +286,7 @@ web_oms_9 = html.Div(
                                 html.Label("Подразделения", className="fw-semibold small mb-1"),
                                 dcc.Dropdown(
                                     id=f"departments-{type_page}",
-                                    options=_department_options(),
+                                    options=[],
                                     multi=True,
                                     placeholder="Все подразделения",
                                 ),
@@ -297,7 +303,7 @@ web_oms_9 = html.Div(
                                 html.Label("Специальности", className="fw-semibold small mb-1"),
                                 dcc.Dropdown(
                                     id=f"specialties-{type_page}",
-                                    options=_specialty_options(),
+                                    options=[],
                                     multi=True,
                                     placeholder="Все специальности",
                                 ),
@@ -309,7 +315,7 @@ web_oms_9 = html.Div(
                                 html.Label("Диагнозы (код)", className="fw-semibold small mb-1"),
                                 dcc.Dropdown(
                                     id=f"diagnoses-{type_page}",
-                                    options=_diagnosis_options(),
+                                    options=[],
                                     multi=True,
                                     placeholder="Все диагнозы",
                                 ),
@@ -418,6 +424,23 @@ web_oms_9 = html.Div(
     ],
     style={"padding": "0.25rem 0 1rem"},
 )
+
+
+@app.callback(
+    Output(f"goals-{type_page}", "options"),
+    Output(f"departments-{type_page}", "options"),
+    Output(f"specialties-{type_page}", "options"),
+    Output(f"diagnoses-{type_page}", "options"),
+    Input(f"lazy-filters-{type_page}", "n_intervals"),
+    prevent_initial_call=False,
+)
+def load_constructor_filter_options(_n):
+    return (
+        _goal_options(),
+        _department_options(),
+        _specialty_options(),
+        _diagnosis_options(),
+    )
 
 
 @app.callback(
