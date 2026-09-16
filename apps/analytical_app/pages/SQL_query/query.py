@@ -105,6 +105,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                                 END AS report_month_number
                      FROM data_loader_omsdata oms),
      oms_data as (SELECT report_data.talon,
+                    report_data.account_number,
                     (ARRAY ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 
                     'Октябрь', 'Ноябрь', 'Декабрь'])[report_data.report_month_number] AS report_month,
                     report_month_number,

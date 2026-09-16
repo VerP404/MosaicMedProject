@@ -18,6 +18,7 @@ from apps.analytical_app.pages.economist.doctors.query import (
     sql_query_doctors_goal_stat,
     sql_query_buildings_goal_stat,
     sql_query_unmatched_doctors,
+    sql_query_doctors_goal_details,
 )
 from apps.analytical_app.query_executor import engine
 
@@ -213,7 +214,38 @@ def economist_doctors_talon_list_def():
                         id=f'loading-table-{type_page}-doctors',
                         type="default",
                         children=html.Div(id=f'result-table-container-{type_page}-doctors')
-                    )
+                    ),
+                    dbc.Card(
+                        [
+                            dbc.CardHeader("Детализация по талонам"),
+                            dbc.CardBody(
+                                [
+                                    html.Div(
+                                        id=f"details-title-{type_page}",
+                                        style={"fontWeight": "bold", "marginBottom": "10px"},
+                                    ),
+                                    dbc.Button(
+                                        "Детализация",
+                                        id=f"details-button-{type_page}",
+                                        color="primary",
+                                        size="sm",
+                                        disabled=True,
+                                        className="mb-2",
+                                    ),
+                                    html.Small(
+                                        "Выберите ячейку цели (или группы / Итого) в таблице выше и нажмите «Детализация».",
+                                        className="text-muted d-block mb-2",
+                                    ),
+                                    dcc.Loading(
+                                        id=f"loading-details-{type_page}",
+                                        type="default",
+                                        children=html.Div(id=f"details-table-container-{type_page}"),
+                                    ),
+                                ]
+                            ),
+                        ],
+                        className="mt-3 shadow-sm",
+                    ),
                 ]
             ),
             dbc.Tab(
@@ -537,6 +569,7 @@ def update_table_doctors_goal(
             sort_action="native",
             filter_action="native",
             export_format="xlsx",
+            cell_selectable=True,
             style_table={"overflowX": "auto"},
             style_data_conditional=[
                 {
@@ -783,3 +816,165 @@ def update_table_unmatched_doctors(
             style_cell={"whiteSpace": "normal", "minWidth": "80px"},
         )
     ])
+
+
+_ROW_META_COLS = {"doctor", "specialty", "building", "department", "doctor_code"}
+
+
+@app.callback(
+    Output(f"details-button-{type_page}", "disabled"),
+    Input(f"table-{type_page}-doctors", "active_cell"),
+    prevent_initial_call=False,
+)
+def update_doctors_details_button_state(active_cell):
+    if not active_cell:
+        return True
+    column_id = active_cell.get("column_id")
+    if not column_id or column_id in _ROW_META_COLS:
+        return True
+    return False
+
+
+@app.callback(
+    Output(f"details-title-{type_page}", "children"),
+    Output(f"details-table-container-{type_page}", "children"),
+    Input(f"details-button-{type_page}", "n_clicks"),
+    State(f"table-{type_page}-doctors", "data"),
+    State(f"table-{type_page}-doctors", "active_cell"),
+    State(f"dropdown-year-{type_page}", "value"),
+    State(f"dropdown-report-type-{type_page}", "value"),
+    State(f"range-slider-month-{type_page}", "value"),
+    State(f"date-picker-range-input-{type_page}", "start_date"),
+    State(f"date-picker-range-input-{type_page}", "end_date"),
+    State(f"date-picker-range-treatment-{type_page}", "start_date"),
+    State(f"date-picker-range-treatment-{type_page}", "end_date"),
+    State(f"dropdown-inogorodniy-{type_page}", "value"),
+    State(f"dropdown-sanction-{type_page}", "value"),
+    State(f"dropdown-amount-null-{type_page}", "value"),
+    State(f"goals-selection-mode-{type_page}", "value"),
+    State(f"dropdown-goals-{type_page}", "value"),
+    State(f"dropdown-goal-groups-{type_page}", "value"),
+    State(f"status-selection-mode-{type_page}", "value"),
+    State(f"status-group-radio-{type_page}", "value"),
+    State(f"status-individual-dropdown-{type_page}", "value"),
+    State(f"doctor-match-mode-{type_page}", "value"),
+    prevent_initial_call=True,
+)
+def show_doctors_goal_details(
+    n_clicks, table_data, active_cell,
+    year, report_type, months_range,
+    start_in, end_in, start_tr, end_tr,
+    inogorod, sanction, amount_null,
+    goal_mode, indiv_goals, grp_goals,
+    status_mode, status_grp, status_indiv,
+    match_mode,
+):
+    if not n_clicks or not active_cell or not table_data:
+        return "", []
+
+    row_idx = active_cell.get("row")
+    column_id = active_cell.get("column_id")
+    if row_idx is None or row_idx >= len(table_data) or not column_id:
+        return "Ошибка: не выбрана ячейка", []
+
+    if column_id in {"doctor", "specialty", "building", "department", "doctor_code"}:
+        return "Выберите колонку цели, группы целей или «Итого»", []
+
+    row = table_data[row_idx]
+    doctor = row.get("doctor")
+    specialty = row.get("specialty")
+    building = row.get("building")
+    department = row.get("department")
+    doctor_code = row.get("doctor_code")
+
+    # Цели для детализации
+    if goal_mode == "group" and grp_goals:
+        all_goals = [item for g in grp_goals for item in GOAL_GROUPS.get(g, [])]
+        group_mapping = {g: GOAL_GROUPS.get(g, []) for g in grp_goals}
+    elif goal_mode == "individual" and indiv_goals:
+        all_goals = list(indiv_goals)
+        group_mapping = {}
+    else:
+        group_mapping = {}
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT DISTINCT goal FROM data_loader_omsdata WHERE goal IS NOT NULL AND goal <> '-'"
+            )).fetchall()
+        all_goals = [r[0] for r in rows]
+    all_goals = sorted(dict.fromkeys(all_goals), key=sort_key)
+
+    if column_id == "Итого":
+        detail_goals = all_goals
+        detail_label = "Итого"
+    elif column_id in group_mapping:
+        detail_goals = group_mapping[column_id]
+        detail_label = f"группа «{column_id}»"
+    else:
+        detail_goals = [column_id]
+        detail_label = f"цель «{column_id}»"
+
+    if not detail_goals:
+        return "Нет целей для детализации", []
+
+    statuses = (
+        status_groups.get(status_grp, [])
+        if status_mode == "group" else (status_indiv or [])
+    )
+
+    months_ph = None
+    si = ei = st = et = None
+    if report_type == "month" and months_range:
+        months_ph = ", ".join(str(m) for m in range(months_range[0], months_range[1] + 1))
+    elif report_type == "initial_input" and start_in and end_in:
+        si = datetime.fromisoformat(start_in).strftime("%d-%m-%Y")
+        ei = datetime.fromisoformat(end_in).strftime("%d-%m-%Y")
+    elif report_type == "treatment" and start_tr and end_tr:
+        st = datetime.fromisoformat(start_tr).strftime("%d-%m-%Y")
+        et = datetime.fromisoformat(end_tr).strftime("%d-%m-%Y")
+
+    try:
+        sql = sql_query_doctors_goal_details(
+            selected_year=year,
+            months_placeholder=months_ph,
+            inogorodniy=inogorod,
+            sanction=sanction,
+            amount_null=amount_null,
+            detail_goals=detail_goals,
+            status_list=statuses,
+            input_start=si,
+            input_end=ei,
+            treatment_start=st,
+            treatment_end=et,
+            match_mode=match_mode or "all",
+            doctor=doctor,
+            specialty=specialty,
+            building=building,
+            department=department,
+            doctor_code=doctor_code,
+        )
+        cols, data = TableUpdater.query_to_df(engine, sql)
+        df = pd.DataFrame(data)
+    except Exception as e:
+        return f"Ошибка детализации: {e}", []
+
+    title = f"Детализация: {doctor or '—'} — {detail_label} ({len(df)} тал.)"
+    if df.empty:
+        return title, dbc.Alert("Талоны не найдены по выбранной ячейке.", color="info")
+
+    return title, dash_table.DataTable(
+        id=f"table-{type_page}-details",
+        columns=[
+            {
+                "name": c["name"] if isinstance(c, dict) else c,
+                "id": c["id"] if isinstance(c, dict) else c,
+            }
+            for c in cols
+        ],
+        data=df.to_dict("records"),
+        page_size=20,
+        sort_action="native",
+        filter_action="native",
+        export_format="xlsx",
+        style_table={"overflowX": "auto"},
+        style_cell={"whiteSpace": "normal", "minWidth": "70px", "maxWidth": "220px"},
+    )

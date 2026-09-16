@@ -285,3 +285,92 @@ def sql_query_buildings_goal_stat(
         SELECT * FROM pivot
         ORDER BY building;
         """
+
+
+def _sql_quote(value) -> str:
+    if value is None:
+        return ""
+    return str(value).replace("'", "''")
+
+
+def sql_query_doctors_goal_details(
+    selected_year,
+    months_placeholder,
+    inogorodniy,
+    sanction,
+    amount_null,
+    detail_goals=None,
+    status_list=None,
+    input_start=None,
+    input_end=None,
+    treatment_start=None,
+    treatment_end=None,
+    match_mode="all",
+    doctor=None,
+    specialty=None,
+    building=None,
+    department=None,
+    doctor_code=None,
+):
+    """
+    Детализация талонов по строке врача и выбранной цели/группе целей.
+    """
+    base = base_query(
+        selected_year,
+        months_placeholder or ", ".join(str(m) for m in range(1, 12 + 1)),
+        inogorodniy,
+        sanction,
+        amount_null,
+        initial_input_date_start=input_start,
+        initial_input_date_end=input_end,
+        treatment_start=treatment_start,
+        treatment_end=treatment_end,
+        status_list=status_list,
+    )
+
+    match_sql = _match_filter(match_mode)
+    doctor_expr = _doctor_display_expr(match_mode)
+
+    conditions = []
+    if match_sql:
+        conditions.append(match_sql.replace("AND ", "", 1).strip())
+
+    if detail_goals:
+        quoted = ", ".join(f"'{_sql_quote(g)}'" for g in detail_goals)
+        conditions.append(f"goal IN ({quoted})")
+
+    # Сопоставление строки сводки
+    conditions.append(f"COALESCE(({doctor_expr}), '') = '{_sql_quote(doctor)}'")
+    conditions.append(f"COALESCE(specialty, '') = '{_sql_quote(specialty)}'")
+    conditions.append(f"COALESCE(building, '') = '{_sql_quote(building)}'")
+    conditions.append(f"COALESCE(department, '') = '{_sql_quote(department)}'")
+    if doctor_code is not None and str(doctor_code).strip() != "":
+        conditions.append(
+            f"COALESCE(NULLIF(TRIM(doctor_code), ''), '') = '{_sql_quote(doctor_code)}'"
+        )
+
+    where_sql = " AND ".join(conditions) if conditions else "1=1"
+    return f"""
+        {base}
+        SELECT
+            talon AS "Талон",
+            goal AS "Цель",
+            status AS "Статус",
+            enp AS "ЕНП",
+            patient AS "Пациент",
+            birth_date AS "Дата рождения",
+            treatment_start AS "Дата начала",
+            treatment_end AS "Дата окончания",
+            gender AS "Пол",
+            ({doctor_expr}) AS "Врач",
+            specialty AS "Специальность",
+            building AS "Корпус",
+            department AS "Отделение",
+            report_month AS "Отчетный месяц",
+            amount_numeric AS "Сумма",
+            initial_input_date AS "Дата формирования",
+            account_number AS "Номер счета"
+        FROM oms
+        WHERE {where_sql}
+        ORDER BY talon;
+        """

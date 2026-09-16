@@ -599,6 +599,7 @@ def sql_query_svpod_details(selected_year, selected_month, group_ids, filter_con
                                 END AS report_month_number
                      FROM data_loader_omsdata oms),
      oms_data as (SELECT report_data.talon,
+                    report_data.account_number,
                     (ARRAY ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 
                     'Октябрь', 'Ноябрь', 'Декабрь'])[report_data.report_month_number] AS report_month,
                     report_month_number,
@@ -714,7 +715,9 @@ def sql_query_svpod_details(selected_year, selected_month, group_ids, filter_con
            specialty                           AS "Специальность",
            building                            AS "Корпус",
            department                          AS "Отделение",
-           report_month                        AS "Отчетный месяц"
+           report_month                        AS "Отчетный месяц",
+           initial_input_date                  AS "Дата формирования",
+           account_number                      AS "Номер счета"
     FROM oms
     ORDER BY talon
     """
@@ -1356,6 +1359,7 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
                                 END AS report_month_number
                      FROM data_loader_omsdata oms),
      oms_data as (SELECT report_data.talon,
+                    report_data.account_number,
                     (ARRAY ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 
                     'Октябрь', 'Ноябрь', 'Декабрь'])[report_data.report_month_number] AS report_month,
                     report_month_number,
@@ -1485,7 +1489,9 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
            specialty                           AS "Специальность",
            building                            AS "Корпус",
            department                          AS "Отделение",
-           report_month                        AS "Отчетный месяц"
+           report_month                        AS "Отчетный месяц",
+           initial_input_date                  AS "Дата формирования",
+           account_number                      AS "Номер счета"
     FROM oms
     ORDER BY talon
     """
