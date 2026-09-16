@@ -14,7 +14,11 @@ from apps.analytical_app.components.filters import (
     filter_status, status_groups, filter_report_type, filter_months,
     date_picker, update_buttons
 )
-from apps.analytical_app.pages.economist.doctors.query import sql_query_doctors_goal_stat, sql_query_buildings_goal_stat
+from apps.analytical_app.pages.economist.doctors.query import (
+    sql_query_doctors_goal_stat,
+    sql_query_buildings_goal_stat,
+    sql_query_unmatched_doctors,
+)
 from apps.analytical_app.query_executor import engine
 
 type_page = "econ-doctors-talon-list"
@@ -172,10 +176,26 @@ def economist_doctors_talon_list_def():
 
                     ], width=8),
 
-                    # Правый столбец: статусы
+                    # Правый столбец: статусы + сопоставление со справочником
                     dbc.Col([
                         dbc.Label("Статусы:"),
-                        filter_status(type_page)
+                        filter_status(type_page),
+                        html.Hr(),
+                        dbc.Label("Врачи в справочнике:"),
+                        dbc.RadioItems(
+                            id=f"doctor-match-mode-{type_page}",
+                            options=[
+                                {"label": "Все", "value": "all"},
+                                {"label": "Только в справочнике", "value": "matched"},
+                                {"label": "Только не заведены", "value": "unmatched"},
+                            ],
+                            value="all",
+                            className="mb-1",
+                        ),
+                        html.Small(
+                            "«Не заведены» — код из талона ОМС нет в personnel (карточка врача).",
+                            className="text-muted",
+                        ),
                     ], width=4),
 
                 ], className="mb-3"),
@@ -206,7 +226,27 @@ def economist_doctors_talon_list_def():
                         children=html.Div(id=f'result-table-container-{type_page}-buildings')
                     )
                 ]
-            )
+            ),
+            dbc.Tab(
+                label="Не заведены в справочник",
+                tab_id=f"tab-unmatched-{type_page}",
+                children=[
+                    html.Div(
+                        [
+                            html.P(
+                                "Коды врачей из талонов ОМС, для которых нет записи в personnel "
+                                "(нужно завести DoctorRecord с этим кодом).",
+                                className="text-muted small mt-2 mb-2",
+                            ),
+                            dcc.Loading(
+                                id=f'loading-table-{type_page}-unmatched',
+                                type="default",
+                                children=html.Div(id=f'result-table-container-{type_page}-unmatched')
+                            ),
+                        ]
+                    )
+                ]
+            ),
         ], active_tab=f"tab-doctors-{type_page}")
 
     ], style={"padding": "0rem"})
@@ -390,13 +430,15 @@ def toggle_status(mode):
     State(f'status-selection-mode-{type_page}', 'value'),
     State(f'status-group-radio-{type_page}', 'value'),
     State(f'status-individual-dropdown-{type_page}', 'value'),
+    State(f'doctor-match-mode-{type_page}', 'value'),
 )
 def update_table_doctors_goal(
         n, year, report_type, months_range,
         start_in, end_in, start_tr, end_tr,
         inogorod, sanction, amount_null,
         goal_mode, indiv_goals, grp_goals,
-        status_mode, status_grp, status_indiv
+        status_mode, status_grp, status_indiv,
+        match_mode,
 ):
     if not n:
         raise exceptions.PreventUpdate
@@ -439,6 +481,8 @@ def update_table_doctors_goal(
         st = datetime.fromisoformat(start_tr).strftime("%d-%m-%Y")
         et = datetime.fromisoformat(end_tr).strftime("%d-%m-%Y")
 
+    match_mode = match_mode or "all"
+
     # Генерация SQL и выполнение
     sql = sql_query_doctors_goal_stat(
         selected_year=year,
@@ -451,7 +495,8 @@ def update_table_doctors_goal(
         status_list=statuses,
         report_type=report_type,
         input_start=si, input_end=ei,
-        treatment_start=st, treatment_end=et
+        treatment_start=st, treatment_end=et,
+        match_mode=match_mode,
     )
     cols, data = TableUpdater.query_to_df(engine, sql)
     df = pd.DataFrame(data)
@@ -468,6 +513,7 @@ def update_table_doctors_goal(
                     html.Li("Проверьте выбранный период (год, месяцы или даты)"),
                     html.Li("Измените фильтры по статусам"),
                     html.Li("Выберите другие цели или группы целей"),
+                    html.Li("Проверьте режим «Врачи в справочнике»"),
                     html.Li("Проверьте фильтры по типу пациентов (местные/иногородние)"),
                     html.Li("Попробуйте другой тип отчёта")
                 ]),
@@ -492,6 +538,16 @@ def update_table_doctors_goal(
             filter_action="native",
             export_format="xlsx",
             style_table={"overflowX": "auto"},
+            style_data_conditional=[
+                {
+                    "if": {
+                        "filter_query": (
+                            '{specialty} eq "" || {specialty} is blank'
+                        )
+                    },
+                    "backgroundColor": "#fff3cd",
+                }
+            ],
         )
     ])
 
@@ -613,5 +669,117 @@ def update_table_buildings_goal(
             filter_action="native",
             export_format="xlsx",
             style_table={"overflowX": "auto"},
+        )
+    ])
+
+
+# 6c) Врачи из талонов, не заведённые в personnel
+@app.callback(
+    Output(f'result-table-container-{type_page}-unmatched', 'children'),
+    Input(f'update-button-{type_page}', 'n_clicks'),
+    State(f'dropdown-year-{type_page}', 'value'),
+    State(f'dropdown-report-type-{type_page}', 'value'),
+    State(f'range-slider-month-{type_page}', 'value'),
+    State(f'date-picker-range-input-{type_page}', 'start_date'),
+    State(f'date-picker-range-input-{type_page}', 'end_date'),
+    State(f'date-picker-range-treatment-{type_page}', 'start_date'),
+    State(f'date-picker-range-treatment-{type_page}', 'end_date'),
+    State(f'dropdown-inogorodniy-{type_page}', 'value'),
+    State(f'dropdown-sanction-{type_page}', 'value'),
+    State(f'dropdown-amount-null-{type_page}', 'value'),
+    State(f'goals-selection-mode-{type_page}', 'value'),
+    State(f'dropdown-goals-{type_page}', 'value'),
+    State(f'dropdown-goal-groups-{type_page}', 'value'),
+    State(f'status-selection-mode-{type_page}', 'value'),
+    State(f'status-group-radio-{type_page}', 'value'),
+    State(f'status-individual-dropdown-{type_page}', 'value'),
+)
+def update_table_unmatched_doctors(
+        n, year, report_type, months_range,
+        start_in, end_in, start_tr, end_tr,
+        inogorod, sanction, amount_null,
+        goal_mode, indiv_goals, grp_goals,
+        status_mode, status_grp, status_indiv,
+):
+    if not n:
+        raise exceptions.PreventUpdate
+
+    if goal_mode == 'group' and grp_goals:
+        goals = [item for g in grp_goals for item in GOAL_GROUPS.get(g, [])]
+    elif goal_mode == 'individual' and indiv_goals:
+        goals = indiv_goals
+    else:
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT DISTINCT goal FROM data_loader_omsdata WHERE goal IS NOT NULL AND goal <> '-'"
+            )).fetchall()
+        goals = [r[0] for r in rows]
+    goals = sorted(dict.fromkeys(goals), key=sort_key)
+
+    statuses = (
+        status_groups.get(status_grp, [])
+        if status_mode == 'group' else (status_indiv or [])
+    )
+
+    months_ph = None
+    si = ei = st = et = None
+    if report_type == 'month' and months_range:
+        months_ph = ", ".join(str(m) for m in range(months_range[0], months_range[1] + 1))
+    elif report_type == 'initial_input' and start_in and end_in:
+        si = datetime.fromisoformat(start_in).strftime("%d-%m-%Y")
+        ei = datetime.fromisoformat(end_in).strftime("%d-%m-%Y")
+    elif report_type == 'treatment' and start_tr and end_tr:
+        st = datetime.fromisoformat(start_tr).strftime("%d-%m-%Y")
+        et = datetime.fromisoformat(end_tr).strftime("%d-%m-%Y")
+
+    sql = sql_query_unmatched_doctors(
+        selected_year=year,
+        months_placeholder=months_ph,
+        inogorodniy=inogorod,
+        sanction=sanction,
+        amount_null=amount_null,
+        goals=goals,
+        status_list=statuses,
+        input_start=si,
+        input_end=ei,
+        treatment_start=st,
+        treatment_end=et,
+    )
+    cols, data = TableUpdater.query_to_df(engine, sql)
+    df = pd.DataFrame(data)
+
+    if df.empty:
+        return html.Div([
+            dbc.Alert(
+                "Все врачи из выборки найдены в справочнике personnel — несопоставленных кодов нет.",
+                color="success",
+                className="mt-3",
+            )
+        ])
+
+    total_talons = int(df["Талонов"].sum()) if "Талонов" in df.columns else 0
+    return html.Div([
+        dbc.Alert(
+            f"Кодов без карточки: {len(df)}, талонов: {total_talons}. "
+            "Заведите DoctorRecord с этим кодом в разделе персонала.",
+            color="warning",
+            className="mt-2 mb-2",
+        ),
+        dash_table.DataTable(
+            id=f"table-{type_page}-unmatched",
+            columns=[
+                {
+                    "name": c["name"] if isinstance(c, dict) else c,
+                    "id": c["id"] if isinstance(c, dict) else c
+                }
+                for c in cols
+            ],
+            data=df.to_dict('records'),
+            page_size=25,
+            sort_action="native",
+            filter_action="native",
+            export_format="xlsx",
+            style_table={"overflowX": "auto"},
+            style_cell={"whiteSpace": "normal", "minWidth": "80px"},
         )
     ])
