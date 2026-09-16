@@ -279,7 +279,12 @@ def _applied_rules_hint(
         parts.append(filter_conditions)
     if selected_year:
         parts.append(f"год: {selected_year}")
-    parts.append("финансы" if mode == "finance" else "объемы")
+    if mode == "finance":
+        parts.append("финансы")
+    elif mode == "both":
+        parts.append("общий (объемы+финансы)")
+    else:
+        parts.append("объемы")
     kind_label = "ТФОМС" if (plan_kind or "tfoms") == "tfoms" else "внутренний"
     parts.append(f"план: {kind_label}")
     if selected_month:
@@ -293,7 +298,7 @@ def _applied_rules_hint(
     names = _building_names(buildings)
     if names:
         parts.append(f"корпус: {', '.join(names)}")
-    if mode == "finance":
+    if mode in ("finance", "both"):
         unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
         parts.append(f"ед.: {finance_unit_label(unit)}")
     tooltip = "; ".join(parts) if parts else "Условия не заданы"
@@ -442,6 +447,7 @@ current_report_tab = html.Div(
                                         options=[
                                             {"label": "Объемы", "value": "volumes"},
                                             {"label": "Финансы", "value": "finance"},
+                                            {"label": "Общий", "value": "both"},
                                         ],
                                         value="volumes",
                                         clearable=False,
@@ -1230,6 +1236,33 @@ def _svpod_money_format() -> Format:
     )
 
 
+def _format_money_display(value, *, precision: int = 2) -> str:
+    """Строка с разрядами через пробел — для смешанной таблицы Объемы+Финансы."""
+    try:
+        num = float(value or 0)
+    except (TypeError, ValueError):
+        return str(value) if value is not None else ""
+    if precision == 0:
+        formatted = f"{num:,.0f}"
+    else:
+        formatted = f"{num:,.{precision}f}"
+    return formatted.replace(",", " ")
+
+
+def _format_finance_rows_for_mixed_table(rows: list[dict]) -> list[dict]:
+    """В режиме both колонки общие — формат DataTable не применим только к финансам."""
+    out = []
+    for row in rows:
+        r = dict(row)
+        for cid in _SVPOD_MONEY_COL_IDS:
+            if cid in r:
+                r[cid] = _format_money_display(r[cid], precision=2)
+        if "%" in r:
+            r["%"] = _format_money_display(r["%"], precision=1)
+        out.append(r)
+    return out
+
+
 def _format_svpod_columns(columns, *, finance: bool):
     """В режиме финансов: 2 знака, разряды. % — 1 знак."""
     if not finance:
@@ -1390,6 +1423,192 @@ def fetch_plan_data(selected_level, year, mode='volumes', plan_kind='internal', 
         return {row["month"]: _as_float(row["plan"]) for row in result}
 
 
+def _build_svpod_detail_rows(
+    *,
+    mode,
+    selected_year,
+    selected_level,
+    filter_conditions,
+    unique,
+    buildings,
+    plan_kind,
+    months_to_show,
+    current_month,
+    current_day,
+    month_closed,
+    calendar_month,
+    manually_selected,
+):
+    """
+    Одна лента строк для volumes или finance: месяцы + Нарастающе + Год.
+    Каскад входящего остатка независим для каждого mode.
+    """
+    _, fact_data_list = TableUpdater.query_to_df(
+        engine,
+        sql_query_rep(
+            selected_year,
+            group_id=[selected_level],
+            filter_conditions=filter_conditions,
+            mode=mode,
+            unique_flag=unique,
+            building=buildings,
+        ),
+    )
+    fact_dict = {row["month"]: row for row in fact_data_list}
+    plan_data = fetch_plan_data(
+        selected_level,
+        selected_year,
+        mode,
+        plan_kind=plan_kind or "tfoms",
+        building_ids=buildings,
+    )
+
+    fact_data = []
+    for m in months_to_show:
+        row_template = {
+            "month": m,
+            "План 1/12": 0.0,
+            "Входящий остаток": 0.0,
+            "План": 0.0,
+            "Факт": 0.0,
+            "%": 0.0,
+            "Остаток": 0.0,
+            "новые": 0.0,
+            "в_тфомс": 0.0,
+            "оплачено": 0.0,
+            "исправлено": 0.0,
+            "отказано": 0.0,
+            "отменено": 0.0,
+        }
+        if m in fact_dict:
+            source = fact_dict[m]
+            row_template["новые"] = _as_float(source.get("новые", 0))
+            row_template["в_тфомс"] = _as_float(source.get("в_тфомс", 0))
+            row_template["оплачено"] = _as_float(source.get("оплачено", 0))
+            row_template["исправлено"] = _as_float(source.get("исправлено", 0))
+            row_template["отказано"] = _as_float(source.get("отказано", 0))
+            row_template["отменено"] = _as_float(source.get("отменено", 0))
+        row_template["План 1/12"] = _as_float(plan_data.get(m, 0))
+        fact_data.append(row_template)
+
+    incoming_balance = 0.0
+    for row in fact_data:
+        m = row["month"]
+        row["Входящий остаток"] = float(incoming_balance)
+        row["План"] = _as_float(row["План 1/12"]) + _as_float(row["Входящий остаток"])
+        row["Факт"] = float(
+            compute_svpod_month_fact(
+                row,
+                m,
+                reporting_month=current_month,
+                current_day=current_day,
+                month_closed=month_closed,
+                calendar_month=calendar_month,
+                manually_selected=manually_selected,
+            )
+        )
+        plan_val = _as_float(row["План"])
+        fact_val = _as_float(row["Факт"])
+        row["%"] = round(fact_val / plan_val * 100, 1) if plan_val > 0 else 0.0
+        row["Остаток"] = plan_val - fact_val
+        incoming_balance = row["Остаток"]
+
+    if fact_data:
+        total_plan_12 = sum(_as_float(r["План 1/12"]) for r in fact_data)
+        total_fact = sum(_as_float(r["Факт"]) for r in fact_data)
+        fact_data.append({
+            "month": "Нарастающе",
+            "План 1/12": 0.0,
+            "Входящий остаток": 0.0,
+            "План": total_plan_12,
+            "Факт": total_fact,
+            "Остаток": _as_float(fact_data[-1]["Остаток"]),
+            "%": round(total_fact / total_plan_12 * 100, 1) if total_plan_12 > 0 else 0.0,
+            "новые": sum(_as_float(r["новые"]) for r in fact_data),
+            "в_тфомс": sum(_as_float(r["в_тфомс"]) for r in fact_data),
+            "оплачено": sum(_as_float(r["оплачено"]) for r in fact_data),
+            "исправлено": sum(_as_float(r["исправлено"]) for r in fact_data),
+            "отказано": sum(_as_float(r["отказано"]) for r in fact_data),
+            "отменено": sum(_as_float(r["отменено"]) for r in fact_data),
+        })
+
+    year_plan = sum(_as_float(plan_data.get(m, 0)) for m in range(1, 13))
+    if fact_data:
+        month_rows = [r for r in fact_data if isinstance(r["month"], int)]
+        total_fact_overall = sum(_as_float(r["Факт"]) for r in month_rows)
+        fact_data.append({
+            "month": "Год",
+            "План 1/12": 0.0,
+            "Входящий остаток": 0.0,
+            "План": year_plan,
+            "Факт": total_fact_overall,
+            "Остаток": year_plan - total_fact_overall,
+            "%": round(total_fact_overall / year_plan * 100, 1) if year_plan else 0.0,
+            "новые": sum(_as_float(r["новые"]) for r in month_rows),
+            "в_тфомс": sum(_as_float(r["в_тфомс"]) for r in month_rows),
+            "оплачено": sum(_as_float(r["оплачено"]) for r in month_rows),
+            "исправлено": sum(_as_float(r["исправлено"]) for r in month_rows),
+            "отказано": sum(_as_float(r["отказано"]) for r in month_rows),
+            "отменено": sum(_as_float(r["отменено"]) for r in month_rows),
+        })
+
+    return fact_data
+
+
+def _merge_svpod_both_rows(volume_rows, finance_rows):
+    """Склеить две ленты: на каждый месяц Объемы затем Финансы; итоги парами."""
+    vol_months = {r["month"]: r for r in volume_rows if isinstance(r.get("month"), int)}
+    fin_months = {r["month"]: r for r in finance_rows if isinstance(r.get("month"), int)}
+    months = sorted(set(vol_months) | set(fin_months))
+
+    out = []
+    for m in months:
+        if m in vol_months:
+            row = dict(vol_months[m])
+            row["Тип"] = "Объемы"
+            out.append(row)
+        if m in fin_months:
+            row = dict(fin_months[m])
+            row["Тип"] = "Финансы"
+            out.append(row)
+
+    vol_sum = {r["month"]: r for r in volume_rows if not isinstance(r.get("month"), int)}
+    fin_sum = {r["month"]: r for r in finance_rows if not isinstance(r.get("month"), int)}
+    for label in ("Нарастающе", "Год"):
+        if label in vol_sum:
+            row = dict(vol_sum[label])
+            row["Тип"] = "Объемы"
+            out.append(row)
+        if label in fin_sum:
+            row = dict(fin_sum[label])
+            row["Тип"] = "Финансы"
+            out.append(row)
+    return out
+
+
+def _svpod_detail_columns(*, with_type: bool = False):
+    columns = [
+        {"name": ["", "Месяц"], "id": "month"},
+    ]
+    if with_type:
+        columns.append({"name": ["", "Тип"], "id": "Тип"})
+    columns.extend([
+        {"name": ["Итог", "План"], "id": "План"},
+        {"name": ["Итог", "Факт"], "id": "Факт"},
+        {"name": ["Итог", "%"], "id": "%"},
+        {"name": ["Итог", "Остаток"], "id": "Остаток"},
+        {"name": ["Факт", "Новые"], "id": "новые"},
+        {"name": ["Факт", "В ТФОМС"], "id": "в_тфомс"},
+        {"name": ["Факт", "Оплачено"], "id": "оплачено"},
+        {"name": ["Факт", "Исправлено"], "id": "исправлено"},
+        {"name": ["Факт", "Отказано"], "id": "отказано"},
+        {"name": ["Факт", "Отменено"], "id": "отменено"},
+        {"name": ["План 1/12", "План 1/12"], "id": "План 1/12"},
+        {"name": ["План 1/12", "Входящий остаток"], "id": "Входящий остаток"},
+    ])
+    return columns
+
+
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data'),
@@ -1435,33 +1654,7 @@ def update_table_with_plan_and_balance(n_clicks,
 
     unique = unique_flag if unique_flag is not None else False
     buildings = _normalize_building_ids(building_ids)
-
-    # Загружаем фактические данные с измерением времени
-    start_time = time.time()
-    fact_columns, fact_data_list = TableUpdater.query_to_df(
-        engine,
-        sql_query_rep(selected_year,
-                      group_id=[selected_level],
-                      filter_conditions=filter_conditions,
-                      mode=mode,
-                      unique_flag=unique,
-                      building=buildings)
-    )
-    execution_time = time.time() - start_time
-    # Превращаем список словарей fact_data_list в dict по ключу "month"
-    fact_dict = {}
-    for row in fact_data_list:
-        m = row["month"]
-        fact_dict[m] = row
-
-    # Загружаем плановые данные (МО или сумма выбранных корпусов)
-    plan_data = fetch_plan_data(
-        selected_level,
-        selected_year,
-        mode,
-        plan_kind=plan_kind or "tfoms",
-        building_ids=buildings,
-    )
+    mode = mode or "volumes"
 
     today = datetime.today()
     default_month = today.month - 1 if today.day <= 5 else today.month
@@ -1469,169 +1662,48 @@ def update_table_with_plan_and_balance(n_clicks,
     current_month = selected_month if selected_month is not None else default_month
     month_closed = _month_closed_enabled(month_closed_switch)
     manually_selected = selected_month is not None
-
-    # Формируем список месяцев для отображения: от 1 до current_month
     months_to_show = list(range(1, current_month + 1))
 
-    # Создаём «заготовку» для итоговой таблицы.
-    # Для каждого месяца делаем словарь со всеми нужными полями, заполненными нулями.
-    # Потом при наличии данных - перезапишем.
-    fact_data = []
-    for m in months_to_show:
-        # Базовая заготовка на случай, если нет данных вообще
-        row_template = {
-            "month": m,
-            "План 1/12": 0.0,
-            "Входящий остаток": 0.0,
-            "План": 0.0,
-            "Факт": 0.0,
-            "%": 0.0,
-            "Остаток": 0.0,
-            "новые": 0.0,
-            "в_тфомс": 0.0,
-            "оплачено": 0.0,
-            "исправлено": 0.0,
-            "отказано": 0.0,
-            "отменено": 0.0,
-        }
+    build_kwargs = dict(
+        selected_year=selected_year,
+        selected_level=selected_level,
+        filter_conditions=filter_conditions,
+        unique=unique,
+        buildings=buildings,
+        plan_kind=plan_kind,
+        months_to_show=months_to_show,
+        current_month=current_month,
+        current_day=current_day,
+        month_closed=month_closed,
+        calendar_month=today.month,
+        manually_selected=manually_selected,
+    )
 
-        # Если в fact_dict есть запись для этого месяца, берём данные
-        if m in fact_dict:
-            source = fact_dict[m]
-            # mode='finance' -> суммы (Decimal из PG), mode='volumes' -> кол-во
-            row_template["новые"] = _as_float(source.get("новые", 0))
-            row_template["в_тфомс"] = _as_float(source.get("в_тфомс", 0))
-            row_template["оплачено"] = _as_float(source.get("оплачено", 0))
-            row_template["исправлено"] = _as_float(source.get("исправлено", 0))
-            row_template["отказано"] = _as_float(source.get("отказано", 0))
-            row_template["отменено"] = _as_float(source.get("отменено", 0))
+    start_time = time.time()
+    if mode == "both":
+        volume_rows = _build_svpod_detail_rows(mode="volumes", **build_kwargs)
+        finance_rows = _build_svpod_detail_rows(mode="finance", **build_kwargs)
+        unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
+        finance_rows = scale_rows_money(finance_rows, unit)
+        finance_rows = _format_finance_rows_for_mixed_table(finance_rows)
+        fact_data = _merge_svpod_both_rows(volume_rows, finance_rows)
+        columns = _svpod_detail_columns(with_type=True)
+    else:
+        fact_data = _build_svpod_detail_rows(mode=mode, **build_kwargs)
+        columns = _svpod_detail_columns(with_type=False)
+        if mode == "finance":
+            unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
+            fact_data = scale_rows_money(fact_data, unit)
+            columns = _format_svpod_columns(columns, finance=True)
+    execution_time = time.time() - start_time
 
-        # Подставляем план, если он есть
-        row_template["План 1/12"] = _as_float(plan_data.get(m, 0))
-
-        fact_data.append(row_template)
-
-    # Теперь пробегаемся по fact_data и рассчитываем Факт, Остаток, % и т.д.
-    incoming_balance = 0.0
-    for row in fact_data:
-        m = row["month"]
-        row["Входящий остаток"] = float(incoming_balance)
-        row["План"] = _as_float(row["План 1/12"]) + _as_float(row["Входящий остаток"])
-
-        row["Факт"] = float(
-            compute_svpod_month_fact(
-                row,
-                m,
-                reporting_month=current_month,
-                current_day=current_day,
-                month_closed=month_closed,
-                calendar_month=today.month,
-                manually_selected=manually_selected,
-            )
-        )
-
-        plan_val = _as_float(row["План"])
-        fact_val = _as_float(row["Факт"])
-        if plan_val > 0:
-            row["%"] = round(fact_val / plan_val * 100, 1)
-        else:
-            row["%"] = 0.0
-
-        row["Остаток"] = plan_val - fact_val
-        incoming_balance = row["Остаток"]
-
-    # Добавим строку «Нарастающе»
-    if fact_data:
-        total_plan_12 = sum(_as_float(r["План 1/12"]) for r in fact_data)
-        total_fact = sum(_as_float(r["Факт"]) for r in fact_data)
-        total_new = sum(_as_float(r["новые"]) for r in fact_data)
-        total_tfoms = sum(_as_float(r["в_тфомс"]) for r in fact_data)
-        total_oplacheno = sum(_as_float(r["оплачено"]) for r in fact_data)
-        total_ispravleno = sum(_as_float(r["исправлено"]) for r in fact_data)
-        total_otkazano = sum(_as_float(r["отказано"]) for r in fact_data)
-        total_otmeneno = sum(_as_float(r["отменено"]) for r in fact_data)
-        cumulative_row = {
-            "month": "Нарастающе",
-            "План 1/12": 0.0,
-            "Входящий остаток": 0.0,
-            "План": total_plan_12,
-            "Факт": total_fact,
-            "Остаток": _as_float(fact_data[-1]["Остаток"]),
-            "%": round(total_fact / total_plan_12 * 100, 1) if total_plan_12 > 0 else 0.0,
-            "новые": total_new,
-            "в_тфомс": total_tfoms,
-            "оплачено": total_oplacheno,
-            "исправлено": total_ispravleno,
-            "отказано": total_otkazano,
-            "отменено": total_otmeneno,
-        }
-        fact_data.append(cumulative_row)
-
-    # Добавим строку «Год» (1..12)
-    year_plan = sum(_as_float(plan_data.get(m, 0)) for m in range(1, 13))
-    if fact_data:
-        total_fact_overall = sum(
-            _as_float(r["Факт"]) for r in fact_data if isinstance(r["month"], int)
-        )
-        year_row = {
-            "month": "Год",
-            "План 1/12": 0.0,
-            "Входящий остаток": 0.0,
-            "План": year_plan,
-            "Факт": total_fact_overall,
-            "Остаток": year_plan - total_fact_overall,
-            "%": round(total_fact_overall / year_plan * 100, 1) if year_plan else 0.0,
-            "новые": sum(
-                _as_float(r["новые"]) for r in fact_data if isinstance(r["month"], int)
-            ),
-            "в_тфомс": sum(
-                _as_float(r["в_тфомс"]) for r in fact_data if isinstance(r["month"], int)
-            ),
-            "оплачено": sum(
-                _as_float(r["оплачено"]) for r in fact_data if isinstance(r["month"], int)
-            ),
-            "исправлено": sum(
-                _as_float(r["исправлено"]) for r in fact_data if isinstance(r["month"], int)
-            ),
-            "отказано": sum(
-                _as_float(r["отказано"]) for r in fact_data if isinstance(r["month"], int)
-            ),
-            "отменено": sum(
-                _as_float(r["отменено"]) for r in fact_data if isinstance(r["month"], int)
-            ),
-        }
-        fact_data.append(year_row)
-
-    columns = [
-        {"name": ["", "Месяц"], "id": "month"},
-        {"name": ["Итог", "План"], "id": "План"},
-        {"name": ["Итог", "Факт"], "id": "Факт"},
-        {"name": ["Итог", "%"], "id": "%"},
-        {"name": ["Итог", "Остаток"], "id": "Остаток"},
-        {"name": ["Факт", "Новые"], "id": "новые"},
-        {"name": ["Факт", "В ТФОМС"], "id": "в_тфомс"},
-        {"name": ["Факт", "Оплачено"], "id": "оплачено"},
-        {"name": ["Факт", "Исправлено"], "id": "исправлено"},
-        {"name": ["Факт", "Отказано"], "id": "отказано"},
-        {"name": ["Факт", "Отменено"], "id": "отменено"},
-        {"name": ["План 1/12", "План 1/12"], "id": "План 1/12"},
-        {"name": ["План 1/12", "Входящий остаток"], "id": "Входящий остаток"},
-    ]
-
-    # Формируем статус загрузки
     if execution_time < 1:
         time_text = f"{execution_time*1000:.0f}мс"
     else:
         time_text = f"{execution_time:.1f}с"
-    
-    # Подсчитываем количество записей (исключаем строки "Нарастающе" и "Год")
+
     record_count = len([r for r in fact_data if isinstance(r.get("month"), int)])
     status_text = f"Запрос выполнен за {time_text}. Найдено записей: {record_count}"
-
-    if mode == "finance":
-        unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
-        fact_data = scale_rows_money(fact_data, unit)
-        columns = _format_svpod_columns(columns, finance=True)
 
     applied = _applied_rules_hint(
         filter_conditions=filter_conditions,
