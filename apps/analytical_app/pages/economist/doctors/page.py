@@ -30,6 +30,44 @@ def sort_key(x):
     return (0, int(x)) if x.isdigit() else (1, x.lower())
 
 
+def _parse_dash_date(value):
+    """Дата из DatePickerRange → DD-MM-YYYY для SQL."""
+    if not value:
+        return None
+    if hasattr(value, "strftime"):
+        return value.strftime("%d-%m-%Y")
+    s = str(value).split("T")[0]
+    return datetime.strptime(s, "%Y-%m-%d").strftime("%d-%m-%Y")
+
+
+def _resolve_period(report_type, months_range, start_in, end_in, start_tr, end_tr):
+    """
+    Возвращает (months_ph, input_start, input_end, treatment_start, treatment_end, error).
+    Для дат формирования/лечения отчётный месяц не используется.
+    """
+    report_type = report_type or "month"
+    if report_type == "month":
+        if not months_range or len(months_range) != 2:
+            return None, None, None, None, None, "Укажите диапазон отчётных месяцев."
+        si, ei = int(months_range[0]), int(months_range[1])
+        months_ph = ", ".join(str(m) for m in range(si, ei + 1))
+        return months_ph, None, None, None, None, None
+
+    if report_type == "initial_input":
+        si, ei = _parse_dash_date(start_in), _parse_dash_date(end_in)
+        if not si or not ei:
+            return None, None, None, None, None, "Укажите период по дате формирования."
+        return None, si, ei, None, None, None
+
+    if report_type == "treatment":
+        st, et = _parse_dash_date(start_tr), _parse_dash_date(end_tr)
+        if not st or not et:
+            return None, None, None, None, None, "Укажите период по дате окончания лечения."
+        return None, None, None, st, et, None
+
+    return None, None, None, None, None, "Неизвестный тип периода."
+
+
 # Функция для загрузки списка конфигураций из БД
 def load_configs():
     return pd.read_sql(
@@ -499,19 +537,11 @@ def update_table_doctors_goal(
     )
 
     # Период
-    months_ph = None
-    si = ei = st = et = None
-    if report_type == 'month' and months_range:
-        si, ei = months_range
-        months_ph = ", ".join(str(m) for m in range(si, ei + 1))
-        # Для отчётного месяца не передаём даты
-        si = ei = st = et = None
-    elif report_type == 'initial_input' and start_in and end_in:
-        si = datetime.fromisoformat(start_in).strftime("%d-%m-%Y")
-        ei = datetime.fromisoformat(end_in).strftime("%d-%m-%Y")
-    elif report_type == 'treatment' and start_tr and end_tr:
-        st = datetime.fromisoformat(start_tr).strftime("%d-%m-%Y")
-        et = datetime.fromisoformat(end_tr).strftime("%d-%m-%Y")
+    months_ph, si, ei, st, et, period_err = _resolve_period(
+        report_type, months_range, start_in, end_in, start_tr, end_tr
+    )
+    if period_err:
+        return html.Div(dbc.Alert(period_err, color="warning", className="mt-3"))
 
     match_mode = match_mode or "all"
 
@@ -637,19 +667,11 @@ def update_table_buildings_goal(
         if status_mode == 'group' else (status_indiv or [])
     )
 
-    months_ph = None
-    si = ei = st = et = None
-    if report_type == 'month' and months_range:
-        si, ei = months_range
-        months_ph = ", ".join(str(m) for m in range(si, ei + 1))
-        # Для отчётного месяца не передаём даты
-        si = ei = st = et = None
-    elif report_type == 'initial_input' and start_in and end_in:
-        si = datetime.fromisoformat(start_in).strftime("%d-%m-%Y")
-        ei = datetime.fromisoformat(end_in).strftime("%d-%m-%Y")
-    elif report_type == 'treatment' and start_tr and end_tr:
-        st = datetime.fromisoformat(start_tr).strftime("%d-%m-%Y")
-        et = datetime.fromisoformat(end_tr).strftime("%d-%m-%Y")
+    months_ph, si, ei, st, et, period_err = _resolve_period(
+        report_type, months_range, start_in, end_in, start_tr, end_tr
+    )
+    if period_err:
+        return html.Div(dbc.Alert(period_err, color="warning", className="mt-3"))
 
     sql = sql_query_buildings_goal_stat(
         selected_year=year,
@@ -754,16 +776,11 @@ def update_table_unmatched_doctors(
         if status_mode == 'group' else (status_indiv or [])
     )
 
-    months_ph = None
-    si = ei = st = et = None
-    if report_type == 'month' and months_range:
-        months_ph = ", ".join(str(m) for m in range(months_range[0], months_range[1] + 1))
-    elif report_type == 'initial_input' and start_in and end_in:
-        si = datetime.fromisoformat(start_in).strftime("%d-%m-%Y")
-        ei = datetime.fromisoformat(end_in).strftime("%d-%m-%Y")
-    elif report_type == 'treatment' and start_tr and end_tr:
-        st = datetime.fromisoformat(start_tr).strftime("%d-%m-%Y")
-        et = datetime.fromisoformat(end_tr).strftime("%d-%m-%Y")
+    months_ph, si, ei, st, et, period_err = _resolve_period(
+        report_type, months_range, start_in, end_in, start_tr, end_tr
+    )
+    if period_err:
+        return html.Div(dbc.Alert(period_err, color="warning", className="mt-3"))
 
     sql = sql_query_unmatched_doctors(
         selected_year=year,
@@ -930,16 +947,11 @@ def show_doctors_goal_details(
         if status_mode == "group" else (status_indiv or [])
     )
 
-    months_ph = None
-    si = ei = st = et = None
-    if report_type == "month" and months_range:
-        months_ph = ", ".join(str(m) for m in range(months_range[0], months_range[1] + 1))
-    elif report_type == "initial_input" and start_in and end_in:
-        si = datetime.fromisoformat(start_in).strftime("%d-%m-%Y")
-        ei = datetime.fromisoformat(end_in).strftime("%d-%m-%Y")
-    elif report_type == "treatment" and start_tr and end_tr:
-        st = datetime.fromisoformat(start_tr).strftime("%d-%m-%Y")
-        et = datetime.fromisoformat(end_tr).strftime("%d-%m-%Y")
+    months_ph, si, ei, st, et, period_err = _resolve_period(
+        report_type, months_range, start_in, end_in, start_tr, end_tr
+    )
+    if period_err:
+        return period_err, []
 
     try:
         sql = sql_query_doctors_goal_details(

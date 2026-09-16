@@ -1304,18 +1304,34 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
     # Если amount_null == '3' (Все), фильтр не применяется
     
     if treatment_start and treatment_end:
-        treatment = (f"AND to_date(treatment_end, 'DD-MM-YYYY') BETWEEN to_date('{treatment_start}', "
-                     f"'DD-MM-YYYY') and to_date('{treatment_end}', 'DD-MM-YYYY')")
-    
+        treatment = (
+            f"AND CASE WHEN treatment_end ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' "
+            f"THEN to_date(treatment_end, 'DD-MM-YYYY') ELSE NULL END "
+            f"BETWEEN to_date('{treatment_start}', 'DD-MM-YYYY') "
+            f"AND to_date('{treatment_end}', 'DD-MM-YYYY')"
+        )
+
     if input_start and input_end:
-        initial_input = (f"AND to_date(initial_input_date, 'DD-MM-YYYY') BETWEEN to_date('{input_start}', "
-                         f"'DD-MM-YYYY') and to_date('{input_end}', 'DD-MM-YYYY')")
-    
+        initial_input = (
+            f"AND CASE WHEN initial_input_date ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' "
+            f"THEN to_date(initial_input_date, 'DD-MM-YYYY') ELSE NULL END "
+            f"BETWEEN to_date('{input_start}', 'DD-MM-YYYY') "
+            f"AND to_date('{input_end}', 'DD-MM-YYYY')"
+        )
+
     if status_list:
         status = "AND status IN (" + ",".join(f"'{cel}'" for cel in status_list) + ")"
 
     status4_override_clause = " OR status = '4'" if include_status4_override else ""
-    
+    use_date_period = bool((input_start and input_end) or (treatment_start and treatment_end))
+    months_sql = months_placeholder or ", ".join(str(m) for m in range(1, 13))
+    if use_date_period:
+        period_filter = "TRUE"
+    else:
+        period_filter = (
+            f"report_year = '{selected_year}' "
+            f"AND (report_month_number IN ({months_sql}){status4_override_clause})"
+        )
     query = f"""
     WITH report_data AS (SELECT oms.*,
                             CASE
@@ -1462,8 +1478,7 @@ def sql_query_indicators_details(selected_year, months_placeholder, inogorod, sa
                       LEFT JOIN public.personnel_person person ON person.id = pd.person_id
              ),
      oms as (select * from oms_data 
-             WHERE report_year = '{selected_year}' 
-                   AND (report_month_number IN ({months_placeholder}){status4_override_clause})
+             WHERE {period_filter}
                    {inogorodniy_filter}
                    {sanction_filter}
                    {amount_null_filter}

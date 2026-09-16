@@ -54,13 +54,37 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
     if amount_null == '2':
         amount_null_filter = f"AND amount_numeric = '0'"
 
+    # По дате формирования / окончания лечения — период задаётся датами,
+    # фильтр по отчётному году/месяцу не применяем (иначе «все месяцы года»).
+    use_date_period = bool(
+        (initial_input_date_start and initial_input_date_end)
+        or (treatment_start and treatment_end)
+    )
+
     if treatment_start and treatment_end:
-        treatment = (f"AND to_date(treatment_end, 'DD-MM-YYYY') BETWEEN to_date('{treatment_start}', "
-                     f"'DD-MM-YYYY') and to_date('{treatment_end}', 'DD-MM-YYYY')")
+        treatment = (
+            f"AND CASE WHEN treatment_end ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' "
+            f"THEN to_date(treatment_end, 'DD-MM-YYYY') ELSE NULL END "
+            f"BETWEEN to_date('{treatment_start}', 'DD-MM-YYYY') "
+            f"AND to_date('{treatment_end}', 'DD-MM-YYYY')"
+        )
 
     if initial_input_date_start and initial_input_date_end:
-        initial_input = (f"AND to_date(initial_input_date, 'DD-MM-YYYY') BETWEEN to_date('{initial_input_date_start}', "
-                         f"'DD-MM-YYYY') and to_date('{initial_input_date_end}', 'DD-MM-YYYY')")
+        initial_input = (
+            f"AND CASE WHEN initial_input_date ~ '^\\d{{2}}-\\d{{2}}-\\d{{4}}$' "
+            f"THEN to_date(initial_input_date, 'DD-MM-YYYY') ELSE NULL END "
+            f"BETWEEN to_date('{initial_input_date_start}', 'DD-MM-YYYY') "
+            f"AND to_date('{initial_input_date_end}', 'DD-MM-YYYY')"
+        )
+
+    months_sql = months or ", ".join(str(m) for m in range(1, 13))
+    if use_date_period:
+        period_filter = "TRUE"
+    else:
+        period_filter = (
+            f"report_year = '{year}' "
+            f"AND (report_month_number IN ({months_sql}){status4_override_clause})"
+        )
 
     return f"""
         WITH report_data AS (SELECT oms.*,
@@ -210,8 +234,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
      ),
             oms as (select *
                     from oms_data
-                     WHERE report_year = '{year}' 
-                           AND (report_month_number IN ({months}){status4_override_clause})
+                     WHERE {period_filter}
                                {inogorodniy_filter}
                                {sanction_filter}
                                {amount_null_filter}
