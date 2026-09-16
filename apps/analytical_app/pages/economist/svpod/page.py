@@ -1,4 +1,5 @@
 from datetime import datetime
+import colorsys
 import time
 from functools import lru_cache
 
@@ -86,13 +87,21 @@ _SVPOD_MONTHLY_STYLE_HEADER = {
 
 
 def _svpod_monthly_column_styles(extra=None):
-    """Ширины колонок помесячной таблицы: узкие месяц/%, деньги без переноса."""
+    """Ширины колонок + визуальное разделение групп Итог | Факт | План 1/12."""
     styles = [
         {
             "if": {"column_id": "month"},
             "minWidth": "100px",
             "width": "100px",
             "maxWidth": "116px",
+            "textAlign": "center",
+            "fontWeight": "600",
+        },
+        {
+            "if": {"column_id": "Тип"},
+            "minWidth": "88px",
+            "width": "92px",
+            "maxWidth": "110px",
             "textAlign": "center",
         },
         {
@@ -102,8 +111,67 @@ def _svpod_monthly_column_styles(extra=None):
             "maxWidth": "68px",
             "textAlign": "right",
         },
+        # Группа «Итог»
+        {
+            "if": {"column_id": "План"},
+            "borderLeft": "2px solid #b8c4d4",
+            "backgroundColor": "#f7f9fc",
+            "minWidth": "118px",
+            "width": "128px",
+            "maxWidth": "168px",
+            "textAlign": "right",
+        },
+        {
+            "if": {"column_id": "Факт"},
+            "backgroundColor": "#f7f9fc",
+            "fontWeight": "600",
+            "minWidth": "118px",
+            "width": "128px",
+            "maxWidth": "168px",
+            "textAlign": "right",
+        },
+        {
+            "if": {"column_id": "%"},
+            "backgroundColor": "#f7f9fc",
+        },
+        {
+            "if": {"column_id": "Остаток"},
+            "backgroundColor": "#f7f9fc",
+            "fontWeight": "600",
+            "minWidth": "118px",
+            "width": "128px",
+            "maxWidth": "168px",
+            "textAlign": "right",
+        },
+        # Группа «Факт по статусам»
+        {
+            "if": {"column_id": "новые"},
+            "borderLeft": "2px solid #b8c4d4",
+            "minWidth": "118px",
+            "width": "128px",
+            "maxWidth": "168px",
+            "textAlign": "right",
+        },
+        # Группа «План 1/12»
+        {
+            "if": {"column_id": "План 1/12"},
+            "borderLeft": "2px solid #b8c4d4",
+            "backgroundColor": "#f3f4f6",
+            "minWidth": "118px",
+            "width": "128px",
+            "maxWidth": "168px",
+            "textAlign": "right",
+        },
+        {
+            "if": {"column_id": "Входящий остаток"},
+            "backgroundColor": "#f3f4f6",
+            "minWidth": "118px",
+            "width": "128px",
+            "maxWidth": "168px",
+            "textAlign": "right",
+        },
     ]
-    for cid in _SVPOD_MONEY_COL_IDS:
+    for cid in ("в_тфомс", "оплачено", "исправлено", "отказано", "отменено"):
         styles.append(
             {
                 "if": {"column_id": cid},
@@ -115,6 +183,146 @@ def _svpod_monthly_column_styles(extra=None):
         )
     if extra:
         styles.extend(extra)
+    return styles
+
+
+_SVPOD_HEADER_GROUP_STYLES = [
+    {"if": {"column_id": "План"}, "borderLeft": "2px solid #b8c4d4", "backgroundColor": "#e8eef6"},
+    {"if": {"column_id": "Факт"}, "backgroundColor": "#e8eef6"},
+    {"if": {"column_id": "%"}, "backgroundColor": "#e8eef6"},
+    {"if": {"column_id": "Остаток"}, "backgroundColor": "#e8eef6"},
+    {"if": {"column_id": "новые"}, "borderLeft": "2px solid #b8c4d4", "backgroundColor": "#eef2f0"},
+    {"if": {"column_id": "в_тфомс"}, "backgroundColor": "#eef2f0"},
+    {"if": {"column_id": "оплачено"}, "backgroundColor": "#eef2f0"},
+    {"if": {"column_id": "исправлено"}, "backgroundColor": "#eef2f0"},
+    {"if": {"column_id": "отказано"}, "backgroundColor": "#eef2f0"},
+    {"if": {"column_id": "отменено"}, "backgroundColor": "#eef2f0"},
+    {"if": {"column_id": "План 1/12"}, "borderLeft": "2px solid #b8c4d4", "backgroundColor": "#ececef"},
+    {"if": {"column_id": "Входящий остаток"}, "backgroundColor": "#ececef"},
+    {"if": {"column_id": "Тип"}, "backgroundColor": "#e8e8e8"},
+]
+
+
+def _parse_style_number(value) -> float | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).replace(" ", "").replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+
+
+def _pct_plan_gradient_style(pct: float) -> dict:
+    """
+    Градиент % выполнения плана: фиксированная шкала 0→100.
+    0% — красный, 50% — жёлтый, 100%+ — зелёный.
+    Относительный min/max по таблице не используем: иначе 94–99%
+    выглядели бы как «плохо».
+    """
+    t = max(0.0, min(float(pct), 100.0)) / 100.0
+    # Hue: 0° red → 120° green
+    hue = t * (120.0 / 360.0)
+    # Пастельный фон + чуть насыщеннее у краёв шкалы
+    lightness = 0.92 - 0.06 * abs(t - 0.5) * 2
+    saturation = 0.45 + 0.15 * (1.0 - abs(t - 0.5) * 2)
+    r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
+    bg = f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
+    # Текст темнее того же оттенка
+    r2, g2, b2 = colorsys.hls_to_rgb(hue, 0.28, 0.55)
+    fg = f"#{int(r2 * 255):02x}{int(g2 * 255):02x}{int(b2 * 255):02x}"
+    return {
+        "backgroundColor": bg,
+        "color": fg,
+        "fontWeight": "700",
+    }
+
+
+def _svpod_detail_style_data_conditional(fact_data, *, mode: str) -> list[dict]:
+    """Раскраска: месяцы / Тип / итоги / акценты Остаток и градиент %."""
+    styles: list[dict] = []
+    mode = mode or "volumes"
+
+    # Чередование месяцев (только одиночные режимы)
+    if mode != "both":
+        for idx, row in enumerate(fact_data or []):
+            m = row.get("month")
+            if isinstance(m, int) and m % 2 == 0:
+                styles.append({
+                    "if": {"row_index": idx},
+                    "backgroundColor": "#f7f8fa",
+                })
+
+    # Режим общий: Объемы / Финансы
+    if mode == "both":
+        styles.extend([
+            {
+                "if": {"filter_query": '{Тип} = "Объемы"'},
+                "backgroundColor": "#f7f7f8",
+            },
+            {
+                "if": {"filter_query": '{Тип} = "Финансы"'},
+                "backgroundColor": "#fff8ef",
+            },
+        ])
+
+    # Итоговые строки
+    styles.extend([
+        {
+            "if": {"filter_query": '{month} = "Нарастающе"'},
+            "backgroundColor": "#e8f1fb",
+            "fontWeight": "600",
+            "borderTop": "2px solid #9db4d0",
+        },
+        {
+            "if": {"filter_query": '{month} = "Год"'},
+            "backgroundColor": "#d9e8f7",
+            "fontWeight": "700",
+            "borderTop": "2px solid #7a9cc0",
+        },
+    ])
+    if mode == "both":
+        styles.extend([
+            {
+                "if": {"filter_query": '{month} = "Нарастающе" && {Тип} = "Объемы"'},
+                "backgroundColor": "#dde8f5",
+                "fontWeight": "600",
+            },
+            {
+                "if": {"filter_query": '{month} = "Нарастающе" && {Тип} = "Финансы"'},
+                "backgroundColor": "#e6eef8",
+                "fontWeight": "600",
+            },
+            {
+                "if": {"filter_query": '{month} = "Год" && {Тип} = "Объемы"'},
+                "backgroundColor": "#cfe0f2",
+                "fontWeight": "700",
+            },
+            {
+                "if": {"filter_query": '{month} = "Год" && {Тип} = "Финансы"'},
+                "backgroundColor": "#d4e3f4",
+                "fontWeight": "700",
+            },
+        ])
+
+    # Акценты по ячейкам — после фонов строк
+    for idx, row in enumerate(fact_data or []):
+        ost = _parse_style_number(row.get("Остаток"))
+        if ost is not None and ost < 0:
+            styles.append({
+                "if": {"row_index": idx, "column_id": "Остаток"},
+                "backgroundColor": "#fde8e8",
+                "color": "#9b1c1c",
+                "fontWeight": "700",
+            })
+        pct = _parse_style_number(row.get("%"))
+        if pct is not None:
+            styles.append({
+                "if": {"row_index": idx, "column_id": "%"},
+                **_pct_plan_gradient_style(pct),
+            })
+
     return styles
 
 
@@ -541,6 +749,7 @@ current_report_tab = html.Div(
             style_cell=_SVPOD_MONTHLY_STYLE_CELL,
             style_cell_conditional=_svpod_monthly_column_styles(),
             style_header=_SVPOD_MONTHLY_STYLE_HEADER,
+            style_header_conditional=_SVPOD_HEADER_GROUP_STYLES,
         ),
         html.Div(
             id=f'loading-status-{type_page}',
@@ -1612,6 +1821,7 @@ def _svpod_detail_columns(*, with_type: bool = False):
 @app.callback(
     [Output(f'result-table1-{type_page}', 'columns'),
      Output(f'result-table1-{type_page}', 'data'),
+     Output(f'result-table1-{type_page}', 'style_data_conditional'),
      Output(f'loading-output-{type_page}', 'children'),
      Output(f'applied-filters-{type_page}', 'children'),
      Output(f'loading-status-{type_page}', 'children'),
@@ -1719,7 +1929,8 @@ def update_table_with_plan_and_balance(n_clicks,
     )
 
     title = _indicator_path_title(selected_levels, selected_level_options)
-    return columns, fact_data, loading_output, applied, status_text, title
+    style_rows = _svpod_detail_style_data_conditional(fact_data, mode=mode)
+    return columns, fact_data, style_rows, loading_output, applied, status_text, title
 
 
 # Callback для активации кнопки детализации при выборе строки
