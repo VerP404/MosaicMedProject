@@ -8,6 +8,7 @@ from django.test import SimpleTestCase
 from apps.analytical_app.pages.economist.svpod.page import (
     _as_float,
     _month_closed_enabled,
+    _svpod_carry_ispravleno,
     compute_svpod_month_fact,
     svpod_month_is_open,
 )
@@ -111,6 +112,7 @@ class SvpodMonthFactTests(SimpleTestCase):
         self.assertEqual(fact, 65.0)
 
     def test_sept15_august_paid_only(self):
+        """После 10-го август закрыт — в Факте только оплачено."""
         fact = compute_svpod_month_fact(
             _ROW,
             8,
@@ -121,6 +123,62 @@ class SvpodMonthFactTests(SimpleTestCase):
             manually_selected=False,
         )
         self.assertEqual(fact, 30.0)
+
+    def test_sept17_carry_ispravleno_into_september(self):
+        """17 сентября: исправлено августа уходит в Факт сентября."""
+        rows = {
+            8: {"исправлено": 5696, "оплачено": 4669, "новые": 0, "в_тфомс": 0},
+            9: {"исправлено": 0, "оплачено": 0, "новые": 2550, "в_тфомс": 0},
+        }
+        carry = _svpod_carry_ispravleno(
+            rows,
+            reporting_month=9,
+            current_day=17,
+            calendar_month=9,
+            month_closed=False,
+            manually_selected=False,
+        )
+        self.assertEqual(carry, 5696.0)
+
+        sept = compute_svpod_month_fact(
+            rows[9],
+            9,
+            reporting_month=9,
+            current_day=17,
+            month_closed=False,
+            calendar_month=9,
+            manually_selected=False,
+            carry_ispravleno=carry,
+        )
+        self.assertEqual(sept, 2550.0 + 5696.0)
+
+        aug = compute_svpod_month_fact(
+            rows[8],
+            8,
+            reporting_month=9,
+            current_day=17,
+            month_closed=False,
+            calendar_month=9,
+            manually_selected=False,
+        )
+        self.assertEqual(aug, 4669.0)
+
+    def test_grace_august_keeps_own_fixed_not_in_carry(self):
+        """До 10-го августа своё исправлено остаётся в августе, не в переносе."""
+        rows = {
+            7: {"исправлено": 100, "оплачено": 10, "новые": 0, "в_тфомс": 0},
+            8: {"исправлено": 50, "оплачено": 20, "новые": 0, "в_тфомс": 0},
+            9: {"исправлено": 0, "оплачено": 0, "новые": 5, "в_тфомс": 0},
+        }
+        carry = _svpod_carry_ispravleno(
+            rows,
+            reporting_month=9,
+            current_day=8,
+            calendar_month=9,
+            month_closed=False,
+            manually_selected=False,
+        )
+        self.assertEqual(carry, 100.0)  # только июль; август ещё открыт
 
     def test_switch_parser(self):
         self.assertTrue(_month_closed_enabled(["closed"]))

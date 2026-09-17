@@ -4,7 +4,7 @@ import time
 from functools import lru_cache
 
 from dash import html, dcc, Output, Input, State, ALL, exceptions
-from dash.dash_table.Format import Format, Group, Scheme
+from dash.dash_table.Format import Format, Group, Scheme, Sign
 import dash_bootstrap_components as dbc
 import pandas as pd
 from dash.exceptions import PreventUpdate
@@ -214,23 +214,48 @@ def _parse_style_number(value) -> float | None:
         return None
 
 
+def _pct_to_hue_factor(pct: float) -> float:
+    """
+    Нелинейная шкала 0..1 для hue 0°→120°.
+    Зелёный появляется только ближе к 100%; ~50% ещё красно-оранжевый.
+    """
+    p = max(0.0, min(float(pct), 100.0))
+    if p <= 50:
+        # 0→50: красный → оранжево-красный
+        return (p / 50.0) * 0.20
+    if p <= 75:
+        # 50→75: оранжевый → жёлто-оранжевый
+        return 0.20 + (p - 50.0) / 25.0 * 0.22
+    if p <= 90:
+        # 75→90: жёлтый
+        return 0.42 + (p - 75.0) / 15.0 * 0.20
+    if p <= 97:
+        # 90→97: жёлто-зелёный (94 ещё не «как 100»)
+        return 0.62 + (p - 90.0) / 7.0 * 0.22
+    # 97→100: насыщенный зелёный
+    return 0.84 + (p - 97.0) / 3.0 * 0.16
+
+
 def _pct_plan_gradient_style(pct: float) -> dict:
     """
-    Градиент % выполнения плана: фиксированная шкала 0→100.
-    0% — красный, 50% — жёлтый, 100%+ — зелёный.
-    Относительный min/max по таблице не используем: иначе 94–99%
-    выглядели бы как «плохо».
+    Градиент % выполнения плана (фикс. шкала 0→100, нелинейная):
+    0 — красный, ~50 — оранжевый, ~90 — жёлтый, 97+ — зелёный.
     """
-    t = max(0.0, min(float(pct), 100.0)) / 100.0
-    # Hue: 0° red → 120° green
+    t = _pct_to_hue_factor(pct)
     hue = t * (120.0 / 360.0)
-    # Пастельный фон + чуть насыщеннее у краёв шкалы
-    lightness = 0.92 - 0.06 * abs(t - 0.5) * 2
-    saturation = 0.45 + 0.15 * (1.0 - abs(t - 0.5) * 2)
+    # Ниже 90% — насыщеннее (хуже видно), у зелени — спокойнее
+    if pct < 90:
+        lightness = 0.88
+        saturation = 0.62
+    elif pct < 97:
+        lightness = 0.90
+        saturation = 0.50
+    else:
+        lightness = 0.88
+        saturation = 0.48
     r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
     bg = f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
-    # Текст темнее того же оттенка
-    r2, g2, b2 = colorsys.hls_to_rgb(hue, 0.28, 0.55)
+    r2, g2, b2 = colorsys.hls_to_rgb(hue, 0.26, 0.60)
     fg = f"#{int(r2 * 255):02x}{int(g2 * 255):02x}{int(b2 * 255):02x}"
     return {
         "backgroundColor": bg,
@@ -240,7 +265,7 @@ def _pct_plan_gradient_style(pct: float) -> dict:
 
 
 def _svpod_detail_style_data_conditional(fact_data, *, mode: str) -> list[dict]:
-    """Раскраска: месяцы / Тип / итоги / акценты Остаток и градиент %."""
+    """Раскраска: месяцы / Тип / итоги / градиент %."""
     styles: list[dict] = []
     mode = mode or "volumes"
 
@@ -308,14 +333,6 @@ def _svpod_detail_style_data_conditional(fact_data, *, mode: str) -> list[dict]:
 
     # Акценты по ячейкам — после фонов строк
     for idx, row in enumerate(fact_data or []):
-        ost = _parse_style_number(row.get("Остаток"))
-        if ost is not None and ost < 0:
-            styles.append({
-                "if": {"row_index": idx, "column_id": "Остаток"},
-                "backgroundColor": "#fde8e8",
-                "color": "#9b1c1c",
-                "fontWeight": "700",
-            })
         pct = _parse_style_number(row.get("%"))
         if pct is not None:
             styles.append({
@@ -1445,17 +1462,51 @@ def _svpod_money_format() -> Format:
     )
 
 
-def _format_money_display(value, *, precision: int = 2) -> str:
+def _format_money_display(value, *, precision: int = 2, signed: bool = False, grouped: bool = True) -> str:
     """Строка с разрядами через пробел — для смешанной таблицы Объемы+Финансы."""
     try:
         num = float(value or 0)
     except (TypeError, ValueError):
         return str(value) if value is not None else ""
-    if precision == 0:
-        formatted = f"{num:,.0f}"
+    if grouped:
+        if precision == 0:
+            formatted = f"{num:,.0f}"
+        else:
+            formatted = f"{num:,.{precision}f}"
+        formatted = formatted.replace(",", " ")
     else:
-        formatted = f"{num:,.{precision}f}"
-    return formatted.replace(",", " ")
+        if precision == 0:
+            formatted = f"{num:.0f}"
+        else:
+            formatted = f"{num:.{precision}f}"
+    if signed and num > 0 and not formatted.startswith("+"):
+        formatted = f"+{formatted}"
+    return formatted
+
+
+def _format_ostatok_signed(value, *, finance: bool) -> str:
+    """
+    Остаток = Факт − План.
+    «−» — недобор (ещё надо доделать),
+    «+» — перевыполнение (сверх плана).
+    Разделитель разрядов — только для финансов.
+    """
+    return _format_money_display(
+        value,
+        precision=2 if finance else 0,
+        signed=True,
+        grouped=finance,
+    )
+
+
+def _apply_ostatok_signed_display(rows: list[dict], *, finance: bool) -> list[dict]:
+    out = []
+    for row in rows or []:
+        r = dict(row)
+        if "Остаток" in r:
+            r["Остаток"] = _format_ostatok_signed(r["Остаток"], finance=finance)
+        out.append(r)
+    return out
 
 
 def _format_finance_rows_for_mixed_table(rows: list[dict]) -> list[dict]:
@@ -1464,7 +1515,11 @@ def _format_finance_rows_for_mixed_table(rows: list[dict]) -> list[dict]:
     for row in rows:
         r = dict(row)
         for cid in _SVPOD_MONEY_COL_IDS:
-            if cid in r:
+            if cid not in r:
+                continue
+            if cid == "Остаток":
+                r[cid] = _format_ostatok_signed(r[cid], finance=True)
+            else:
                 r[cid] = _format_money_display(r[cid], precision=2)
         if "%" in r:
             r["%"] = _format_money_display(r["%"], precision=1)
@@ -1473,19 +1528,29 @@ def _format_finance_rows_for_mixed_table(rows: list[dict]) -> list[dict]:
 
 
 def _format_svpod_columns(columns, *, finance: bool):
-    """В режиме финансов: 2 знака, разряды. % — 1 знак."""
-    if not finance:
-        return columns
+    """В режиме финансов: 2 знака, разряды. % — 1 знак. Остаток — всегда со знаком."""
     money_fmt = _svpod_money_format()
     pct_fmt = Format(scheme=Scheme.fixed, precision=1)
+    ost_fmt = Format(
+        scheme=Scheme.fixed,
+        precision=2 if finance else 0,
+        group=Group.yes if finance else Group.no,
+        groups=3,
+        group_delimiter=" ",
+        decimal_delimiter=".",
+        sign=Sign.positive,
+    )
     out = []
     for col in columns:
         col = dict(col)
         cid = col.get("id")
-        if cid in _SVPOD_MONEY_COL_IDS:
+        if cid == "Остаток":
+            col["type"] = "numeric"
+            col["format"] = ost_fmt
+        elif finance and cid in _SVPOD_MONEY_COL_IDS:
             col["type"] = "numeric"
             col["format"] = money_fmt
-        elif cid == "%":
+        elif finance and cid == "%":
             col["type"] = "numeric"
             col["format"] = pct_fmt
         out.append(col)
@@ -1527,6 +1592,7 @@ def compute_svpod_month_fact(
     month_closed: bool,
     calendar_month: int | None = None,
     manually_selected: bool = False,
+    carry_ispravleno: float = 0.0,
 ) -> float:
     """
     Факт месяца для вкладки «выполнение по месяцам».
@@ -1537,8 +1603,11 @@ def compute_svpod_month_fact(
       - будущие: 0
 
     month_closed=False:
-      - отчётный месяц (и календарный предыдущий до 10-го): новые+ТФОМС+оплачено+исправлено этого месяца
-      - более ранние: только оплачено
+      - отчётный месяц (и календарный предыдущий до 10-го):
+        новые + ТФОМС + оплачено + исправлено этого месяца
+      - в отчётный месяц дополнительно: исправлено из уже закрытых прошлых месяцев
+        (недоделанные исправления «переезжают» в текущий Факт)
+      - более ранние закрытые: только оплачено
       - ручной выбор месяца: только оплачено
     """
     paid = float(row.get("оплачено", 0) or 0)
@@ -1564,10 +1633,50 @@ def compute_svpod_month_fact(
         month_closed=False,
         manually_selected=manually_selected,
     ):
-        return new_ + tfoms + paid + fixed
+        base = new_ + tfoms + paid + fixed
+        # Перенос исправлений прошлых месяцев — только в отчётный месяц
+        if month == reporting_month:
+            return base + float(carry_ispravleno or 0.0)
+        return base
     if month < reporting_month:
         return paid
     return 0.0
+
+
+def _svpod_carry_ispravleno(
+    rows_by_month: dict,
+    *,
+    reporting_month: int,
+    current_day: int,
+    calendar_month: int | None,
+    month_closed: bool,
+    manually_selected: bool,
+) -> float:
+    """
+    Сумма «исправлено» по месяцам, которые уже закрыты для открытой формулы.
+    Эти объёмы идут в Факт отчётного (текущего) месяца.
+    """
+    if month_closed or manually_selected:
+        return 0.0
+    total = 0.0
+    for m, row in (rows_by_month or {}).items():
+        try:
+            month = int(m)
+        except (TypeError, ValueError):
+            continue
+        if month >= reporting_month:
+            continue
+        if svpod_month_is_open(
+            month,
+            reporting_month=reporting_month,
+            current_day=current_day,
+            calendar_month=calendar_month,
+            month_closed=False,
+            manually_selected=False,
+        ):
+            continue
+        total += _as_float(row.get("исправлено", 0))
+    return total
 
 
 def _as_float(value, default: float = 0.0) -> float:
@@ -1701,6 +1810,15 @@ def _build_svpod_detail_rows(
         fact_data.append(row_template)
 
     incoming_balance = 0.0
+    rows_by_month = {r["month"]: r for r in fact_data if isinstance(r.get("month"), int)}
+    carry_fixed = _svpod_carry_ispravleno(
+        rows_by_month,
+        reporting_month=current_month,
+        current_day=current_day,
+        calendar_month=calendar_month,
+        month_closed=month_closed,
+        manually_selected=manually_selected,
+    )
     for row in fact_data:
         m = row["month"]
         row["Входящий остаток"] = float(incoming_balance)
@@ -1714,13 +1832,16 @@ def _build_svpod_detail_rows(
                 month_closed=month_closed,
                 calendar_month=calendar_month,
                 manually_selected=manually_selected,
+                carry_ispravleno=carry_fixed if m == current_month else 0.0,
             )
         )
         plan_val = _as_float(row["План"])
         fact_val = _as_float(row["Факт"])
         row["%"] = round(fact_val / plan_val * 100, 1) if plan_val > 0 else 0.0
-        row["Остаток"] = plan_val - fact_val
-        incoming_balance = row["Остаток"]
+        # Факт − План: минус = ещё надо доделать, плюс = сверх плана
+        row["Остаток"] = fact_val - plan_val
+        # В следующий месяц переносим только недобор (неиспользованный план)
+        incoming_balance = max(0.0, plan_val - fact_val)
 
     if fact_data:
         total_plan_12 = sum(_as_float(r["План 1/12"]) for r in fact_data)
@@ -1731,7 +1852,7 @@ def _build_svpod_detail_rows(
             "Входящий остаток": 0.0,
             "План": total_plan_12,
             "Факт": total_fact,
-            "Остаток": _as_float(fact_data[-1]["Остаток"]),
+            "Остаток": total_fact - total_plan_12,
             "%": round(total_fact / total_plan_12 * 100, 1) if total_plan_12 > 0 else 0.0,
             "новые": sum(_as_float(r["новые"]) for r in fact_data),
             "в_тфомс": sum(_as_float(r["в_тфомс"]) for r in fact_data),
@@ -1751,7 +1872,7 @@ def _build_svpod_detail_rows(
             "Входящий остаток": 0.0,
             "План": year_plan,
             "Факт": total_fact_overall,
-            "Остаток": year_plan - total_fact_overall,
+            "Остаток": total_fact_overall - year_plan,
             "%": round(total_fact_overall / year_plan * 100, 1) if year_plan else 0.0,
             "новые": sum(_as_float(r["новые"]) for r in month_rows),
             "в_тфомс": sum(_as_float(r["в_тфомс"]) for r in month_rows),
@@ -1805,7 +1926,7 @@ def _svpod_detail_columns(*, with_type: bool = False):
         {"name": ["Итог", "План"], "id": "План"},
         {"name": ["Итог", "Факт"], "id": "Факт"},
         {"name": ["Итог", "%"], "id": "%"},
-        {"name": ["Итог", "Остаток"], "id": "Остаток"},
+        {"name": ["Итог", "К плану (−недобор/+сверх)"], "id": "Остаток"},
         {"name": ["Факт", "Новые"], "id": "новые"},
         {"name": ["Факт", "В ТФОМС"], "id": "в_тфомс"},
         {"name": ["Факт", "Оплачено"], "id": "оплачено"},
@@ -1895,6 +2016,7 @@ def update_table_with_plan_and_balance(n_clicks,
         finance_rows = _build_svpod_detail_rows(mode="finance", **build_kwargs)
         unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
         finance_rows = scale_rows_money(finance_rows, unit)
+        volume_rows = _apply_ostatok_signed_display(volume_rows, finance=False)
         finance_rows = _format_finance_rows_for_mixed_table(finance_rows)
         fact_data = _merge_svpod_both_rows(volume_rows, finance_rows)
         columns = _svpod_detail_columns(with_type=True)
@@ -1905,6 +2027,9 @@ def update_table_with_plan_and_balance(n_clicks,
             unit = normalize_finance_unit(finance_unit or get_default_finance_unit())
             fact_data = scale_rows_money(fact_data, unit)
             columns = _format_svpod_columns(columns, finance=True)
+        else:
+            # Объемы: у Остатка явный знак +/−
+            columns = _format_svpod_columns(columns, finance=False)
     execution_time = time.time() - start_time
 
     if execution_time < 1:
@@ -2062,6 +2187,22 @@ def show_svpod_details(n_clicks, viewport_data, virtual_data, table_data, active
                         month_conditions.append(
                             f"(report_month_number = {m} AND {open_status_sql})"
                         )
+                        # В отчётный месяц — ещё исправлено из закрытых прошлых
+                        if m == reporting_month:
+                            for pm in range(1, reporting_month):
+                                if svpod_month_is_open(
+                                    pm,
+                                    reporting_month=reporting_month,
+                                    current_day=current_day,
+                                    calendar_month=calendar_month,
+                                    month_closed=False,
+                                    manually_selected=manually_selected,
+                                ):
+                                    continue
+                                month_conditions.append(
+                                    f"(report_month_number = {pm} AND "
+                                    f"status IN ('4', '6', '8', '19'))"
+                                )
                     else:
                         month_conditions.append(
                             f"(report_month_number = {m} AND status = '3')"
@@ -2094,7 +2235,29 @@ def show_svpod_details(n_clicks, viewport_data, virtual_data, table_data, active
                     month_closed=False,
                     manually_selected=manually_selected,
                 ):
-                    status_filter = list(_SVPOD_OPEN_STATUSES)
+                    if month_num == reporting_month:
+                        # отчётный: свои открытые + исправлено из закрытых прошлых
+                        parts = [
+                            f"(report_month_number = {month_num} AND {open_status_sql})"
+                        ]
+                        for pm in range(1, reporting_month):
+                            if svpod_month_is_open(
+                                pm,
+                                reporting_month=reporting_month,
+                                current_day=current_day,
+                                calendar_month=calendar_month,
+                                month_closed=False,
+                                manually_selected=manually_selected,
+                            ):
+                                continue
+                            parts.append(
+                                f"(report_month_number = {pm} AND "
+                                f"status IN ('4', '6', '8', '19'))"
+                            )
+                        status_filter = f"COMPLEX_LOGIC:{':'.join(parts)}"
+                        filter_month = None
+                    else:
+                        status_filter = list(_SVPOD_OPEN_STATUSES)
                 else:
                     status_filter = ['3']
         elif column_id == 'новые':
@@ -2400,17 +2563,20 @@ def generate_cumulative_report(
                             # Для других месяцев: только оплаченные (статус 3)
                             month_fact = month_data.get("оплачено", 0) or 0
                     else:
-                        # Режим "Предъявленные" - текущая логика
+                        # Режим "Предъявленные"
                         if m < current_month:
-                            # Для месяцев < отчетного: только оплаченные (статус 3)
                             month_fact = month_data.get("оплачено", 0) or 0
                         elif m == current_month:
-                            # Для отчетного месяца: новые+в_тфомс+оплачено+исправлено
+                            past_fixed = sum(
+                                (fact_dict.get(pm, {}).get("исправлено", 0) or 0)
+                                for pm in range(1, current_month)
+                            )
                             month_fact = (
                                 (month_data.get("новые", 0) or 0) +
                                 (month_data.get("в_тфомс", 0) or 0) +
                                 (month_data.get("оплачено", 0) or 0) +
-                                (month_data.get("исправлено", 0) or 0)
+                                (month_data.get("исправлено", 0) or 0) +
+                                past_fixed
                             )
                         else:
                             month_fact = 0

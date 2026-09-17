@@ -983,17 +983,20 @@ def get_cumulative_report_for_all_groups(selected_year, mode='volumes', unique_f
                     # Для других месяцев: только оплаченные (статус 3)
                     month_fact = month_data.get("оплачено", 0) or 0
             else:
-                # Режим "Предъявленные" - текущая логика
+                # Режим "Предъявленные"
                 if m < current_month:
-                    # Для месяцев < отчетного: только оплаченные (статус 3)
                     month_fact = month_data.get("оплачено", 0) or 0
                 elif m == current_month:
-                    # Для отчетного месяца: новые+в_тфомс+оплачено+исправлено этого месяца
+                    past_fixed = sum(
+                        (fact_dict.get(pm, {}).get("исправлено", 0) or 0)
+                        for pm in range(1, current_month)
+                    )
                     month_fact = (
                         (month_data.get("новые", 0) or 0) +
                         (month_data.get("в_тфомс", 0) or 0) +
                         (month_data.get("оплачено", 0) or 0) +
-                        (month_data.get("исправлено", 0) or 0)
+                        (month_data.get("исправлено", 0) or 0) +
+                        past_fixed
                     )
                 else:
                     month_fact = 0
