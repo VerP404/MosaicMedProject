@@ -334,20 +334,40 @@ def delete_preset(preset_id: int) -> None:
         )
 
 
+MAX_PRINT_SECTIONS = 12
+MIN_PRINT_SECTIONS = 1
+
 DEFAULT_PRINT_CONFIG = {
-    "columns": 3,
+    # Столбцов разделов на листе (разделы раскладываются в сетку)
+    "page_columns": 2,
+    # Таблиц индикаторов в ряду внутри раздела (по умолчанию)
+    "columns": 2,
     "page_orientation": "landscape",
     "sections": [
-        {"title": "Лечебно-диагностическая работа", "items": []},
-        {"title": "Профилактическая работа", "items": []},
+        {"title": "Лечебно-диагностическая работа", "item_columns": 2, "items": []},
+        {"title": "Профилактическая работа", "item_columns": 2, "items": []},
     ],
 }
 
 
+def _clamp_item_columns(value, default: int = 2) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        n = default
+    return max(1, min(4, n))
+
+
 def normalize_print_config(config: dict | None) -> dict:
+    """
+    Макет бланка:
+    - sections — именованные блоки (сколько угодно, до MAX);
+    - page_columns (1..4) — во сколько столбцов раскладывать разделы на листе;
+    - section.item_columns / columns (1..4) — сколько таблиц индикаторов в ряду.
+    """
     cfg = dict(config or {})
-    columns = int(cfg.get("columns") or 3)
-    columns = max(1, min(4, columns))
+    columns = _clamp_item_columns(cfg.get("columns"), 2)
+    page_columns = _clamp_item_columns(cfg.get("page_columns"), 2)
     orientation = cfg.get("page_orientation") or "landscape"
     if orientation not in ("landscape", "portrait"):
         orientation = "landscape"
@@ -364,18 +384,38 @@ def normalize_print_config(config: dict | None) -> dict:
                     "indicator_id": iid,
                     "short_title": (it.get("short_title") or "").strip() or str(iid),
                     "show_of_year": bool(it.get("show_of_year")),
+                    "source_label": (it.get("source_label") or "").strip(),
                 }
             )
+        item_columns = _clamp_item_columns(
+            sec.get("item_columns", columns),
+            columns,
+        )
         sections.append(
             {
                 "title": (sec.get("title") or "").strip() or "Раздел",
+                "item_columns": item_columns,
                 "items": items,
             }
         )
     if not sections:
-        sections = list(DEFAULT_PRINT_CONFIG["sections"])
+        sections = [
+            {
+                "title": "Раздел 1",
+                "item_columns": columns,
+                "items": [],
+            }
+        ]
+    if len(sections) > MAX_PRINT_SECTIONS:
+        keep = sections[:MAX_PRINT_SECTIONS]
+        extra_items = []
+        for sec in sections[MAX_PRINT_SECTIONS:]:
+            extra_items.extend(sec.get("items") or [])
+        keep[-1]["items"] = list(keep[-1].get("items") or []) + extra_items
+        sections = keep
     return {
         "columns": columns,
+        "page_columns": page_columns,
         "page_orientation": orientation,
         "sections": sections,
     }

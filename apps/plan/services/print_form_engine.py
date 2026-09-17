@@ -1,6 +1,7 @@
 """Сборка данных и HTML печатного бланка «Выполнение объёмных показателей»."""
 from __future__ import annotations
 
+from datetime import datetime
 from html import escape
 from typing import Any, Sequence
 
@@ -11,7 +12,10 @@ from apps.analytical_app.components.navbar import get_organization_name
 from apps.analytical_app.query_executor import engine
 from apps.plan.services.building_report_engine import (
     BuildReportParams,
+    accumulate_pair,
     build_long_report,
+    fetch_fact_by_building,
+    resolve_payment_type,
 )
 
 MONTH_NAMES_RU = {
@@ -113,6 +117,92 @@ def collect_indicator_ids(config: dict) -> list[int]:
     return ids
 
 
+def _append_unassigned_building_rows(
+    by_group: dict[int, list[dict]],
+    *,
+    year: int,
+    reporting_month: int,
+    indicator_ids: list[int],
+    payment_type: str,
+    period_closed: bool,
+    metric: str,
+    unique_flag: bool,
+) -> None:
+    """
+    Факт без привязки к корпусу (или корпус не из плана) → строка «без корпуса», план 0.
+    """
+    from apps.analytical_app.pages.economist.svpod.query import get_filter_conditions
+
+    effective = resolve_payment_type(payment_type, period_closed)
+    for gid in indicator_ids:
+        filter_conditions = get_filter_conditions([gid], year)
+        try:
+            fact_all = fetch_fact_by_building(
+                engine,
+                year,
+                gid,
+                None,  # все корпуса, включая NULL / «Без корпуса»
+                metric,
+                unique_flag,
+                filter_conditions,
+            )
+        except Exception:
+            continue
+        if not fact_all:
+            continue
+
+        known_bids = {
+            int(r["building_id"])
+            for r in by_group.get(gid, [])
+            if r.get("building_id") is not None
+        }
+        unassigned_by_month: dict[int, dict] = {}
+        for row in fact_all:
+            bid = row.get("building_id")
+            try:
+                bid_int = int(bid) if bid is not None and str(bid).strip() != "" else None
+            except (TypeError, ValueError):
+                bid_int = None
+            # NULL / 0 / корпус не из плана
+            if bid_int is not None and bid_int in known_bids:
+                continue
+            month = int(row.get("month") or 0)
+            if month < 1:
+                continue
+            bucket = unassigned_by_month.setdefault(
+                month,
+                {"новые": 0, "в_тфомс": 0, "оплачено": 0, "исправлено": 0, "month": month},
+            )
+            for key in ("новые", "в_тфомс", "оплачено", "исправлено"):
+                bucket[key] = float(bucket.get(key) or 0) + float(row.get(key) or 0)
+
+        if not unassigned_by_month:
+            continue
+        _month_rows, _plan, cum_fact, _bal = accumulate_pair(
+            {},
+            list(unassigned_by_month.values()),
+            reporting_month,
+            effective,
+            period_closed=period_closed,
+        )
+        if cum_fact <= 0:
+            continue
+        by_group.setdefault(gid, []).append(
+            {
+                "building_id": None,
+                "building_name": "без корпуса",
+                "plan": 0.0,
+                "fact": cum_fact,
+                "pct": 0.0,
+                "year_plan": 0.0,
+                "of_year": None,
+            }
+        )
+        by_group[gid].sort(
+            key=lambda r: (r.get("building_name") == "без корпуса", str(r.get("building_name") or ""))
+        )
+
+
 def build_print_form_data(
     *,
     year: int,
@@ -151,7 +241,9 @@ def build_print_form_data(
             else f"{MONTH_NAMES_RU[1]} {year}"
         ),
         "payment_label": payment_mode_label(payment_type, period_closed),
-        "columns": int(config.get("columns") or 3),
+        "generated_at": datetime.now().strftime("%d.%m.%Y %H:%M"),
+        "columns": int(config.get("columns") or 2),
+        "page_columns": int(config.get("page_columns") or 2),
         "page_orientation": config.get("page_orientation") or "landscape",
         "metric": metric,
         "plan_kind": kind,
@@ -173,46 +265,47 @@ def build_print_form_data(
         plan_kind=kind,
     )
     long_df = build_long_report(engine, params)
-    if long_df is None or long_df.empty:
-        missing = []
-        for sec in config.get("sections") or []:
-            for it in sec.get("items") or []:
-                missing.append(
-                    {
-                        "indicator_id": it.get("indicator_id"),
-                        "short_title": it.get("short_title") or str(it.get("indicator_id")),
-                        "reason": "нет плана по корпусам за период (или нет BuildingPlan)",
-                    }
-                )
-        return {"header": header, "sections": [], "missing": missing}
 
-    totals = long_df[long_df["is_total"] == True].copy()  # noqa: E712
-    year_plans = fetch_annual_building_plans(year, indicator_ids, metric, plan_kind=kind)
-
-    # index: group_id -> list of building rows
     by_group: dict[int, list[dict]] = {}
-    for _, row in totals.iterrows():
-        gid = int(row["group_id"])
-        bid = int(row["building_id"])
-        plan = float(row["plan"] or 0)
-        fact = float(row["fact"] or 0)
-        pct = float(row["pct"] or 0) if plan else 0.0
-        year_plan = float(year_plans.get((gid, bid), 0) or 0)
-        of_year = round(fact / year_plan * 100, 1) if year_plan > 0 else None
-        by_group.setdefault(gid, []).append(
-            {
-                "building_id": bid,
-                "building_name": row["building_name"],
-                "plan": plan,
-                "fact": fact,
-                "pct": pct,
-                "year_plan": year_plan,
-                "of_year": of_year,
-            }
-        )
+    if long_df is not None and not long_df.empty:
+        totals = long_df[long_df["is_total"] == True].copy()  # noqa: E712
+        year_plans = fetch_annual_building_plans(year, indicator_ids, metric, plan_kind=kind)
+        for _, row in totals.iterrows():
+            gid = int(row["group_id"])
+            bid = int(row["building_id"])
+            plan = float(row["plan"] or 0)
+            fact = float(row["fact"] or 0)
+            pct = float(row["pct"] or 0) if plan else 0.0
+            year_plan = float(year_plans.get((gid, bid), 0) or 0)
+            of_year = round(fact / year_plan * 100, 1) if year_plan > 0 else None
+            by_group.setdefault(gid, []).append(
+                {
+                    "building_id": bid,
+                    "building_name": row["building_name"],
+                    "plan": plan,
+                    "fact": fact,
+                    "pct": pct,
+                    "year_plan": year_plan,
+                    "of_year": of_year,
+                }
+            )
+
+    # Факт вне корпусов плана → «без корпуса», план 0
+    _append_unassigned_building_rows(
+        by_group,
+        year=year,
+        reporting_month=reporting_month,
+        indicator_ids=indicator_ids,
+        payment_type=payment_type,
+        period_closed=period_closed,
+        metric=metric,
+        unique_flag=unique_flag,
+    )
 
     for gid in by_group:
-        by_group[gid].sort(key=lambda r: r["building_name"])
+        by_group[gid].sort(
+            key=lambda r: (r.get("building_name") == "без корпуса", str(r.get("building_name") or ""))
+        )
 
     sections_out = []
     missing: list[dict] = []
@@ -230,7 +323,7 @@ def build_print_form_data(
                     {
                         "indicator_id": gid,
                         "short_title": short_title,
-                        "reason": "нет плана по корпусам за период",
+                        "reason": "нет плана по корпусам и нет факта «без корпуса» на период",
                     }
                 )
                 continue
@@ -256,29 +349,49 @@ def build_print_form_data(
                     "total": total,
                 }
             )
-        if tables:
-            sections_out.append(
-                {
-                    "title": (sec.get("title") or "").strip() or "Раздел",
-                    "tables": tables,
-                }
-            )
+        try:
+            item_columns = max(1, min(4, int(sec.get("item_columns") or header.get("columns") or 2)))
+        except (TypeError, ValueError):
+            item_columns = max(1, min(4, int(header.get("columns") or 2)))
+        # Пустой раздел тоже сохраняем — иначе число колонок листа «прыгает»
+        sections_out.append(
+            {
+                "title": (sec.get("title") or "").strip() or "Раздел",
+                "item_columns": item_columns,
+                "tables": tables,
+            }
+        )
 
     return {"header": header, "sections": sections_out, "missing": missing}
 
 
 def render_print_form_html(data: dict[str, Any]) -> str:
-    """HTML бланка для превью и печати."""
+    """HTML бланка: разделы в сетке page_columns; внутри — сетка индикаторов."""
     header = data.get("header") or {}
-    sections = data.get("sections") or []
+    sections = list(data.get("sections") or [])
     metric = header.get("metric") or "volumes"
-    columns = int(header.get("columns") or 3)
+    default_columns = max(1, min(4, int(header.get("columns") or 2)))
+    try:
+        page_columns = max(1, min(4, int(header.get("page_columns") or 2)))
+    except (TypeError, ValueError):
+        page_columns = 2
     orientation = header.get("page_orientation") or "landscape"
+    if orientation not in ("landscape", "portrait"):
+        orientation = "landscape"
+    page_size = "A4 landscape" if orientation == "landscape" else "A4 portrait"
+    if not sections:
+        sections = [{"title": "Раздел", "item_columns": default_columns, "tables": []}]
 
     parts: list[str] = []
     parts.append(
-        f'<div id="print-volume-form-sheet" class="print-volume-form" '
-        f'data-orientation="{escape(orientation)}" style="--pvf-columns:{columns}">'
+        "<style id=\"pvf-dynamic-page\">"
+        f"@media print {{ @page {{ size: {page_size}; margin: 8mm; }} }}"
+        "</style>"
+    )
+    parts.append(
+        f'<div id="print-volume-form-sheet" class="print-volume-form pvf-orient-{escape(orientation)}" '
+        f'data-orientation="{escape(orientation)}" '
+        f'style="--pvf-section-count:{page_columns}; --pvf-columns:{default_columns}">'
     )
     parts.append('<div class="pvf-header">')
     parts.append(f'<div class="pvf-org">{escape(str(header.get("organization") or ""))}</div>')
@@ -289,31 +402,49 @@ def render_print_form_html(data: dict[str, Any]) -> str:
         f' &nbsp;|&nbsp; По данным: <strong>{escape(str(header.get("payment_label") or ""))}</strong>'
         f"</div>"
     )
+    if header.get("generated_at"):
+        parts.append(
+            f'<div class="pvf-generated">'
+            f'Сформировано: <strong>{escape(str(header["generated_at"]))}</strong>'
+            f' &nbsp;|&nbsp; Лист: <strong>{"альбомный" if orientation == "landscape" else "книжный"}</strong>'
+            f' &nbsp;|&nbsp; Столбцов: <strong>{page_columns}</strong>'
+            f"</div>"
+        )
     parts.append("</div>")
 
-    if not sections:
+    has_tables = any(sec.get("tables") for sec in sections)
+    if not has_tables:
         parts.append('<div class="pvf-empty">')
         parts.append(
-            "Нет данных для бланка. Нужны индикаторы с <b>планом по корпусам</b> "
-            "(вкладка «Ввод планов»). "
+            "Нет данных для бланка. Добавьте индикаторы в разделы макета "
+            "и задайте план по корпусам (вкладка «Ввод планов»). "
         )
         missing = data.get("missing") or []
         if missing:
-            parts.append("<br/>Не попали в бланк: ")
-            parts.append(
-                "; ".join(
+            parts.append("<ul class='pvf-missing-list'>")
+            for m in missing:
+                parts.append(
+                    "<li>"
                     f"{escape(str(m.get('short_title')))} (id={escape(str(m.get('indicator_id')))})"
-                    for m in missing
+                    f" — {escape(str(m.get('reason') or 'нет данных'))}"
+                    "</li>"
                 )
-            )
+            parts.append("</ul>")
         parts.append("</div>")
         parts.append("</div>")
         return "".join(parts)
 
+    parts.append(
+        f'<div class="pvf-sections" style="--pvf-section-count:{page_columns}">'
+    )
     for sec in sections:
+        try:
+            item_cols = max(1, min(4, int(sec.get("item_columns") or default_columns)))
+        except (TypeError, ValueError):
+            item_cols = default_columns
         parts.append('<section class="pvf-section">')
         parts.append(f'<h3 class="pvf-section-title">{escape(sec.get("title") or "")}</h3>')
-        parts.append('<div class="pvf-grid">')
+        parts.append(f'<div class="pvf-grid" style="--pvf-columns:{item_cols}">')
         for table in sec.get("tables") or []:
             show_of_year = bool(table.get("show_of_year"))
             parts.append('<div class="pvf-mini">')
@@ -346,7 +477,10 @@ def render_print_form_html(data: dict[str, Any]) -> str:
             parts.append("</tr>")
             parts.append("</tbody></table>")
             parts.append("</div>")
+        if not (sec.get("tables") or []):
+            parts.append('<div class="pvf-empty-col">Нет индикаторов в разделе</div>')
         parts.append("</div></section>")
+    parts.append("</div>")
 
     parts.append("</div>")
     return "".join(parts)

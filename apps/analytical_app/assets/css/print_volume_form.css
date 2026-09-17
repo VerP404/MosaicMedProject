@@ -1,12 +1,305 @@
-/* Печатный бланк «Выполнение объёмных показателей» */
+/* Печатный бланк «Выполнение объёмных показателей» + редактор макета */
+
+.pvf-filters-card {
+  position: sticky;
+  top: 0.5rem;
+  max-height: calc(100vh - 1rem);
+  overflow: auto;
+  border: 1px solid var(--pvf-border, #d7e0ea);
+  background: #fff;
+  z-index: 5;
+}
+
+.pvf-filters-card .card-body {
+  padding: 0.65rem 0.75rem !important;
+}
+
+.pvf-filters-card .mb-3 {
+  margin-bottom: 0.55rem !important;
+}
+
+.pvf-filters-card label {
+  margin-bottom: 0.15rem !important;
+  font-size: 0.78rem;
+}
+
+.pvf-filters-card .form-control,
+.pvf-filters-card .Select-control,
+.pvf-filters-card .dash-dropdown .Select-control {
+  min-height: 30px;
+}
+
+.pvf-page {
+  --pvf-accent: #1f4e79;
+  --pvf-surface: #f4f7fb;
+  --pvf-border: #d7e0ea;
+}
+
+.pvf-hero-card {
+  background: linear-gradient(180deg, #f7fafc 0%, #eef3f8 100%);
+  border: 1px solid var(--pvf-border) !important;
+}
+
+.pvf-layout-accordion .accordion-button {
+  font-weight: 600;
+}
+
+.pvf-editor-sheet {
+  display: grid;
+  grid-template-columns: repeat(var(--pvf-editor-sections, 1), minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.pvf-editor-section {
+  border: 1px solid var(--pvf-border);
+  border-radius: 0.5rem;
+  background: #fff;
+  min-width: 0;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0.65rem !important;
+}
+
+.pvf-editor-section .card-header {
+  padding: 0.4rem 0.65rem !important;
+}
+
+.pvf-editor-section .card-body {
+  padding: 0.55rem 0.65rem 0.65rem !important;
+}
+
+.pvf-editor-section:focus-within {
+  z-index: 40;
+}
+
+.pvf-editor-list {
+  position: relative;
+}
+
+.pvf-sec-body {
+  overflow: visible !important;
+}
+
+.pvf-editor-sec-title {
+  font-weight: 600;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  flex: 1;
+  min-width: 0;
+}
+
+.pvf-ind-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  overflow: visible;
+}
+
+.pvf-ind-row {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) 1.25rem 4.5rem 5.5rem auto;
+  align-items: center;
+  column-gap: 0.35rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid #e8eef4;
+  border-radius: 0.35rem;
+  background: var(--pvf-surface);
+}
+
+.pvf-ind-num {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.pvf-ind-row > .pvf-ind-title,
+.pvf-ind-row > .form-control.pvf-ind-title {
+  width: 100% !important;
+  min-width: 0;
+  font-size: 0.85rem;
+  height: 30px;
+  padding: 0.15rem 0.45rem;
+}
+
+.pvf-ind-info {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #6c757d;
+  color: #495057;
+  background: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+}
+
+.pvf-ind-warn {
+  justify-self: start;
+  font-size: 0.7rem;
+  min-height: 1rem;
+}
+
+.pvf-ind-year {
+  justify-self: start;
+  white-space: nowrap;
+}
+
+.pvf-ind-btns {
+  justify-self: end;
+}
+
+.pvf-sec-add-row {
+  position: relative;
+  z-index: 2;
+  overflow: visible;
+}
+
+.pvf-sec-add-row:focus-within {
+  z-index: 50;
+}
+
+.pvf-page .Select-menu-outer,
+.pvf-page .VirtualizedSelectOption,
+.pvf-page div[id*="react-select"][id$="-listbox"],
+.pvf-page .pvf-add-ind-dd div[class*="-menu"],
+.pvf-editor-section .dash-dropdown .Select-menu-outer {
+  z-index: 2000 !important;
+}
+
+.pvf-editor-section .dash-dropdown {
+  position: relative;
+  z-index: 3;
+}
+
+@media (max-width: 900px) {
+  .pvf-ind-row {
+    grid-template-columns: 1.5rem minmax(0, 1fr) 1.25rem auto;
+  }
+  .pvf-ind-warn {
+    display: none;
+  }
+  .pvf-ind-year {
+    grid-column: 2 / 4;
+  }
+  .pvf-ind-btns {
+    grid-column: 4;
+    grid-row: 1 / span 2;
+    align-self: start;
+  }
+}
+
+.pvf-editor-items {
+  display: grid;
+  grid-template-columns: repeat(var(--pvf-item-cols, 1), minmax(0, 1fr));
+  gap: 0.45rem;
+  max-height: 32rem;
+  overflow: auto;
+}
+
+.pvf-editor-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #e8eef4;
+  border-radius: 0.4rem;
+  background: var(--pvf-surface);
+  min-width: 0;
+}
+
+.pvf-editor-item-pos {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #1f4e79;
+  letter-spacing: 0.02em;
+}
+
+.pvf-editor-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.pvf-editor-item-title {
+  font-size: 0.85rem;
+}
+
+.pvf-editor-item-id {
+  font-size: 0.7rem;
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.pvf-editor-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.pvf-editor-year-switch .form-check {
+  margin-bottom: 0;
+  font-size: 0.75rem;
+}
+
+.pvf-editor-add {
+  background: #fafbfc;
+  border-radius: 0.35rem;
+  padding: 0.4rem;
+}
+
+.pvf-preview-wrap {
+  margin-top: 0.25rem;
+}
+
+.pvf-empty-state {
+  color: #6c757d;
+}
 
 .print-volume-form {
-  --pvf-columns: 3;
+  --pvf-columns: 1;
+  --pvf-section-count: 1;
   font-family: "Times New Roman", Times, serif;
   font-size: 9pt;
   color: #000;
   background: #fff;
   padding: 0.5rem;
+}
+
+.pvf-preview-paper {
+  background: #fff;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.pvf-paper-landscape {
+  width: 100%;
+  max-width: 1100px;
+  min-height: 620px;
+}
+
+.pvf-paper-portrait {
+  width: 100%;
+  max-width: 720px;
+  min-height: 900px;
+}
+
+.pvf-empty-col {
+  font-size: 8pt;
+  color: #888;
+  font-style: italic;
+  padding: 0.25rem;
+  grid-column: 1 / -1;
 }
 
 .pvf-header {
@@ -38,31 +331,61 @@
   font-style: italic;
 }
 
+/* Колонки разделов на листе (1–4) */
+.pvf-sections,
+.pvf-sections-duo {
+  display: grid;
+  grid-template-columns: repeat(var(--pvf-section-count, 2), minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.pvf-editor-item-warn {
+  border-color: #f0c36d !important;
+  background: #fff8e8 !important;
+}
+
+.pvf-generated {
+  font-size: 8pt;
+  margin-top: 0.15rem;
+  color: #333;
+}
+
+.pvf-missing-list {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+  text-align: left;
+}
+
 .pvf-section {
-  margin-bottom: 0.75rem;
-  break-inside: avoid-page;
+  margin-bottom: 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  min-width: 0;
 }
 
 .pvf-section-title {
   font-size: 10pt;
   font-weight: bold;
-  margin: 0.4rem 0 0.35rem;
+  margin: 0 0 0.35rem;
   text-align: center;
   border-bottom: 1px solid #333;
   padding-bottom: 0.15rem;
 }
 
+/* Сетка индикаторов внутри раздела — слева→направо, сверху→вниз */
 .pvf-grid {
-  column-count: var(--pvf-columns);
-  column-gap: 0.6rem;
+  display: grid;
+  grid-template-columns: repeat(var(--pvf-columns, 1), minmax(0, 1fr));
+  gap: 0.45rem 0.55rem;
+  align-items: start;
 }
 
 .pvf-mini {
   break-inside: avoid;
-  display: inline-block;
+  page-break-inside: avoid;
   width: 100%;
-  margin: 0 0 0.45rem;
-  vertical-align: top;
+  min-width: 0;
 }
 
 .pvf-mini-title {
@@ -106,10 +429,13 @@
 
 /* Экран: рамка превью */
 #print-volume-form-preview {
-  border: 1px solid #ccc;
-  background: #fff;
+  border: 1px solid var(--pvf-border, #ccc);
+  border-radius: 0.4rem;
+  background: #e9eef3;
   overflow: auto;
   max-height: 75vh;
+  padding: 0.75rem;
+  box-shadow: inset 0 0 0 1px rgba(15, 35, 55, 0.04);
 }
 
 @media print {
@@ -118,9 +444,8 @@
     margin: 8mm;
   }
 
-  /* Книжная: пользователь может сменить ориентацию в диалоге печати */
-  body.pvf-print-portrait {
-    /* placeholder for future named @page */
+  body[data-pvf-orientation="portrait"] {
+    /* fallback; точный size задаёт #pvf-print-page-style / #pvf-dynamic-page */
   }
 
   body * {
@@ -141,10 +466,18 @@
     width: 100% !important;
     max-height: none !important;
     border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
     overflow: visible !important;
     background: #fff !important;
     padding: 0 !important;
     margin: 0 !important;
+  }
+
+  .pvf-preview-paper {
+    max-width: none !important;
+    width: 100% !important;
+    min-height: 0 !important;
   }
 
   .d-print-none,
@@ -164,5 +497,10 @@
 
   .pvf-preview-inner > * {
     margin: 0 !important;
+  }
+
+  .pvf-sections,
+  .pvf-sections-duo {
+    break-inside: avoid;
   }
 }
