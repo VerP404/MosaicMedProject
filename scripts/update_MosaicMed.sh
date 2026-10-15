@@ -205,34 +205,15 @@ else
     echo "[INFO] Структура индикаторов успешно импортирована."
 fi
 
-# Остановка текущих процессов
+# Остановка текущих процессов (без Dagster — его рестартит restart_dagster.sh)
 echo "[INFO] Остановка текущих процессов..."
 pkill -f 'python3.12 manage.py runserver' 2>/dev/null
 pkill -f 'python3.12 apps/analytical_app/index.py' 2>/dev/null
 pkill -f 'python3.12 apps/chief_app/main.py' 2>/dev/null
 pkill -f 'python3.12 apps/masterd_dashboard/app.py' 2>/dev/null
-pkill -f 'python3.12 start_dagster.py --host 0.0.0.0 --port 3000' 2>/dev/null
 pkill -f 'python3.12 apps/dash_dn/index.py' 2>/dev/null
 pkill -f 'python3.12 -m apps.dash_dn' 2>/dev/null
 echo "[INFO] Основные процессы остановлены (если были запущены)."
-
-echo "[INFO] Поиск и остановка процессов dagster-daemon..."
-DAGSTER_DAEMON_PIDS=$(pgrep -f 'dagster-daemon run')
-if [ -n "$DAGSTER_DAEMON_PIDS" ]; then
-    echo "[INFO] Останавливаем процессы dagster-daemon: $DAGSTER_DAEMON_PIDS"
-    kill $DAGSTER_DAEMON_PIDS 2>/dev/null
-else
-    echo "[INFO] Процессы dagster-daemon не найдены."
-fi
-
-echo "[INFO] Поиск и остановка процессов dagit..."
-DAGIT_PIDS=$(pgrep -f 'dagit')
-if [ -n "$DAGIT_PIDS" ]; then
-    echo "[INFO] Останавливаем процессы dagit: $DAGIT_PIDS"
-    kill $DAGIT_PIDS 2>/dev/null
-else
-    echo "[INFO] Процессы dagit не найдены."
-fi
 
 # Перезапуск серверов в фоне
 echo "[INFO] Перезапуск серверов..."
@@ -240,9 +221,12 @@ nohup python3.12 manage.py runserver 0.0.0.0:8000 > /dev/null 2>&1 &
 nohup python3.12 apps/analytical_app/index.py > /dev/null 2>&1 &
 nohup python3.12 apps/chief_app/main.py > /dev/null 2>&1 &
 nohup python3.12 apps/masterd_dashboard/app.py --host 0.0.0.0 --port 5020 > /dev/null 2>&1 &
-nohup python3.12 start_dagster.py --host 0.0.0.0 --port 3000 > /dev/null 2>&1 &
 # Подбор услуг ДН (Dash, SQLite): порт PORT_DASH_DN или 7777, HOST_DASH_DN из .env
 nohup python3.12 apps/dash_dn/index.py > /dev/null 2>&1 &
+
+# Dagster: полный рестарт (webserver + daemon + grpc), лог в dagster_home
+echo "[INFO] Перезапуск Dagster через scripts/restart_dagster.sh..."
+bash "${SCRIPT_DIR}/restart_dagster.sh" --port 3000
 
 echo "=============================================="
 echo "Скрипт обновления завершён: $(date)"
