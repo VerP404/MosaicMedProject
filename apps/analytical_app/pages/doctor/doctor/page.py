@@ -8,7 +8,7 @@ from apps.analytical_app.callback import get_selected_doctors, TableUpdater
 from apps.analytical_app.components.filters import filter_doctors, filter_years, filter_months, \
     get_current_reporting_month, get_available_buildings, filter_building, get_available_departments, filter_department, \
     filter_profile, filter_doctor, get_available_profiles, get_available_doctors, get_departments_by_doctor, \
-    get_doctor_details, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
+    get_doctor_details, get_available_doctor_codes, filter_inogorod, filter_sanction, filter_amount_null, date_picker, filter_report_type, \
     update_buttons, parse_doctor_ids
 from apps.analytical_app.elements import card_table, get_selected_period
 from apps.analytical_app.pages.doctor.doctor.query import sql_query_amb_def, sql_query_dd_def, sql_query_stac_def, sql_query_details
@@ -69,6 +69,20 @@ doctor_talon = html.Div(
                                 [
                                     dbc.Col(filter_profile(type_page), width=6),
                                     dbc.Col(filter_doctor(type_page), width=6),
+                                ]
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        dcc.Dropdown(
+                                            id=f'dropdown-doctor-code-{type_page}',
+                                            options=[],
+                                            placeholder='Выберите код врача (опционально)...',
+                                            clearable=True,
+                                            multi=True,
+                                        ),
+                                        width=12
+                                    ),
                                 ]
                             ),
                             dbc.Row(
@@ -261,6 +275,7 @@ doctor_talon = html.Div(
      Output(f'result-table2-{type_page}', 'data')],
     [Input(f'update-button-{type_page}', 'n_clicks')],
     [State(f'dropdown-doctor-{type_page}', 'value'),
+     State(f'dropdown-doctor-code-{type_page}', 'value'),
      State(f'dropdown-profile-{type_page}', 'value'),
      State(f'range-slider-month-{type_page}', 'value'),
      State(f'dropdown-year-{type_page}', 'value'),
@@ -275,13 +290,13 @@ doctor_talon = html.Div(
      State(f'date-picker-range-treatment-{type_page}', 'end_date'),
      State(f'dropdown-report-type-{type_page}', 'value')]
 )
-def update_table(n_clicks, value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
+def update_table(n_clicks, value_doctor, value_doctor_code, value_profile, selected_period, selected_year, inogorodniy, sanction,
                  amount_null, building_ids, department_ids, start_date_input, end_date_input,
                  start_date_treatment, end_date_treatment, report_type):
     if not n_clicks:
         raise exceptions.PreventUpdate
 
-    selected_doctor_ids = parse_doctor_ids(value_doctor)
+    selected_doctor_ids = parse_doctor_ids(value_doctor_code) or parse_doctor_ids(value_doctor)
 
     start_date_input_formatted, end_date_input_formatted = None, None
     start_date_treatment_formatted, end_date_treatment_formatted = None, None
@@ -463,6 +478,21 @@ def update_filters(building_id, department_id, profile_id, doctor_id, selected_y
 
 
 @app.callback(
+    [
+        Output(f'dropdown-doctor-code-{type_page}', 'options'),
+        Output(f'dropdown-doctor-code-{type_page}', 'value'),
+    ],
+    [
+        Input(f'dropdown-doctor-{type_page}', 'value')
+    ]
+)
+def update_doctor_codes(doctor_ids):
+    if not doctor_ids:
+        return [], None
+    return get_available_doctor_codes(doctor_ids), None
+
+
+@app.callback(
     Output(f'selected-filters-{type_page}', 'children'),
     [Input(f'dropdown-doctor-{type_page}', 'value')]
 )
@@ -591,9 +621,14 @@ def update_button_states(active_cell1, active_cell2):
     [
         State(f'result-table1-{type_page}', 'data'),
         State(f'result-table1-{type_page}', 'columns'),
+        State(f'result-table1-{type_page}', 'derived_virtual_data'),
+        State(f'result-table1-{type_page}', 'derived_viewport_data'),
         State(f'result-table2-{type_page}', 'data'),
         State(f'result-table2-{type_page}', 'columns'),
+        State(f'result-table2-{type_page}', 'derived_virtual_data'),
+        State(f'result-table2-{type_page}', 'derived_viewport_data'),
         State(f'dropdown-doctor-{type_page}', 'value'),
+        State(f'dropdown-doctor-code-{type_page}', 'value'),
         State(f'dropdown-profile-{type_page}', 'value'),
         State(f'range-slider-month-{type_page}', 'value'),
         State(f'dropdown-year-{type_page}', 'value'),
@@ -610,43 +645,66 @@ def update_button_states(active_cell1, active_cell2):
     ]
 )
 def show_details(n_clicks_details1, n_clicks_details2, active_cell1, active_cell2,
-                 data1, columns1, data2, columns2,
-                 value_doctor, value_profile, selected_period, selected_year, inogorodniy, sanction,
+                 data1, columns1, virtual1, viewport1, data2, columns2, virtual2, viewport2,
+                 value_doctor, value_doctor_code, value_profile, selected_period, selected_year, inogorodniy, sanction,
                  amount_null, building_ids, department_ids, start_date_input, end_date_input,
                  start_date_treatment, end_date_treatment, report_type):
     ctx = callback_context
     if not ctx.triggered:
         raise exceptions.PreventUpdate
 
+    def _visible_rows(viewport, virtual, full):
+        # active_cell.row — индекс в отфильтрованном/отсортированном виде, не в полном data
+        if viewport is not None:
+            return viewport
+        if virtual is not None:
+            return virtual
+        return full or []
+
+    def _resolve_column_id(active_cell, cols):
+        if not active_cell:
+            return None
+        column_id = active_cell.get('column_id')
+        if column_id:
+            return column_id
+        col_idx = active_cell.get('column')
+        if cols is not None and col_idx is not None and 0 <= col_idx < len(cols):
+            return cols[col_idx].get('id')
+        return None
+
     triggered_id = ctx.triggered[0]['prop_id']
-    
-    # Определяем какая кнопка была нажата
+
     is_from_table1 = False
     active_cell = None
     row_data = None
     cols = None
-    
+
     if triggered_id.startswith(f'details-button1-{type_page}'):
-        # Кнопка детализации по категориям
         is_from_table1 = True
         if not active_cell1:
             raise exceptions.PreventUpdate
         active_cell = active_cell1
-        row_data = (data1 or [])[active_cell.get('row')]
+        rows = _visible_rows(viewport1, virtual1, data1)
+        row_idx = active_cell.get('row')
+        if row_idx is None or row_idx >= len(rows):
+            raise exceptions.PreventUpdate
+        row_data = rows[row_idx]
         cols = columns1
     elif triggered_id.startswith(f'details-button2-{type_page}'):
-        # Кнопка детализации по целям
         is_from_table1 = False
         if not active_cell2:
             raise exceptions.PreventUpdate
         active_cell = active_cell2
-        row_data = (data2 or [])[active_cell.get('row')]
+        rows = _visible_rows(viewport2, virtual2, data2)
+        row_idx = active_cell.get('row')
+        if row_idx is None or row_idx >= len(rows):
+            raise exceptions.PreventUpdate
+        row_data = rows[row_idx]
         cols = columns2
     else:
-        # Если клик не по кнопке детализации - очищаем
         return '', [], [], ''
 
-    # Берем значение ключевой колонки явно: в таблице 1 колонка называется "Группа", в таблице 2 — id 'goal'
+    # Таблица 1: «Группа»; таблица 2: goal
     first_value = None
     if row_data:
         if is_from_table1:
@@ -654,12 +712,9 @@ def show_details(n_clicks_details1, n_clicks_details2, active_cell1, active_cell
         else:
             first_value = row_data.get('goal')
 
-    # Определяем статус по заголовку столбца
-    column_id = cols[active_cell.get('column')]['id'] if cols and active_cell.get('column') is not None else None
+    column_id = _resolve_column_id(active_cell, cols)
     status_filter = None
-    # Не учитывать клики по самой первой колонке (название группы/цели)
     if column_id and column_id not in ['Группа', 'goal']:
-        # Примеры заголовков: "Всего", "1", "Оплачен(3 )", "В работе(1,2,3,4,6,8)"
         if column_id == 'Всего':
             status_filter = None
         else:
@@ -683,7 +738,7 @@ def show_details(n_clicks_details1, n_clicks_details2, active_cell1, active_cell
 
     months_list = ', '.join([str(m) for m in range(selected_period[0], selected_period[1] + 1)]) if selected_period else '1'
 
-    selected_doctor_ids = parse_doctor_ids(value_doctor)
+    selected_doctor_ids = parse_doctor_ids(value_doctor_code) or parse_doctor_ids(value_doctor)
     
     # Создаем ключ кэша на основе всех параметров
     cache_key = f"{selected_year}_{months_list}_{inogorodniy}_{sanction}_{amount_null}_{building_ids}_{department_ids}_{value_profile}_{selected_doctor_ids}_{start_date_input_formatted}_{end_date_input_formatted}_{start_date_treatment_formatted}_{end_date_treatment_formatted}_{group_name}_{goal_value}_{status_filter}"

@@ -127,6 +127,7 @@ def sql_query_details(selected_year, months_placeholder, inogorod, sanction, amo
     SELECT talon                               AS "Талон",
            goal                                AS "Цель",
            status                              AS "Статус",
+           source                              AS "Источник",
            enp                                 AS "ЕНП",
            patient                             AS "Пациент",
            birth_date                          AS "Дата рождения",
