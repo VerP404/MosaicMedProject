@@ -1,11 +1,22 @@
 import datetime
 
+import pandas as pd
 from dash import html, dcc, Output, Input, dash_table, exceptions, State
+from sqlalchemy import text
+
 from apps.analytical_app.app import app
 from apps.analytical_app.callback import TableUpdater
 from apps.analytical_app.components.filters import status_groups, get_current_reporting_month
-from apps.analytical_app.pages.head.dispensary.reports.query import sql_query_disp_rep_f1000, sql_query_disp_rep_f1001, \
-    sql_query_disp_rep_f2000, sql_query_disp_rep_f3000, sql_query_disp_rep_f2001, sql_query_disp_rep_f3001_3003
+from apps.analytical_app.pages.head.dispensary.adults.query import (
+    sql_query_form131_1000,
+    sql_query_form131_1001,
+)
+from apps.analytical_app.pages.head.dispensary.reports.query import (
+    sql_query_disp_rep_f2000,
+    sql_query_disp_rep_f3000,
+    sql_query_disp_rep_f2001,
+    sql_query_disp_rep_f3001_3003,
+)
 from apps.analytical_app.query_executor import engine
 
 type_page = "dispensary-reports"
@@ -261,11 +272,6 @@ def update_table(n_clicks, month_start, month_end, current_month, selected_statu
     loading_output = html.Div([dcc.Loading(type="default")])
     selected_status_values = status_groups[selected_status]
     selected_status_tuple = tuple(selected_status_values)
-    sql_conditions = ''
-    if month_end == current_month:
-        sql_conditions = 'or ("Номер счёта" is null) or ("Статус" in (\'6\', \'8\'))'
-    sql_query1 = sql_query_disp_rep_f1000(sql_conditions)
-    sql_query2 = sql_query_disp_rep_f1001(sql_conditions)
 
     sql_conditions_dd = ''
     if month_end == current_month:
@@ -286,8 +292,22 @@ def update_table(n_clicks, month_start, month_end, current_month, selected_statu
         'list_months': list_months,
         'status_list': selected_status_tuple
     }
-    columns1, data1 = TableUpdater.query_to_df(engine, sql_query1, bind_params)
-    columns2, data2 = TableUpdater.query_to_df(engine, sql_query2, bind_params)
+
+    # 1000 / 1001 — актуальные запросы (load_data_oms_data + ИСЗЛ), как на /head/adults/dv3
+    year_val = datetime.datetime.now().year
+    form131_common = dict(
+        selected_year=year_val,
+        months_range=[month_start, month_end],
+        report_type="month",
+        status_list=list(selected_status_values),
+    )
+    df1000 = pd.read_sql_query(text(sql_query_form131_1000(**form131_common)), engine)
+    df1001 = pd.read_sql_query(text(sql_query_form131_1001(**form131_common)), engine)
+    columns1 = [{"name": c, "id": c} for c in df1000.columns]
+    data1 = df1000.to_dict("records")
+    columns2 = [{"name": c, "id": c} for c in df1001.columns]
+    data2 = df1001.to_dict("records")
+
     columns3, data3 = TableUpdater.query_to_df(engine, sql_query3, bind_params)
     columns4, data4 = TableUpdater.query_to_df(engine, sql_query4, bind_params)
     columns5, data5 = TableUpdater.query_to_df(engine, sql_query5, bind_params)

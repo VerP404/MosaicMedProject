@@ -31,6 +31,8 @@ from apps.analytical_app.components.filters import (
 from apps.analytical_app.pages.head.dispensary.adults.query import (
     sql_query_dispensary_age,
     sql_query_dogvn_65_plus,
+    sql_query_form131_1000,
+    sql_query_form131_1001,
     DISPENSARY_ADULT_GOALS,
 )
 from apps.analytical_app.query_executor import engine
@@ -228,6 +230,32 @@ adults_dv3 = html.Div(
                         ),
                     ],
                 ),
+                dbc.Tab(
+                    label="Форма 131 (1000 / 1001)",
+                    tab_id="form131",
+                    children=[
+                        html.P(
+                            [
+                                "Таблица 1000 — численность из ИСЗЛ по возрастным группам формы 131; ",
+                                "ПМО (ОПВ) и ДОГВН (ДВ4) — те же талоны ОМС, что вкладка «По возрастам» ",
+                                "(итог ДОГВН = итог ДВ4, итог ПМО = итог ОПВ). ",
+                                "Таблица 1001 — трудоспособный возраст (М 18–60, Ж 18–55), тоже по талонам ОМС.",
+                            ],
+                            className="text-muted mt-2 mb-1",
+                        ),
+                        dcc.Loading(
+                            id=f"loading-table-form131-{type_page}",
+                            type="default",
+                            children=html.Div(
+                                [
+                                    html.Div(id=f"table-container-f1000-{type_page}"),
+                                    html.Hr(),
+                                    html.Div(id=f"table-container-f1001-{type_page}"),
+                                ]
+                            ),
+                        ),
+                    ],
+                ),
             ],
             className="mt-2",
         ),
@@ -374,11 +402,11 @@ def _empty_alert(msg, color="info"):
     return dbc.Alert(msg, color=color, className="mt-3")
 
 
-def _df_to_table_div(df, title):
+def _df_to_table_div(df, title, show_index=True):
     if df.empty:
         return _empty_alert("По выбранным условиям данные не найдены.")
     table = dbc.Table.from_dataframe(
-        df, striped=True, bordered=True, hover=True, index=True, responsive=True
+        df, striped=True, bordered=True, hover=True, index=show_index, responsive=True
     )
     return html.Div([html.H6(title, className="mt-2 mb-2"), table])
 
@@ -403,6 +431,8 @@ def _excel_download(df, filename, params):
     [
         Output(f"table-container-{type_page}", "children"),
         Output(f"table-container-dogvn65-{type_page}", "children"),
+        Output(f"table-container-f1000-{type_page}", "children"),
+        Output(f"table-container-f1001-{type_page}", "children"),
         Output(f"download-{type_page}", "data"),
     ],
     [
@@ -494,35 +524,88 @@ def render_table_and_export(
         df_dogvn = _build_smo_age_table(
             pd.read_sql_query(text(sql_query_dogvn_65_plus(**common)), engine)
         )
+        df_f1000 = pd.read_sql_query(text(sql_query_form131_1000(**common)), engine)
+        df_f1001 = pd.read_sql_query(text(sql_query_form131_1001(**common)), engine)
         return (
             _df_to_table_div(df_age, "Диспансеризация взрослых по возрастам, видам и полу"),
             _df_to_table_div(df_dogvn, "ДОГВН 65+ (ДВ4) по возрастам и страховым"),
+            _df_to_table_div(
+                df_f1000,
+                "1000 — возрастные группы (прикреплённые / ПМО / ДОГВН)",
+                show_index=False,
+            ),
+            _df_to_table_div(
+                df_f1001,
+                "1001 — трудоспособный возраст (прошедшие ПМО / ДОГВН)",
+                show_index=False,
+            ),
             no_update,
         )
 
     if trigger == f"btn-export-{type_page}":
         start, end = selected_months or (None, None)
         period = f"{start}–{end}" if start and end else ""
+        base_params = {
+            "Год": year_val,
+            "Период (месяцы)": period,
+            "Тип отчёта": report_type,
+            "Корпуса": building_ids,
+            "Отделения": department_ids,
+            "Группы здоровья": ", ".join(health_groups) if health_groups else "Все",
+            "Статусы": ", ".join(statuses) if statuses else "Все",
+        }
+
         if active_tab == "dogvn65":
             df = _build_smo_age_table(
                 pd.read_sql_query(text(sql_query_dogvn_65_plus(**common)), engine)
             )
             if df.empty:
-                return no_update, _empty_alert("Нет данных для выгрузки.", "warning"), no_update
-            params = {
-                "Год": year_val,
-                "Период (месяцы)": period,
-                "Тип отчёта": report_type,
-                "Цель": "ДВ4",
-                "Возраст": "65+",
-                "Корпуса": building_ids,
-                "Отделения": department_ids,
-                "Группы здоровья": ", ".join(health_groups) if health_groups else "Все",
-            }
+                return (
+                    no_update,
+                    _empty_alert("Нет данных для выгрузки.", "warning"),
+                    no_update,
+                    no_update,
+                    no_update,
+                )
+            params = {**base_params, "Цель": "ДВ4", "Возраст": "65+"}
             return (
                 no_update,
                 no_update,
+                no_update,
+                no_update,
                 _excel_download(df, f"dogvn_65plus_{datetime.now():%Y%m%d_%H%M}.xlsx", params),
+            )
+
+        if active_tab == "form131":
+            df1000 = pd.read_sql_query(text(sql_query_form131_1000(**common)), engine)
+            df1001 = pd.read_sql_query(text(sql_query_form131_1001(**common)), engine)
+            if df1000.empty and df1001.empty:
+                return (
+                    no_update,
+                    no_update,
+                    _empty_alert("Нет данных для выгрузки.", "warning"),
+                    no_update,
+                    no_update,
+                )
+
+            def to_excel(buffer):
+                with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                    df1000.to_excel(writer, sheet_name="1000", index=False)
+                    df1001.to_excel(writer, sheet_name="1001", index=False)
+                    pd.DataFrame(
+                        {
+                            "Параметр": list(base_params.keys()),
+                            "Значение": [str(v) for v in base_params.values()],
+                        }
+                    ).to_excel(writer, sheet_name="Параметры", index=False)
+                buffer.seek(0)
+
+            return (
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                send_bytes(to_excel, f"form131_1000_1001_{datetime.now():%Y%m%d_%H%M}.xlsx"),
             )
 
         df = _build_age_table(
@@ -532,17 +615,17 @@ def render_table_and_export(
             )
         )
         if df.empty:
-            return _empty_alert("Нет данных для выгрузки.", "warning"), no_update, no_update
-        params = {
-            "Год": year_val,
-            "Период (месяцы)": period,
-            "Тип отчёта": report_type,
-            "Виды": ", ".join(selected_types or []),
-            "Корпуса": building_ids,
-            "Отделения": department_ids,
-            "Группы здоровья": ", ".join(health_groups) if health_groups else "Все",
-        }
+            return (
+                _empty_alert("Нет данных для выгрузки.", "warning"),
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+            )
+        params = {**base_params, "Виды": ", ".join(selected_types or [])}
         return (
+            no_update,
+            no_update,
             no_update,
             no_update,
             _excel_download(df, f"dispensary_age_{datetime.now():%Y%m%d_%H%M}.xlsx", params),

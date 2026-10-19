@@ -106,6 +106,352 @@ def _as_int_list(values):
     return out
 
 
+def _oms_period_and_common_conds(
+    selected_year,
+    months_range=None,
+    inogorod=None,
+    sanction=None,
+    amount_null=None,
+    building=None,
+    department=None,
+    input_start=None,
+    input_end=None,
+    treatment_start=None,
+    treatment_end=None,
+    report_type="month",
+    status_list=None,
+    health_groups=None,
+    icd_codes=None,
+    table_alias="",
+):
+    """Общие условия для load_data_oms_data (без goal/age)."""
+    p = f"{table_alias}." if table_alias else ""
+    conds = [f"{p}report_year = {int(selected_year)}"]
+
+    if report_type == "month" and months_range and len(months_range) >= 2:
+        start_m, end_m = int(months_range[0]), int(months_range[1])
+        conds.append(f"{p}report_month BETWEEN {start_m} AND {end_m}")
+    elif report_type == "initial_input" and input_start and input_end:
+        conds.append(
+            f"{p}initial_input_date BETWEEN '{_sql_quote(input_start[:10])}' "
+            f"AND '{_sql_quote(input_end[:10])}'"
+        )
+    elif report_type == "treatment" and treatment_start and treatment_end:
+        conds.append(
+            f"{p}treatment_end BETWEEN '{_sql_quote(treatment_start[:10])}' "
+            f"AND '{_sql_quote(treatment_end[:10])}'"
+        )
+
+    if inogorod == "1":
+        conds.append(f"{p}inogorodniy = FALSE")
+    elif inogorod == "2":
+        conds.append(f"{p}inogorodniy = TRUE")
+
+    if sanction == "1":
+        conds.append(f"({p}sanctions IN ('-', '0') OR {p}sanctions IS NULL)")
+    elif sanction == "2":
+        conds.append(f"{p}sanctions NOT IN ('-', '0') AND {p}sanctions IS NOT NULL")
+
+    if amount_null == "1":
+        conds.append(f"{p}amount_numeric IS NOT NULL AND {p}amount_numeric <> 0")
+    elif amount_null == "2":
+        conds.append(f"({p}amount_numeric IS NULL OR {p}amount_numeric = 0)")
+
+    building_ids = _as_int_list(building)
+    if building_ids:
+        conds.append(f"{p}building_id IN (" + ", ".join(map(str, building_ids)) + ")")
+    department_ids = _as_int_list(department)
+    if department_ids:
+        conds.append(f"{p}department_id IN (" + ", ".join(map(str, department_ids)) + ")")
+
+    if status_list:
+        conds.append(
+            f"{p}status IN (" + ", ".join(f"'{_sql_quote(s)}'" for s in status_list) + ")"
+        )
+
+    if health_groups:
+        if "all" in health_groups:
+            pass
+        elif health_groups == ["with"] or (len(health_groups) == 1 and health_groups[0] == "with"):
+            conds.append(f"{p}health_group <> '-'")
+        else:
+            values = ", ".join(
+                f"'{_sql_quote(hg)}'" for hg in health_groups if hg not in ("all", "with")
+            )
+            if values:
+                conds.append(f"{p}health_group IN ({values})")
+
+    if icd_codes:
+        conds.append(
+            f"{p}main_diagnosis_code IN ("
+            + ", ".join(f"'{_sql_quote(c)}'" for c in icd_codes)
+            + ")"
+        )
+
+    return conds
+
+
+# Возрастные группы таблицы 1000 формы 131
+_FORM131_AGE_GROUPS = (
+    (18, 34, "18-34"),
+    (35, 39, "35-39"),
+    (40, 54, "40-54"),
+    (55, 59, "55-59"),
+    (60, 64, "60-64"),
+    (65, 74, "65-74"),
+    (75, None, "75 и старше"),
+)
+
+
+def _form131_age_group_sql(age_expr="age_years"):
+    parts = []
+    for i, (lo, hi, label) in enumerate(_FORM131_AGE_GROUPS):
+        if hi is None:
+            parts.append(f"WHEN {age_expr} >= {lo} THEN '{label}'")
+        else:
+            parts.append(f"WHEN {age_expr} BETWEEN {lo} AND {hi} THEN '{label}'")
+    return "CASE\n            " + "\n            ".join(parts) + "\n        END"
+
+
+def _form131_age_group_order_sql(col='"Возрастная группа"'):
+    cases = []
+    for i, (_, _, label) in enumerate(_FORM131_AGE_GROUPS):
+        cases.append(f"WHEN {col} = '{label}' THEN {i}")
+    cases.append(f"WHEN {col} = 'Итого' THEN 999")
+    return "CASE " + " ".join(cases) + " ELSE 998 END"
+
+
+def sql_query_form131_1000(
+    selected_year,
+    months_range=None,
+    inogorod=None,
+    sanction=None,
+    amount_null=None,
+    building=None,
+    department=None,
+    input_start=None,
+    input_end=None,
+    treatment_start=None,
+    treatment_end=None,
+    report_type="month",
+    status_list=None,
+    health_groups=None,
+    icd_codes=None,
+    lpuuch_values=None,
+):
+    """
+    Таблица 1000 формы 131.
+    Численность (всего/М/Ж) — прикреплённые из ИСЗЛ (возраст на 31.12 отчётного года).
+    ПМО / ДОГВН — те же талоны ОМС, что вкладка «По возрастам» (COUNT(*), age > 17,
+    пол и возраст из load_data_oms_data, те же фильтры).
+    """
+    year = int(selected_year)
+    oms_conds = _oms_period_and_common_conds(
+        selected_year=year,
+        months_range=months_range,
+        inogorod=inogorod,
+        sanction=sanction,
+        amount_null=amount_null,
+        building=building,
+        department=department,
+        input_start=input_start,
+        input_end=input_end,
+        treatment_start=treatment_start,
+        treatment_end=treatment_end,
+        report_type=report_type,
+        status_list=status_list,
+        health_groups=health_groups,
+        icd_codes=icd_codes,
+        table_alias="o",
+    )
+    oms_conds.append("o.goal IN ('ОПВ', 'ДВ4')")
+    oms_conds.append("o.age > 17")
+    oms_where = " AND ".join(oms_conds)
+
+    lpuuch_condition = ""
+    if lpuuch_values:
+        safe = [f"'{_sql_quote(lpu)}'" for lpu in lpuuch_values if lpu]
+        if safe:
+            lpuuch_condition = f"AND a.lpuuch IN ({', '.join(safe)})"
+
+    age_group_iszl = _form131_age_group_sql("a.age_years")
+    age_group_oms = _form131_age_group_sql("o.age")
+    order_sql = _form131_age_group_order_sql('agr."Возрастная группа"')
+    age_values = ", ".join(
+        f"('{label}', {i})" for i, (_, _, label) in enumerate(_FORM131_AGE_GROUPS)
+    )
+
+    return f"""
+WITH age_groups AS (
+    SELECT age_group, sort_ord
+    FROM (VALUES {age_values}) AS t(age_group, sort_ord)
+),
+attached_patients AS (
+    SELECT
+        regexp_replace(enp, '\\D', '', 'g') AS enp_norm,
+        fio,
+        CASE
+            WHEN LOWER(fio) LIKE '%ович%' THEN 'М'
+            WHEN LOWER(fio) LIKE '%евич%' THEN 'М'
+            WHEN LOWER(fio) LIKE '%ич%' THEN 'М'
+            WHEN LOWER(fio) LIKE '%овна%' THEN 'Ж'
+            WHEN LOWER(fio) LIKE '%евна%' THEN 'Ж'
+            WHEN LOWER(fio) LIKE '%ична%' THEN 'Ж'
+            WHEN LOWER(fio) LIKE '%инична%' THEN 'Ж'
+            WHEN LOWER(fio) LIKE '%ья%' THEN 'Ж'
+            WHEN LOWER(fio) LIKE '%иа%' THEN 'Ж'
+            WHEN LOWER(fio) LIKE '%йя%' THEN 'Ж'
+            WHEN LOWER(fio) LIKE '%инич%' THEN 'М'
+            WHEN LOWER(fio) LIKE '%ус%' THEN 'М'
+            WHEN LOWER(fio) LIKE '%ия%' THEN 'Ж'
+            WHEN RIGHT(LOWER(fio), 1) IN ('а', 'я', 'и', 'е', 'о', 'у', 'э', 'ю') THEN 'Ж'
+            ELSE 'М'
+        END AS gender,
+        lpuuch,
+        COALESCE(
+            CASE WHEN dr ~ '^[0-9]{{2}}[.][0-9]{{2}}[.][0-9]{{4}}' THEN to_date(dr, 'DD.MM.YYYY') END,
+            CASE WHEN dr ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' THEN to_date(dr, 'YYYY-MM-DD') END
+        ) AS dr_date
+    FROM data_loader_iszlpeople
+    WHERE COALESCE(NULLIF(enp, '-'), '') <> ''
+      AND COALESCE(NULLIF(fio, '-'), '') <> ''
+),
+adults AS (
+    SELECT
+        enp_norm,
+        gender,
+        lpuuch,
+        DATE_PART('year', AGE(make_date({year}, 12, 31), dr_date))::INT AS age_years
+    FROM attached_patients
+    WHERE dr_date IS NOT NULL
+),
+attached_pop AS (
+    SELECT
+        {age_group_iszl} AS age_group,
+        COUNT(*) AS всего,
+        COUNT(*) FILTER (WHERE gender = 'М') AS m_cnt,
+        COUNT(*) FILTER (WHERE gender = 'Ж') AS f_cnt
+    FROM adults a
+    WHERE a.age_years >= 18
+      {lpuuch_condition}
+    GROUP BY 1
+),
+oms_counts AS (
+    SELECT
+        {age_group_oms} AS age_group,
+        COUNT(*) FILTER (WHERE o.goal = 'ОПВ') AS pmo,
+        COUNT(*) FILTER (WHERE o.goal = 'ДВ4') AS dogvn,
+        COUNT(*) FILTER (WHERE o.goal = 'ОПВ' AND o.gender = 'М') AS pmo_m,
+        COUNT(*) FILTER (WHERE o.goal = 'ДВ4' AND o.gender = 'М') AS dogvn_m,
+        COUNT(*) FILTER (WHERE o.goal = 'ОПВ' AND o.gender = 'Ж') AS pmo_f,
+        COUNT(*) FILTER (WHERE o.goal = 'ДВ4' AND o.gender = 'Ж') AS dogvn_f
+    FROM load_data_oms_data o
+    WHERE {oms_where}
+    GROUP BY 1
+),
+agr AS (
+    SELECT
+        g.age_group AS "Возрастная группа",
+        COALESCE(p.всего, 0) AS всего,
+        COALESCE(p.m_cnt, 0) AS "М",
+        COALESCE(p.f_cnt, 0) AS "Ж",
+        COALESCE(c.pmo_m, 0) AS "ПМО_М",
+        COALESCE(c.dogvn_m, 0) AS "ДОГВН_М",
+        COALESCE(c.pmo_f, 0) AS "ПМО_Ж",
+        COALESCE(c.dogvn_f, 0) AS "ДОГВН_Ж",
+        COALESCE(c.pmo, 0) AS "ПМО",
+        COALESCE(c.dogvn, 0) AS "ДОГВН"
+    FROM age_groups g
+    LEFT JOIN attached_pop p ON p.age_group = g.age_group
+    LEFT JOIN oms_counts c ON c.age_group = g.age_group
+),
+totals AS (
+    SELECT
+        'Итого' AS "Возрастная группа",
+        SUM(всего) AS всего,
+        SUM("М") AS "М",
+        SUM("Ж") AS "Ж",
+        SUM("ПМО_М") AS "ПМО_М",
+        SUM("ДОГВН_М") AS "ДОГВН_М",
+        SUM("ПМО_Ж") AS "ПМО_Ж",
+        SUM("ДОГВН_Ж") AS "ДОГВН_Ж",
+        SUM("ПМО") AS "ПМО",
+        SUM("ДОГВН") AS "ДОГВН"
+    FROM agr
+)
+SELECT * FROM (
+    SELECT * FROM agr
+    UNION ALL
+    SELECT * FROM totals
+) agr
+ORDER BY {order_sql}
+"""
+
+
+def sql_query_form131_1001(
+    selected_year,
+    months_range=None,
+    inogorod=None,
+    sanction=None,
+    amount_null=None,
+    building=None,
+    department=None,
+    input_start=None,
+    input_end=None,
+    treatment_start=None,
+    treatment_end=None,
+    report_type="month",
+    status_list=None,
+    health_groups=None,
+    icd_codes=None,
+):
+    """
+    Таблица 1001 формы 131 — прошедшие ПМО/ДОГВН в трудоспособном возрасте.
+    М: 18–60, Ж: 18–55. Счёт как на вкладке «По возрастам»: талоны ОМС (COUNT(*)).
+    """
+    year = int(selected_year)
+    oms_conds = _oms_period_and_common_conds(
+        selected_year=year,
+        months_range=months_range,
+        inogorod=inogorod,
+        sanction=sanction,
+        amount_null=amount_null,
+        building=building,
+        department=department,
+        input_start=input_start,
+        input_end=input_end,
+        treatment_start=treatment_start,
+        treatment_end=treatment_end,
+        report_type=report_type,
+        status_list=status_list,
+        health_groups=health_groups,
+        icd_codes=icd_codes,
+        table_alias="o",
+    )
+    oms_conds.append("o.goal IN ('ОПВ', 'ДВ4')")
+    oms_where = " AND ".join(oms_conds)
+
+    return f"""
+SELECT
+    CASE
+        WHEN o.goal = 'ОПВ' THEN 'ПМО (ОПВ)'
+        WHEN o.goal = 'ДВ4' THEN 'ДОГВН (ДВ4)'
+        ELSE o.goal
+    END AS "Показатель",
+    COUNT(*) AS всего,
+    COUNT(*) FILTER (WHERE o.gender = 'М') AS "М",
+    COUNT(*) FILTER (WHERE o.gender = 'Ж') AS "Ж"
+FROM load_data_oms_data o
+WHERE {oms_where}
+  AND (
+        (o.gender = 'М' AND o.age BETWEEN 18 AND 60)
+        OR (o.gender = 'Ж' AND o.age BETWEEN 18 AND 55)
+  )
+GROUP BY o.goal
+ORDER BY "Показатель"
+"""
+
+
 def sql_query_dispensary_age(
     selected_year,
     months_range=None,
