@@ -134,6 +134,7 @@ def base_query(year, months, inogorodniy, sanction, amount_null,
                     'Октябрь', 'Ноябрь', 'Декабрь'])[report_data.report_month_number] AS report_month,
                     report_month_number,
                     report_data.report_year,
+                    report_data.source,
                     report_data.source_id,
                     report_data.status,
                     CASE
